@@ -1,0 +1,1814 @@
+{
+  "generated_at_unix": 1787914846,
+  "primary_route_count": 74,
+  "overlay_route_count": 26,
+  "total_route_count": 100,
+  "primary_routes": [
+    {
+      "file": "login.html",
+      "route_id": "login",
+      "kind": "auth",
+      "title": "Login",
+      "section": "Authentication",
+      "subtitle": "Operational sign-in with clear loading, error, and blocked-access states.",
+      "source": "login",
+      "nav": null,
+      "links": [
+        {
+          "label": "Forgot Password",
+          "href": "support-workspace.html"
+        },
+        {
+          "label": "Set Password",
+          "href": "password-setup.html"
+        }
+      ]
+    },
+    {
+      "file": "password-setup.html",
+      "route_id": "password-setup",
+      "kind": "auth",
+      "title": "Set Password",
+      "section": "Authentication",
+      "subtitle": "First-time password setup after account creation or credential reset.",
+      "source": "password_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Sign In",
+          "href": "login.html"
+        }
+      ]
+    },
+    {
+      "file": "forgot-password.html",
+      "route_id": "forgot-password",
+      "kind": "auth",
+      "title": "Forgot Password",
+      "section": "Authentication",
+      "subtitle": "Self-service password reset via email link.",
+      "source": "forgot_password",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Sign In",
+          "href": "login.html"
+        }
+      ]
+    },
+    {
+      "file": "reset-password.html",
+      "route_id": "reset-password",
+      "kind": "auth",
+      "title": "Reset Password",
+      "section": "Authentication",
+      "subtitle": "Set a new password using a reset token from email.",
+      "source": "reset_password",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Sign In",
+          "href": "login.html"
+        }
+      ]
+    },
+    {
+      "file": "access-denied.html",
+      "route_id": "access-denied",
+      "kind": "utility",
+      "title": "Access Denied",
+      "section": "System",
+      "subtitle": "Permission-safe fallback for blocked routes and actions.",
+      "source": "access_denied",
+      "nav": null,
+      "links": [
+        {
+          "label": "Go To Support Workspace",
+          "href": "support-workspace.html"
+        }
+      ]
+    },
+    {
+      "file": "support-workspace.html",
+      "route_id": "support-workspace",
+      "kind": "utility",
+      "title": "Support Workspace",
+      "section": "System",
+      "subtitle": "Recovery path for access, workflow, and escalation issues.",
+      "source": "support_workspace",
+      "nav": null,
+      "links": [
+        {
+          "label": "Return To Dashboard",
+          "href": "role-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "not-found.html",
+      "route_id": "not-found",
+      "kind": "utility",
+      "title": "Not Found",
+      "section": "System",
+      "subtitle": "Clean not-found state that still feels part of RecruitOps.",
+      "source": "not_found",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back To Dashboard",
+          "href": "role-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "role-dashboard.html",
+      "route_id": "role-dashboard",
+      "kind": "app",
+      "title": "Role Dashboard",
+      "section": "Dashboard",
+      "subtitle": "Unified execution dashboard with corrected shell and navigation.",
+      "source": "role_dashboard_collapsible_rails",
+      "nav": "role-dashboard.html",
+      "links": [
+        {
+          "label": "Actions & Alerts",
+          "href": "dashboard-actions-overlay.html"
+        },
+        {
+          "label": "Open My Work",
+          "href": "my-work-dashboard.html"
+        },
+        {
+          "label": "Review Daily Updates",
+          "href": "daily-updates-workspace.html"
+        }
+      ]
+    },
+    {
+      "file": "my-work-dashboard.html",
+      "route_id": "my-work-dashboard",
+      "kind": "app",
+      "title": "My Work",
+      "section": "Dashboard",
+      "subtitle": "Personal work surface aligned to the same shell and interaction rules.",
+      "source": "my_work_dashboard_unified_shell",
+      "nav": "my-work-dashboard.html",
+      "links": [
+        {
+          "label": "Open Delivery Queue",
+          "href": "delivery-work-queue.html"
+        },
+        {
+          "label": "View Notifications",
+          "href": "notifications-center.html"
+        }
+      ]
+    },
+    {
+      "file": "location-management.html",
+      "route_id": "location-management",
+      "kind": "app",
+      "title": "Location Management",
+      "section": "Administration",
+      "subtitle": "Admin setup page cleaned up into the shared shell.",
+      "source": "location_management_unified_shell",
+      "nav": "location-management.html",
+      "links": [
+        {
+          "label": "Open Location Drawer",
+          "href": "location-form-drawer.html"
+        },
+        {
+          "label": "Location Performance",
+          "href": "location-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "location-dashboard.html",
+      "route_id": "location-dashboard",
+      "kind": "app",
+      "title": "Location Dashboard",
+      "section": "Administration",
+      "subtitle": "Location performance, operating coverage, and regional delivery health.",
+      "source": "v3:location_dashboard",
+      "nav": "location-dashboard.html",
+      "links": [
+        {
+          "label": "Manage Locations",
+          "href": "location-management.html"
+        },
+        {
+          "label": "Open Location Drawer",
+          "href": "location-form-drawer.html"
+        }
+      ]
+    },
+    {
+      "file": "user-management.html",
+      "route_id": "user-management",
+      "kind": "app",
+      "title": "User Management",
+      "section": "Administration",
+      "subtitle": "User lifecycle page with unified rail, topbar, and safer interactions.",
+      "source": "user_management_unified_shell",
+      "nav": "user-management.html",
+      "links": [
+        {
+          "label": "Open User Drawer",
+          "href": "user-form-drawer.html"
+        },
+        {
+          "label": "Open User Detail",
+          "href": "user-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "user-detail.html",
+      "route_id": "user-detail",
+      "kind": "app",
+      "title": "User Detail",
+      "section": "Administration",
+      "subtitle": "Single-user lifecycle, role, scope, and owned-work view.",
+      "source": "v2:user_detail",
+      "nav": "user-management.html",
+      "links": [
+        {
+          "label": "Back To Users",
+          "href": "user-management.html"
+        },
+        {
+          "label": "Edit User",
+          "href": "user-form-drawer.html"
+        },
+        {
+          "label": "Deactivate User",
+          "href": "deactivate-user-dialog.html"
+        },
+        {
+          "label": "Reassignment Review",
+          "href": "reassignment-review-drawer.html"
+        }
+      ]
+    },
+    {
+      "file": "role-management.html",
+      "route_id": "role-management",
+      "kind": "app",
+      "title": "Role Management",
+      "section": "Administration",
+      "subtitle": "Permission control page using the standardized navigation model.",
+      "source": "role_management",
+      "nav": "role-management.html",
+      "links": [
+        {
+          "label": "Open Role Drawer",
+          "href": "role-form-drawer.html"
+        }
+      ]
+    },
+    {
+      "file": "client-directory.html",
+      "route_id": "client-directory",
+      "kind": "app",
+      "title": "Client Directory",
+      "section": "Clients",
+      "subtitle": "Commercial workspace integrated into the app shell.",
+      "source": "client_directory",
+      "nav": "client-directory.html",
+      "links": [
+        {
+          "label": "Open Client Drawer",
+          "href": "client-create-or-edit-drawer.html"
+        },
+        {
+          "label": "Open Client Detail",
+          "href": "client-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "client-detail.html",
+      "route_id": "client-detail",
+      "kind": "app",
+      "title": "Client Detail",
+      "section": "Clients",
+      "subtitle": "Detailed client page with routed supporting surfaces.",
+      "source": "client_detail",
+      "nav": "client-directory.html",
+      "links": [
+        {
+          "label": "Add Contact",
+          "href": "contact-form-dialog.html"
+        },
+        {
+          "label": "Create Requisition",
+          "href": "requisition-intake.html"
+        }
+      ]
+    },
+    {
+      "file": "requisition-list.html",
+      "route_id": "requisition-list",
+      "kind": "app",
+      "title": "Requisition List",
+      "section": "Requisitions",
+      "subtitle": "Demand queue with corrected page naming and shared controls.",
+      "source": "requisition_list",
+      "nav": "requisition-list.html",
+      "links": [
+        {
+          "label": "Create Requisition",
+          "href": "requisition-intake.html"
+        },
+        {
+          "label": "Open Detail",
+          "href": "requisition-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "requisition-intake.html",
+      "route_id": "requisition-intake",
+      "kind": "app",
+      "title": "Requisition Intake",
+      "section": "Requisitions",
+      "subtitle": "Structured intake flow now anchored to the unified shell.",
+      "source": "requisition_intake",
+      "nav": "requisition-list.html",
+      "links": [
+        {
+          "label": "Back To Requisitions",
+          "href": "requisition-list.html"
+        },
+        {
+          "label": "Go To Client Detail",
+          "href": "client-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "requisition-intake-edit.html",
+      "route_id": "requisition-intake-edit",
+      "kind": "app",
+      "title": "Edit Requisition",
+      "section": "Requisitions",
+      "subtitle": "Edit-mode requisition intake with existing values and audit-safe save states.",
+      "source": "v2:requisition_intake_fixed_layout_edit_mode",
+      "nav": "requisition-list.html",
+      "links": [
+        {
+          "label": "View Detail",
+          "href": "requisition-detail.html"
+        },
+        {
+          "label": "Back To Requisitions",
+          "href": "requisition-list.html"
+        }
+      ]
+    },
+    {
+      "file": "requisition-detail.html",
+      "route_id": "requisition-detail",
+      "kind": "app",
+      "title": "Requisition Detail",
+      "section": "Requisitions",
+      "subtitle": "Execution detail screen with routed secondary actions.",
+      "source": "requisition_detail",
+      "nav": "requisition-list.html",
+      "links": [
+        {
+          "label": "Open Reassign Owner",
+          "href": "reassign-owner-dialog.html"
+        },
+        {
+          "label": "Edit Requisition",
+          "href": "requisition-intake-edit.html"
+        },
+        {
+          "label": "Open Pipeline Board",
+          "href": "pipeline-board.html"
+        }
+      ]
+    },
+    {
+      "file": "delivery-work-queue.html",
+      "route_id": "delivery-work-queue",
+      "kind": "app",
+      "title": "Delivery Work Queue",
+      "section": "Requisitions",
+      "subtitle": "Operational queue aligned to the same top-level experience.",
+      "source": "delivery_work_queue",
+      "nav": "requisition-list.html",
+      "links": [
+        {
+          "label": "Open Requisition Detail",
+          "href": "requisition-detail.html"
+        },
+        {
+          "label": "Review Daily Updates",
+          "href": "daily-updates-workspace.html"
+        }
+      ]
+    },
+    {
+      "file": "candidate-profiles.html",
+      "route_id": "candidate-profiles",
+      "kind": "app",
+      "title": "Candidate Profiles",
+      "section": "Candidates",
+      "subtitle": "Candidate list integrated with duplicate and upload flows.",
+      "source": "candidate_profiles",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Upload Resume",
+          "href": "resume-upload-and-review.html"
+        },
+        {
+          "label": "Open Candidate Drawer",
+          "href": "candidate-review-drawer.html"
+        },
+        {
+          "label": "Open Candidate Detail",
+          "href": "candidate-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "candidate-detail.html",
+      "route_id": "candidate-detail",
+      "kind": "app",
+      "title": "Candidate Detail",
+      "section": "Candidates",
+      "subtitle": "Detailed candidate profile with applications, ownership, notes, and history links.",
+      "source": "v4:candidate_detail",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Application History",
+          "href": "application-history.html"
+        },
+        {
+          "label": "Application Detail",
+          "href": "application-detail-drawer.html"
+        },
+        {
+          "label": "Back To Candidates",
+          "href": "candidate-profiles.html"
+        }
+      ]
+    },
+    {
+      "file": "application-history.html",
+      "route_id": "application-history",
+      "kind": "app",
+      "title": "Application History",
+      "section": "Candidates",
+      "subtitle": "Detailed audit timeline for candidate application lifecycle and requisition history.",
+      "source": "v4:application_history",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Candidate Detail",
+          "href": "candidate-detail.html"
+        },
+        {
+          "label": "Requisition Detail",
+          "href": "requisition-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "resume-upload-and-review.html",
+      "route_id": "resume-upload-and-review",
+      "kind": "app",
+      "title": "Resume Upload & Review",
+      "section": "Candidates",
+      "subtitle": "Upload flow ready for later parsing and candidate APIs.",
+      "source": "resume_upload_and_review",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Run Duplicate Review",
+          "href": "candidate-duplicate-review.html"
+        },
+        {
+          "label": "Back To Candidates",
+          "href": "candidate-profiles.html"
+        },
+        {
+          "label": "Link To Requisition",
+          "href": "link-to-requisition-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "candidate-duplicate-review.html",
+      "route_id": "candidate-duplicate-review",
+      "kind": "app",
+      "title": "Candidate Duplicate Review",
+      "section": "Candidates",
+      "subtitle": "Protected duplicate flow with linked follow-up actions.",
+      "source": "candidate_duplicate_review",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Request Exception",
+          "href": "exception-request-dialog.html"
+        },
+        {
+          "label": "Open Duplicate Warning",
+          "href": "duplicate-warning-modal.html"
+        },
+        {
+          "label": "Review Matches",
+          "href": "review-matches-workspace.html"
+        },
+        {
+          "label": "Continue Screening",
+          "href": "candidate-screening.html"
+        }
+      ]
+    },
+    {
+      "file": "review-matches-workspace.html",
+      "route_id": "review-matches-workspace",
+      "kind": "app",
+      "title": "Review Matches",
+      "section": "Candidates",
+      "subtitle": "Candidate match analysis workspace ready for scoring and reviewer APIs.",
+      "source": "v3:review_matches_workspace",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Open Duplicate Warning",
+          "href": "duplicate-warning-modal.html"
+        },
+        {
+          "label": "Back To Candidates",
+          "href": "candidate-profiles.html"
+        }
+      ]
+    },
+    {
+      "file": "candidate-screening.html",
+      "route_id": "candidate-screening",
+      "kind": "app",
+      "title": "Candidate Screening",
+      "section": "Candidates",
+      "subtitle": "Screening desk cleaned up for stable lifecycle and routed overlays.",
+      "source": "candidate_screening",
+      "nav": "candidate-profiles.html",
+      "links": [
+        {
+          "label": "Move Stage",
+          "href": "stage-move-dialog.html"
+        },
+        {
+          "label": "Stage History",
+          "href": "stage-history-audit-log.html"
+        },
+        {
+          "label": "Open Pipeline Board",
+          "href": "pipeline-board.html"
+        }
+      ]
+    },
+    {
+      "file": "pipeline-board.html",
+      "route_id": "pipeline-board",
+      "kind": "app",
+      "title": "Pipeline Board",
+      "section": "Pipeline",
+      "subtitle": "Board-first workflow standardized with shared layout and overlay handling.",
+      "source": "pipeline_board",
+      "nav": "pipeline-board.html",
+      "links": [
+        {
+          "label": "Move Candidate",
+          "href": "stage-move-dialog.html"
+        },
+        {
+          "label": "Open History Drawer",
+          "href": "pipeline-history-drawer.html"
+        },
+        {
+          "label": "Stage History",
+          "href": "stage-history-audit-log.html"
+        }
+      ]
+    },
+    {
+      "file": "stage-history-audit-log.html",
+      "route_id": "stage-history-audit-log",
+      "kind": "app",
+      "title": "Stage History",
+      "section": "Pipeline",
+      "subtitle": "Candidate stage transition audit trail with reviewer-safe lifecycle context.",
+      "source": "v3:stage_history_audit_log",
+      "nav": "pipeline-board.html",
+      "links": [
+        {
+          "label": "Move Stage",
+          "href": "stage-move-dialog.html"
+        },
+        {
+          "label": "Back To Pipeline",
+          "href": "pipeline-board.html"
+        }
+      ]
+    },
+    {
+      "file": "daily-updates-workspace.html",
+      "route_id": "daily-updates-workspace",
+      "kind": "app",
+      "title": "Daily Updates",
+      "section": "Daily Updates",
+      "subtitle": "Submission and review surface ready for live status APIs later.",
+      "source": "daily_updates_workspace",
+      "nav": "daily-updates-workspace.html",
+      "links": [
+        {
+          "label": "Submit Update",
+          "href": "daily-updates-submission.html"
+        },
+        {
+          "label": "Review Updates",
+          "href": "daily-updates-review.html"
+        },
+        {
+          "label": "Open Update Detail",
+          "href": "daily-update-detail-panel.html"
+        },
+        {
+          "label": "Request Clarification",
+          "href": "clarification-request-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "daily-updates-submission.html",
+      "route_id": "daily-updates-submission",
+      "kind": "app",
+      "title": "Daily Updates Submission",
+      "section": "Daily Updates",
+      "subtitle": "Recruiter daily update submission flow with draft and validation states.",
+      "source": "v2:daily_updates_submission_workspace",
+      "nav": "daily-updates-workspace.html",
+      "links": [
+        {
+          "label": "Review Updates",
+          "href": "daily-updates-review.html"
+        },
+        {
+          "label": "Back To Daily Updates",
+          "href": "daily-updates-workspace.html"
+        }
+      ]
+    },
+    {
+      "file": "daily-updates-review.html",
+      "route_id": "daily-updates-review",
+      "kind": "app",
+      "title": "Daily Updates Review",
+      "section": "Daily Updates",
+      "subtitle": "Reviewer workspace for submitted updates, blockers, missing items, and detail panels.",
+      "source": "v2:daily_updates_review_workspace",
+      "nav": "daily-updates-workspace.html",
+      "links": [
+        {
+          "label": "Submit Update",
+          "href": "daily-updates-submission.html"
+        },
+        {
+          "label": "Open Update Detail",
+          "href": "daily-update-detail-panel.html"
+        },
+        {
+          "label": "Request Clarification",
+          "href": "clarification-request-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "notifications-center.html",
+      "route_id": "notifications-center",
+      "kind": "app",
+      "title": "Notifications Center",
+      "section": "Notifications",
+      "subtitle": "Notification workspace with integrated detail panel route.",
+      "source": "notifications_center",
+      "nav": "notifications-center.html",
+      "links": [
+        {
+          "label": "Open Notification Detail",
+          "href": "notification-detail-panel.html"
+        }
+      ]
+    },
+    {
+      "file": "approvals-inbox.html",
+      "route_id": "approvals-inbox",
+      "kind": "app",
+      "title": "Approvals Inbox",
+      "section": "Approvals",
+      "subtitle": "Governance queue aligned to the same shell and overlay model.",
+      "source": "approvals_inbox",
+      "nav": "approvals-inbox.html",
+      "links": [
+        {
+          "label": "Review Approval",
+          "href": "approval-review-drawer.html"
+        },
+        {
+          "label": "Request Exception",
+          "href": "exception-request-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "landing.html",
+      "route_id": "landing",
+      "kind": "marketing",
+      "title": "Landing Page",
+      "section": "Marketing",
+      "subtitle": "Public-facing product entry before sign-in.",
+      "source": "v5:landing_page_public_marketing",
+      "nav": null,
+      "links": [
+        {
+          "label": "Sign In",
+          "href": "login.html"
+        },
+        {
+          "label": "Product Tour",
+          "href": "product-tour.html"
+        },
+        {
+          "label": "Use Cases",
+          "href": "use-cases.html"
+        }
+      ]
+    },
+    {
+      "file": "product-tour.html",
+      "route_id": "product-tour",
+      "kind": "marketing",
+      "title": "Product Tour",
+      "section": "Marketing",
+      "subtitle": "Public product tour showing the RecruitOps workflow end to end.",
+      "source": "v5:product_tour_public_marketing",
+      "nav": null,
+      "links": [
+        {
+          "label": "Landing",
+          "href": "landing.html"
+        },
+        {
+          "label": "Plan Strategy",
+          "href": "product-tour-plan-strategy.html"
+        },
+        {
+          "label": "Assign Ownership",
+          "href": "product-tour-assign-ownership.html"
+        },
+        {
+          "label": "Move Candidates",
+          "href": "product-tour-move-candidates.html"
+        },
+        {
+          "label": "Resolve Exceptions",
+          "href": "product-tour-resolve-exceptions.html"
+        },
+        {
+          "label": "Report Progress",
+          "href": "product-tour-report-progress.html"
+        }
+      ]
+    },
+    {
+      "file": "product-tour-plan-strategy.html",
+      "route_id": "product-tour-plan-strategy",
+      "kind": "marketing",
+      "title": "Plan Strategy",
+      "section": "Marketing",
+      "subtitle": "Product tour step one for requisition strategy setup.",
+      "source": "v5:product_tour_plan_strategy",
+      "nav": null,
+      "links": [
+        {
+          "label": "Product Tour",
+          "href": "product-tour.html"
+        },
+        {
+          "label": "Next Step",
+          "href": "product-tour-assign-ownership.html"
+        }
+      ]
+    },
+    {
+      "file": "product-tour-assign-ownership.html",
+      "route_id": "product-tour-assign-ownership",
+      "kind": "marketing",
+      "title": "Assign Ownership",
+      "section": "Marketing",
+      "subtitle": "Product tour step two for accountability and owner handoffs.",
+      "source": "v5:product_tour_assign_ownership",
+      "nav": null,
+      "links": [
+        {
+          "label": "Previous Step",
+          "href": "product-tour-plan-strategy.html"
+        },
+        {
+          "label": "Next Step",
+          "href": "product-tour-move-candidates.html"
+        }
+      ]
+    },
+    {
+      "file": "product-tour-move-candidates.html",
+      "route_id": "product-tour-move-candidates",
+      "kind": "marketing",
+      "title": "Move Candidates",
+      "section": "Marketing",
+      "subtitle": "Product tour step three for candidate movement and pipeline clarity.",
+      "source": "v5:product_tour_move_candidates",
+      "nav": null,
+      "links": [
+        {
+          "label": "Previous Step",
+          "href": "product-tour-assign-ownership.html"
+        },
+        {
+          "label": "Next Step",
+          "href": "product-tour-resolve-exceptions.html"
+        }
+      ]
+    },
+    {
+      "file": "product-tour-resolve-exceptions.html",
+      "route_id": "product-tour-resolve-exceptions",
+      "kind": "marketing",
+      "title": "Resolve Exceptions",
+      "section": "Marketing",
+      "subtitle": "Product tour step four for governance and exception handling.",
+      "source": "v5:product_tour_resolve_exceptions",
+      "nav": null,
+      "links": [
+        {
+          "label": "Previous Step",
+          "href": "product-tour-move-candidates.html"
+        },
+        {
+          "label": "Next Step",
+          "href": "product-tour-report-progress.html"
+        }
+      ]
+    },
+    {
+      "file": "product-tour-report-progress.html",
+      "route_id": "product-tour-report-progress",
+      "kind": "marketing",
+      "title": "Report Progress",
+      "section": "Marketing",
+      "subtitle": "Product tour step five for reporting progress and operating visibility.",
+      "source": "v5:product_tour_report_progress",
+      "nav": null,
+      "links": [
+        {
+          "label": "Previous Step",
+          "href": "product-tour-resolve-exceptions.html"
+        },
+        {
+          "label": "Product Tour",
+          "href": "product-tour.html"
+        }
+      ]
+    },
+    {
+      "file": "use-cases.html",
+      "route_id": "use-cases",
+      "kind": "marketing",
+      "title": "Use Cases",
+      "section": "Marketing",
+      "subtitle": "Focused public use-case page for the pre-login product flow.",
+      "source": "custom",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back To Landing",
+          "href": "landing.html"
+        },
+        {
+          "label": "Sign In",
+          "href": "login.html"
+        }
+      ]
+    },
+    {
+      "file": "interview-scheduler.html",
+      "route_id": "interview-scheduler",
+      "kind": "app",
+      "title": "Interview Scheduler",
+      "section": "Interviews",
+      "subtitle": "Calendar and list view for scheduling and managing interview rounds.",
+      "source": "interview_scheduler",
+      "nav": "interview-scheduler.html",
+      "links": [
+        {
+          "label": "View Interview Detail",
+          "href": "interview-detail.html"
+        },
+        {
+          "label": "Submit Feedback",
+          "href": "interview-feedback-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "interview-detail.html",
+      "route_id": "interview-detail",
+      "kind": "app",
+      "title": "Interview Detail",
+      "section": "Interviews",
+      "subtitle": "Single interview round view with interviewer info, feedback history, and notes.",
+      "source": "interview_detail",
+      "nav": "interview-scheduler.html",
+      "links": [
+        {
+          "label": "Submit Feedback",
+          "href": "interview-feedback-dialog.html"
+        },
+        {
+          "label": "Back to Scheduler",
+          "href": "interview-scheduler.html"
+        }
+      ]
+    },
+    {
+      "file": "offer-management.html",
+      "route_id": "offer-management",
+      "kind": "app",
+      "title": "Offer Management",
+      "section": "Offers",
+      "subtitle": "Track and manage offer letters, approvals, and candidate responses.",
+      "source": "offer_management",
+      "nav": "offer-management.html",
+      "links": [
+        {
+          "label": "Create Offer",
+          "href": "offer-create-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "work-assignment.html",
+      "route_id": "work-assignment",
+      "kind": "app",
+      "title": "Work Assignment",
+      "section": "Team",
+      "subtitle": "Assign and manage team members across requisitions.",
+      "source": "work_assignment",
+      "nav": "work-assignment.html",
+      "links": [
+        {
+          "label": "Open Requisition Detail",
+          "href": "requisition-detail.html"
+        }
+      ]
+    },
+    {
+      "file": "role-permissions-editor.html",
+      "route_id": "role-permissions-editor",
+      "kind": "app",
+      "title": "Role and Permissions",
+      "section": "Administration",
+      "subtitle": "Configure role-based access control with a permission matrix.",
+      "source": "role_permissions_editor",
+      "nav": "role-management.html",
+      "links": [
+        {
+          "label": "Back To Roles",
+          "href": "role-management.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-welcome.html",
+      "route_id": "onboarding-welcome",
+      "kind": "standalone",
+      "title": "Welcome Setup",
+      "section": "Onboarding",
+      "subtitle": "First onboarding step for starting a new RecruitOps workspace.",
+      "source": "v6:onboarding_welcome_welcome_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Next: Company Profile",
+          "href": "onboarding-company-profile.html"
+        },
+        {
+          "label": "Skip to Dashboard",
+          "href": "role-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-company-profile.html",
+      "route_id": "onboarding-company-profile",
+      "kind": "standalone",
+      "title": "Company Profile Setup",
+      "section": "Onboarding",
+      "subtitle": "Capture workspace identity, company details, and brand basics.",
+      "source": "v6:onboarding_company_profile_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Welcome",
+          "href": "onboarding-welcome.html"
+        },
+        {
+          "label": "Next: Hiring Teams",
+          "href": "onboarding-hiring-teams.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-hiring-teams.html",
+      "route_id": "onboarding-hiring-teams",
+      "kind": "standalone",
+      "title": "Hiring Teams Setup",
+      "section": "Onboarding",
+      "subtitle": "Map hiring teams, owners, and collaboration coverage.",
+      "source": "v6:onboarding_hiring_teams_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Company Profile",
+          "href": "onboarding-company-profile.html"
+        },
+        {
+          "label": "Next: Locations",
+          "href": "onboarding-locations.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-locations.html",
+      "route_id": "onboarding-locations",
+      "kind": "standalone",
+      "title": "Locations Setup",
+      "section": "Onboarding",
+      "subtitle": "Configure operating locations and regional hiring coverage.",
+      "source": "v6:onboarding_locations_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Hiring Teams",
+          "href": "onboarding-hiring-teams.html"
+        },
+        {
+          "label": "Next: Roles",
+          "href": "onboarding-role-setup.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-role-setup.html",
+      "route_id": "onboarding-role-setup",
+      "kind": "standalone",
+      "title": "Role Setup",
+      "section": "Onboarding",
+      "subtitle": "Configure permissions and role templates for the workspace.",
+      "source": "v6:onboarding_role_setup_refined",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Locations",
+          "href": "onboarding-locations.html"
+        },
+        {
+          "label": "Next: Pipeline Builder",
+          "href": "onboarding-pipeline-stage-builder.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-pipeline-stage-builder.html",
+      "route_id": "onboarding-pipeline-stage-builder",
+      "kind": "standalone",
+      "title": "Pipeline Stage Builder",
+      "section": "Onboarding",
+      "subtitle": "Build the default hiring pipeline before launch.",
+      "source": "v6:onboarding_pipeline_stage_builder",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Roles",
+          "href": "onboarding-role-setup.html"
+        },
+        {
+          "label": "Add Custom Stage",
+          "href": "onboarding-add-custom-stage-overlay.html"
+        },
+        {
+          "label": "Next: Integrations",
+          "href": "onboarding-integrations.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-add-custom-stage-overlay.html",
+      "route_id": "onboarding-add-custom-stage-overlay",
+      "kind": "standalone",
+      "title": "Add Custom Stage",
+      "section": "Onboarding",
+      "subtitle": "Focused stage-creation view for onboarding pipeline setup.",
+      "source": "v6:onboarding_add_custom_stage_overlay",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Pipeline Builder",
+          "href": "onboarding-pipeline-stage-builder.html"
+        },
+        {
+          "label": "Continue to Integrations",
+          "href": "onboarding-integrations.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-integrations.html",
+      "route_id": "onboarding-integrations",
+      "kind": "standalone",
+      "title": "Integrations Setup",
+      "section": "Onboarding",
+      "subtitle": "Connect core tools or continue with integrations staged for later.",
+      "source": "v6:onboarding_integrations_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Pipeline Builder",
+          "href": "onboarding-pipeline-stage-builder.html"
+        },
+        {
+          "label": "Launch Workspace",
+          "href": "onboarding-success-launch.html"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-success-launch.html",
+      "route_id": "onboarding-success-launch",
+      "kind": "standalone",
+      "title": "Workspace Ready",
+      "section": "Onboarding",
+      "subtitle": "Completion state for launching the configured RecruitOps workspace.",
+      "source": "v6:onboarding_success_launch",
+      "nav": null,
+      "links": [
+        {
+          "label": "Open Dashboard",
+          "href": "role-dashboard.html"
+        },
+        {
+          "label": "Review Setup",
+          "href": "onboarding-welcome.html"
+        }
+      ]
+    },
+    {
+      "file": "tenant-setup.html",
+      "route_id": "tenant-setup",
+      "kind": "standalone",
+      "title": "Company Settings",
+      "section": "Administration",
+      "subtitle": "Configure workspace, branding, email, and data retention settings.",
+      "source": "tenant_setup",
+      "nav": null,
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "role-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "meetings.html",
+      "route_id": "meetings",
+      "kind": "app",
+      "title": "Meetings",
+      "section": "Meetings",
+      "subtitle": "Schedule and manage recruitment team meetings, standups, and debriefs.",
+      "source": "meetings",
+      "nav": "meetings.html",
+      "links": [
+        {
+          "label": "Schedule Meeting",
+          "href": "meeting-form-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "follow-ups.html",
+      "route_id": "follow-ups",
+      "kind": "app",
+      "title": "Follow-Ups",
+      "section": "Follow-Ups",
+      "subtitle": "Track action items, reminders, and pending tasks across candidates and requisitions.",
+      "source": "follow_ups",
+      "nav": "follow-ups.html",
+      "links": [
+        {
+          "label": "Add Follow-Up",
+          "href": "follow-up-form-dialog.html"
+        }
+      ]
+    },
+    {
+      "file": "business-titles.html",
+      "route_id": "business-titles",
+      "kind": "app",
+      "title": "Business Titles",
+      "section": "Job Templates",
+      "subtitle": "Manage job title templates, descriptions, and compensation bands.",
+      "source": "business_titles",
+      "nav": "business-titles.html",
+      "links": []
+    },
+    {
+      "file": "visibility-rules.html",
+      "route_id": "visibility-rules",
+      "kind": "app",
+      "title": "Data Visibility Rules",
+      "section": "Administration",
+      "subtitle": "Control what team members can see and access based on their role and assignments.",
+      "source": "visibility_rules",
+      "nav": "visibility-rules.html",
+      "links": []
+    },
+    {
+      "file": "join-tracker.html",
+      "route_id": "join-tracker",
+      "kind": "app",
+      "title": "Join Tracker",
+      "section": "Onboarding",
+      "subtitle": "Track onboarding progress for candidates who have accepted offers.",
+      "source": "join_tracker",
+      "nav": "join-tracker.html",
+      "links": [
+        {
+          "label": "Open Offers",
+          "href": "offer-management.html"
+        }
+      ]
+    },
+    {
+      "file": "daily-review.html",
+      "route_id": "daily-review",
+      "kind": "app",
+      "title": "Daily Review",
+      "section": "Dashboard",
+      "subtitle": "Your daily recruitment operations digest with action items and pipeline activity.",
+      "source": "daily_review",
+      "nav": "daily-review.html",
+      "links": [
+        {
+          "label": "Submit Daily Update",
+          "href": "daily-updates-workspace.html"
+        }
+      ]
+    },
+    {
+      "file": "analytics-dashboard.html",
+      "route_id": "analytics-dashboard",
+      "kind": "app",
+      "title": "Reports Dashboard",
+      "section": "Reports",
+      "subtitle": "Real-time recruitment metrics, KPIs, and performance insights.",
+      "source": "analytics-dashboard",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "View Reports",
+          "href": "reports.html"
+        },
+        {
+          "label": "SLA Tracker",
+          "href": "sla-tracker.html"
+        }
+      ]
+    },
+    {
+      "file": "reports.html",
+      "route_id": "reports",
+      "kind": "app",
+      "title": "Reports",
+      "section": "Reports",
+      "subtitle": "Pre-built and custom reports for recruitment analytics.",
+      "source": "reports",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "analytics-dashboard.html"
+        },
+        {
+          "label": "Custom Report Builder",
+          "href": "custom-report-builder.html"
+        }
+      ]
+    },
+    {
+      "file": "company-dashboard.html",
+      "route_id": "company-dashboard",
+      "kind": "app",
+      "title": "Company Performance",
+      "section": "Reports",
+      "subtitle": "Company-wide recruitment performance dashboard for leadership reporting.",
+      "source": "v3:company_dashboard",
+      "nav": "company-dashboard.html",
+      "links": [
+        {
+          "label": "Reports Dashboard",
+          "href": "analytics-dashboard.html"
+        },
+        {
+          "label": "User Performance",
+          "href": "user-performance-reports.html"
+        }
+      ]
+    },
+    {
+      "file": "sla-tracker.html",
+      "route_id": "sla-tracker",
+      "kind": "app",
+      "title": "SLA Tracker",
+      "section": "Reports",
+      "subtitle": "Monitor service level agreements and compliance metrics across all active mandates.",
+      "source": "sla-tracker",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "analytics-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "team-workload.html",
+      "route_id": "team-workload",
+      "kind": "app",
+      "title": "Team Workload",
+      "section": "Team",
+      "subtitle": "Visualize team capacity, active assignments, and workload distribution.",
+      "source": "team-workload",
+      "nav": "team-workload.html",
+      "links": [
+        {
+          "label": "Open Work Assignment",
+          "href": "work-assignment.html"
+        }
+      ]
+    },
+    {
+      "file": "pipeline-analytics.html",
+      "route_id": "pipeline-analytics",
+      "kind": "app",
+      "title": "Pipeline Reports",
+      "section": "Reports",
+      "subtitle": "Deep-dive into pipeline conversion rates, stage durations, and bottlenecks.",
+      "source": "pipeline-analytics",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "analytics-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "time-to-fill-report.html",
+      "route_id": "time-to-fill-report",
+      "kind": "app",
+      "title": "Time to Fill Report",
+      "section": "Reports",
+      "subtitle": "Analyze time-to-fill metrics by department, role type, and seniority level.",
+      "source": "time-to-fill-report",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "analytics-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "source-effectiveness.html",
+      "route_id": "source-effectiveness",
+      "kind": "app",
+      "title": "Source Effectiveness",
+      "section": "Reports",
+      "subtitle": "Measure ROI and conversion rates across all recruitment channels.",
+      "source": "source-effectiveness",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "analytics-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "custom-report-builder.html",
+      "route_id": "custom-report-builder",
+      "kind": "app",
+      "title": "Custom Report Builder",
+      "section": "Reports",
+      "subtitle": "Create tailored reports by selecting metrics, filters, and visualization options.",
+      "source": "custom-report-builder",
+      "nav": "analytics-dashboard.html",
+      "links": [
+        {
+          "label": "Back to Dashboard",
+          "href": "analytics-dashboard.html"
+        }
+      ]
+    },
+    {
+      "file": "user-performance-reports.html",
+      "route_id": "user-performance-reports",
+      "kind": "app",
+      "title": "User Performance",
+      "section": "Reports",
+      "subtitle": "Recruiter and team performance matrix ready for reporting APIs.",
+      "source": "v3:user_performance_reports",
+      "nav": "user-performance-reports.html",
+      "links": [
+        {
+          "label": "Company Performance",
+          "href": "company-dashboard.html"
+        },
+        {
+          "label": "Users",
+          "href": "user-management.html"
+        }
+      ]
+    }
+  ],
+  "overlay_routes": [
+    {
+      "file": "dashboard-actions-overlay.html",
+      "route_id": "dashboard-actions-overlay",
+      "kind": "overlay",
+      "title": "Actions & Alerts",
+      "overlay_kind": "panel",
+      "parent": "role-dashboard.html",
+      "parent_route_id": "role-dashboard",
+      "parent_title": "Role Dashboard",
+      "parent_section": "Dashboard",
+      "source": "role_dashboard_collapsible_rails",
+      "required_selectors": []
+    },
+    {
+      "file": "approval-review-drawer.html",
+      "route_id": "approval-review-drawer",
+      "kind": "overlay",
+      "title": "Approval Review",
+      "overlay_kind": "drawer",
+      "parent": "approvals-inbox.html",
+      "parent_route_id": "approvals-inbox",
+      "parent_title": "Approvals Inbox",
+      "parent_section": "Approvals",
+      "source": "approval_review_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "application-detail-drawer.html",
+      "route_id": "application-detail-drawer",
+      "kind": "overlay",
+      "title": "Application Detail",
+      "overlay_kind": "drawer",
+      "parent": "candidate-detail.html",
+      "parent_route_id": "candidate-detail",
+      "parent_title": "Candidate Detail",
+      "parent_section": "Candidates",
+      "source": "v4:application_detail_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "candidate-review-drawer.html",
+      "route_id": "candidate-review-drawer",
+      "kind": "overlay",
+      "title": "Candidate Workspace",
+      "overlay_kind": "drawer",
+      "parent": "candidate-profiles.html",
+      "parent_route_id": "candidate-profiles",
+      "parent_title": "Candidate Profiles",
+      "parent_section": "Candidates",
+      "source": "candidate_review_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "client-create-or-edit-drawer.html",
+      "route_id": "client-create-or-edit-drawer",
+      "kind": "overlay",
+      "title": "Create Client",
+      "overlay_kind": "drawer",
+      "parent": "client-directory.html",
+      "parent_route_id": "client-directory",
+      "parent_title": "Client Directory",
+      "parent_section": "Clients",
+      "source": "client_create_or_edit_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "contact-form-dialog.html",
+      "route_id": "contact-form-dialog",
+      "kind": "overlay",
+      "title": "Client Contact Form",
+      "overlay_kind": "dialog",
+      "parent": "client-detail.html",
+      "parent_route_id": "client-detail",
+      "parent_title": "Client Detail",
+      "parent_section": "Clients",
+      "source": "contact_form_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "daily-update-detail-panel.html",
+      "route_id": "daily-update-detail-panel",
+      "kind": "overlay",
+      "title": "Daily Update Detail",
+      "overlay_kind": "panel",
+      "parent": "daily-updates-workspace.html",
+      "parent_route_id": "daily-updates-workspace",
+      "parent_title": "Daily Updates",
+      "parent_section": "Daily Updates",
+      "source": "daily_update_detail_panel",
+      "required_selectors": []
+    },
+    {
+      "file": "deactivate-user-dialog.html",
+      "route_id": "deactivate-user-dialog",
+      "kind": "overlay",
+      "title": "Deactivate User",
+      "overlay_kind": "dialog",
+      "parent": "user-detail.html",
+      "parent_route_id": "user-detail",
+      "parent_title": "User Detail",
+      "parent_section": "Administration",
+      "source": "v4:deactivate_user_dialog",
+      "required_selectors": [
+        ".overlay-host.dialog textarea"
+      ]
+    },
+    {
+      "file": "assignment-history-drawer.html",
+      "route_id": "assignment-history-drawer",
+      "kind": "overlay",
+      "title": "Assignment History",
+      "overlay_kind": "drawer",
+      "parent": "requisition-detail.html",
+      "parent_route_id": "requisition-detail",
+      "parent_title": "Requisition Detail",
+      "parent_section": "Requisitions",
+      "source": "v3:assignment_history_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "clarification-request-dialog.html",
+      "route_id": "clarification-request-dialog",
+      "kind": "overlay",
+      "title": "Request Clarification",
+      "overlay_kind": "dialog",
+      "parent": "daily-updates-review.html",
+      "parent_route_id": "daily-updates-review",
+      "parent_title": "Daily Updates Review",
+      "parent_section": "Daily Updates",
+      "source": "v3:clarification_request_dialog",
+      "required_selectors": [
+        ".overlay-host.dialog textarea"
+      ]
+    },
+    {
+      "file": "duplicate-warning-modal.html",
+      "route_id": "duplicate-warning-modal",
+      "kind": "overlay",
+      "title": "Duplicate Warning",
+      "overlay_kind": "dialog",
+      "parent": "candidate-duplicate-review.html",
+      "parent_route_id": "candidate-duplicate-review",
+      "parent_title": "Candidate Duplicate Review",
+      "parent_section": "Candidates",
+      "source": "v3:duplicate_warning_modal",
+      "required_selectors": []
+    },
+    {
+      "file": "exception-request-dialog.html",
+      "route_id": "exception-request-dialog",
+      "kind": "overlay",
+      "title": "Exception Request",
+      "overlay_kind": "dialog",
+      "parent": "approvals-inbox.html",
+      "parent_route_id": "approvals-inbox",
+      "parent_title": "Approvals Inbox",
+      "parent_section": "Approvals",
+      "source": "exception_request_dialog",
+      "required_selectors": [
+        ".overlay-host.dialog select",
+        ".overlay-host.dialog textarea"
+      ]
+    },
+    {
+      "file": "location-form-drawer.html",
+      "route_id": "location-form-drawer",
+      "kind": "overlay",
+      "title": "Add New Location",
+      "overlay_kind": "drawer",
+      "parent": "location-management.html",
+      "parent_route_id": "location-management",
+      "parent_title": "Location Management",
+      "parent_section": "Administration",
+      "source": "v3:location_form_drawer_refined_structure",
+      "required_selectors": []
+    },
+    {
+      "file": "link-to-requisition-dialog.html",
+      "route_id": "link-to-requisition-dialog",
+      "kind": "overlay",
+      "title": "Link To Requisition",
+      "overlay_kind": "dialog",
+      "parent": "candidate-profiles.html",
+      "parent_route_id": "candidate-profiles",
+      "parent_title": "Candidate Profiles",
+      "parent_section": "Candidates",
+      "source": "v3:link_to_requisition_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "notification-detail-panel.html",
+      "route_id": "notification-detail-panel",
+      "kind": "overlay",
+      "title": "Notification Detail",
+      "overlay_kind": "panel",
+      "parent": "notifications-center.html",
+      "parent_route_id": "notifications-center",
+      "parent_title": "Notifications Center",
+      "parent_section": "Notifications",
+      "source": "notification_detail_panel_final_unified_version",
+      "required_selectors": []
+    },
+    {
+      "file": "pipeline-history-drawer.html",
+      "route_id": "pipeline-history-drawer",
+      "kind": "overlay",
+      "title": "Pipeline History",
+      "overlay_kind": "drawer",
+      "parent": "pipeline-board.html",
+      "parent_route_id": "pipeline-board",
+      "parent_title": "Pipeline Board",
+      "parent_section": "Pipeline",
+      "source": "pipeline_history_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "reassign-owner-dialog.html",
+      "route_id": "reassign-owner-dialog",
+      "kind": "overlay",
+      "title": "Reassign Requisition Owner",
+      "overlay_kind": "dialog",
+      "parent": "requisition-detail.html",
+      "parent_route_id": "requisition-detail",
+      "parent_title": "Requisition Detail",
+      "parent_section": "Requisitions",
+      "source": "reassign_owner_dialog_refined_audit_flow",
+      "required_selectors": []
+    },
+    {
+      "file": "reassignment-review-drawer.html",
+      "route_id": "reassignment-review-drawer",
+      "kind": "overlay",
+      "title": "Reassignment Review",
+      "overlay_kind": "drawer",
+      "parent": "user-detail.html",
+      "parent_route_id": "user-detail",
+      "parent_title": "User Detail",
+      "parent_section": "Administration",
+      "source": "v4:reassignment_review_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "role-form-drawer.html",
+      "route_id": "role-form-drawer",
+      "kind": "overlay",
+      "title": "Configure Role",
+      "overlay_kind": "drawer",
+      "parent": "role-management.html",
+      "parent_route_id": "role-management",
+      "parent_title": "Role Management",
+      "parent_section": "Administration",
+      "source": "role_form_drawer",
+      "required_selectors": []
+    },
+    {
+      "file": "stage-move-dialog.html",
+      "route_id": "stage-move-dialog",
+      "kind": "overlay",
+      "title": "Move Candidate Stage",
+      "overlay_kind": "dialog",
+      "parent": "pipeline-board.html",
+      "parent_route_id": "pipeline-board",
+      "parent_title": "Pipeline Board",
+      "parent_section": "Pipeline",
+      "source": "stage_move_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "status-update-dialog.html",
+      "route_id": "status-update-dialog",
+      "kind": "overlay",
+      "title": "Update Requisition Status",
+      "overlay_kind": "dialog",
+      "parent": "requisition-detail.html",
+      "parent_route_id": "requisition-detail",
+      "parent_title": "Requisition Detail",
+      "parent_section": "Requisitions",
+      "source": "v3:status_update_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "user-form-drawer.html",
+      "route_id": "user-form-drawer",
+      "kind": "overlay",
+      "title": "Add New User",
+      "overlay_kind": "drawer",
+      "parent": "user-management.html",
+      "parent_route_id": "user-management",
+      "parent_title": "User Management",
+      "parent_section": "Administration",
+      "source": "user_form_drawer",
+      "required_selectors": [
+        "#fullName",
+        "#email",
+        "#primaryLocation",
+        "#primaryRole"
+      ]
+    },
+    {
+      "file": "interview-feedback-dialog.html",
+      "route_id": "interview-feedback-dialog",
+      "kind": "overlay",
+      "title": "Interview Feedback",
+      "overlay_kind": "dialog",
+      "parent": "interview-detail.html",
+      "parent_route_id": "interview-detail",
+      "parent_title": "Interview Detail",
+      "parent_section": "Interviews",
+      "source": "interview_feedback_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "offer-create-dialog.html",
+      "route_id": "offer-create-dialog",
+      "kind": "overlay",
+      "title": "Create Offer",
+      "overlay_kind": "dialog",
+      "parent": "offer-management.html",
+      "parent_route_id": "offer-management",
+      "parent_title": "Offer Management",
+      "parent_section": "Offers",
+      "source": "offer_create_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "meeting-form-dialog.html",
+      "route_id": "meeting-form-dialog",
+      "kind": "overlay",
+      "title": "Schedule Meeting",
+      "overlay_kind": "dialog",
+      "parent": "meetings.html",
+      "parent_route_id": "meetings",
+      "parent_title": "Meetings",
+      "parent_section": "Meetings",
+      "source": "meeting_form_dialog",
+      "required_selectors": []
+    },
+    {
+      "file": "follow-up-form-dialog.html",
+      "route_id": "follow-up-form-dialog",
+      "kind": "overlay",
+      "title": "New Follow-Up",
+      "overlay_kind": "dialog",
+      "parent": "follow-ups.html",
+      "parent_route_id": "follow-ups",
+      "parent_title": "Follow-Ups",
+      "parent_section": "Follow-Ups",
+      "source": "follow_up_form_dialog",
+      "required_selectors": []
+    }
+  ]
+}

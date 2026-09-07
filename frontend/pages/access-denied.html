@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Access Denied - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1787914846" />
+</head>
+<body class="min-h-screen bg-background text-on-background antialiased" data-route-id="access-denied" data-route-kind="utility" data-route-title="Access Denied" data-route-section="System">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <main id="main-content" tabindex="-1" class="auth-main">
+    <section class="shell-card auth-shell">
+      <div class="auth-card" data-demo-validate="true">
+        <div class="max-w-4xl w-full grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-gutter items-start"> <!-- Dominant Denied Card --> <section class="bg-surface border border-border rounded shadow-sm"> <div class="bg-danger-bg border-b border-border p-inset-card flex items-start gap-stack-default rounded-t"> <div class="bg-surface rounded-full p-2 border border-border flex-shrink-0"> <span class="material-symbols-outlined text-danger-text text-3xl" data-icon="lock" data-weight="fill" style="font-variation-settings: 'FILL' 1;">lock</span> </div> <div> <h1 class="font-headline-lg text-headline-lg text-on-surface mb-stack-compact">Access Restricted</h1> <p class="font-body-md text-body-md text-text-muted">You do not have the required permissions to view this module or perform this action.</p> </div> </div> <div class="p-inset-card flex flex-col gap-stack-default"> <p class="font-body-sm text-body-sm text-on-surface"> This restriction is typically enforced by role-based access controls or location-specific scoping policies defined by your system administrator. </p> <div class="border border-border rounded p-stack-default bg-surface-alt"> <h3 class="font-data-tabular text-data-tabular text-on-surface mb-2">Request ID</h3> <div class="flex items-center gap-2 text-text-muted font-mono text-sm bg-surface p-2 rounded border border-border"> <span class="truncate">REQ-20231024-9A4F-88B2</span> <button aria-label="Copy Request ID" class="material-symbols-outlined text-lg hover:text-primary ml-auto" data-icon="content_copy">content_copy</button> </div> </div> <div class="flex flex-col sm:flex-row gap-stack-default mt-4 pt-4 border-t border-border"> <a class="bg-primary hover:bg-primary-hover text-on-primary font-body-md text-body-md py-2 px-4 rounded text-center transition-colors flex items-center justify-center gap-2 flex-1" href="role-dashboard.html"> <span class="material-symbols-outlined text-lg" data-icon="dashboard">dashboard</span> Return to Dashboard </a> <a class="border border-border hover:bg-highlight-soft text-on-surface font-body-md text-body-md py-2 px-4 rounded text-center transition-colors flex items-center justify-center gap-2 flex-1" href="javascript:history.back()"> <span class="material-symbols-outlined text-lg" data-icon="history">history</span> Previous Page </a> </div> </div> </section> <!-- Secondary Guidance Rail --> <section class="flex flex-col gap-gutter"> <div class="bg-surface border border-border rounded shadow-sm"> <div class="bg-surface-alt border-b border-border px-inset-card py-stack-default rounded-t"> <h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2"> <span class="material-symbols-outlined text-primary text-xl" data-icon="info">info</span> Common Causes </h2> </div> <ul class="p-inset-card flex flex-col gap-stack-default"> <li class="flex items-start gap-stack-compact"> <span class="material-symbols-outlined text-text-muted text-lg mt-0.5" data-icon="admin_panel_settings">admin_panel_settings</span> <div> <h3 class="font-data-tabular text-data-tabular text-on-surface">Module Permissions</h3> <p class="font-body-sm text-body-sm text-text-muted mt-1">Your current role does not grant access to this specific functional area.</p> </div> </li> <li class="flex items-start gap-stack-compact"> <span class="material-symbols-outlined text-text-muted text-lg mt-0.5" data-icon="block">block</span> <div> <h3 class="font-data-tabular text-data-tabular text-on-surface">Action Restrictions</h3> <p class="font-body-sm text-body-sm text-text-muted mt-1">You can view this entity, but editing or deleting is restricted.</p> </div> </li> <li class="flex items-start gap-stack-compact"> <span class="material-symbols-outlined text-text-muted text-lg mt-0.5" data-icon="location_on">location_on</span> <div> <h3 class="font-data-tabular text-data-tabular text-on-surface">Location Scope</h3> <p class="font-body-sm text-body-sm text-text-muted mt-1">This record belongs to a regional branch outside your assigned scope.</p> </div> </li> </ul> </div> <div class="bg-surface border border-border rounded p-inset-card shadow-sm flex items-center justify-between gap-stack-default"> <div> <h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">Need Assistance?</h3> <p class="font-body-sm text-body-sm text-text-muted">Contact your IT administrator to request an access review.</p> </div> <a class="bg-surface-alt border border-border hover:bg-highlight-soft text-on-surface font-body-sm text-body-sm py-2 px-3 rounded flex items-center gap-2 transition-colors whitespace-nowrap" href="support-workspace.html"> <span class="material-symbols-outlined text-lg" data-icon="support_agent">support_agent</span> Open Support </a> </div> </section> </div>
+      </div>
+    </section>
+  </main>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    <script src="../shared/renderers.js"></script>
+    <script src="../shared/api-client.js?v=1787914846"></script>
+    <script src="../shared/ui-utils.js"></script>
+    <script src="../shared/tables.js"></script>
+    <script src="../shared/forms.js"></script>
+    <script src="../shared/sidebar.js"></script>
+    <script src="../shared/pipeline.js"></script>
+    <script src="../shared/routing.js"></script>
+
+  <script src="../shared/app.js?v=1787914846"></script>
+</body>
+</html>

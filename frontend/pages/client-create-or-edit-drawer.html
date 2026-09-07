@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Client - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1787914846" />
+</head>
+<body class="bg-background text-on-background antialiased" data-route-id="client-create-or-edit-drawer" data-route-kind="overlay" data-route-title="Create Client" data-route-section="Clients" data-parent-route="client-directory" data-parent-title="Client Directory" data-overlay-page="true" data-overlay-close-href="client-directory.html">
+  
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <a href="../index.html" class="sidebar-brand" title="Return to frontend index">
+          <div class="sidebar-mark">R</div>
+          <div class="sidebar-brand-copy">
+            <div class="sidebar-brand-name">RecruitOps</div>
+            <div class="sidebar-brand-meta">Recruitment OS</div>
+          </div>
+        </a>
+        <a href="client-directory.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Return to Client Directory without leaving the current workflow context."><span class="material-symbols-outlined text-[18px]">arrow_back</span><span class="sidebar-cta-copy">Back To Client Directory</span></a>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+          <details class="nav-group" data-nav-group="work"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">dashboard</span><span class="nav-group-label">Work</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="role-dashboard.html" class="nav-link " title="Role Dashboard" ><span class="material-symbols-outlined shrink-0" >dashboard</span><span class="sidebar-label">Role Dashboard</span></a>
+<a href="my-work-dashboard.html" class="nav-link " title="My Work" ><span class="material-symbols-outlined shrink-0" >checklist_rtl</span><span class="sidebar-label">My Work</span></a>
+<a href="daily-review.html" class="nav-link " title="Daily Review" ><span class="material-symbols-outlined shrink-0" >today</span><span class="sidebar-label">Daily Review</span></a>
+</div></details>
+<details class="nav-group" open data-nav-group="hiring"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">work</span><span class="nav-group-label">Hiring</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="client-directory.html" class="nav-link is-active" title="Clients" aria-current="page"><span class="material-symbols-outlined shrink-0" style="font-variation-settings:'FILL' 1;">apartment</span><span class="sidebar-label">Clients</span></a>
+<a href="requisition-list.html" class="nav-link " title="Requisitions" ><span class="material-symbols-outlined shrink-0" >work</span><span class="sidebar-label">Requisitions</span></a>
+<a href="candidate-profiles.html" class="nav-link " title="Candidates" ><span class="material-symbols-outlined shrink-0" >group</span><span class="sidebar-label">Candidates</span></a>
+<a href="pipeline-board.html" class="nav-link " title="Pipeline" ><span class="material-symbols-outlined shrink-0" >account_tree</span><span class="sidebar-label">Pipeline</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="workflow"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">event_available</span><span class="nav-group-label">Workflow</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="interview-scheduler.html" class="nav-link " title="Interviews" ><span class="material-symbols-outlined shrink-0" >calendar_month</span><span class="sidebar-label">Interviews</span></a>
+<a href="offer-management.html" class="nav-link " title="Offers" ><span class="material-symbols-outlined shrink-0" >request_quote</span><span class="sidebar-label">Offers</span></a>
+<a href="meetings.html" class="nav-link " title="Meetings" ><span class="material-symbols-outlined shrink-0" >event</span><span class="sidebar-label">Meetings</span></a>
+<a href="follow-ups.html" class="nav-link " title="Follow-Ups" ><span class="material-symbols-outlined shrink-0" >task_alt</span><span class="sidebar-label">Follow-Ups</span></a>
+<a href="join-tracker.html" class="nav-link " title="Join Tracker" ><span class="material-symbols-outlined shrink-0" >how_to_reg</span><span class="sidebar-label">Join Tracker</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="inbox"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">inbox</span><span class="nav-group-label">Inbox</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="daily-updates-workspace.html" class="nav-link " title="Daily Updates" ><span class="material-symbols-outlined shrink-0" >assignment</span><span class="sidebar-label">Daily Updates</span></a>
+<a href="notifications-center.html" class="nav-link " title="Notifications" ><span class="material-symbols-outlined shrink-0" >notifications</span><span class="sidebar-label">Notifications</span></a>
+<a href="approvals-inbox.html" class="nav-link " title="Approvals" ><span class="material-symbols-outlined shrink-0" >fact_check</span><span class="sidebar-label">Approvals</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="reports"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">monitoring</span><span class="nav-group-label">Reports</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="analytics-dashboard.html" class="nav-link " title="Reports" ><span class="material-symbols-outlined shrink-0" >monitoring</span><span class="sidebar-label">Reports</span></a>
+<a href="company-dashboard.html" class="nav-link " title="Company Performance" ><span class="material-symbols-outlined shrink-0" >business</span><span class="sidebar-label">Company Performance</span></a>
+<a href="user-performance-reports.html" class="nav-link " title="User Performance" ><span class="material-symbols-outlined shrink-0" >leaderboard</span><span class="sidebar-label">User Performance</span></a>
+<a href="team-workload.html" class="nav-link " title="Team Workload" ><span class="material-symbols-outlined shrink-0" >groups</span><span class="sidebar-label">Team Workload</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="admin"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">admin_panel_settings</span><span class="nav-group-label">Admin</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="location-management.html" class="nav-link " title="Locations" ><span class="material-symbols-outlined shrink-0" >location_on</span><span class="sidebar-label">Locations</span></a>
+<a href="location-dashboard.html" class="nav-link " title="Location Dashboard" ><span class="material-symbols-outlined shrink-0" >query_stats</span><span class="sidebar-label">Location Dashboard</span></a>
+<a href="user-management.html" class="nav-link " title="Users" ><span class="material-symbols-outlined shrink-0" >manage_accounts</span><span class="sidebar-label">Users</span></a>
+<a href="role-management.html" class="nav-link " title="Roles" ><span class="material-symbols-outlined shrink-0" >shield_person</span><span class="sidebar-label">Roles</span></a>
+<a href="business-titles.html" class="nav-link " title="Titles" ><span class="material-symbols-outlined shrink-0" >badge</span><span class="sidebar-label">Titles</span></a>
+<a href="visibility-rules.html" class="nav-link " title="Visibility" ><span class="material-symbols-outlined shrink-0" >visibility</span><span class="sidebar-label">Visibility</span></a>
+<a href="work-assignment.html" class="nav-link " title="Assignments" ><span class="material-symbols-outlined shrink-0" >group_add</span><span class="sidebar-label">Assignments</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="support"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">support_agent</span><span class="nav-group-label">Support</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="support-workspace.html" class="nav-link " title="Help Desk" ><span class="material-symbols-outlined shrink-0" >support_agent</span><span class="sidebar-label">Help Desk</span></a>
+</div></details>
+        </nav>
+        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" data-mobile-nav-open class="inline-flex rounded-full border border-border bg-surface p-2 text-on-surface lg:hidden" aria-label="Open mobile navigation">
+              <span class="material-symbols-outlined text-[18px]">menu</span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Clients</p>
+              <p class="truncate text-sm font-semibold text-on-surface" data-shell-page-title>Create Client</p>
+            </div>
+          </div>
+          <div class="topbar-search hidden md:block">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-muted">search</span>
+            <label class="sr-only" for="topbar-search">Search within RecruitOps</label>
+            <input id="topbar-search" type="text" placeholder="Search within RecruitOps..." aria-label="Search within RecruitOps" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="topbar-action rounded-full border border-border bg-surface p-2 text-on-surface" data-route="notifications-center.html" aria-label="Review notifications" title="Open Notifications Center">
+              <span class="material-symbols-outlined text-[18px]">notifications</span>
+            </button>
+            <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
+              <span class="material-symbols-outlined text-[18px]">help</span>
+            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
+              BN
+            </button>
+          </div>
+        </header>
+        
+    <dialog id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+      <div class="mobile-nav-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">RecruitOps</p>
+            <h2 class="mt-1 text-lg font-bold text-on-surface">Navigation</h2>
+          </div>
+          <button type="button" data-mobile-nav-close class="rounded-full border border-border p-2 text-on-surface" aria-label="Close mobile navigation">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <details class="nav-group" data-nav-group="work"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">dashboard</span><span class="nav-group-label">Work</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="role-dashboard.html" class="nav-link " title="Role Dashboard" ><span class="material-symbols-outlined shrink-0" >dashboard</span><span class="sidebar-label">Role Dashboard</span></a>
+<a href="my-work-dashboard.html" class="nav-link " title="My Work" ><span class="material-symbols-outlined shrink-0" >checklist_rtl</span><span class="sidebar-label">My Work</span></a>
+<a href="daily-review.html" class="nav-link " title="Daily Review" ><span class="material-symbols-outlined shrink-0" >today</span><span class="sidebar-label">Daily Review</span></a>
+</div></details>
+<details class="nav-group" open data-nav-group="hiring"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">work</span><span class="nav-group-label">Hiring</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="client-directory.html" class="nav-link is-active" title="Clients" aria-current="page"><span class="material-symbols-outlined shrink-0" style="font-variation-settings:'FILL' 1;">apartment</span><span class="sidebar-label">Clients</span></a>
+<a href="requisition-list.html" class="nav-link " title="Requisitions" ><span class="material-symbols-outlined shrink-0" >work</span><span class="sidebar-label">Requisitions</span></a>
+<a href="candidate-profiles.html" class="nav-link " title="Candidates" ><span class="material-symbols-outlined shrink-0" >group</span><span class="sidebar-label">Candidates</span></a>
+<a href="pipeline-board.html" class="nav-link " title="Pipeline" ><span class="material-symbols-outlined shrink-0" >account_tree</span><span class="sidebar-label">Pipeline</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="workflow"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">event_available</span><span class="nav-group-label">Workflow</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="interview-scheduler.html" class="nav-link " title="Interviews" ><span class="material-symbols-outlined shrink-0" >calendar_month</span><span class="sidebar-label">Interviews</span></a>
+<a href="offer-management.html" class="nav-link " title="Offers" ><span class="material-symbols-outlined shrink-0" >request_quote</span><span class="sidebar-label">Offers</span></a>
+<a href="meetings.html" class="nav-link " title="Meetings" ><span class="material-symbols-outlined shrink-0" >event</span><span class="sidebar-label">Meetings</span></a>
+<a href="follow-ups.html" class="nav-link " title="Follow-Ups" ><span class="material-symbols-outlined shrink-0" >task_alt</span><span class="sidebar-label">Follow-Ups</span></a>
+<a href="join-tracker.html" class="nav-link " title="Join Tracker" ><span class="material-symbols-outlined shrink-0" >how_to_reg</span><span class="sidebar-label">Join Tracker</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="inbox"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">inbox</span><span class="nav-group-label">Inbox</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="daily-updates-workspace.html" class="nav-link " title="Daily Updates" ><span class="material-symbols-outlined shrink-0" >assignment</span><span class="sidebar-label">Daily Updates</span></a>
+<a href="notifications-center.html" class="nav-link " title="Notifications" ><span class="material-symbols-outlined shrink-0" >notifications</span><span class="sidebar-label">Notifications</span></a>
+<a href="approvals-inbox.html" class="nav-link " title="Approvals" ><span class="material-symbols-outlined shrink-0" >fact_check</span><span class="sidebar-label">Approvals</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="reports"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">monitoring</span><span class="nav-group-label">Reports</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="analytics-dashboard.html" class="nav-link " title="Reports" ><span class="material-symbols-outlined shrink-0" >monitoring</span><span class="sidebar-label">Reports</span></a>
+<a href="company-dashboard.html" class="nav-link " title="Company Performance" ><span class="material-symbols-outlined shrink-0" >business</span><span class="sidebar-label">Company Performance</span></a>
+<a href="user-performance-reports.html" class="nav-link " title="User Performance" ><span class="material-symbols-outlined shrink-0" >leaderboard</span><span class="sidebar-label">User Performance</span></a>
+<a href="team-workload.html" class="nav-link " title="Team Workload" ><span class="material-symbols-outlined shrink-0" >groups</span><span class="sidebar-label">Team Workload</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="admin"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">admin_panel_settings</span><span class="nav-group-label">Admin</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="location-management.html" class="nav-link " title="Locations" ><span class="material-symbols-outlined shrink-0" >location_on</span><span class="sidebar-label">Locations</span></a>
+<a href="location-dashboard.html" class="nav-link " title="Location Dashboard" ><span class="material-symbols-outlined shrink-0" >query_stats</span><span class="sidebar-label">Location Dashboard</span></a>
+<a href="user-management.html" class="nav-link " title="Users" ><span class="material-symbols-outlined shrink-0" >manage_accounts</span><span class="sidebar-label">Users</span></a>
+<a href="role-management.html" class="nav-link " title="Roles" ><span class="material-symbols-outlined shrink-0" >shield_person</span><span class="sidebar-label">Roles</span></a>
+<a href="business-titles.html" class="nav-link " title="Titles" ><span class="material-symbols-outlined shrink-0" >badge</span><span class="sidebar-label">Titles</span></a>
+<a href="visibility-rules.html" class="nav-link " title="Visibility" ><span class="material-symbols-outlined shrink-0" >visibility</span><span class="sidebar-label">Visibility</span></a>
+<a href="work-assignment.html" class="nav-link " title="Assignments" ><span class="material-symbols-outlined shrink-0" >group_add</span><span class="sidebar-label">Assignments</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="support"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">support_agent</span><span class="nav-group-label">Support</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="support-workspace.html" class="nav-link " title="Help Desk" ><span class="material-symbols-outlined shrink-0" >support_agent</span><span class="sidebar-label">Help Desk</span></a>
+</div></details>
+          <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+        </div>
+      </div>
+    </dialog>
+    
+        <main id="main-content" tabindex="-1" class="app-canvas">
+          <div class="page-stack">
+    
+    <section class="overlay-layout" data-overlay-mount-parent="Client Directory">
+      <div class="overlay-underlay">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6"> <div> <h1 class="font-headline-lg text-headline-lg text-on-surface">Client Directory</h1> <p class="font-body-md text-body-md text-text-muted mt-1">Manage enterprise accounts, active requisitions, and client ownership.</p> </div> <button class="bg-primary-container text-on-primary-container font-data-tabular text-data-tabular font-medium py-2 px-5 rounded hover:bg-primary-hover transition-colors flex items-center gap-2 whitespace-nowrap"> <span class="material-symbols-outlined text-[18px]">domain_add</span> Add Client </button> </div> <!-- Management Surface --> <div class="bg-surface border border-border rounded flex flex-col h-[calc(100vh-200px)]"> <!-- Toolbar --> <div class="p-4 border-b border-border bg-surface-alt flex flex-wrap items-center justify-between gap-4 shrink-0"> <!-- Tabs --> <div class="flex space-x-1 bg-surface-variant p-1 rounded"> <button class="px-3 py-1 text-sm font-medium rounded bg-surface text-on-surface">All Clients</button> <button class="px-3 py-1 text-sm font-medium rounded text-on-surface-variant hover:text-on-surface transition-colors">Active</button> <button class="px-3 py-1 text-sm font-medium rounded text-on-surface-variant hover:text-on-surface transition-colors">Onboarding</button> </div> <!-- Filters --> <div class="flex items-center gap-3 ml-auto"> <div class="relative"> <select class="appearance-none bg-surface border border-border rounded pl-3 pr-8 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary"> <option>Location</option> <option>North America</option> <option>EMEA</option> <option>APAC</option> </select> <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-text-muted pointer-events-none">expand_more</span> </div> <div class="relative"> <select class="appearance-none bg-surface border border-border rounded pl-3 pr-8 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary"> <option>Industry</option> <option>Technology</option> <option>Finance</option> <option>Healthcare</option> </select> <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-text-muted pointer-events-none">expand_more</span> </div> </div> </div> <!-- Table Container --> <div class="flex-1 overflow-auto"> <table class="w-full text-left border-collapse min-w-[1000px]"> <thead class="bg-surface z-10 border-b border-border"> <tr> <th class="font-label-caps text-label-caps text-text-muted px-4 py-3 font-semibold uppercase tracking-wider">Client Name</th> <th class="font-label-caps text-label-caps text-text-muted px-4 py-3 font-semibold uppercase tracking-wider">Location</th> <th class="font-label-caps text-label-caps text-text-muted px-4 py-3 font-semibold uppercase tracking-wider">Client Owner</th> <th class="font-label-caps text-label-caps text-text-muted px-4 py-3 font-semibold uppercase tracking-wider">Industry</th> <th class="font-label-caps text-label-caps text-text-muted px-4 py-3 font-semibold uppercase tracking-wider">Status</th> <th class="font-label-caps text-label-caps text-text-muted px-4 py-3 font-semibold uppercase tracking-wider">Activity</th> <th class="px-4 py-3">
+</th> </tr> </thead> <tbody class="divide-y divide-border font-data-tabular text-data-tabular"> <!-- Row 1 --> <tr class="hover:bg-highlight-soft transition-colors h-table-row group"> <td class="px-4 py-2 font-medium text-on-surface">Acme Corp</td> <td class="px-4 py-2 text-text-muted">San Francisco, CA</td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-xs font-bold">SJ</div> <span class="">Sarah J.</span> </div> </td> <td class="px-4 py-2 text-text-muted">Technology</td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-bg text-success-text border border-success-text/20">Active</span> </td> <td class="px-4 py-2"> <div class="flex flex-col"> <span class="text-on-surface">12 Active Requisitions</span> <span class="text-xs text-text-muted">Req: Sr. Engineer (2d ago)</span> </div> </td> <td class="px-4 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity"> <button class="p-1 text-text-muted hover:text-primary transition-colors" title="View Detail"> <span class="material-symbols-outlined text-[18px]">visibility</span> </button> <button class="p-1 text-text-muted hover:text-primary transition-colors ml-2" title="New Requisition"> <span class="material-symbols-outlined text-[18px]">post_add</span> </button> </td> </tr> <!-- Row 2 --> <tr class="bg-surface-alt hover:bg-highlight-soft transition-colors h-table-row group"> <td class="px-4 py-2 font-medium text-on-surface">Global Finance LLC</td> <td class="px-4 py-2 text-text-muted">London, UK</td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-6 h-6 rounded-full bg-surface-dim text-on-surface-variant flex items-center justify-center text-xs font-bold">MR</div> <span class="">Mike R.</span> </div> </td> <td class="px-4 py-2 text-text-muted">Finance</td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info-bg text-info-text border border-info-text/20">Onboarding</span> </td> <td class="px-4 py-2"> <div class="flex flex-col"> <span class="text-on-surface">0 Active Requisitions</span> <span class="text-xs text-text-muted">Contract signing phase</span> </div> </td> <td class="px-4 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity"> <button class="p-1 text-text-muted hover:text-primary transition-colors" title="View Detail"> <span class="material-symbols-outlined text-[18px]">visibility</span> </button> </td> </tr> <!-- Row 3 --> <tr class="hover:bg-highlight-soft transition-colors h-table-row group"> <td class="px-4 py-2 font-medium text-on-surface">HealthPlus Network</td> <td class="px-4 py-2 text-text-muted">Boston, MA</td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-6 h-6 rounded-full bg-tertiary--dim text-on-tertiary--variant flex items-center justify-center text-xs font-bold">AL</div> <span class="">Anna L.</span> </div> </td> <td class="px-4 py-2 text-text-muted">Healthcare</td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning-bg text-warning-text border border-warning-text/20">Passive</span> </td> <td class="px-4 py-2"> <div class="flex flex-col"> <span class="text-on-surface">1 Active Job</span> <span class="text-xs text-text-muted">Req: RN (3mo ago)</span> </div> </td> <td class="px-4 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity"> <button class="p-1 text-text-muted hover:text-primary transition-colors" title="View Detail"> <span class="material-symbols-outlined text-[18px]">visibility</span> </button> </td> </tr> </tbody> </table> </div> <!-- Pagination Footer --> <div class="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0"> <span class="font-body-sm text-body-sm text-text-muted">Showing 1 to 3 of 42 entries</span> <div class="flex items-center gap-2"> <button class="p-1 rounded text-text-muted hover:bg-surface-variant disabled:opacity-50" disabled=""> <span class="material-symbols-outlined text-[20px]">chevron_left</span> </button> <button class="p-1 rounded text-text-muted hover:bg-surface-variant"> <span class="material-symbols-outlined text-[20px]">chevron_right</span> </button> </div> </div> </div>
+      </div>
+      <a class="overlay-close-pill" href="client-directory.html" data-overlay-return-link="true"><span class="material-symbols-outlined text-[16px]">arrow_back</span>Back To Client Directory</a>
+      <div class="overlay-backdrop" data-overlay-close></div>
+      <div class="overlay-host drawer">
+        <aside aria-labelledby="drawer-title" aria-modal="true" class="inset-y-0 w-full max-w-[480px] bg-surface-container-low shadow-[-4px_0_24px_rgba(39,48,56,0.12)] flex flex-col border-l border-border transition-transform transform translate-x-0 max-h-[calc(100vh-48px)]" role="dialog" data-overlay-surface="true"> <!-- Sticky Header --> <div class="flex items-center justify-between px-gutter h-shell-header border-b border-border bg-surface shrink-0 z-10"> <h2 class="font-headline-md text-headline-md font-semibold text-primary" id="drawer-title"> Create Client </h2> <button aria-label="Close overlay" class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-highlight-soft flex items-center justify-center" type="button" data-overlay-close="true" title="Close overlay"> <span class="material-symbols-outlined text-[20px]" data-icon="close">close</span> </button> </div> <!-- Scrollable Content --> <div class="flex-1 overflow-y-auto p-gutter relative custom-scrollbar"> <form class="flex flex-col gap-8 pb-8"> <!-- Section: Identity --> <div class="flex flex-col gap-4"> <h3 class="font-label-caps text-label-caps text-text-muted uppercase border-b border-border pb-2">Identity</h3> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="client-name">Client Name <span class="text-error">*</span>
+</label> <input class="w-full h-10 px-3 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-shadow" id="client-name" name="client-name" placeholder="e.g. Acme Corp" required="" type="text"/> </div> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="client-code">Client Code <span class="text-error">*</span>
+</label> <input class="w-full h-10 px-3 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-shadow" id="client-code" name="client-code" placeholder="e.g. ACM-01" required="" type="text"/> </div> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="industry">Industry</label> <div class="relative"> <select class="w-full h-10 pl-3 pr-10 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none appearance-none transition-shadow" id="industry" name="industry"> <option disabled="" selected="" value="">Select an industry</option> <option value="technology">Technology</option> <option value="finance">Finance</option> <option value="healthcare">Healthcare</option> <option value="retail">Retail</option> <option value="manufacturing">Manufacturing</option> </select> <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant"> <span class="material-symbols-outlined text-[20px]" data-icon="expand_more">expand_more</span> </div> </div> </div> </div> <!-- Section: Location & Ownership --> <div class="flex flex-col gap-4"> <h3 class="font-label-caps text-label-caps text-text-muted uppercase border-b border-border pb-2">Location &amp; Ownership</h3> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="location">Location</label> <div class="relative"> <input class="w-full h-10 pl-10 pr-3 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-shadow" id="location" name="location" placeholder="Search locations..." type="text"/> <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-text-muted"> <span class="material-symbols-outlined text-[20px]" data-icon="search">search</span> </div> </div> </div> <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="client-owner">Client Owner</label> <div class="relative"> <select class="w-full h-10 pl-3 pr-10 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none appearance-none transition-shadow" id="client-owner" name="client-owner"> <option disabled="" selected="" value="">Select owner</option> <option value="user1">Jane Doe</option> <option value="user2">John Smith</option> <option value="user3">Alice Jones</option> </select> <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant"> <span class="material-symbols-outlined text-[20px]" data-icon="person">person</span> </div> </div> </div> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="business-source">Business Source</label> <div class="relative"> <select class="w-full h-10 pl-3 pr-10 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none appearance-none transition-shadow" id="business-source" name="business-source"> <option disabled="" selected="" value="">Select source</option> <option value="user1">Jane Doe</option> <option value="user2">John Smith</option> <option value="user4">Bob Brown</option> </select> <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant"> <span class="material-symbols-outlined text-[20px]" data-icon="person_add">person_add</span> </div> </div> </div> </div> </div> <!-- Section: Commercials --> <div class="flex flex-col gap-4"> <h3 class="font-label-caps text-label-caps text-text-muted uppercase border-b border-border pb-2">Commercials</h3> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="status">Status</label> <div class="relative"> <select class="w-full h-10 pl-3 pr-10 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none appearance-none transition-shadow" id="status" name="status"> <option selected="" value="onboarding">Onboarding</option> <option value="active">Active</option> <option value="passive">Passive</option> </select> <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant"> <span class="material-symbols-outlined text-[20px]" data-icon="expand_more">expand_more</span> </div> </div> </div> <div class="flex flex-col gap-stack-compact"> <label class="font-data-tabular text-data-tabular text-on-surface font-medium" for="commercial-notes">Commercial Notes</label> <textarea class="w-full p-3 bg-surface border border-border rounded text-body-md focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none resize-y transition-shadow" id="commercial-notes" name="commercial-notes" placeholder="Enter details regarding fees, terms, etc." rows="4">
+</textarea> </div> </div> </form> </div> <!-- Sticky Footer --> <div class="flex items-center justify-end gap-3 px-gutter py-4 border-t border-border bg-surface shrink-0 z-10"> <button class="px-4 h-10 border border-border text-on-surface font-headline-sm text-headline-sm rounded hover:bg-highlight-soft transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1" type="button" data-overlay-close="true" title="Cancel and close overlay"> Cancel </button> <button class="px-4 h-10 bg-primary text-on-primary font-headline-sm text-headline-sm rounded hover:bg-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1" type="submit"> Save Client </button> </div> </aside>
+      </div>
+    </section>
+  
+          </div>
+        </main>
+      </div>
+    </div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    
+    <script src="../shared/renderers.js"></script>
+    <script src="../shared/api-client.js?v=1787914846"></script>
+    <script src="../shared/ui-utils.js"></script>
+    <script src="../shared/tables.js"></script>
+    <script src="../shared/forms.js"></script>
+    <script src="../shared/sidebar.js"></script>
+    <script src="../shared/pipeline.js"></script>
+    <script src="../shared/routing.js"></script>
+
+  <script src="../shared/app.js?v=1787914846"></script>
+</body>
+</html>

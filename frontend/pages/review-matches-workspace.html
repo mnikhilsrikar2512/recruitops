@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Review Matches - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1787914846" />
+</head>
+  <body class="bg-background text-on-background antialiased" data-route-id="review-matches-workspace" data-route-kind="app" data-route-title="Review Matches" data-route-section="Candidates">
+  
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <a href="../index.html" class="sidebar-brand" title="Return to frontend index">
+          <div class="sidebar-mark">R</div>
+          <div class="sidebar-brand-copy">
+            <div class="sidebar-brand-name">RecruitOps</div>
+            <div class="sidebar-brand-meta">Recruitment OS</div>
+          </div>
+        </a>
+        <a href="duplicate-warning-modal.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Open the duplicate warning overlay for this match review."><span class="material-symbols-outlined text-[18px]">warning</span><span class="sidebar-cta-copy">Duplicate Warning</span></a>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+          <details class="nav-group" data-nav-group="work"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">dashboard</span><span class="nav-group-label">Work</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="role-dashboard.html" class="nav-link " title="Role Dashboard" ><span class="material-symbols-outlined shrink-0" >dashboard</span><span class="sidebar-label">Role Dashboard</span></a>
+<a href="my-work-dashboard.html" class="nav-link " title="My Work" ><span class="material-symbols-outlined shrink-0" >checklist_rtl</span><span class="sidebar-label">My Work</span></a>
+<a href="daily-review.html" class="nav-link " title="Daily Review" ><span class="material-symbols-outlined shrink-0" >today</span><span class="sidebar-label">Daily Review</span></a>
+</div></details>
+<details class="nav-group" open data-nav-group="hiring"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">work</span><span class="nav-group-label">Hiring</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="client-directory.html" class="nav-link " title="Clients" ><span class="material-symbols-outlined shrink-0" >apartment</span><span class="sidebar-label">Clients</span></a>
+<a href="requisition-list.html" class="nav-link " title="Requisitions" ><span class="material-symbols-outlined shrink-0" >work</span><span class="sidebar-label">Requisitions</span></a>
+<a href="candidate-profiles.html" class="nav-link is-active" title="Candidates" aria-current="page"><span class="material-symbols-outlined shrink-0" style="font-variation-settings:'FILL' 1;">group</span><span class="sidebar-label">Candidates</span></a>
+<a href="pipeline-board.html" class="nav-link " title="Pipeline" ><span class="material-symbols-outlined shrink-0" >account_tree</span><span class="sidebar-label">Pipeline</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="workflow"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">event_available</span><span class="nav-group-label">Workflow</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="interview-scheduler.html" class="nav-link " title="Interviews" ><span class="material-symbols-outlined shrink-0" >calendar_month</span><span class="sidebar-label">Interviews</span></a>
+<a href="offer-management.html" class="nav-link " title="Offers" ><span class="material-symbols-outlined shrink-0" >request_quote</span><span class="sidebar-label">Offers</span></a>
+<a href="meetings.html" class="nav-link " title="Meetings" ><span class="material-symbols-outlined shrink-0" >event</span><span class="sidebar-label">Meetings</span></a>
+<a href="follow-ups.html" class="nav-link " title="Follow-Ups" ><span class="material-symbols-outlined shrink-0" >task_alt</span><span class="sidebar-label">Follow-Ups</span></a>
+<a href="join-tracker.html" class="nav-link " title="Join Tracker" ><span class="material-symbols-outlined shrink-0" >how_to_reg</span><span class="sidebar-label">Join Tracker</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="inbox"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">inbox</span><span class="nav-group-label">Inbox</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="daily-updates-workspace.html" class="nav-link " title="Daily Updates" ><span class="material-symbols-outlined shrink-0" >assignment</span><span class="sidebar-label">Daily Updates</span></a>
+<a href="notifications-center.html" class="nav-link " title="Notifications" ><span class="material-symbols-outlined shrink-0" >notifications</span><span class="sidebar-label">Notifications</span></a>
+<a href="approvals-inbox.html" class="nav-link " title="Approvals" ><span class="material-symbols-outlined shrink-0" >fact_check</span><span class="sidebar-label">Approvals</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="reports"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">monitoring</span><span class="nav-group-label">Reports</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="analytics-dashboard.html" class="nav-link " title="Reports" ><span class="material-symbols-outlined shrink-0" >monitoring</span><span class="sidebar-label">Reports</span></a>
+<a href="company-dashboard.html" class="nav-link " title="Company Performance" ><span class="material-symbols-outlined shrink-0" >business</span><span class="sidebar-label">Company Performance</span></a>
+<a href="user-performance-reports.html" class="nav-link " title="User Performance" ><span class="material-symbols-outlined shrink-0" >leaderboard</span><span class="sidebar-label">User Performance</span></a>
+<a href="team-workload.html" class="nav-link " title="Team Workload" ><span class="material-symbols-outlined shrink-0" >groups</span><span class="sidebar-label">Team Workload</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="admin"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">admin_panel_settings</span><span class="nav-group-label">Admin</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="location-management.html" class="nav-link " title="Locations" ><span class="material-symbols-outlined shrink-0" >location_on</span><span class="sidebar-label">Locations</span></a>
+<a href="location-dashboard.html" class="nav-link " title="Location Dashboard" ><span class="material-symbols-outlined shrink-0" >query_stats</span><span class="sidebar-label">Location Dashboard</span></a>
+<a href="user-management.html" class="nav-link " title="Users" ><span class="material-symbols-outlined shrink-0" >manage_accounts</span><span class="sidebar-label">Users</span></a>
+<a href="role-management.html" class="nav-link " title="Roles" ><span class="material-symbols-outlined shrink-0" >shield_person</span><span class="sidebar-label">Roles</span></a>
+<a href="business-titles.html" class="nav-link " title="Titles" ><span class="material-symbols-outlined shrink-0" >badge</span><span class="sidebar-label">Titles</span></a>
+<a href="visibility-rules.html" class="nav-link " title="Visibility" ><span class="material-symbols-outlined shrink-0" >visibility</span><span class="sidebar-label">Visibility</span></a>
+<a href="work-assignment.html" class="nav-link " title="Assignments" ><span class="material-symbols-outlined shrink-0" >group_add</span><span class="sidebar-label">Assignments</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="support"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">support_agent</span><span class="nav-group-label">Support</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="support-workspace.html" class="nav-link " title="Help Desk" ><span class="material-symbols-outlined shrink-0" >support_agent</span><span class="sidebar-label">Help Desk</span></a>
+</div></details>
+        </nav>
+        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" data-mobile-nav-open class="inline-flex rounded-full border border-border bg-surface p-2 text-on-surface lg:hidden" aria-label="Open mobile navigation">
+              <span class="material-symbols-outlined text-[18px]">menu</span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Candidates</p>
+              <p class="truncate text-sm font-semibold text-on-surface" data-shell-page-title>Review Matches</p>
+            </div>
+          </div>
+          <div class="topbar-search hidden md:block">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-muted">search</span>
+            <label class="sr-only" for="topbar-search">Search within RecruitOps</label>
+            <input id="topbar-search" type="text" placeholder="Search within RecruitOps..." aria-label="Search within RecruitOps" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="topbar-action rounded-full border border-border bg-surface p-2 text-on-surface" data-route="notifications-center.html" aria-label="Review notifications" title="Open Notifications Center">
+              <span class="material-symbols-outlined text-[18px]">notifications</span>
+            </button>
+            <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
+              <span class="material-symbols-outlined text-[18px]">help</span>
+            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
+              BN
+            </button>
+          </div>
+        </header>
+        
+    <dialog id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+      <div class="mobile-nav-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">RecruitOps</p>
+            <h2 class="mt-1 text-lg font-bold text-on-surface">Navigation</h2>
+          </div>
+          <button type="button" data-mobile-nav-close class="rounded-full border border-border p-2 text-on-surface" aria-label="Close mobile navigation">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <details class="nav-group" data-nav-group="work"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">dashboard</span><span class="nav-group-label">Work</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="role-dashboard.html" class="nav-link " title="Role Dashboard" ><span class="material-symbols-outlined shrink-0" >dashboard</span><span class="sidebar-label">Role Dashboard</span></a>
+<a href="my-work-dashboard.html" class="nav-link " title="My Work" ><span class="material-symbols-outlined shrink-0" >checklist_rtl</span><span class="sidebar-label">My Work</span></a>
+<a href="daily-review.html" class="nav-link " title="Daily Review" ><span class="material-symbols-outlined shrink-0" >today</span><span class="sidebar-label">Daily Review</span></a>
+</div></details>
+<details class="nav-group" open data-nav-group="hiring"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">work</span><span class="nav-group-label">Hiring</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="client-directory.html" class="nav-link " title="Clients" ><span class="material-symbols-outlined shrink-0" >apartment</span><span class="sidebar-label">Clients</span></a>
+<a href="requisition-list.html" class="nav-link " title="Requisitions" ><span class="material-symbols-outlined shrink-0" >work</span><span class="sidebar-label">Requisitions</span></a>
+<a href="candidate-profiles.html" class="nav-link is-active" title="Candidates" aria-current="page"><span class="material-symbols-outlined shrink-0" style="font-variation-settings:'FILL' 1;">group</span><span class="sidebar-label">Candidates</span></a>
+<a href="pipeline-board.html" class="nav-link " title="Pipeline" ><span class="material-symbols-outlined shrink-0" >account_tree</span><span class="sidebar-label">Pipeline</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="workflow"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">event_available</span><span class="nav-group-label">Workflow</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="interview-scheduler.html" class="nav-link " title="Interviews" ><span class="material-symbols-outlined shrink-0" >calendar_month</span><span class="sidebar-label">Interviews</span></a>
+<a href="offer-management.html" class="nav-link " title="Offers" ><span class="material-symbols-outlined shrink-0" >request_quote</span><span class="sidebar-label">Offers</span></a>
+<a href="meetings.html" class="nav-link " title="Meetings" ><span class="material-symbols-outlined shrink-0" >event</span><span class="sidebar-label">Meetings</span></a>
+<a href="follow-ups.html" class="nav-link " title="Follow-Ups" ><span class="material-symbols-outlined shrink-0" >task_alt</span><span class="sidebar-label">Follow-Ups</span></a>
+<a href="join-tracker.html" class="nav-link " title="Join Tracker" ><span class="material-symbols-outlined shrink-0" >how_to_reg</span><span class="sidebar-label">Join Tracker</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="inbox"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">inbox</span><span class="nav-group-label">Inbox</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="daily-updates-workspace.html" class="nav-link " title="Daily Updates" ><span class="material-symbols-outlined shrink-0" >assignment</span><span class="sidebar-label">Daily Updates</span></a>
+<a href="notifications-center.html" class="nav-link " title="Notifications" ><span class="material-symbols-outlined shrink-0" >notifications</span><span class="sidebar-label">Notifications</span></a>
+<a href="approvals-inbox.html" class="nav-link " title="Approvals" ><span class="material-symbols-outlined shrink-0" >fact_check</span><span class="sidebar-label">Approvals</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="reports"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">monitoring</span><span class="nav-group-label">Reports</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="analytics-dashboard.html" class="nav-link " title="Reports" ><span class="material-symbols-outlined shrink-0" >monitoring</span><span class="sidebar-label">Reports</span></a>
+<a href="company-dashboard.html" class="nav-link " title="Company Performance" ><span class="material-symbols-outlined shrink-0" >business</span><span class="sidebar-label">Company Performance</span></a>
+<a href="user-performance-reports.html" class="nav-link " title="User Performance" ><span class="material-symbols-outlined shrink-0" >leaderboard</span><span class="sidebar-label">User Performance</span></a>
+<a href="team-workload.html" class="nav-link " title="Team Workload" ><span class="material-symbols-outlined shrink-0" >groups</span><span class="sidebar-label">Team Workload</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="admin"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">admin_panel_settings</span><span class="nav-group-label">Admin</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="location-management.html" class="nav-link " title="Locations" ><span class="material-symbols-outlined shrink-0" >location_on</span><span class="sidebar-label">Locations</span></a>
+<a href="location-dashboard.html" class="nav-link " title="Location Dashboard" ><span class="material-symbols-outlined shrink-0" >query_stats</span><span class="sidebar-label">Location Dashboard</span></a>
+<a href="user-management.html" class="nav-link " title="Users" ><span class="material-symbols-outlined shrink-0" >manage_accounts</span><span class="sidebar-label">Users</span></a>
+<a href="role-management.html" class="nav-link " title="Roles" ><span class="material-symbols-outlined shrink-0" >shield_person</span><span class="sidebar-label">Roles</span></a>
+<a href="business-titles.html" class="nav-link " title="Titles" ><span class="material-symbols-outlined shrink-0" >badge</span><span class="sidebar-label">Titles</span></a>
+<a href="visibility-rules.html" class="nav-link " title="Visibility" ><span class="material-symbols-outlined shrink-0" >visibility</span><span class="sidebar-label">Visibility</span></a>
+<a href="work-assignment.html" class="nav-link " title="Assignments" ><span class="material-symbols-outlined shrink-0" >group_add</span><span class="sidebar-label">Assignments</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="support"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">support_agent</span><span class="nav-group-label">Support</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="support-workspace.html" class="nav-link " title="Help Desk" ><span class="material-symbols-outlined shrink-0" >support_agent</span><span class="sidebar-label">Help Desk</span></a>
+</div></details>
+          <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+        </div>
+      </div>
+    </dialog>
+    
+        <main id="main-content" tabindex="-1" class="app-canvas">
+          <div class="page-stack">
+    
+    <section class="shell-card" data-demo-validate="true">
+      <div class="workspace-surface">
+      <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-gutter"> <!-- Left: Comparison Panel --> <div class="flex-1 flex flex-col gap-stack-default"> <div class="flex gap-stack-default"> <!-- Incoming Record --> <div class="flex-1 bg-surface border border-border rounded flex flex-col"> <div class="bg-surface-alt px-inset-card py-stack-default border-b border-border"> <div class="font-label-caps text-label-caps text-text-muted mb-1">Incoming Record</div> <div class="font-headline-md text-headline-md text-on-surface">Sarah Miller</div> <div class="font-body-sm text-body-sm text-text-muted mt-1">Source: Agency Submission • Just Now</div> </div> <div class="p-inset-card flex-1 flex flex-col gap-stack-default overflow-y-auto"> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">Email Address</div> <div class="font-body-md text-body-md bg-highlight-soft px-2 py-1 -mx-2 rounded flex items-center justify-between"> <span>s.miller@techcloud.io</span> <span class="material-symbols-outlined text-success-text text-[16px]">check_circle</span> </div> </div> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">Phone Number</div> <div class="font-body-md text-body-md bg-highlight-soft px-2 py-1 -mx-2 rounded flex items-center justify-between"> <span>+1 (555) 012-3456</span> <span class="material-symbols-outlined text-success-text text-[16px]">check_circle</span> </div> </div> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">Current Role &amp; Company</div> <div class="font-body-md text-body-md px-2 py-1 -mx-2">Senior Product Designer at TechCloud</div> </div> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">LinkedIn URL</div> <div class="font-body-md text-body-md px-2 py-1 -mx-2 text-primary">linkedin.com/in/sarah-miller-design</div> </div> </div> </div> <!-- Divider / Icon --> <div class="flex items-center justify-center -mx-stack-default z-10 w-0"> <div class="bg-surface border border-border rounded-full p-2 flex items-center justify-center text-text-muted shadow-sm"> <span class="material-symbols-outlined">compare_arrows</span> </div> </div> <!-- Existing Record --> <div class="flex-1 bg-surface border border-border rounded flex flex-col opacity-90"> <div class="bg-surface-alt px-inset-card py-stack-default border-b border-border"> <div class="font-label-caps text-label-caps text-text-muted mb-1">Existing Record (ID: CND-8492)</div> <div class="font-headline-md text-headline-md text-on-surface">Sarah Miller-Thompson</div> <div class="font-body-sm text-body-sm text-text-muted mt-1">Source: Direct Application • Added 4 mo ago</div> </div> <div class="p-inset-card flex-1 flex flex-col gap-stack-default overflow-y-auto"> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">Email Address</div> <div class="font-body-md text-body-md bg-highlight-soft px-2 py-1 -mx-2 rounded flex items-center justify-between"> <span>s.miller@techcloud.io</span> <span class="material-symbols-outlined text-success-text text-[16px]">check_circle</span> </div> </div> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">Phone Number</div> <div class="font-body-md text-body-md bg-highlight-soft px-2 py-1 -mx-2 rounded flex items-center justify-between"> <span>+1 (555) 012-3456</span> <span class="material-symbols-outlined text-success-text text-[16px]">check_circle</span> </div> </div> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">Current Role &amp; Company</div> <div class="font-body-md text-body-md px-2 py-1 -mx-2">Product Designer II at TechCloud</div> </div> <div> <div class="font-label-caps text-label-caps text-text-muted mb-1">LinkedIn URL</div> <div class="font-body-md text-body-md px-2 py-1 -mx-2 text-text-muted italic">Not Provided</div> </div> </div> </div> </div> </div> <!-- Right: Decision Panel --> <div class="w-full lg:w-[400px] shrink-0 flex flex-col gap-stack-default"> <div class="bg-surface border border-border rounded flex flex-col p-inset-card"> <div class="flex items-center justify-between mb-stack-default"> <h2 class="font-headline-sm text-headline-sm text-on-surface">Match Analysis</h2> <div class="flex items-center gap-1 text-danger-text bg-danger-bg px-2 py-1 rounded font-label-caps text-label-caps"> 98% High Confidence </div> </div> <div class="mb-stack-default"> <label class="font-label-caps text-label-caps text-text-muted block mb-2">Merge Strategy</label> <div class="flex flex-col gap-2"> <label class="flex items-start gap-2 p-3 border border-border rounded cursor-pointer hover:bg-surface-alt transition-colors"> <input checked="" class="mt-1 text-primary focus:ring-primary border-border" name="merge_strategy" type="radio"/> <div> <div class="font-body-md text-body-md font-medium text-on-surface">Update Existing</div> <div class="font-body-sm text-body-sm text-text-muted">Keep existing core data, append new information (e.g. LinkedIn).</div> </div> </label> <label class="flex items-start gap-2 p-3 border border-border rounded cursor-pointer hover:bg-surface-alt transition-colors"> <input class="mt-1 text-primary focus:ring-primary border-border" name="merge_strategy" type="radio"/> <div> <div class="font-body-md text-body-md font-medium text-on-surface">Overwrite Existing</div> <div class="font-body-sm text-body-sm text-text-muted">Replace existing details with incoming record values where they conflict.</div> </div> </label> </div> </div> <div class="mb-stack-default"> <label class="font-label-caps text-label-caps text-text-muted block mb-2">Resolution Note (Required for Merge)</label> <textarea class="w-full bg-surface border border-border rounded p-3 font-body-sm text-body-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none h-24 placeholder:text-text-muted" placeholder="Document reason for merge decision...">
+</textarea> </div> <div class="flex flex-col gap-2 mt-auto"> <button class="bg-primary-container text-surface flex items-center justify-center py-2 px-4 rounded font-body-md text-body-md font-medium hover:bg-primary-hover transition-colors"> Confirm Merge </button> <button class="bg-surface border border-border text-on-surface flex items-center justify-center py-2 px-4 rounded font-body-md text-body-md font-medium hover:bg-surface-alt transition-colors"> Mark as Unique (Create New) </button> <button class="bg-surface text-danger-text flex items-center justify-center py-2 px-4 rounded font-body-md text-body-md font-medium hover:bg-danger-bg transition-colors mt-2"> Cancel &amp; Archive Incoming </button> </div> </div> </div> </div>
+      </div>
+    </section>
+    
+  
+          </div>
+        </main>
+      </div>
+    </div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    
+    <script src="../shared/renderers.js"></script>
+    <script src="../shared/api-client.js?v=1787914846"></script>
+    <script src="../shared/ui-utils.js"></script>
+    <script src="../shared/tables.js"></script>
+    <script src="../shared/forms.js"></script>
+    <script src="../shared/sidebar.js"></script>
+    <script src="../shared/pipeline.js"></script>
+    <script src="../shared/routing.js"></script>
+
+  <script src="../shared/app.js?v=1787914846"></script>
+</body>
+</html>

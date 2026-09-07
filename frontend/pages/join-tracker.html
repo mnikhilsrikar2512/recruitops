@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join Tracker - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1787914846" />
+</head>
+  <body class="bg-background text-on-background antialiased" data-route-id="join-tracker" data-route-kind="app" data-route-title="Join Tracker" data-route-section="Onboarding">
+  
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <a href="../index.html" class="sidebar-brand" title="Return to frontend index">
+          <div class="sidebar-mark">R</div>
+          <div class="sidebar-brand-copy">
+            <div class="sidebar-brand-name">RecruitOps</div>
+            <div class="sidebar-brand-meta">Recruitment OS</div>
+          </div>
+        </a>
+        <a href="offer-management.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Review related offers from the join tracker."><span class="material-symbols-outlined text-[18px]">request_quote</span><span class="sidebar-cta-copy">Open Offers</span></a>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+          <details class="nav-group" data-nav-group="work"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">dashboard</span><span class="nav-group-label">Work</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="role-dashboard.html" class="nav-link " title="Role Dashboard" ><span class="material-symbols-outlined shrink-0" >dashboard</span><span class="sidebar-label">Role Dashboard</span></a>
+<a href="my-work-dashboard.html" class="nav-link " title="My Work" ><span class="material-symbols-outlined shrink-0" >checklist_rtl</span><span class="sidebar-label">My Work</span></a>
+<a href="daily-review.html" class="nav-link " title="Daily Review" ><span class="material-symbols-outlined shrink-0" >today</span><span class="sidebar-label">Daily Review</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="hiring"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">work</span><span class="nav-group-label">Hiring</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="client-directory.html" class="nav-link " title="Clients" ><span class="material-symbols-outlined shrink-0" >apartment</span><span class="sidebar-label">Clients</span></a>
+<a href="requisition-list.html" class="nav-link " title="Requisitions" ><span class="material-symbols-outlined shrink-0" >work</span><span class="sidebar-label">Requisitions</span></a>
+<a href="candidate-profiles.html" class="nav-link " title="Candidates" ><span class="material-symbols-outlined shrink-0" >group</span><span class="sidebar-label">Candidates</span></a>
+<a href="pipeline-board.html" class="nav-link " title="Pipeline" ><span class="material-symbols-outlined shrink-0" >account_tree</span><span class="sidebar-label">Pipeline</span></a>
+</div></details>
+<details class="nav-group" open data-nav-group="workflow"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">event_available</span><span class="nav-group-label">Workflow</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="interview-scheduler.html" class="nav-link " title="Interviews" ><span class="material-symbols-outlined shrink-0" >calendar_month</span><span class="sidebar-label">Interviews</span></a>
+<a href="offer-management.html" class="nav-link " title="Offers" ><span class="material-symbols-outlined shrink-0" >request_quote</span><span class="sidebar-label">Offers</span></a>
+<a href="meetings.html" class="nav-link " title="Meetings" ><span class="material-symbols-outlined shrink-0" >event</span><span class="sidebar-label">Meetings</span></a>
+<a href="follow-ups.html" class="nav-link " title="Follow-Ups" ><span class="material-symbols-outlined shrink-0" >task_alt</span><span class="sidebar-label">Follow-Ups</span></a>
+<a href="join-tracker.html" class="nav-link is-active" title="Join Tracker" aria-current="page"><span class="material-symbols-outlined shrink-0" style="font-variation-settings:'FILL' 1;">how_to_reg</span><span class="sidebar-label">Join Tracker</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="inbox"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">inbox</span><span class="nav-group-label">Inbox</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="daily-updates-workspace.html" class="nav-link " title="Daily Updates" ><span class="material-symbols-outlined shrink-0" >assignment</span><span class="sidebar-label">Daily Updates</span></a>
+<a href="notifications-center.html" class="nav-link " title="Notifications" ><span class="material-symbols-outlined shrink-0" >notifications</span><span class="sidebar-label">Notifications</span></a>
+<a href="approvals-inbox.html" class="nav-link " title="Approvals" ><span class="material-symbols-outlined shrink-0" >fact_check</span><span class="sidebar-label">Approvals</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="reports"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">monitoring</span><span class="nav-group-label">Reports</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="analytics-dashboard.html" class="nav-link " title="Reports" ><span class="material-symbols-outlined shrink-0" >monitoring</span><span class="sidebar-label">Reports</span></a>
+<a href="company-dashboard.html" class="nav-link " title="Company Performance" ><span class="material-symbols-outlined shrink-0" >business</span><span class="sidebar-label">Company Performance</span></a>
+<a href="user-performance-reports.html" class="nav-link " title="User Performance" ><span class="material-symbols-outlined shrink-0" >leaderboard</span><span class="sidebar-label">User Performance</span></a>
+<a href="team-workload.html" class="nav-link " title="Team Workload" ><span class="material-symbols-outlined shrink-0" >groups</span><span class="sidebar-label">Team Workload</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="admin"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">admin_panel_settings</span><span class="nav-group-label">Admin</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="location-management.html" class="nav-link " title="Locations" ><span class="material-symbols-outlined shrink-0" >location_on</span><span class="sidebar-label">Locations</span></a>
+<a href="location-dashboard.html" class="nav-link " title="Location Dashboard" ><span class="material-symbols-outlined shrink-0" >query_stats</span><span class="sidebar-label">Location Dashboard</span></a>
+<a href="user-management.html" class="nav-link " title="Users" ><span class="material-symbols-outlined shrink-0" >manage_accounts</span><span class="sidebar-label">Users</span></a>
+<a href="role-management.html" class="nav-link " title="Roles" ><span class="material-symbols-outlined shrink-0" >shield_person</span><span class="sidebar-label">Roles</span></a>
+<a href="business-titles.html" class="nav-link " title="Titles" ><span class="material-symbols-outlined shrink-0" >badge</span><span class="sidebar-label">Titles</span></a>
+<a href="visibility-rules.html" class="nav-link " title="Visibility" ><span class="material-symbols-outlined shrink-0" >visibility</span><span class="sidebar-label">Visibility</span></a>
+<a href="work-assignment.html" class="nav-link " title="Assignments" ><span class="material-symbols-outlined shrink-0" >group_add</span><span class="sidebar-label">Assignments</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="support"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">support_agent</span><span class="nav-group-label">Support</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="support-workspace.html" class="nav-link " title="Help Desk" ><span class="material-symbols-outlined shrink-0" >support_agent</span><span class="sidebar-label">Help Desk</span></a>
+</div></details>
+        </nav>
+        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" data-mobile-nav-open class="inline-flex rounded-full border border-border bg-surface p-2 text-on-surface lg:hidden" aria-label="Open mobile navigation">
+              <span class="material-symbols-outlined text-[18px]">menu</span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Onboarding</p>
+              <p class="truncate text-sm font-semibold text-on-surface" data-shell-page-title>Join Tracker</p>
+            </div>
+          </div>
+          <div class="topbar-search hidden md:block">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-muted">search</span>
+            <label class="sr-only" for="topbar-search">Search within RecruitOps</label>
+            <input id="topbar-search" type="text" placeholder="Search within RecruitOps..." aria-label="Search within RecruitOps" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="topbar-action rounded-full border border-border bg-surface p-2 text-on-surface" data-route="notifications-center.html" aria-label="Review notifications" title="Open Notifications Center">
+              <span class="material-symbols-outlined text-[18px]">notifications</span>
+            </button>
+            <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
+              <span class="material-symbols-outlined text-[18px]">help</span>
+            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
+              BN
+            </button>
+          </div>
+        </header>
+        
+    <dialog id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+      <div class="mobile-nav-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">RecruitOps</p>
+            <h2 class="mt-1 text-lg font-bold text-on-surface">Navigation</h2>
+          </div>
+          <button type="button" data-mobile-nav-close class="rounded-full border border-border p-2 text-on-surface" aria-label="Close mobile navigation">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <details class="nav-group" data-nav-group="work"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">dashboard</span><span class="nav-group-label">Work</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="role-dashboard.html" class="nav-link " title="Role Dashboard" ><span class="material-symbols-outlined shrink-0" >dashboard</span><span class="sidebar-label">Role Dashboard</span></a>
+<a href="my-work-dashboard.html" class="nav-link " title="My Work" ><span class="material-symbols-outlined shrink-0" >checklist_rtl</span><span class="sidebar-label">My Work</span></a>
+<a href="daily-review.html" class="nav-link " title="Daily Review" ><span class="material-symbols-outlined shrink-0" >today</span><span class="sidebar-label">Daily Review</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="hiring"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">work</span><span class="nav-group-label">Hiring</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="client-directory.html" class="nav-link " title="Clients" ><span class="material-symbols-outlined shrink-0" >apartment</span><span class="sidebar-label">Clients</span></a>
+<a href="requisition-list.html" class="nav-link " title="Requisitions" ><span class="material-symbols-outlined shrink-0" >work</span><span class="sidebar-label">Requisitions</span></a>
+<a href="candidate-profiles.html" class="nav-link " title="Candidates" ><span class="material-symbols-outlined shrink-0" >group</span><span class="sidebar-label">Candidates</span></a>
+<a href="pipeline-board.html" class="nav-link " title="Pipeline" ><span class="material-symbols-outlined shrink-0" >account_tree</span><span class="sidebar-label">Pipeline</span></a>
+</div></details>
+<details class="nav-group" open data-nav-group="workflow"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">event_available</span><span class="nav-group-label">Workflow</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="interview-scheduler.html" class="nav-link " title="Interviews" ><span class="material-symbols-outlined shrink-0" >calendar_month</span><span class="sidebar-label">Interviews</span></a>
+<a href="offer-management.html" class="nav-link " title="Offers" ><span class="material-symbols-outlined shrink-0" >request_quote</span><span class="sidebar-label">Offers</span></a>
+<a href="meetings.html" class="nav-link " title="Meetings" ><span class="material-symbols-outlined shrink-0" >event</span><span class="sidebar-label">Meetings</span></a>
+<a href="follow-ups.html" class="nav-link " title="Follow-Ups" ><span class="material-symbols-outlined shrink-0" >task_alt</span><span class="sidebar-label">Follow-Ups</span></a>
+<a href="join-tracker.html" class="nav-link is-active" title="Join Tracker" aria-current="page"><span class="material-symbols-outlined shrink-0" style="font-variation-settings:'FILL' 1;">how_to_reg</span><span class="sidebar-label">Join Tracker</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="inbox"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">inbox</span><span class="nav-group-label">Inbox</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="daily-updates-workspace.html" class="nav-link " title="Daily Updates" ><span class="material-symbols-outlined shrink-0" >assignment</span><span class="sidebar-label">Daily Updates</span></a>
+<a href="notifications-center.html" class="nav-link " title="Notifications" ><span class="material-symbols-outlined shrink-0" >notifications</span><span class="sidebar-label">Notifications</span></a>
+<a href="approvals-inbox.html" class="nav-link " title="Approvals" ><span class="material-symbols-outlined shrink-0" >fact_check</span><span class="sidebar-label">Approvals</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="reports"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">monitoring</span><span class="nav-group-label">Reports</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="analytics-dashboard.html" class="nav-link " title="Reports" ><span class="material-symbols-outlined shrink-0" >monitoring</span><span class="sidebar-label">Reports</span></a>
+<a href="company-dashboard.html" class="nav-link " title="Company Performance" ><span class="material-symbols-outlined shrink-0" >business</span><span class="sidebar-label">Company Performance</span></a>
+<a href="user-performance-reports.html" class="nav-link " title="User Performance" ><span class="material-symbols-outlined shrink-0" >leaderboard</span><span class="sidebar-label">User Performance</span></a>
+<a href="team-workload.html" class="nav-link " title="Team Workload" ><span class="material-symbols-outlined shrink-0" >groups</span><span class="sidebar-label">Team Workload</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="admin"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">admin_panel_settings</span><span class="nav-group-label">Admin</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="location-management.html" class="nav-link " title="Locations" ><span class="material-symbols-outlined shrink-0" >location_on</span><span class="sidebar-label">Locations</span></a>
+<a href="location-dashboard.html" class="nav-link " title="Location Dashboard" ><span class="material-symbols-outlined shrink-0" >query_stats</span><span class="sidebar-label">Location Dashboard</span></a>
+<a href="user-management.html" class="nav-link " title="Users" ><span class="material-symbols-outlined shrink-0" >manage_accounts</span><span class="sidebar-label">Users</span></a>
+<a href="role-management.html" class="nav-link " title="Roles" ><span class="material-symbols-outlined shrink-0" >shield_person</span><span class="sidebar-label">Roles</span></a>
+<a href="business-titles.html" class="nav-link " title="Titles" ><span class="material-symbols-outlined shrink-0" >badge</span><span class="sidebar-label">Titles</span></a>
+<a href="visibility-rules.html" class="nav-link " title="Visibility" ><span class="material-symbols-outlined shrink-0" >visibility</span><span class="sidebar-label">Visibility</span></a>
+<a href="work-assignment.html" class="nav-link " title="Assignments" ><span class="material-symbols-outlined shrink-0" >group_add</span><span class="sidebar-label">Assignments</span></a>
+</div></details>
+<details class="nav-group" data-nav-group="support"><summary class="nav-group-toggle"><span class="material-symbols-outlined nav-group-icon">support_agent</span><span class="nav-group-label">Support</span><span class="material-symbols-outlined nav-group-chevron">expand_more</span></summary><div class="nav-sub">
+<a href="support-workspace.html" class="nav-link " title="Help Desk" ><span class="material-symbols-outlined shrink-0" >support_agent</span><span class="sidebar-label">Help Desk</span></a>
+</div></details>
+          <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+        </div>
+      </div>
+    </dialog>
+    
+        <main id="main-content" tabindex="-1" class="app-canvas">
+          <div class="page-stack">
+    
+    <section class="shell-card" data-demo-validate="true">
+      <div class="workspace-surface">
+      <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4"> <div> <h2 class="font-headline-lg text-headline-lg text-on-surface">Join Tracker</h2> <p class="font-body-sm text-body-sm text-text-muted mt-1">Track onboarding progress for candidates who have accepted offers</p> </div> <div class="flex items-center gap-3 shrink-0"> <button class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-container text-on-primary font-body-sm hover:bg-primary-hover transition-colors"> <span class="material-symbols-outlined text-[18px]">person_add</span> Add to Tracker </button> </div> </div> <!-- Summary Cards --> <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"> <div class="bg-surface border border-border rounded-lg p-inset-card shadow-sm"> <div class="flex items-center justify-between mb-2"> <span class="font-label-caps text-label-caps text-text-muted">STARTING THIS WEEK</span> <span class="material-symbols-outlined text-primary text-[20px]">event_upcoming</span> </div> <p class="font-headline-md text-headline-md font-bold text-primary">2</p> </div> <div class="bg-surface border border-border rounded-lg p-inset-card shadow-sm"> <div class="flex items-center justify-between mb-2"> <span class="font-label-caps text-label-caps text-text-muted">IN PROGRESS</span> <span class="material-symbols-outlined text-info-text text-[20px]">sync</span> </div> <p class="font-headline-md text-headline-md font-bold text-info-text">5</p> </div> <div class="bg-surface border border-border rounded-lg p-inset-card shadow-sm"> <div class="flex items-center justify-between mb-2"> <span class="font-label-caps text-label-caps text-text-muted">STARTING SOON</span> <span class="material-symbols-outlined text-warning-text text-[20px]">schedule</span> </div> <p class="font-headline-md text-headline-md font-bold text-warning-text">3</p> </div> <div class="bg-surface border border-border rounded-lg p-inset-card shadow-sm"> <div class="flex items-center justify-between mb-2"> <span class="font-label-caps text-label-caps text-text-muted">COMPLETE</span> <span class="material-symbols-outlined text-success-text text-[20px]">check_circle</span> </div> <p class="font-headline-md text-headline-md font-bold text-success-text">8</p> </div> </div> <!-- Filters & Search Bar --> <div class="bg-surface border border-border rounded-lg p-3 flex flex-col xl:flex-row gap-4 items-center justify-between shadow-sm"> <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto"> <div class="flex items-center gap-2 border-r border-border pr-3"> <span class="material-symbols-outlined text-text-muted text-[18px]">filter_list</span> <span class="font-label-caps text-label-caps text-text-muted">FILTERS</span> </div> <select class="bg-surface border border-border rounded text-on-surface font-body-sm py-1.5 pl-2 pr-8 focus:outline-none focus:border-primary"> <option>Status: All</option> <option>Pre-boarding</option> <option>Day 1 Ready</option> <option>In Progress</option> <option>Complete</option> </select> <select class="bg-surface border border-border rounded text-on-surface font-body-sm py-1.5 pl-2 pr-8 focus:outline-none focus:border-primary"> <option>Start Date Range</option> <option>This Week</option> <option>Next Week</option> <option>This Month</option> <option>Next Month</option> </select> <select class="bg-surface border border-border rounded text-on-surface font-body-sm py-1.5 pl-2 pr-8 focus:outline-none focus:border-primary"> <option>Department: All</option> <option>Engineering</option> <option>Product</option> <option>Design</option> <option>Marketing</option> </select> </div> <div class="relative w-full xl:w-72 shrink-0"> <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">search</span> <input class="w-full bg-surface-alt border border-border rounded-lg pl-9 pr-3 py-1.5 font-body-sm focus:outline-none focus:border-primary text-on-surface placeholder-text-muted" placeholder="Search by name or position..." type="text"/> </div> </div> <!-- Main Data Table --> <div class="bg-surface border border-border rounded-lg shadow-sm flex flex-col"> <div class="overflow-x-auto"> <table class="w-full text-left border-collapse whitespace-nowrap"> <thead class="bg-surface-alt border-b border-border z-10"> <tr> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Candidate</th> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Position</th> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Start Date</th> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Onboarding Progress</th> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Tasks</th> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Documents</th> <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Status</th> <th class="py-3 px-4 w-10">
+</th> </tr> </thead> <tbody class="font-data-tabular text-data-tabular text-on-surface divide-y divide-border"> <!-- Row 1: Alex Morgan --> <tr class="hover:bg-highlight-soft transition-colors h-table-row"> <td class="px-4 py-2"> <div class="flex items-center gap-3"> <div class="w-8 h-8 rounded-full bg-primary text-primary font-bold flex items-center justify-center shrink-0">AM</div> <div> <p class="font-semibold">Alex Morgan</p> <p class="text-text-muted font-body-sm text-[11px]">alex.morgan@example.com</p> </div> </div> </td> <td class="px-4 py-2"> <p>Senior Backend Engineer</p> <p class="text-text-muted font-body-sm text-[11px]">Engineering</p> </td> <td class="px-4 py-2"> <p>Aug 28</p> <p class="text-text-muted font-body-sm text-[11px]">in 7 days</p> </td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-24 h-1.5 bg-surface-alt rounded-full"> <div class="bg-primary rounded-full" style="width: 40%">
+</div> </div> <span class="text-[11px] text-text-muted">40%</span> </div> </td> <td class="px-4 py-2"> <span>4/10</span> </td> <td class="px-4 py-2"> <div class="flex items-center gap-1"> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-alt border border-border text-[10px] font-semibold">2</span> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success-text text-[10px] font-semibold">5</span> </div> </td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded bg-info-bg text-info-text text-[11px] font-semibold border border-outline-variant">Pre-boarding</span> </td> <td class="px-4 py-2 text-right"> <button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant cursor-pointer"> <span class="material-symbols-outlined text-[20px]">more_vert</span> </button> </td> </tr> <!-- Row 2: Jamie Garcia --> <tr class="bg-surface-alt hover:bg-highlight-soft transition-colors h-table-row"> <td class="px-4 py-2"> <div class="flex items-center gap-3"> <div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container font-bold flex items-center justify-center shrink-0">JG</div> <div> <p class="font-semibold">Jamie Garcia</p> <p class="text-text-muted font-body-sm text-[11px]">jamie.garcia@example.com</p> </div> </div> </td> <td class="px-4 py-2"> <p>Product Manager</p> <p class="text-text-muted font-body-sm text-[11px]">Product</p> </td> <td class="px-4 py-2"> <p>Aug 25</p> <p class="text-text-muted font-body-sm text-[11px]">in 4 days</p> </td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-24 h-1.5 bg-surface-alt rounded-full"> <div class="bg-info-text rounded-full" style="width: 70%">
+</div> </div> <span class="text-[11px] text-text-muted">70%</span> </div> </td> <td class="px-4 py-2"> <span>7/10</span> </td> <td class="px-4 py-2"> <div class="flex items-center gap-1"> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-alt border border-border text-[10px] font-semibold">4</span> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success-text text-[10px] font-semibold">5</span> </div> </td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded bg-success-bg text-success-text text-[11px] font-semibold border border-primary-fixed-dim">Day 1 Ready</span> </td> <td class="px-4 py-2 text-right"> <button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant cursor-pointer"> <span class="material-symbols-outlined text-[20px]">more_vert</span> </button> </td> </tr> <!-- Row 3: Sam Lee --> <tr class="hover:bg-highlight-soft transition-colors h-table-row"> <td class="px-4 py-2"> <div class="flex items-center gap-3"> <div class="w-8 h-8 rounded-full bg-primary text-primary font-bold flex items-center justify-center shrink-0">SL</div> <div> <p class="font-semibold">Sam Lee</p> <p class="text-text-muted font-body-sm text-[11px]">sam.lee@example.com</p> </div> </div> </td> <td class="px-4 py-2"> <p>Data Analyst</p> <p class="text-text-muted font-body-sm text-[11px]">Engineering</p> </td> <td class="px-4 py-2"> <p>Sep 1</p> <p class="text-text-muted font-body-sm text-[11px]">in 11 days</p> </td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-24 h-1.5 bg-surface-alt rounded-full"> <div class="bg-primary rounded-full" style="width: 20%">
+</div> </div> <span class="text-[11px] text-text-muted">20%</span> </div> </td> <td class="px-4 py-2"> <span>2/10</span> </td> <td class="px-4 py-2"> <div class="flex items-center gap-1"> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-alt border border-border text-[10px] font-semibold">1</span> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success-text text-[10px] font-semibold">5</span> </div> </td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded bg-info-bg text-info-text text-[11px] font-semibold border border-outline-variant">Pre-boarding</span> </td> <td class="px-4 py-2 text-right"> <button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant cursor-pointer"> <span class="material-symbols-outlined text-[20px]">more_vert</span> </button> </td> </tr> <!-- Row 4: Casey Brown --> <tr class="bg-surface-alt hover:bg-highlight-soft transition-colors h-table-row"> <td class="px-4 py-2"> <div class="flex items-center gap-3"> <div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container font-bold flex items-center justify-center shrink-0">CB</div> <div> <p class="font-semibold">Casey Brown</p> <p class="text-text-muted font-body-sm text-[11px]">casey.brown@example.com</p> </div> </div> </td> <td class="px-4 py-2"> <p>DevOps Engineer</p> <p class="text-text-muted font-body-sm text-[11px]">Engineering</p> </td> <td class="px-4 py-2"> <p>Aug 18</p> <p class="text-text-muted font-body-sm text-[11px]">3 days ago</p> </td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-24 h-1.5 bg-surface-alt rounded-full"> <div class="bg-warning-text rounded-full" style="width: 60%">
+</div> </div> <span class="text-[11px] text-text-muted">60%</span> </div> </td> <td class="px-4 py-2"> <span>6/10</span> </td> <td class="px-4 py-2"> <div class="flex items-center gap-1"> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-alt border border-border text-[10px] font-semibold">3</span> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success-text text-[10px] font-semibold">5</span> </div> </td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded bg-warning-bg text-warning-text text-[11px] font-semibold border border-highlight-soft">In Progress</span> </td> <td class="px-4 py-2 text-right"> <button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant cursor-pointer"> <span class="material-symbols-outlined text-[20px]">more_vert</span> </button> </td> </tr> <!-- Row 5: Taylor Swift --> <tr class="hover:bg-highlight-soft transition-colors h-table-row"> <td class="px-4 py-2"> <div class="flex items-center gap-3"> <div class="w-8 h-8 rounded-full bg-primary text-primary font-bold flex items-center justify-center shrink-0">TS</div> <div> <p class="font-semibold">Taylor Swift</p> <p class="text-text-muted font-body-sm text-[11px]">taylor.swift@example.com</p> </div> </div> </td> <td class="px-4 py-2"> <p>UX Designer</p> <p class="text-text-muted font-body-sm text-[11px]">Design</p> </td> <td class="px-4 py-2"> <p>Jul 15</p> <p class="text-text-muted font-body-sm text-[11px]">completed</p> </td> <td class="px-4 py-2"> <div class="flex items-center gap-2"> <div class="w-24 h-1.5 bg-surface-alt rounded-full"> <div class="bg-success-text rounded-full" style="width: 100%">
+</div> </div> <span class="text-[11px] text-text-muted">100%</span> </div> </td> <td class="px-4 py-2"> <span>10/10</span> </td> <td class="px-4 py-2"> <div class="flex items-center gap-1"> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success-text text-[10px] font-semibold">5</span> <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success-text text-[10px] font-semibold">5</span> </div> </td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-container text-on-primary text-[11px] font-semibold">Complete</span> </td> <td class="px-4 py-2 text-right"> <button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant cursor-pointer"> <span class="material-symbols-outlined text-[20px]">more_vert</span> </button> </td> </tr> </tbody> </table> </div> <!-- Pagination Footer --> <div class="bg-surface border-t border-border p-3 flex items-center justify-between text-body-sm text-text-muted"> <span>Showing 1 to 5 of 18 entries</span> <div class="flex items-center gap-2"> <button class="p-1 rounded hover:bg-highlight-soft disabled:opacity-50" disabled=""> <span class="material-symbols-outlined text-[18px]">chevron_left</span> </button> <button class="w-6 h-6 rounded bg-primary-container text-on-primary font-semibold flex items-center justify-center">1</button> <button class="w-6 h-6 rounded hover:bg-highlight-soft flex items-center justify-center">2</button> <button class="w-6 h-6 rounded hover:bg-highlight-soft flex items-center justify-center">3</button> <button class="p-1 rounded hover:bg-highlight-soft"> <span class="material-symbols-outlined text-[18px]">chevron_right</span> </button> </div> </div> </div>
+      </div>
+    </section>
+    
+  
+          </div>
+        </main>
+      </div>
+    </div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    
+    <script src="../shared/renderers.js"></script>
+    <script src="../shared/api-client.js?v=1787914846"></script>
+    <script src="../shared/ui-utils.js"></script>
+    <script src="../shared/tables.js"></script>
+    <script src="../shared/forms.js"></script>
+    <script src="../shared/sidebar.js"></script>
+    <script src="../shared/pipeline.js"></script>
+    <script src="../shared/routing.js"></script>
+
+  <script src="../shared/app.js?v=1787914846"></script>
+</body>
+</html>

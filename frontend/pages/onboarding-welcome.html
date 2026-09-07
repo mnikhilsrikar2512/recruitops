@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome Setup — RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css" />
+  <link rel="stylesheet" href="../shared/landing.css" />
+</head>
+<body class="bg-background" data-route-id="onboarding-welcome" data-route-kind="standalone" data-route-title="Welcome Setup" data-route-section="Onboarding">
+  <main id="main-content">
+    <div class="min-h-screen flex items-center justify-center px-6 py-20" style="padding-top:80px">
+      <div style="width:100%;max-width:1000px;display:flex;gap:48px;align-items:center;flex-wrap:wrap">
+
+        <!-- Left: Content -->
+        <div style="flex:1;min-width:320px">
+          <!-- Progress -->
+          <div style="margin-bottom:32px">
+            <div class="flex justify-between items-center mb-2" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#69746F">
+              <span>Setup Progress</span><span>0%</span>
+            </div>
+            <div style="width:100%;height:6px;background:#DDE3DD;border-radius:999px"><div style="width:0%;height:100%;background:#24483C;border-radius:999px"></div></div>
+          </div>
+
+          <!-- Hero -->
+          <h1 class="hero-animate-1 font-extrabold text-on-surface mb-4" style="font-size:clamp(28px,4vw,36px);line-height:1.15">Let's set up your recruiting command center.</h1>
+          <p class="hero-animate-2 text-on-surface-variant mb-8" style="font-size:16px;line-height:1.6;max-width:480px">Your workspace is ready. Setup takes approximately 6 minutes and establishes the foundation for your hiring operations.</p>
+
+          <!-- Actions -->
+          <div class="hero-animate-3 flex flex-col sm:flex-row gap-4">
+            <button onclick="window.location.href='onboarding-company-profile.html'" class="btn-primary" style="border:none;cursor:pointer">Start Setup <span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span></button>
+            <button class="btn-secondary" style="cursor:pointer"><span class="material-symbols-outlined" style="font-size:18px;color:#69746F">cloud_upload</span> Import from RecruitOps</button>
+          </div>
+
+          <!-- Achievements -->
+          <div class="mt-8 pt-8 flex flex-col sm:flex-row gap-6" style="border-top:1px solid #DDE3DD">
+            <div class="flex items-center gap-3"><div class="w-6 h-6 rounded-full flex items-center justify-center" style="background:#E9F2EB"><span class="material-symbols-outlined" style="font-size:14px;color:#24483C">check</span></div><span style="font-size:12px;font-weight:500;color:#17201C">Workspace created</span></div>
+            <div class="flex items-center gap-3"><div class="w-6 h-6 rounded-full flex items-center justify-center" style="background:#E9F2EB"><span class="material-symbols-outlined" style="font-size:14px;color:#24483C">check</span></div><span style="font-size:12px;font-weight:500;color:#17201C">Admin verified</span></div>
+            <div class="flex items-center gap-3" style="opacity:0.5"><div class="w-6 h-6 rounded-full flex items-center justify-center" style="border:1px solid #DDE3DD"><span class="material-symbols-outlined" style="font-size:14px;color:#69746F">lock</span></div><span style="font-size:12px;font-weight:500;color:#69746F">Setup path unlocked</span></div>
+          </div>
+        </div>
+
+        <!-- Right: Setup Path -->
+        <div style="width:100%;max-width:360px;flex-shrink:0">
+          <div class="bg-surface border border-border rounded-lg p-8" style="position:relative">
+            <div style="position:absolute;left:47px;top:48px;bottom:48px;width:1px;background:#DDE3DD;z-index:0"></div>
+            <h3 style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#69746F;margin-bottom:24px">Your Setup Path</h3>
+            <div class="flex flex-col gap-3" style="position:relative;z-index:10">
+              <div class="flex items-center gap-4 p-3 rounded-lg" style="cursor:default"><div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="border:1px solid #DDE3DD;background:#fff;color:#69746F;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.06);z-index:10">1</div><span style="font-size:12px;font-weight:500;color:#17201C">Company Profile</span></div>
+              <div class="flex items-center gap-4 p-3 rounded-lg" style="cursor:default"><div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="border:1px solid #DDE3DD;background:#fff;color:#69746F;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.06);z-index:10">2</div><span style="font-size:12px;font-weight:500;color:#17201C">Locations</span></div>
+              <div class="flex items-center gap-4 p-3 rounded-lg" style="cursor:default"><div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="border:1px solid #DDE3DD;background:#fff;color:#69746F;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.06);z-index:10">3</div><span style="font-size:12px;font-weight:500;color:#17201C">Hiring Teams</span></div>
+              <div class="flex items-center gap-4 p-3 rounded-lg" style="cursor:default"><div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="border:1px solid #DDE3DD;background:#fff;color:#69746F;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.06);z-index:10">4</div><span style="font-size:12px;font-weight:500;color:#17201C">Roles</span></div>
+              <div class="flex items-center gap-4 p-3 rounded-lg" style="cursor:default"><div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="border:1px solid #DDE3DD;background:#fff;color:#69746F;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.06);z-index:10">5</div><span style="font-size:12px;font-weight:500;color:#17201C">Pipeline</span></div>
+              <div class="flex items-center gap-4 p-3 rounded-lg" style="cursor:default"><div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="border:1px solid #DDE3DD;background:#fff;color:#69746F;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.06);z-index:10">6</div><span style="font-size:12px;font-weight:500;color:#17201C">Integrations</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+  <script src="../shared/landing.js"></script>
+  <script src="../shared/renderers.js"></script>
+  <script src="../shared/api-client.js"></script>
+    <script src="../shared/ui-utils.js"></script>
+    <script src="../shared/tables.js"></script>
+    <script src="../shared/forms.js"></script>
+    <script src="../shared/sidebar.js"></script>
+    <script src="../shared/pipeline.js"></script>
+    <script src="../shared/routing.js"></script>
+
+  <script src="../shared/app.js"></script>
+</body>
+</html>
