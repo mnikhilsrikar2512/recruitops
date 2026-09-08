@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from app.core.config import settings
 from app.core.security import (
     create_sha256_password_hash,
     generate_session_token,
@@ -46,7 +47,7 @@ from app.schemas.auth import (
 )
 from app.schemas.permission import PermissionScopePayload, ResolvedPermissionsResponse
 
-SESSION_TTL_HOURS = 12
+SESSION_TTL_HOURS = settings.session_ttl_hours
 
 
 @dataclass
@@ -271,7 +272,7 @@ def forgot_password_service(
         token_hash=hash_session_token(setup_token),
         purpose="self-reset",
         issued_by_user_id=user.id,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
     )
     return PasswordForgotResponse(
         message="If an account with that email exists, a reset link has been sent"

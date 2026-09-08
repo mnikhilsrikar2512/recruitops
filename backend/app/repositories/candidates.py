@@ -189,7 +189,8 @@ def _map_candidate(row: RowMapping, linked_requisition_titles: list[str] | None 
 def _load_linked_requisition_titles(engine: Engine, candidate_ids: list[int]) -> dict[int, list[str]]:
     if not candidate_ids:
         return {}
-    placeholders = ", ".join(str(candidate_id) for candidate_id in candidate_ids)
+    bind_names = [f"cid_{i}" for i in range(len(candidate_ids))]
+    placeholders = ", ".join(f":{name}" for name in bind_names)
     query = text(
         f"""
         SELECT ca.candidate_id, r.title
@@ -200,8 +201,9 @@ def _load_linked_requisition_titles(engine: Engine, candidate_ids: list[int]) ->
         ORDER BY r.title;
         """
     )
+    params = {name: cid for name, cid in zip(bind_names, candidate_ids)}
     with engine.connect() as connection:
-        rows = connection.execute(query).mappings().all()
+        rows = connection.execute(query, params).mappings().all()
     items: dict[int, list[str]] = {}
     for row in rows:
         items.setdefault(row["candidate_id"], []).append(row["title"])

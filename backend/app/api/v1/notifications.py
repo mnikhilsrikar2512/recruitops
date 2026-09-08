@@ -11,7 +11,7 @@ from app.schemas.notification import (
 from app.services.auth import AuthContext
 from app.services.notifications import list_notifications_service, mark_notification_read_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
 
 @router.get("/", response_model=NotificationListResponse)

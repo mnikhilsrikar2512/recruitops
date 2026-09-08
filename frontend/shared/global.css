@@ -358,7 +358,28 @@
       box-shadow: 0 0 0 3px rgba(70, 91, 76, 0.12);
     }
     .topbar-action {
+      position: relative;
       transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+    .notification-badge {
+      position: absolute;
+      top: -4px;
+      right: -3px;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 4px;
+      border-radius: 9999px;
+      background: #88423b;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 17px;
+      text-align: center;
+      pointer-events: none;
+      box-shadow: 0 0 0 2px rgba(250, 251, 248, 0.9);
+    }
+    .notification-badge[hidden] {
+      display: none;
     }
     .topbar-action:hover {
       border-color: rgba(70, 91, 76, 0.28);

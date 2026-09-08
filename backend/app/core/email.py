@@ -50,7 +50,9 @@ async def send_email(
         return False
 
 
-def build_password_setup_email(setup_token: str, base_url: str = "http://localhost:3000") -> tuple[str, str, str]:
+def build_password_setup_email(setup_token: str, base_url: str | None = None) -> tuple[str, str, str]:
+    if base_url is None:
+        base_url = settings.frontend_base_url
     subject = "Set Up Your Password - Recruitment System"
     setup_url = f"{base_url}/password-setup?token={setup_token}"
     html_body = f"""
@@ -72,7 +74,9 @@ def build_password_setup_email(setup_token: str, base_url: str = "http://localho
     return subject, html_body, text_body
 
 
-def build_password_reset_email(reset_token: str, base_url: str = "http://localhost:3000") -> tuple[str, str, str]:
+def build_password_reset_email(reset_token: str, base_url: str | None = None) -> tuple[str, str, str]:
+    if base_url is None:
+        base_url = settings.frontend_base_url
     subject = "Reset Your Password - Recruitment System"
     reset_url = f"{base_url}/reset-password?token={reset_token}"
     html_body = f"""
@@ -99,8 +103,10 @@ def build_notification_email(
     event_type: str,
     message: str,
     action_url: str | None = None,
-    base_url: str = "http://localhost:3000",
+    base_url: str | None = None,
 ) -> tuple[str, str, str]:
+    if base_url is None:
+        base_url = settings.frontend_base_url
     subject = f"Notification: {event_type.replace('_', ' ').title()} - Recruitment System"
     action_link = f'<p><a href="{base_url}{action_url}">View Details</a></p>' if action_url else ""
     html_body = f"""

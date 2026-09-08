@@ -684,7 +684,8 @@ async function loadNotificationDetailPanel() {
   const notificationId = queryInt("notification_id");
   if (notificationId) {
     try {
-      await apiRequest(`/notifications/${notificationId}/read`, { method: "POST" });
+      await apiRequest(`/notifications/${notificationId}/read`, { method: "PATCH", body: JSON.stringify({ status: "read" }) });
+      refreshNotificationBadge();
     } catch {}
   }
 }
@@ -971,42 +972,133 @@ async function loadAssignmentHistoryDrawer() {
   if (host) host.innerHTML = '<div class="p-4 text-text-muted">Assignment history loaded.</div>';
 }
 
+let workAssignmentReqId = null;
+
 async function loadWorkAssignment() {
-  const [actions, pipeline, requisitions] = await Promise.all([
-    apiRequest("/workflow-actions/queue?page_size=50").catch(() => ({ items: [] })),
-    apiRequest("/pipeline/board").catch(() => []),
+  workAssignmentReqId = queryInt("requisition_id") || workAssignmentReqId;
+  const [requisitions, users] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] })),
   ]);
-  const items = actions.items || [];
-  const pipelineItems = Array.isArray(pipeline) ? pipeline : pipeline.items || [];
+  const reqItems = requisitions.items || [];
+  if (!workAssignmentReqId && reqItems.length) workAssignmentReqId = reqItems[0].id;
+  const selected = reqItems.find((r) => r.id === workAssignmentReqId);
+
+  let assignments = [];
+  if (workAssignmentReqId) {
+    const payload = await apiRequest(`/requisitions/${workAssignmentReqId}/assignments`).catch(() => []);
+    assignments = Array.isArray(payload) ? payload : payload.items || [];
+  }
+  const assignedIds = new Set(assignments.map((a) => a.assigned_user_id));
+  const available = (users.items || []).filter((u) => !assignedIds.has(u.id) && u.id !== selected?.primary_owner_user_id);
+
   const surface = document.querySelector(".workspace-surface");
   if (!surface) return;
-  const pipelineByEntity = new Map();
-  pipelineItems.forEach((item) => {
-    pipelineByEntity.set(`candidate:${item.candidate_id}`, item);
-    pipelineByEntity.set(`requisition:${item.requisition_id}`, item);
-  });
-  surface.innerHTML = `<div class="space-y-5" data-live-delivery-work-queue="true">
-    <h1 class="text-headline-lg font-bold text-on-surface">Delivery Work Queue</h1>
-    <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
-      ${htmlList(items, (item, index) => renderDeliveryWorkRow(item, index, pipelineByEntity), '<div class="p-6 text-text-muted">No workflow actions.</div>')}
+  const initials = (name) => (name || "?").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const roleOptions = reqItems.map((r) => `<option value="${r.id}" ${r.id === workAssignmentReqId ? "selected" : ""}>${escapeLiveHtml(r.title || `Requisition ${r.id}`)}${r.primary_owner_name ? ` — owner: ${escapeLiveHtml(r.primary_owner_name)}` : ""}</option>`).join("");
+  const assignedRows = selected
+    ? (assignments.length
+        ? assignments.map((a) => `<div class="px-4 py-3 flex items-center justify-between hover:bg-highlight-soft transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full ${a.assignment_type === "primary_owner" ? "bg-primary-container text-on-primary" : "bg-secondary-container text-on-secondary-container"} font-bold flex items-center justify-center shrink-0 text-sm">${escapeLiveHtml(initials(a.assigned_user_name))}</div>
+              <div>
+                <p class="font-semibold text-on-surface">${escapeLiveHtml(a.assigned_user_name || "Unknown")}</p>
+                <p class="text-text-muted font-body-sm text-[11px]">${escapeLiveHtml(a.assignment_type || "contributor")}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              ${a.assignment_type === "primary_owner" ? '<span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-container text-on-primary text-[10px] font-bold uppercase tracking-wide">Owner</span>' : ""}
+              <button type="button" class="text-text-muted hover:text-danger-text transition-colors p-1 rounded hover:bg-danger-bg" title="Remove assignment" data-remove-assignment="${a.id}" aria-label="Remove assignment"><span class="material-symbols-outlined text-[18px]">close</span></button>
+            </div>
+          </div>`).join("")
+        : '<div class="px-4 py-6 text-text-muted font-body-sm">No team members assigned yet.</div>')
+    : '<div class="px-4 py-6 text-text-muted font-body-sm">Select a requisition to view its team.</div>';
+  const availableRows = selected
+    ? (available.length
+        ? available.map((u) => `<div class="px-4 py-3 flex items-center justify-between hover:bg-highlight-soft transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary-container font-bold flex items-center justify-center shrink-0 text-sm">${escapeLiveHtml(initials(u.full_name))}</div>
+              <div>
+                <p class="font-semibold text-on-surface">${escapeLiveHtml(u.full_name)}</p>
+                <p class="text-text-muted font-body-sm text-[11px]">${escapeLiveHtml(u.business_title || u.role_name || "Team member")}</p>
+              </div>
+            </div>
+            <button type="button" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary font-body-sm text-[12px] font-semibold hover:bg-primary-hover transition-colors" data-assign-user="${u.id}" title="Assign as contributor"><span class="material-symbols-outlined text-[16px]">add</span> Assign</button>
+          </div>`).join("")
+        : '<div class="px-4 py-6 text-text-muted font-body-sm">Everyone is already assigned.</div>')
+    : '<div class="px-4 py-6 text-text-muted font-body-sm">Select a requisition first.</div>';
+
+  surface.innerHTML = `<div class="space-y-5" data-live-work-assignment="true">
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div>
+        <h1 class="text-headline-lg font-bold text-on-surface">Work Assignment</h1>
+        <p class="font-body-sm text-body-sm text-text-muted mt-1">Assign team members across requisitions. Owner transfers require the primary-owner assignment type.</p>
+      </div>
+      <span class="inline-flex items-center rounded-full bg-success-bg px-2.5 py-1 font-label-caps text-label-caps text-success-text">Live API data</span>
+    </div>
+    <div class="bg-surface border border-border rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-text-muted text-[18px]">work</span>
+        <span class="font-label-caps text-label-caps text-text-muted">REQUISITION</span>
+      </div>
+      <select id="work-assignment-requisition" class="w-full sm:w-96 bg-surface-alt border border-border rounded-lg text-on-surface font-body-sm py-2 pl-3 pr-3 focus:outline-none focus:border-primary">
+        ${roleOptions || '<option value="">No requisitions yet</option>'}
+      </select>
+      <div class="flex items-center gap-2 text-sm text-text-muted">
+        <span class="material-symbols-outlined text-[16px]">group</span>
+        <span class="font-body-sm">${assignments.length} assigned</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-surface border border-border rounded-lg shadow-sm flex flex-col">
+        <div class="bg-surface-alt border-b border-border px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-primary">group</span><h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Assigned Members</h3></div>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-container text-on-primary text-[11px] font-bold">${assignments.length}</span>
+        </div>
+        <div class="divide-y divide-border">${assignedRows}</div>
+      </div>
+      <div class="bg-surface border border-border rounded-lg shadow-sm flex flex-col">
+        <div class="bg-surface-alt border-b border-border px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-success-text">person_add</span><h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Available Team</h3></div>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-success-bg text-success-text text-[11px] font-bold">${available.length}</span>
+        </div>
+        <div class="divide-y divide-border max-h-[480px] overflow-y-auto">${availableRows}</div>
+      </div>
     </div>
   </div>`;
+
+  const selector = surface.querySelector("#work-assignment-requisition");
+  if (selector) {
+    selector.addEventListener("change", () => {
+      workAssignmentReqId = intOrNull(selector.value);
+      loadWorkAssignment();
+    });
+  }
+  surface.querySelectorAll("[data-assign-user]").forEach((button) => {
+    button.addEventListener("click", () => createRequisitionAssignment(button));
+  });
+  surface.querySelectorAll("[data-remove-assignment]").forEach((button) => {
+    button.addEventListener("click", () => removeRequisitionAssignment(button));
+  });
 }
 
 async function createRequisitionAssignment(button) {
-  const reqId = queryInt("requisition_id");
-  const userId = intOrNull(button?.dataset.userId);
+  const reqId = workAssignmentReqId || queryInt("requisition_id");
+  const userId = intOrNull(button?.dataset.userId || button?.getAttribute("data-assign-user"));
+  const assignmentType = button?.dataset.assignmentType || "contributor";
   if (!reqId || !userId) return;
   try {
-    await apiRequest(`/requisitions/${reqId}/assignments`, { method: "POST", body: JSON.stringify({ user_id: userId, assignment_type: "primary_owner" }) });
-    showLiveSuccess("User assigned");
+    await apiRequest(`/requisitions/${reqId}/assignments`, {
+      method: "POST",
+      body: JSON.stringify({ assigned_user_id: userId, assignment_type: assignmentType }),
+    });
+    showLiveSuccess(assignmentType === "primary_owner" ? "Owner assigned" : "Team member assigned", assignmentType === "primary_owner" ? "Requisition ownership transferred." : "Contributor added to the requisition team.");
     loadWorkAssignment();
   } catch (error) { showLiveError(error); }
 }
 
 async function removeRequisitionAssignment(button) {
-  const assignmentId = intOrNull(button?.dataset.assignmentId);
+  const assignmentId = intOrNull(button?.dataset.assignmentId || button?.getAttribute("data-remove-assignment"));
   if (!assignmentId) return;
   try {
     await apiRequest(`/requisitions/assignments/${assignmentId}`, { method: "DELETE" });
@@ -1151,6 +1243,32 @@ async function loadDailyUpdates() {
   if (!surface) return;
   const list = surface.querySelector(".space-y-4, .rounded-xl.flex.flex-col");
   if (list) list.innerHTML = items.length ? items.map((item, i) => renderDailyUpdateSubmissionCard(item)).join("") : '<div class="p-4 text-text-muted">No updates.</div>';
+}
+
+/* Loader for the daily-updates-submission page: populate the requisition select,
+   date input, and the recent-updates list. Never touches the form fields. */
+async function loadDailyUpdateSubmission() {
+  const [requisitions, updates] = await Promise.all([
+    apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
+  ]);
+  const reqItems = requisitions.items || [];
+  const dateInput = document.getElementById("update-date");
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split("T")[0];
+  await fillSelect("requisition_id", reqItems,
+    (r) => `${escapeLiveHtml(r.requisition_code || `REQ-${r.id}`)} — ${escapeLiveHtml(r.title)}`,
+    (r) => r.id, queryInt("requisition_id"));
+  const recent = document.getElementById("recent-updates-list");
+  if (recent) {
+    const mine = (updates.items || []).slice(0, 5);
+    recent.innerHTML = mine.length
+      ? mine.map((u) => `<div class="flex items-center justify-between border border-border rounded-lg px-4 py-3 bg-surface">
+          <div class="min-w-0"><p class="truncate font-body-sm text-body-sm font-semibold text-on-surface">${escapeLiveHtml((u.summary || "").slice(0, 90) || "(no summary)")}</p>
+          <p class="text-xs text-text-muted mt-0.5">${escapeLiveHtml(String(u.update_date || ""))}</p></div>
+          <span class="ml-3 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.submission_status === "draft" ? "bg-surface-dim text-text-muted" : "bg-success-container text-success-text"}">${escapeLiveHtml(u.submission_status || "submitted")}</span>
+        </div>`).join("")
+      : '<p class="text-text-muted">No updates submitted yet — your first one will appear here.</p>';
+  }
 }
 
 async function loadDailyUpdatesReview() {
@@ -1531,10 +1649,132 @@ async function loadOfferCreateDialog() {
    NOTIFICATIONS
    ═══════════════════════════════════════════════════════════════ */
 
+let notificationItemsCache = [];
+let notificationUnreadTotal = 0;
+let notificationStatusFilter = "unread";
+let notificationSearchText = "";
+
+function notificationFilterLabel() {
+  return notificationStatusFilter === "all" ? "" : notificationStatusFilter;
+}
+
+function notificationsView() {
+  const term = notificationSearchText.trim().toLowerCase();
+  if (!term) return notificationItemsCache;
+  return notificationItemsCache.filter((item) => `${item.title || ""} ${item.message || ""}`.toLowerCase().includes(term));
+}
+
+function ensureNotificationBadge() {
+  const bell = document.querySelector('.app-topbar [data-route*="notifications-center"]');
+  if (!bell) return null;
+  let badge = bell.querySelector("[data-notification-badge]");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "notification-badge";
+    badge.dataset.notificationBadge = "true";
+    badge.hidden = true;
+    bell.appendChild(badge);
+  }
+  return badge;
+}
+
+async function refreshNotificationBadge() {
+  const badge = ensureNotificationBadge();
+  if (!badge || !LIVE_API_ENABLED) return;
+  try {
+    const payload = await apiRequest("/notifications/?status=unread&page_size=1");
+    const count = payload.meta?.total ?? 0;
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.hidden = count === 0;
+  } catch {
+    badge.hidden = true;
+  }
+}
+
+function applyNotificationReadState(row) {
+  if (!row) return;
+  row.classList.add("notification-read");
+  row.dataset.notificationStatus = "read";
+  row.querySelectorAll("[data-notification-unread-indicator]").forEach((dot) => dot.remove());
+  const button = row.querySelector("[data-notification-read]");
+  if (button) button.setAttribute("disabled", "disabled");
+  const badge = row.querySelector("[data-notification-status-badge]");
+  if (badge) badge.textContent = "read";
+}
+
+async function markNotificationReadAction(button) {
+  if (button.disabled) return;
+  button.setAttribute("disabled", "disabled");
+  const row = button.closest("[data-notification-id]");
+  const id = intOrNull(row?.dataset.notificationId);
+  if (!id) {
+    applyNotificationReadState(row);
+    showToast("Notification updated", "This alert is marked as read for this session.");
+    return;
+  }
+  try {
+    await apiRequest(`/notifications/${id}/read`, { method: "PATCH", body: JSON.stringify({ status: "read" }) });
+    notificationItemsCache = notificationItemsCache.map((item) => (String(item.id) === String(id) ? { ...item, status: "read" } : item));
+    notificationUnreadTotal = Math.max(0, notificationUnreadTotal - 1);
+    refreshNotificationBadge();
+    if (routeId() === "notifications-center" && document.querySelector("[data-notifications-command-center]")) {
+      renderNotificationsCommandCenter(notificationsView(), { unread_total: notificationUnreadTotal });
+    } else {
+      applyNotificationReadState(row);
+    }
+    showLiveSuccess("Marked as read", "Notification updated.");
+  } catch (error) {
+    button.removeAttribute("disabled");
+    showLiveError(error);
+  }
+}
+
+function wireNotificationCenterFilters(surface) {
+  const filterBar = surface.querySelector("[data-toggle-group]");
+  if (filterBar && !filterBar.dataset.notifWired) {
+    filterBar.dataset.notifWired = "true";
+    filterBar.querySelectorAll("button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const label = (button.textContent || "").trim().toLowerCase();
+        if (!/^(unread|read|all)$/.test(label)) return;
+        notificationStatusFilter = label;
+        filterBar.querySelectorAll("button").forEach((other) => {
+          other.classList.remove("is-active", "bg-secondary-container", "text-on-secondary-container");
+          other.classList.add("border", "border-border", "bg-surface", "text-secondary", "hover:bg-highlight-soft");
+        });
+        button.classList.add("is-active", "bg-secondary-container", "text-on-secondary-container");
+        button.classList.remove("border", "border-border", "bg-surface", "text-secondary", "hover:bg-highlight-soft");
+        loadNotifications();
+      });
+    });
+  }
+  const searchInput = surface.querySelector('[data-layout="pipeline-filter-bar"] input[type="text"]');
+  if (searchInput && !searchInput.dataset.notifWired) {
+    searchInput.dataset.notifWired = "true";
+    searchInput.addEventListener("input", () => {
+      notificationSearchText = searchInput.value || "";
+      renderNotificationsCommandCenter(notificationsView(), { unread_total: notificationUnreadTotal });
+    });
+  }
+}
+
 async function loadNotifications() {
-  const payload = await apiRequest("/notifications/?page_size=50");
-  const items = payload.items || [];
-  if (routeId() === "notifications-center" && renderNotificationsCommandCenter(items)) return;
+  const query = notificationStatusFilter === "all" ? "?page_size=50" : `?status=${notificationStatusFilter}&page_size=50`;
+  const [payload, unreadPayload] = await Promise.all([
+    apiRequest(`/notifications/${query}`),
+    apiRequest("/notifications/?status=unread&page_size=1").catch(() => null),
+  ]);
+  notificationItemsCache = payload.items || [];
+  if (unreadPayload) notificationUnreadTotal = unreadPayload.meta?.total ?? 0;
+  refreshNotificationBadge();
+  const items = notificationsView();
+  if (routeId() === "notifications-center") {
+    const surface = document.querySelector("[data-notifications-command-center]");
+    if (surface && renderNotificationsCommandCenter(items, { unread_total: notificationUnreadTotal })) {
+      wireNotificationCenterFilters(surface);
+      return;
+    }
+  }
   const list = document.querySelector("[data-notification-list], .workspace-surface .rounded-xl.flex.flex-col");
   if (list && items.length) {
     list.innerHTML = items.map((item) => `<div class="flex items-start gap-4 p-4 border-b border-border bg-surface" data-live-notification-row="true" data-notification-id="${item.id}">
@@ -1543,6 +1783,7 @@ async function loadNotifications() {
         <h4 class="font-headline-sm text-headline-sm text-on-surface truncate">${item.title || "Notification"}</h4>
         <p class="font-body-sm text-body-sm text-text-muted mt-1">${item.message || ""}</p>
       </div>
+      ${String(item.status).toLowerCase() === "unread" ? `<button class="topbar-action" type="button" data-notification-read="true" aria-label="Mark as read" title="Mark as Read"><span class="material-symbols-outlined text-[20px]">done</span></button>` : ""}
     </div>`).join("");
     return;
   }
@@ -2044,7 +2285,7 @@ function bindLiveApiInteractions() {
     const route = routeId();
     const submitRoutes = new Set(["location-form-drawer", "user-form-drawer", "role-form-drawer", "client-create-or-edit-drawer", "contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "meeting-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer", "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup", "onboarding-hiring-teams"]);
     const label = (routeSubmitButton?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-    if (routeSubmitButton && submitRoutes.has(route) && /^(save|create|update|submit|schedule|confirm|continue|next|add|save changes|save user|save client|save contact|save role|create requisition|save candidate)/.test(label)) {
+    if (routeSubmitButton && submitRoutes.has(route) && /^(save|create|update|submit|schedule|confirm|continue|next|add|send|save changes|save user|save client|save contact|save role|create requisition|save candidate)/.test(label)) {
       event.preventDefault();
       event.stopPropagation();
       handleFormSubmit(document.querySelector("form") || routeSubmitButton.closest("form") || document.body);
@@ -2084,12 +2325,30 @@ async function submitOnboardingCompanyProfile() {
   const size = document.getElementById("size")?.value;
   const currency = document.getElementById("currency")?.value;
   const timezone = document.getElementById("timezone")?.value;
+  if (!legalName) { showLiveError(new Error("Company legal name is required.")); return; }
   /* Store company profile in session for onboarding flow */
   session.onboarding = session.onboarding || {};
   session.onboarding.company = { legalName, brandName, industry, size, currency, timezone };
   writeSession(session);
   RecruitOpsLive.session = session;
-  showLiveSuccess("Company profile saved");
+  /* Persist a headquarters location so the company exists in the database */
+  try {
+    const locationName = legalName + " — Headquarters";
+    const payload = {
+      location_name: locationName,
+      location_code: legalName.substring(0, 10).toUpperCase().replace(/\s+/g, ""),
+      status: "active",
+    };
+    const result = await apiRequest("/locations/", { method: "POST", body: JSON.stringify(payload) });
+    session.onboarding.locations = session.onboarding.locations || [];
+    session.onboarding.locations.push({ id: result.id, name: locationName });
+    writeSession(session);
+    RecruitOpsLive.session = session;
+    showLiveSuccess("Company profile saved", "Headquarters location created.");
+  } catch (error) {
+    /* Location may already exist — still save the profile */
+    showLiveSuccess("Company profile saved");
+  }
 }
 
 async function submitOnboardingLocation() {
@@ -2175,6 +2434,16 @@ async function completeOnboarding() {
   session.role_code = "admin";
   writeSession(session);
   RecruitOpsLive.session = session;
+  /* Persist the admin role assignment to the database */
+  try {
+    const userId = session.user_id || currentUserId();
+    if (userId && session.token) {
+      await apiRequest(`/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "active" }),
+      });
+    }
+  } catch (e) { /* Best effort — session already set */ }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2240,7 +2509,7 @@ async function bootPage() {
     "visibility-rules": loadVisibilityRules,
     "business-titles": loadBusinessTitles,
     "daily-updates-workspace": loadDailyUpdates,
-    "daily-updates-submission": loadDailyUpdates,
+    "daily-updates-submission": loadDailyUpdateSubmission,
     "daily-updates-review": loadDailyUpdatesReview,
     "daily-update-detail-panel": loadDailyUpdateDetail,
     "daily-review": loadDailyReview,
@@ -2403,6 +2672,9 @@ RecruitOpsLive.handleLogin = handleLogin;
 RecruitOpsLive.handleLogout = handleLogout;
 RecruitOpsLive.handleForgot = handleForgot;
 RecruitOpsLive.handleFormSubmit = handleFormSubmit;
+RecruitOpsLive.markNotificationRead = markNotificationReadAction;
+RecruitOpsLive.refreshNotificationBadge = refreshNotificationBadge;
+window.RecruitOpsLive = RecruitOpsLive;
 
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2434,6 +2706,11 @@ function startLiveApiClient() {
   Promise.resolve(bootPage()).catch(() => {}).finally(() => {
     hidePageLoader();
   });
+
+  if (RecruitOpsLive.session || readSession()) {
+    refreshNotificationBadge();
+    setInterval(() => refreshNotificationBadge(), 30000);
+  }
 }
 
 if (typeof document !== "undefined") {

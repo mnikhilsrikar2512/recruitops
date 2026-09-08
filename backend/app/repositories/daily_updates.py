@@ -129,8 +129,12 @@ def has_user_requisition_link(engine: Engine, *, user_id: int, requisition_id: i
         """
         SELECT TOP 1 1
         FROM dbo.requisitions AS r
+        LEFT JOIN dbo.requisition_assignments AS a
+          ON a.requisition_id = r.id
+         AND a.assigned_user_id = :user_id
+         AND a.status = N'active'
         WHERE r.id = :requisition_id
-        AND r.owner_user_id = :user_id;
+        AND (r.owner_user_id = :user_id OR a.id IS NOT NULL);
         """
     )
     with engine.connect() as connection:
@@ -150,7 +154,8 @@ def create_daily_update(engine: Engine, location_id: int, payload: DailyUpdateCr
           update_date,
           summary,
           blockers,
-          planned_next_actions
+          planned_next_actions,
+          submitted_at
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -159,7 +164,8 @@ def create_daily_update(engine: Engine, location_id: int, payload: DailyUpdateCr
           :update_date,
           :summary,
           :blockers,
-          :planned_next_actions
+          :planned_next_actions,
+          SYSUTCDATETIME()
         );
         """
     )

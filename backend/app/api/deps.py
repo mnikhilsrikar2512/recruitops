@@ -1,3 +1,4 @@
+import time
 from functools import lru_cache
 from typing import Callable
 
@@ -28,10 +29,10 @@ PERMISSION_ALIASES: dict[str, tuple[str, ...]] = {
     "assignment.create": ("assignment.create", "requisition.assign"),
     "assignment.update": ("assignment.update", "requisition.assign"),
     "requisition.status.update": ("requisition.status.update", "requisition.update"),
-    "pipeline.read.summary": ("pipeline.read.summary", "requisition.read", "candidate.read"),
-    "pipeline.read.detail": ("pipeline.read.detail", "candidate.read"),
-    "pipeline.stage.move": ("pipeline.stage.move", "candidate.update", "candidate.screen"),
-    "pipeline.stage.history.read": ("pipeline.stage.history.read", "candidate.read"),
+    "pipeline.read.summary": ("pipeline.read.summary",),
+    "pipeline.read.detail": ("pipeline.read.detail",),
+    "pipeline.stage.move": ("pipeline.stage.move", "candidate.update"),
+    "pipeline.stage.history.read": ("pipeline.stage.history.read",),
     "interview.read": ("interview.read", "pipeline.read.detail", "candidate.read"),
     "interview.create": ("interview.create", "pipeline.stage.move", "candidate.update"),
     "interview.feedback.submit": ("interview.feedback.submit", "pipeline.stage.move", "candidate.screen"),
@@ -66,10 +67,9 @@ PERMISSION_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "notification.mark_read": ("notification.mark_read", "notification.read", "notification.manage"),
     "user.credentials.manage": ("user.credentials.manage", "user.manage_credentials"),
-    "role.read": ("role.read", "user.read", "settings.read"),
-    "role.create": ("role.create", "settings.update"),
-    "role.update": ("role.update", "settings.update"),
-    "role.permissions.assign": ("role.permissions.assign", "settings.update"),
+    "role.create": ("role.create",),
+    "role.update": ("role.update",),
+    "role.permissions.assign": ("role.permissions.assign",),
     "workflow_action.read": ("workflow_action.read", "dashboard.read_my_work", "dashboard.read_pipeline_summary"),
     "workflow_action.run": ("workflow_action.run", "pipeline.stage.move", "candidate.update"),
     "workflow_action.resolve": ("workflow_action.resolve", "pipeline.stage.move", "candidate.update"),
@@ -77,10 +77,32 @@ PERMISSION_ALIASES: dict[str, tuple[str, ...]] = {
     "workflow_overlay.submit": ("workflow_overlay.submit", "workflow_action.run", "candidate.update"),
 }
 
+_permission_cache: dict[int, tuple[float, set[str]]] = {}
+_PERMISSION_CACHE_TTL_SECONDS = 300
+
 
 def _has_permission(resolved_permissions: set[str], required_code: str) -> bool:
     aliases = PERMISSION_ALIASES.get(required_code, (required_code,))
     return any(code in resolved_permissions for code in aliases)
+
+
+def _get_cached_permissions(engine: Engine, user_id: int) -> set[str]:
+    now = time.monotonic()
+    cached = _permission_cache.get(user_id)
+    if cached:
+        cached_time, cached_perms = cached
+        if now - cached_time < _PERMISSION_CACHE_TTL_SECONDS:
+            return cached_perms
+    perms = set(list_resolved_permissions(engine, user_id))
+    _permission_cache[user_id] = (now, perms)
+    return perms
+
+
+def invalidate_permission_cache(user_id: int | None = None) -> None:
+    if user_id is None:
+        _permission_cache.clear()
+    else:
+        _permission_cache.pop(user_id, None)
 
 
 @lru_cache(maxsize=1)
@@ -105,7 +127,7 @@ def require_permissions(*permission_codes: str) -> Callable[..., AuthContext]:
         if auth_context.user.role_code == "admin":
             return auth_context
 
-        resolved_permissions = set(list_resolved_permissions(engine, auth_context.user.id))
+        resolved_permissions = _get_cached_permissions(engine, auth_context.user.id)
         missing_permissions = [
             code for code in permission_codes if not _has_permission(resolved_permissions, code)
         ]
@@ -127,7 +149,7 @@ def require_any_permission(*permission_codes: str) -> Callable[..., AuthContext]
         if auth_context.user.role_code == "admin":
             return auth_context
 
-        resolved_permissions = set(list_resolved_permissions(engine, auth_context.user.id))
+        resolved_permissions = _get_cached_permissions(engine, auth_context.user.id)
         if any(_has_permission(resolved_permissions, code) for code in permission_codes):
             return auth_context
 

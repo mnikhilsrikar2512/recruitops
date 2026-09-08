@@ -939,12 +939,25 @@ function closeOpenMenus() {
 }
 
 function markNotificationRead(button) {
+  if (button.disabled) return;
+  if (window.RecruitOpsLive?.markNotificationRead) {
+    window.RecruitOpsLive.markNotificationRead(button);
+    return;
+  }
   const item = button.closest(".group, .relative, .flex");
   if (!item) return;
   item.classList.add("notification-read");
   button.setAttribute("disabled", "disabled");
   showToast("Notification updated", "This alert is now marked as read in the frontend workflow.");
 }
+
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest("[data-notification-read]");
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  markNotificationRead(button);
+}, true);
 
 function setupResumeUploadWorkspace() {
   if (document.body?.dataset.routeId !== "resume-upload-and-review") return;
@@ -1931,8 +1944,23 @@ function setupOnboardingInteractions() {
     Array.from(document.querySelectorAll("button")).forEach((button) => {
       const label = getActionLabel(button);
       if (/save pipeline/i.test(label)) {
-        button.dataset.toastTitle = "Pipeline saved";
-        button.dataset.toast = "The onboarding pipeline draft is staged and ready to continue.";
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const inputs = Array.from(document.querySelectorAll("#stage-list input[type='text'], #stage-list input:not([type])"));
+          const stages = inputs.map((input) => input.value.trim()).filter(Boolean);
+          if (stages.length >= 2) {
+            if (typeof savePipelineFlow === "function") savePipelineFlow(stages);
+            const session = RecruitOpsLive.session || (typeof readSession === "function" ? readSession() : {});
+            session.onboarding = session.onboarding || {};
+            session.onboarding.stages = stages;
+            if (typeof writeSession === "function") writeSession(session);
+            RecruitOpsLive.session = session;
+            showToast("Pipeline saved", stages.length + " stages saved to your pipeline.");
+          } else {
+            showToast("Need more stages", "Add at least two stages to define your pipeline.");
+          }
+        });
       }
     });
   }
@@ -1955,8 +1983,22 @@ function setupOnboardingInteractions() {
     Array.from(document.querySelectorAll("button")).forEach((button) => {
       const label = getActionLabel(button);
       if (/connect|configure|reconnect|manage/i.test(label)) {
-        button.dataset.toastTitle = "Integration staged";
-        button.dataset.toast = "This integration action is ready for OAuth or API-key setup.";
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          const card = button.closest("[class*='border']") || button.parentElement;
+          const name = card?.querySelector("h3, h4, strong, .font-headline-sm")?.textContent?.trim() || "integration";
+          button.disabled = true;
+          button.innerHTML = '<span class="material-symbols-outlined text-sm">check</span> Connected';
+          button.classList.remove("bg-primary", "hover:bg-primary-hover");
+          button.classList.add("bg-success-bg", "text-success-text");
+          const session = RecruitOpsLive.session || (typeof readSession === "function" ? readSession() : {});
+          session.onboarding = session.onboarding || {};
+          session.onboarding.integrations = session.onboarding.integrations || [];
+          session.onboarding.integrations.push(name);
+          if (typeof writeSession === "function") writeSession(session);
+          RecruitOpsLive.session = session;
+          showToast("Integration connected", name + " is now linked to your workspace.");
+        });
       }
     });
   }

@@ -413,24 +413,65 @@ function notificationIcon(item) {
   return "notifications";
 }
 
-function renderNotificationsCommandCenter(items) {
+function notificationCategory(item) {
+  const source = `${item?.module_name || ""} ${item?.event_type || ""} ${item?.source_type || ""}`.toLowerCase();
+  if (/approval/.test(source)) return "Approvals";
+  if (/pipeline|stage/.test(source)) return "Pipeline";
+  if (/requisition/.test(source)) return "Requisition";
+  if (/candidate/.test(source)) return "Candidate";
+  if (/daily.update/.test(source)) return "Daily Update";
+  if (/meeting/.test(source)) return "Meeting";
+  return "System";
+}
+
+function renderNotificationsCommandCenter(items, meta) {
   const surface = document.querySelector("[data-notifications-command-center]");
   if (!surface) return false;
-  const list = surface.querySelector(".flex.flex-col");
+
+  const unreadTotal = Number(meta?.unread_total ?? 0);
+  const highCount = items.filter((item) => item.status === "unread" && ["high", "critical"].includes(String(item.priority || "").toLowerCase())).length;
+  const metrics = surface.querySelectorAll(".grid-cols-3 .font-headline-md");
+  if (metrics[0]) metrics[0].textContent = String(unreadTotal);
+  if (metrics[1]) metrics[1].textContent = String(highCount);
+  if (metrics[2]) metrics[2].textContent = String(items.length);
+
+  const pill = Array.from(surface.querySelectorAll("span")).find((span) => /priority alert/i.test(span.textContent || ""));
+  if (pill) pill.textContent = `${highCount} priority alert${highCount === 1 ? "" : "s"}`;
+
+  const liveBadge = Array.from(surface.querySelectorAll("span")).find((span) => /mock state/i.test(span.textContent || ""));
+  if (liveBadge) {
+    liveBadge.textContent = "Live API data";
+    liveBadge.className = liveBadge.className.replace("bg-warning-bg", "bg-success-bg").replace("text-warning-text", "text-success-text");
+  }
+
+  const queueHeading = Array.from(surface.querySelectorAll("h2")).find((heading) => /action queue/i.test(heading.textContent || ""));
+  const list = queueHeading?.closest("section")?.querySelector(".divide-y");
   if (!list) return false;
+
   list.innerHTML = items.length
     ? items.map((item) => {
+        const unread = String(item.status || "").toLowerCase() === "unread";
         const accent = notificationAccentClass(item);
-        return `<div class="flex items-start gap-4 p-4 border-b border-border bg-surface hover:bg-highlight-soft transition-colors" data-live-notification-row="true" data-notification-id="${item.id}">
-          <div class="mt-1 text-primary"><span class="material-symbols-outlined">${notificationIcon(item)}</span></div>
-          <div class="flex-1 min-w-0">
-            <h4 class="font-headline-sm text-headline-sm text-on-surface truncate">${escapeLiveHtml(item.title || "Notification")}</h4>
-            <p class="font-body-sm text-body-sm text-text-muted mt-1">${escapeLiveHtml(item.message || "")}</p>
+        return `<article class="group relative grid gap-3 p-4 transition-colors hover:bg-highlight-soft md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center${unread ? " border-l-4 border-error bg-danger-bg/20" : ""}" data-notification-id="${item.id}" data-notification-status="${escapeLiveHtml(item.status || "read")}">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl ${unread ? "bg-error-container text-error" : "bg-surface-alt text-primary"}">
+            <span class="material-symbols-outlined">${notificationIcon(item)}</span>
           </div>
-          <span class="inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-[10px] font-semibold ${accent}">${escapeLiveHtml(item.status || "New")}</span>
-        </div>`;
+          <div class="min-w-0">
+            <div class="mb-1 flex flex-wrap items-center gap-2">
+              <span class="rounded border px-1.5 py-0.5 font-label-caps text-label-caps uppercase tracking-wider ${unread ? "border-danger-text/20 bg-white text-danger-text" : "border-border bg-surface-alt text-secondary"}">${escapeLiveHtml(notificationCategory(item))}</span>
+              <span class="font-data-tabular text-[11px] text-text-muted">${escapeLiveHtml(relativeTime(item.created_at))}</span>
+              ${unread ? '<span data-notification-unread-indicator class="h-2 w-2 rounded-full bg-error"></span>' : ""}
+            </div>
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">${escapeLiveHtml(item.title || "Notification")}</h3>
+            <p class="mt-1 font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(item.message || "")}</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 md:justify-end">
+            <span class="inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold ${accent}" data-notification-status-badge>${escapeLiveHtml(item.status || "read")}</span>
+            ${unread ? `<button class="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-surface px-2.5 text-secondary hover:bg-highlight-soft" title="Mark as Read" type="button" data-notification-read="true" aria-label="Mark as read"><span class="material-symbols-outlined text-[20px]">done</span></button>` : ""}
+          </div>
+        </article>`;
       }).join("")
-    : `<div class="p-6 text-center text-text-muted">No notifications returned by the API.</div>`;
+    : `<div class="p-6 text-center text-body-sm text-text-muted">No ${escapeLiveHtml(notificationFilterLabel())} notifications. Try the "All" filter.</div>`;
   return true;
 }
 

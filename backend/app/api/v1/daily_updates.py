@@ -43,9 +43,11 @@ def list_daily_updates_endpoint(
 @router.post("/", response_model=DailyUpdateResponse, status_code=201)
 def create_daily_update_endpoint(
     payload: DailyUpdateCreate,
-    _auth: object = Depends(require_permissions("daily_update.create_main")),
+    auth: object = Depends(require_permissions("daily_update.create_main")),
     engine: Engine = Depends(get_engine),
 ) -> DailyUpdateResponse:
+    # The submitter is always the authenticated user — never trust a client-supplied id
+    payload.submitted_by_user_id = auth.user.id
     return create_daily_update_service(engine, payload)
 
 

@@ -152,6 +152,7 @@ def nudge_workflow_action_service(
         NotificationCreate(
             location_id=action_item.location_id,
             user_id=target_user_id,
+            title="Workflow action reminder",
             event_type="workflow_action.nudge",
             source_type=action_item.entity_type,
             source_id=action_item.entity_id or action_item.id,

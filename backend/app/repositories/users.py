@@ -200,7 +200,10 @@ def count_user_active_requisitions(engine: Engine, user_id: int) -> int:
 def count_user_active_assignments(engine: Engine, user_id: int) -> int:
     query = text(
         """
-        SELECT 0 AS total_count;
+        SELECT COUNT(*) AS total_count
+        FROM dbo.requisition_assignments
+        WHERE assigned_user_id = :user_id
+        AND status = N'active';
         """
     )
     with engine.connect() as connection:
@@ -427,14 +430,6 @@ def transfer_active_user_work_and_deactivate(
             connection.execute(
                 text(
                     """
-                    SELECT 1 WHERE 1 = 0;
-                    """
-                ),
-                {"user_id": user_id, "transfer_to_user_id": transfer_to_user_id},
-            )
-            connection.execute(
-                text(
-                    """
                     UPDATE dbo.candidates
                     SET
                       primary_owner_user_id = :transfer_to_user_id,
@@ -545,14 +540,6 @@ def transfer_active_user_work_and_move(
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id;
-                    """
-                ),
-                {"user_id": user_id, "transfer_to_user_id": transfer_to_user_id},
-            )
-            connection.execute(
-                text(
-                    """
-                    SELECT 1 WHERE 1 = 0;
                     """
                 ),
                 {"user_id": user_id, "transfer_to_user_id": transfer_to_user_id},
@@ -704,6 +691,32 @@ def find_valid_password_reset_token(
         AND prt.purpose = :purpose
         AND prt.used_at IS NULL
         AND prt.expires_at > SYSUTCDATETIME();
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(query, {"token_hash": token_hash, "purpose": purpose}).mappings().first()
+    return dict(row) if row else None
+
+
+def find_used_password_reset_token(
+    engine: Engine,
+    token_hash: str,
+    purpose: str,
+) -> dict | None:
+    query = text(
+        """
+        SELECT TOP 1
+          prt.id,
+          prt.user_id,
+          prt.purpose,
+          prt.issued_by_user_id,
+          prt.expires_at,
+          prt.used_at
+        FROM dbo.password_reset_tokens AS prt
+        WHERE prt.token_hash = :token_hash
+        AND prt.purpose = :purpose
+        AND prt.used_at IS NOT NULL
+        ORDER BY prt.used_at DESC;
         """
     )
     with engine.connect() as connection:

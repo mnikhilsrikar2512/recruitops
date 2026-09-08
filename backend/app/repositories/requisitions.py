@@ -436,13 +436,59 @@ def update_requisition_status(engine: Engine, requisition_id: int, payload: Requ
 
 
 def list_requisition_assignments(engine: Engine, requisition_id: int) -> list[RequisitionAssignmentRecord]:
-    _ = (engine, requisition_id)
-    return []
+    query = text(
+        """
+        SELECT
+          a.id,
+          a.location_id,
+          a.requisition_id,
+          a.assigned_user_id,
+          u.full_name AS assigned_user_name,
+          a.assignment_type,
+          a.assigned_by_user_id,
+          au.full_name AS assigned_by_user_name,
+          a.assigned_at,
+          a.status,
+          a.created_at,
+          a.updated_at
+        FROM dbo.requisition_assignments AS a
+        LEFT JOIN dbo.users AS u ON u.id = a.assigned_user_id
+        LEFT JOIN dbo.users AS au ON au.id = a.assigned_by_user_id
+        WHERE a.requisition_id = :requisition_id
+        AND a.status = N'active'
+        ORDER BY a.assigned_at DESC, a.id DESC;
+        """
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(query, {"requisition_id": requisition_id}).mappings().all()
+    return [_map_assignment(row) for row in rows]
 
 
 def find_requisition_assignment_by_id(engine: Engine, assignment_id: int) -> RequisitionAssignmentRecord | None:
-    _ = (engine, assignment_id)
-    return None
+    query = text(
+        """
+        SELECT
+          a.id,
+          a.location_id,
+          a.requisition_id,
+          a.assigned_user_id,
+          u.full_name AS assigned_user_name,
+          a.assignment_type,
+          a.assigned_by_user_id,
+          au.full_name AS assigned_by_user_name,
+          a.assigned_at,
+          a.status,
+          a.created_at,
+          a.updated_at
+        FROM dbo.requisition_assignments AS a
+        LEFT JOIN dbo.users AS u ON u.id = a.assigned_user_id
+        LEFT JOIN dbo.users AS au ON au.id = a.assigned_by_user_id
+        WHERE a.id = :assignment_id;
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(query, {"assignment_id": assignment_id}).mappings().first()
+    return _map_assignment(row) if row else None
 
 
 def create_requisition_assignment(
@@ -451,43 +497,65 @@ def create_requisition_assignment(
     requisition_id: int,
     payload: RequisitionAssignmentCreate,
 ) -> RequisitionAssignmentRecord:
-    query = text(
+    insert_query = text(
         """
-        UPDATE dbo.requisitions
-        SET
-          owner_user_id = :assigned_user_id,
-          updated_at = SYSUTCDATETIME()
-        WHERE id = :requisition_id;
+        INSERT INTO dbo.requisition_assignments (
+          location_id,
+          requisition_id,
+          assigned_user_id,
+          assignment_type,
+          assigned_by_user_id,
+          assigned_at,
+          status
+        )
+        OUTPUT INSERTED.id
+        VALUES (
+          :location_id,
+          :requisition_id,
+          :assigned_user_id,
+          :assignment_type,
+          :assigned_by_user_id,
+          SYSUTCDATETIME(),
+          N'active'
+        );
         """
     )
     with engine.begin() as connection:
-        connection.execute(
-            query,
+        assignment_id = connection.execute(
+            insert_query,
             {
+                "location_id": location_id,
                 "requisition_id": requisition_id,
                 "assigned_user_id": payload.assigned_user_id,
+                "assignment_type": payload.assignment_type,
+                "assigned_by_user_id": payload.assigned_by_user_id or payload.assigned_user_id,
             },
-        )
-    requisition = find_requisition_by_id(engine, requisition_id)
-    if requisition is None:
-        raise RuntimeError("Requisition assignment could not be applied")
-    return RequisitionAssignmentRecord(
-        id=requisition.id,
-        location_id=location_id,
-        requisition_id=requisition_id,
-        assigned_user_id=payload.assigned_user_id,
-        assigned_user_name=requisition.primary_owner_name,
-        assignment_type=payload.assignment_type,
-        assigned_by_user_id=payload.assigned_by_user_id or payload.assigned_user_id,
-        assigned_by_user_name=None,
-        assigned_at=requisition.updated_at,
-        status="active",
-        created_at=requisition.updated_at,
-        updated_at=requisition.updated_at,
-    )
+        ).scalar_one()
+        if payload.assignment_type == "primary_owner":
+            connection.execute(
+                text(
+                    """
+                    UPDATE dbo.requisitions
+                    SET owner_user_id = :assigned_user_id, updated_at = SYSUTCDATETIME()
+                    WHERE id = :requisition_id;
+                    """
+                ),
+                {"requisition_id": requisition_id, "assigned_user_id": payload.assigned_user_id},
+            )
+    created = find_requisition_assignment_by_id(engine, int(assignment_id))
+    if created is None:
+        raise RuntimeError("Created requisition assignment could not be reloaded")
+    return created
 
 
 def remove_requisition_assignment(engine: Engine, assignment_id: int) -> None:
-    _ = (engine, assignment_id)
-    return None
+    query = text(
+        """
+        UPDATE dbo.requisition_assignments
+        SET status = N'inactive', updated_at = SYSUTCDATETIME()
+        WHERE id = :assignment_id;
+        """
+    )
+    with engine.begin() as connection:
+        connection.execute(query, {"assignment_id": assignment_id})
 

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Optional, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,51 +10,51 @@ NotificationPriority = Literal["low", "normal", "high", "critical"]
 
 
 class NotificationCreate(BaseModel):
-    location_id: int | None = None
+    location_id: Optional[int] = None
     user_id: int
-    title: str
+    title: str = ""
     message: str
-    module_name: str | None = None
-    entity_type: str | None = None
-    entity_id: int | None = None
+    module_name: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
     priority: NotificationPriority = "normal"
-    action_url: str | None = None
-    event_type: str | None = None
-    source_type: str | None = None
-    source_id: int | None = None
-
-
-class NotificationListFilters(BaseModel):
-    status: NotificationStatus | None = None
-    priority: NotificationPriority | None = None
-    page: int = Field(default=1, ge=1)
-    page_size: int = Field(default=20, ge=1, le=100)
-
-
-class NotificationMarkReadRequest(BaseModel):
-    status: Literal["read"] = "read"
+    action_url: Optional[str] = None
+    event_type: Optional[str] = None
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
 
 
 class NotificationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    location_id: int | None
+    location_id: Optional[int] = None
     user_id: int
     title: str
     message: str
-    module_name: str
-    entity_type: str
-    entity_id: int
+    module_name: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
     priority: str
     status: str
-    action_url: str | None
-    read_at: datetime | None
+    action_url: Optional[str] = None
+    read_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    event_type: str | None = None
-    source_type: str | None = None
-    source_id: int | None = None
+    event_type: Optional[str] = None
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
+
+
+class NotificationListFilters(BaseModel):
+    status: Optional[NotificationStatus] = None
+    priority: Optional[NotificationPriority] = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+
+
+class NotificationMarkReadRequest(BaseModel):
+    status: Literal["read"] = "read"
 
 
 class NotificationListResponse(BaseModel):

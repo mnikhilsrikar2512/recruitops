@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
+from app.core.config import settings
 from app.core.security import create_sha256_password_hash, hash_session_token, random_secret
 
 from app.repositories.audit import insert_audit_log
@@ -25,6 +26,7 @@ from app.repositories.users import (
     update_user,
     update_user_password_state,
 )
+from sqlalchemy import text
 from app.schemas.notification import NotificationCreate
 from app.schemas.pagination import PaginationMeta
 from app.schemas.user import (
@@ -150,7 +152,7 @@ def reset_user_credentials_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User was not found")
 
     if payload.mode == "temporary-password":
-        temporary_password = _random_secret(8)
+        temporary_password = random_secret(8)
         update_user_password_state(
             engine,
             user_id=user_id,
@@ -165,15 +167,31 @@ def reset_user_credentials_service(
             password_setup_status="reset-required",
         )
 
+    # Clean up any stale unused tokens for this user before creating a new one
+    _mark_stale_tokens_used(engine, user_id, "admin-reset")
+
     setup_token = random_secret(24)
-    create_password_reset_token(
-        engine,
-        user_id=user_id,
-        token_hash=hash_session_token(setup_token),
-        purpose="admin-reset",
-        issued_by_user_id=payload.issued_by_user_id,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
-    )
+    try:
+        create_password_reset_token(
+            engine,
+            user_id=user_id,
+            token_hash=hash_session_token(setup_token),
+            purpose="admin-reset",
+            issued_by_user_id=payload.issued_by_user_id,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
+        )
+    except Exception:
+        # Unique constraint violation — mark existing tokens used and retry once
+        _mark_stale_tokens_used(engine, user_id, "admin-reset")
+        create_password_reset_token(
+            engine,
+            user_id=user_id,
+            token_hash=hash_session_token(setup_token),
+            purpose="admin-reset",
+            issued_by_user_id=payload.issued_by_user_id,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
+        )
+
     update_user_password_state(
         engine,
         user_id=user_id,
@@ -188,6 +206,21 @@ def reset_user_credentials_service(
         expires_in_hours=24,
         password_setup_status="reset-required",
     )
+
+
+def _mark_stale_tokens_used(engine: Engine, user_id: int, purpose: str) -> None:
+    """Mark all unused tokens for the given user and purpose as used."""
+    query = text(
+        """
+        UPDATE dbo.password_reset_tokens
+        SET used_at = SYSUTCDATETIME()
+        WHERE user_id = :user_id
+        AND purpose = :purpose
+        AND used_at IS NULL
+        """
+    )
+    with engine.begin() as connection:
+        connection.execute(query, {"user_id": user_id, "purpose": purpose})
 
 
 def deactivate_user_service(

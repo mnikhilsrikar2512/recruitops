@@ -27,7 +27,7 @@ class DailyUpdateListFilters(BaseModel):
 class DailyUpdateCreate(BaseModel):
     update_date: date
     requisition_id: int = Field(ge=1)
-    submitted_by_user_id: int = Field(ge=1)
+    submitted_by_user_id: int | None = Field(default=None, ge=1)
     summary: str = Field(min_length=1)
     profiles_sourced_count: int | None = Field(default=None, ge=0)
     profiles_screened_count: int | None = Field(default=None, ge=0)

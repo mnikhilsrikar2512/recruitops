@@ -175,3 +175,5 @@ class UserResetCredentialsResponse(BaseModel):
     temporary_password: str | None = None
     setup_token: str | None = None
     expires_in_hours: int | None = None
+    message: str | None = None
+    errors: list[str] | None = None

@@ -72,7 +72,7 @@ def create_notification(engine: Engine, payload: NotificationCreate) -> Notifica
             {
                 "location_id": payload.location_id,
                 "user_id": payload.user_id,
-                "title": payload.title,
+                "title": (payload.title or payload.message)[:200],
                 "message": payload.message,
                 "module_name": payload.module_name,
                 "entity_type": payload.entity_type,

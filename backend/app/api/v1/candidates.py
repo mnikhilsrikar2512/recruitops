@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_any_permission, require_permissions
+from app.api.deps import get_engine, require_any_permission, require_permissions
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDocumentCreate,
@@ -32,13 +32,12 @@ from app.services.candidates import (
 )
 from app.services.auth import AuthContext
 
-router = APIRouter(dependencies=[Depends(get_current_auth_context)])
+router = APIRouter()
 
 
 @router.get("/", response_model=CandidateListResponse)
 def list_candidates_endpoint(
-    _auth: object = Depends(require_permissions("candidate.read")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.read")),
     search: str | None = Query(default=None),
     requisition_id: int | None = Query(default=None, ge=1),
     source_type: str | None = Query(default=None),
@@ -65,7 +64,7 @@ def list_candidates_endpoint(
 @router.post("/", response_model=CandidateResponse, status_code=201)
 def create_candidate_endpoint(
     payload: CandidateCreate,
-    _auth: object = Depends(require_permissions("candidate.create")),
+    auth_context: AuthContext = Depends(require_permissions("candidate.create")),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
     return create_candidate_service(engine, payload)
@@ -73,8 +72,7 @@ def create_candidate_endpoint(
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)
 def get_candidate_detail_endpoint(
-    _auth: object = Depends(require_permissions("candidate.read")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.read")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
@@ -84,8 +82,7 @@ def get_candidate_detail_endpoint(
 @router.patch("/{candidate_id}", response_model=CandidateResponse)
 def update_candidate_endpoint(
     payload: CandidateUpdate,
-    _auth: object = Depends(require_permissions("candidate.update")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.update")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
@@ -95,8 +92,7 @@ def update_candidate_endpoint(
 @router.post("/{candidate_id}/documents", response_model=CandidateDocumentResponse, status_code=201)
 def create_candidate_document_endpoint(
     payload: CandidateDocumentCreate,
-    _auth: object = Depends(require_permissions("candidate.resume.upload")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.resume.upload")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDocumentResponse:
@@ -107,8 +103,7 @@ def create_candidate_document_endpoint(
 async def upload_candidate_document_endpoint(
     file: UploadFile = File(...),
     document_type: str = Query(default="other"),
-    _auth: object = Depends(require_permissions("candidate.resume.upload")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.resume.upload")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDocumentResponse:
@@ -117,8 +112,7 @@ async def upload_candidate_document_endpoint(
 
 @router.get("/{candidate_id}/duplicate-check", response_model=CandidateDuplicateCheckResponse)
 def get_candidate_duplicate_check_endpoint(
-    _auth: object = Depends(require_permissions("candidate.duplicate.check")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.duplicate.check")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDuplicateCheckResponse:
@@ -128,14 +122,13 @@ def get_candidate_duplicate_check_endpoint(
 @router.post("/{candidate_id}/duplicate-check/decision", response_model=CandidateDuplicateReviewCaseResponse, status_code=201)
 def create_candidate_duplicate_decision_endpoint(
     payload: CandidateDuplicateDecisionPayload,
-    _auth: object = Depends(
+    auth_context: AuthContext = Depends(
         require_any_permission(
             "candidate.duplicate.request_override",
             "candidate.duplicate.link_existing",
             "candidate.duplicate.discard_draft",
         )
     ),
-    auth_context: AuthContext = Depends(get_current_auth_context),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDuplicateReviewCaseResponse:
@@ -145,8 +138,7 @@ def create_candidate_duplicate_decision_endpoint(
 @router.post("/{candidate_id}/finalize-profile", response_model=CandidateFinalizeResponse, status_code=201)
 def finalize_candidate_endpoint(
     payload: CandidateFinalizePayload,
-    _auth: object = Depends(require_permissions("candidate.link_requisition")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.link_requisition")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateFinalizeResponse:
@@ -156,8 +148,7 @@ def finalize_candidate_endpoint(
 @router.post("/{candidate_id}/applications", response_model=CandidateFinalizeResponse, status_code=201)
 def create_candidate_application_endpoint(
     payload: CandidateFinalizePayload,
-    _auth: object = Depends(require_permissions("candidate.link_requisition")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.link_requisition")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateFinalizeResponse:
@@ -167,8 +158,7 @@ def create_candidate_application_endpoint(
 @router.post("/{candidate_id}/reassign-owner", response_model=CandidateOwnerReassignmentResponse)
 def reassign_candidate_owner_endpoint(
     payload: CandidateOwnerReassignment,
-    _auth: object = Depends(require_permissions("candidate.update")),
-    auth_context: AuthContext = Depends(get_current_auth_context),
+    auth_context: AuthContext = Depends(require_permissions("candidate.update")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateOwnerReassignmentResponse:

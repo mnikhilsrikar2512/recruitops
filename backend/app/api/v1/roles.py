@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_permissions
+from app.api.deps import (
+    get_current_auth_context,
+    get_engine,
+    invalidate_permission_cache,
+    require_permissions,
+)
 from app.schemas.role import (
     RoleCreate,
     RoleListFilters,
@@ -20,7 +25,7 @@ from app.services.roles import (
     update_role_service,
 )
 
-router = APIRouter(dependencies=[Depends(get_current_auth_context)])
+router = APIRouter(dependencies=[Depends(require_permissions("role.read"))])
 
 
 @router.get("/", response_model=RoleListResponse)
@@ -80,4 +85,6 @@ def assign_role_permissions_endpoint(
     role_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RolePermissionsResponse:
-    return assign_role_permissions_service(engine, role_id, payload)
+    response = assign_role_permissions_service(engine, role_id, payload)
+    invalidate_permission_cache()  # permission grants changed — drop stale cached sets
+    return response
