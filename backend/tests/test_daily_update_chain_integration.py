@@ -29,7 +29,8 @@ from fastapi.testclient import TestClient
 from app.main import create_application
 
 
-ADMIN_EMAIL = "admin@executiveconnection.com"
+# Seed admin candidates: repo dev DB uses the seed user, CI uses the seeded CI admin
+ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
 ADMIN_PASSWORD = "admin123"
 
 
@@ -59,12 +60,17 @@ def client():
 @pytest.fixture(scope="module")
 def daily_chain(client):
     """Set up admin + contributor with daily_update.create_main, once per module."""
-    login = client.post(
-        "/api/v1/auth/login",
-        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-    )
-    if login.status_code != 200:
-        pytest.skip(f"Seed admin login failed ({login.status_code}); seed users first")
+    login = None
+    for candidate in ADMIN_EMAIL_CANDIDATES:
+        attempt = client.post(
+            "/api/v1/auth/login",
+            json={"email": candidate, "password": ADMIN_PASSWORD},
+        )
+        if attempt.status_code == 200:
+            login = attempt
+            break
+    if login is None:
+        pytest.skip("Seed admin login failed; seed users first")
     admin_headers = {"Authorization": f"Bearer {login.json()['token']}"}
     admin_user_id = login.json()["user"]["id"]
 

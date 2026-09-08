@@ -58,7 +58,8 @@ class TestPermissionAliases:
 # ---------------------------------------------------------------------------
 
 
-ADMIN_EMAIL = "admin@executiveconnection.com"
+# Seed admin candidates: repo dev DB uses the seed user, CI uses the seeded CI admin
+ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
 ADMIN_PASSWORD = "admin123"
 # user.read is deliberately granted: the historical bypass aliased role.read to
 # accept user.read, so any user who could list users could also list roles.
@@ -92,12 +93,19 @@ def client():
 @pytest.fixture(scope="module")
 def rbac_chain(client):
     """Run the full admin chain once for the whole module and share the result."""
-    login = client.post(
-        "/api/v1/auth/login",
-        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-    )
-    if login.status_code != 200:
-        pytest.skip(f"Seed admin login failed ({login.status_code}); seed users first")
+    login = None
+    admin_email = None
+    for candidate in ADMIN_EMAIL_CANDIDATES:
+        attempt = client.post(
+            "/api/v1/auth/login",
+            json={"email": candidate, "password": ADMIN_PASSWORD},
+        )
+        if attempt.status_code == 200:
+            login = attempt
+            admin_email = candidate
+            break
+    if login is None:
+        pytest.skip("Seed admin login failed; seed users first")
     admin_headers = {"Authorization": f"Bearer {login.json()['token']}"}
 
     suffix = uuid.uuid4().hex[:8]
