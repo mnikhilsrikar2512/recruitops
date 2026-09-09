@@ -1,8 +1,8 @@
 {
   "generated_at_unix": 1787914846,
-  "primary_route_count": 74,
+  "primary_route_count": 75,
   "overlay_route_count": 26,
-  "total_route_count": 100,
+  "total_route_count": 101,
   "primary_routes": [
     {
       "file": "login.html",
@@ -979,6 +979,17 @@
           "href": "requisition-detail.html"
         }
       ]
+    },
+    {
+      "file": "portal-accounts.html",
+      "route_id": "portal-accounts",
+      "kind": "app",
+      "title": "Portal Accounts",
+      "section": "Administration",
+      "subtitle": "Shared sourcing-account credentials, ownership, and usage-slot scheduling.",
+      "source": "portal_accounts",
+      "nav": "portal-accounts.html",
+      "links": []
     },
     {
       "file": "role-permissions-editor.html",

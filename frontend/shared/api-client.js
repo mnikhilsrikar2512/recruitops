@@ -218,6 +218,7 @@ const SIDEBAR_PERMISSION_MAP = {
   "business-titles.html": ["settings.read"],
   "visibility-rules.html": ["settings.read", "role.read"],
   "work-assignment.html": ["assignment.read", "requisition.assign"],
+  "portal-accounts.html": ["portal.read"],
   "approvals-inbox.html": ["approval.read"],
   "client-directory.html": ["client.read"],
   "candidate-profiles.html": ["candidate.read"],
@@ -1193,6 +1194,288 @@ async function loadReviewMatchesWorkspace() {
 
 
 /* ═══════════════════════════════════════════════════════════════
+   PORTAL ACCOUNTS
+   ═══════════════════════════════════════════════════════════════ */
+
+function portalStatusChip(status) {
+  const map = {
+    active: "bg-success-bg text-success-text border border-success-text/20",
+    inactive: "bg-surface-dim text-text-muted border border-border",
+    locked: "bg-warning-bg text-warning-text border border-warning-text/20",
+  };
+  return `<span class="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-sm text-xs font-semibold ${map[status] || map.inactive}">${escapeLiveHtml(status)}</span>`;
+}
+
+function portalOwnershipChip(ownershipType, ownedByName) {
+  const label = ownershipType === "company-shared" ? "Company shared" : ownershipType === "user-owned" ? `Personal — ${ownedByName || ""}` : `Client owned — ${ownedByName || ""}`;
+  const labelClean = label.replace(/ —\s*$/, "");
+  const cls = ownershipType === "company-shared" ? "bg-primary-container text-on-primary-container" : "bg-secondary-container text-on-secondary-container";
+  return `<span class="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-sm text-[11px] font-semibold ${cls}">${escapeLiveHtml(labelClean)}</span>`;
+}
+
+async function loadPortalAccounts() {
+  const surface = document.querySelector("[data-live-portal-accounts]");
+  if (!surface) return;
+  const canManage = isAdmin() || hasAnyPermission("portal.create", "portal.update");
+  const canBookSlots = isAdmin() || hasAnyPermission("portal.assign_slot");
+
+  const [payload, locations] = await Promise.all([
+    apiRequest("/portal-accounts/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
+  ]);
+  const accounts = payload.items || [];
+  const locationOptions = (locations.items || [])
+    .map((l) => `<option value="${l.id}">${escapeLiveHtml(l.location_name || `Location ${l.id}`)}</option>`)
+    .join("");
+
+  const accountRows = accounts.length
+    ? accounts.map((a) => `
+      <tr class="h-table-row border-b border-border/50 hover:bg-highlight-soft transition-colors" data-account-id="${a.id}">
+        <td class="px-4 py-2">
+          <div class="flex flex-col">
+            <span class="font-headline-sm text-headline-sm text-on-background">${escapeLiveHtml(a.platform_name)}</span>
+            <span class="font-label-caps text-label-caps text-text-muted">${escapeLiveHtml(a.account_name)}</span>
+          </div>
+        </td>
+        <td class="px-4 py-2"><span class="block max-w-[200px] truncate text-on-surface-variant" title="${escapeLiveHtml(a.login_identifier || "")}">${escapeLiveHtml(a.login_identifier || "—")}</span></td>
+        <td class="px-4 py-2">${portalOwnershipChip(a.ownership_type, a.owned_by_user_name)}</td>
+        <td class="px-4 py-2 whitespace-nowrap text-on-surface-variant">${escapeLiveHtml(a.branch_name || "—")}</td>
+        <td class="px-4 py-2">
+          <div class="flex items-center gap-2">
+            ${portalStatusChip(a.status)}
+            ${a.has_full_access ? '<span class="inline-flex items-center whitespace-nowrap px-1.5 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wide bg-warning-bg text-warning-text" title="Full access — no slot scheduling needed">Full access</span>' : ""}
+          </div>
+        </td>
+        <td class="px-4 py-2 text-on-surface-variant">${a.daily_usage_limit_hours != null ? `${a.daily_usage_limit_hours}h/day` : "—"}</td>
+        <td class="px-4 py-2 text-right">
+          <div class="flex items-center justify-end gap-1">
+            <button type="button" class="p-1 text-text-muted hover:text-primary hover:bg-surface-variant rounded transition-colors" title="Usage slots" data-slot-account="${a.id}" data-slot-label="${escapeLiveHtml(a.platform_name)} — ${escapeLiveHtml(a.account_name)}" data-slot-full-access="${a.has_full_access ? 1 : 0}" aria-label="Usage slots"><span class="material-symbols-outlined text-[18px]">calendar_month</span></button>
+            ${canManage ? `<button type="button" class="p-1 text-text-muted hover:text-primary hover:bg-surface-variant rounded transition-colors" title="Edit" data-edit-account="${a.id}" aria-label="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>` : ""}
+          </div>
+        </td>
+      </tr>`).join("")
+    : '<tr><td colspan="7" class="px-4 py-10 text-center text-text-muted font-body-sm">No portal accounts yet. Add a shared sourcing account to start tracking usage.</td></tr>';
+
+  surface.innerHTML = `
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 class="font-headline-lg text-headline-lg text-on-background">Portal Accounts</h1>
+        <p class="font-body-sm text-body-sm text-text-muted mt-1">Shared job-portal credentials, ownership, and usage-slot scheduling for the sourcing team.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center rounded-full bg-success-bg px-2.5 py-1 font-label-caps text-label-caps text-success-text">Live API data</span>
+        ${canManage ? '<button type="button" id="portal-add-btn" class="h-10 px-4 bg-primary-container text-on-primary-container hover:bg-primary-hover rounded-DEFAULT flex items-center gap-2 font-headline-sm text-headline-sm transition-colors"><span class="material-symbols-outlined text-[18px]">add</span> Add Account</button>' : '<span class="inline-flex items-center gap-1.5 rounded-lg bg-surface-dim border border-border px-3 py-1.5 font-body-sm text-[12px] text-text-muted"><span class="material-symbols-outlined text-[15px]">lock</span>Read-only</span>'}
+      </div>
+    </div>
+    <div class="bg-surface border border-border rounded-DEFAULT overflow-hidden">
+      <div class="table-container overflow-auto">
+        <table class="w-full text-left border-collapse min-w-[860px]">
+          <thead class="bg-surface-alt border-b border-border">
+            <tr>
+              <th class="h-[40px] px-4 font-label-caps text-label-caps text-text-muted whitespace-nowrap">Platform / Account</th>
+              <th class="h-[40px] px-4 font-label-caps text-label-caps text-text-muted whitespace-nowrap">Login</th>
+              <th class="h-[40px] px-4 font-label-caps text-label-caps text-text-muted whitespace-nowrap">Ownership</th>
+              <th class="h-[40px] px-4 font-label-caps text-label-caps text-text-muted whitespace-nowrap">Branch</th>
+              <th class="h-[40px] px-4 font-label-caps text-label-caps text-text-muted whitespace-nowrap">Status</th>
+              <th class="h-[40px] px-4 font-label-caps text-label-caps text-text-muted whitespace-nowrap">Usage limit</th>
+              <th class="h-[40px] px-4 w-24"></th>
+            </tr>
+          </thead>
+          <tbody class="font-data-tabular text-data-tabular text-on-background">${accountRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <dialog id="portal-account-dialog" class="rounded-2xl backdrop:bg-black/40 p-0 w-[min(92vw,520px)]">
+      <form method="dialog" class="p-6 space-y-4" id="portal-account-form">
+        <h3 class="font-headline-md text-headline-md font-bold text-on-surface" id="portal-form-title">Add Portal Account</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="block sm:col-span-1"><span class="font-body-sm text-text-muted">Platform *</span><input id="portal-platform" required maxlength="100" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm" placeholder="LinkedIn, Naukri…" /></label>
+          <label class="block sm:col-span-1"><span class="font-body-sm text-text-muted">Account name *</span><input id="portal-account-name" required maxlength="150" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm" placeholder="Shared recruiting login" /></label>
+          <label class="block sm:col-span-2"><span class="font-body-sm text-text-muted">Login identifier</span><input id="portal-login" maxlength="255" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm" placeholder="email or username used to sign in" /></label>
+          <label class="block"><span class="font-body-sm text-text-muted">Branch *</span><select id="portal-branch" required class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm">${locationOptions || '<option value="">No locations yet</option>'}</select></label>
+          <label class="block"><span class="font-body-sm text-text-muted">Ownership *</span><select id="portal-ownership" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm"><option value="company-shared">Company shared</option><option value="user-owned">Personal (user owned)</option><option value="client-owned">Client owned</option></select></label>
+          <label class="block"><span class="font-body-sm text-text-muted">Status</span><select id="portal-status" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm"><option value="active">Active</option><option value="inactive">Inactive</option><option value="locked">Locked</option></select></label>
+          <label class="block"><span class="font-body-sm text-text-muted">Daily usage limit (hours)</span><input id="portal-limit" type="number" min="0" max="24" step="0.5" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm" /></label>
+          <label class="flex items-center gap-2 mt-1"><input id="portal-shared" type="checkbox" checked class="rounded border-outline-variant text-primary bg-transparent w-4 h-4" /><span class="font-body-sm">Shared account</span></label>
+          <label class="flex items-center gap-2 mt-1"><input id="portal-full-access" type="checkbox" class="rounded border-outline-variant text-primary bg-transparent w-4 h-4" /><span class="font-body-sm">Full access (no scheduling)</span></label>
+          <label class="block sm:col-span-2"><span class="font-body-sm text-text-muted">Notes</span><textarea id="portal-notes" rows="2" maxlength="4000" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-sm"></textarea></label>
+        </div>
+        <p id="portal-form-error" class="hidden font-body-sm text-danger-text"></p>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" value="cancel" class="h-10 px-4 rounded-lg border border-border bg-surface text-on-surface font-body-sm hover:bg-highlight-soft" data-close-portal-dialog>Cancel</button>
+          <button type="button" id="portal-save-btn" class="h-10 px-5 rounded-lg bg-primary text-on-primary font-body-sm font-semibold hover:bg-primary-hover">Save Account</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="portal-slots-dialog" class="rounded-2xl backdrop:bg-black/40 p-0 w-[min(94vw,720px)]">
+      <div class="p-6 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-headline-md text-headline-md font-bold text-on-surface" id="portal-slots-title">Usage Slots</h3>
+            <p class="font-body-sm text-body-sm text-text-muted mt-0.5">Scheduled windows when team members may use this account.</p>
+          </div>
+          <button type="button" class="rounded-full border border-border p-2 text-on-surface" data-close-portal-slots aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <p id="portal-slots-banner" class="hidden rounded-lg bg-surface-dim border border-border px-3 py-2 font-body-sm text-[12px] text-text-muted"><span class="material-symbols-outlined text-[14px] align-text-bottom">info</span> This account has full access — slot scheduling is not required, but you can still track usage.</p>
+        <div id="portal-slots-list" class="divide-y divide-border rounded-lg border border-border max-h-64 overflow-auto"></div>
+        <form id="portal-slot-form" class="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
+          <label class="block col-span-2 sm:col-span-1"><span class="font-body-sm text-text-muted">Date</span><input id="portal-slot-date" type="date" required class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-2 py-2 font-body-sm" /></label>
+          <label class="block"><span class="font-body-sm text-text-muted">Start</span><input id="portal-slot-start" type="time" required value="09:00" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-2 py-2 font-body-sm" /></label>
+          <label class="block"><span class="font-body-sm text-text-muted">End</span><input id="portal-slot-end" type="time" required value="11:00" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-2 py-2 font-body-sm" /></label>
+          <label class="block"><span class="font-body-sm text-text-muted">User</span><select id="portal-slot-user" class="mt-1 w-full bg-surface-alt border border-border rounded-lg px-2 py-2 font-body-sm"></select></label>
+          <button type="submit" id="portal-slot-add" class="h-[38px] rounded-lg bg-primary-container text-on-primary-container font-body-sm font-semibold hover:bg-primary-hover flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">add</span> Book</button>
+        </form>
+        <p id="portal-slot-error" class="hidden font-body-sm text-danger-text"></p>
+      </div>
+    </dialog>
+  `;
+
+  let usersCache = [];
+  async function slotUsers() {
+    if (!usersCache.length) {
+      const res = await apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] }));
+      usersCache = res.items || [];
+      const userSelect = surface.querySelector("#portal-slot-user");
+      if (userSelect) userSelect.innerHTML = usersCache.map((u) => `<option value="${u.id}">${escapeLiveHtml(u.full_name)}</option>`).join("");
+    }
+    return usersCache;
+  }
+
+  const accountDialog = surface.querySelector("#portal-account-dialog");
+  const slotsDialog = surface.querySelector("#portal-slots-dialog");
+  let editingAccountId = null;
+  let slotsAccountId = null;
+
+  surface.querySelector("#portal-add-btn")?.addEventListener("click", () => {
+    editingAccountId = null;
+    surface.querySelector("#portal-form-title").textContent = "Add Portal Account";
+    surface.querySelector("#portal-account-form").reset();
+    surface.querySelector("#portal-form-error").classList.add("hidden");
+    accountDialog.showModal();
+  });
+
+  surface.querySelectorAll("[data-edit-account]").forEach((btn) => btn.addEventListener("click", () => {
+    const account = accounts.find((a) => a.id === Number(btn.dataset.editAccount));
+    if (!account) return;
+    editingAccountId = account.id;
+    surface.querySelector("#portal-form-title").textContent = "Edit Portal Account";
+    surface.querySelector("#portal-platform").value = account.platform_name || "";
+    surface.querySelector("#portal-account-name").value = account.account_name || "";
+    surface.querySelector("#portal-login").value = account.login_identifier || "";
+    surface.querySelector("#portal-branch").value = account.branch_id;
+    surface.querySelector("#portal-ownership").value = account.ownership_type;
+    surface.querySelector("#portal-status").value = account.status;
+    surface.querySelector("#portal-limit").value = account.daily_usage_limit_hours ?? "";
+    surface.querySelector("#portal-shared").checked = !!account.is_shared;
+    surface.querySelector("#portal-full-access").checked = !!account.has_full_access;
+    surface.querySelector("#portal-notes").value = account.notes || "";
+    surface.querySelector("#portal-form-error").classList.add("hidden");
+    accountDialog.showModal();
+  }));
+
+  surface.querySelector("#portal-save-btn").addEventListener("click", async () => {
+    const errorEl = surface.querySelector("#portal-form-error");
+    const body = {
+      platform_name: surface.querySelector("#portal-platform").value.trim(),
+      account_name: surface.querySelector("#portal-account-name").value.trim(),
+      login_identifier: surface.querySelector("#portal-login").value.trim() || null,
+      branch_id: Number(surface.querySelector("#portal-branch").value),
+      ownership_type: surface.querySelector("#portal-ownership").value,
+      status: surface.querySelector("#portal-status").value,
+      is_shared: surface.querySelector("#portal-shared").checked,
+      has_full_access: surface.querySelector("#portal-full-access").checked,
+      daily_usage_limit_hours: surface.querySelector("#portal-limit").value === "" ? null : Number(surface.querySelector("#portal-limit").value),
+      notes: surface.querySelector("#portal-notes").value.trim() || null,
+    };
+    if (body.ownership_type === "user-owned") {
+      const session = RecruitOpsLive.session || readSession();
+      body.owned_by_user_id = Number(session?.user_id) || null;
+      if (!body.owned_by_user_id) {
+        errorEl.textContent = "Personal accounts require an owner.";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+    }
+    try {
+      if (editingAccountId) {
+        await apiRequest(`/portal-accounts/${editingAccountId}`, { method: "PATCH", body: JSON.stringify(body) });
+        showToast("Portal account updated", body.account_name);
+      } else {
+        await apiRequest("/portal-accounts/", { method: "POST", body: JSON.stringify(body) });
+        showToast("Portal account created", body.account_name);
+      }
+      accountDialog.close();
+      loadPortalAccounts();
+    } catch (error) {
+      errorEl.textContent = error?.message || "Could not save the account.";
+      errorEl.classList.remove("hidden");
+    }
+  });
+
+  surface.querySelectorAll("[data-close-portal-dialog]").forEach((btn) => btn.addEventListener("click", () => accountDialog.close()));
+  surface.querySelectorAll("[data-close-portal-slots]").forEach((btn) => btn.addEventListener("click", () => slotsDialog.close()));
+
+  surface.querySelectorAll("[data-slot-account]").forEach((btn) => btn.addEventListener("click", async () => {
+    slotsAccountId = Number(btn.dataset.slotAccount);
+    surface.querySelector("#portal-slots-title").textContent = `Usage Slots — ${btn.dataset.slotLabel}`;
+    surface.querySelector("#portal-slots-banner").classList.toggle("hidden", btn.dataset.slotFullAccess !== "1");
+    const canBook = canBookSlots;
+    surface.querySelector("#portal-slot-form").classList.toggle("hidden", !canBook);
+    surface.querySelector("#portal-slot-date").value = new Date().toISOString().slice(0, 10);
+    surface.querySelector("#portal-slot-error").classList.add("hidden");
+    slotsDialog.showModal();
+    await refreshSlots();
+    if (canBook) await slotUsers();
+  }));
+
+  async function refreshSlots() {
+    const list = surface.querySelector("#portal-slots-list");
+    if (!list || !slotsAccountId) return;
+    const slots = await apiRequest(`/portal-accounts/${slotsAccountId}/slots?page_size=100`).catch(() => ({ items: [] }));
+    const items = slots.items || [];
+    list.innerHTML = items.length
+      ? items.map((s) => `
+        <div class="px-4 py-2.5 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="font-data-tabular text-on-surface whitespace-nowrap">${escapeLiveHtml(s.usage_date)} ${escapeLiveHtml(String(s.start_time).slice(0, 5))}–${escapeLiveHtml(String(s.end_time).slice(0, 5))}</span>
+            <span class="truncate font-body-sm text-on-surface-variant">${escapeLiveHtml(s.assigned_user_name || "Unassigned")}</span>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-bold uppercase bg-surface-dim text-text-muted">${escapeLiveHtml(s.status)}</span>
+          </div>
+          ${canBookSlots ? `<button type="button" class="p-1 text-text-muted hover:text-danger-text rounded hover:bg-danger-bg" title="Cancel slot" data-cancel-slot="${s.id}" aria-label="Cancel slot"><span class="material-symbols-outlined text-[16px]">close</span></button>` : ""}
+        </div>`).join("")
+      : '<div class="px-4 py-6 text-center text-text-muted font-body-sm">No slots booked.</div>';
+    list.querySelectorAll("[data-cancel-slot]").forEach((btn) => btn.addEventListener("click", async () => {
+      try {
+        await apiRequest(`/portal-accounts/${slotsAccountId}/slots/${btn.dataset.cancelSlot}`, { method: "DELETE" });
+        showToast("Slot cancelled");
+        refreshSlots();
+      } catch (error) { showLiveError(error); }
+    }));
+  }
+
+  surface.querySelector("#portal-slot-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const errorEl = surface.querySelector("#portal-slot-error");
+    errorEl.classList.add("hidden");
+    const body = {
+      assigned_user_id: Number(surface.querySelector("#portal-slot-user").value),
+      usage_date: surface.querySelector("#portal-slot-date").value,
+      start_time: `${surface.querySelector("#portal-slot-start").value}:00`,
+      end_time: `${surface.querySelector("#portal-slot-end").value}:00`,
+    };
+    try {
+      await apiRequest(`/portal-accounts/${slotsAccountId}/slots`, { method: "POST", body: JSON.stringify(body) });
+      showToast("Slot booked", `${body.usage_date} ${body.start_time.slice(0, 5)}`);
+      refreshSlots();
+    } catch (error) {
+      errorEl.textContent = error?.message || "Could not book the slot.";
+      errorEl.classList.remove("hidden");
+    }
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
    PIPELINE MANAGEMENT
    ═══════════════════════════════════════════════════════════════ */
 
@@ -1979,6 +2262,55 @@ async function loadAnalyticsDashboard() {
   ]);
   renderAnalyticsTeam(users.items || [], requisitions.items || [], candidates.items || [], offerItems);
   renderAnalyticsSavedReports(company, dailyUpdates.items || []);
+  renderPortalUsageReport();
+}
+
+async function renderPortalUsageReport() {
+  const surface = document.querySelector("[data-portal-usage-body]");
+  if (!surface) return;
+  try {
+    const summary = await apiRequest("/portal-accounts/usage-summary?weeks_back=6");
+    const weeks = summary.weeks || [];
+    const platforms = summary.platforms || [];
+    if (!platforms.length || !weeks.length) {
+      surface.innerHTML = '<p class="text-body-sm text-text-muted py-6 text-center">No portal usage recorded in the last 6 weeks.</p>';
+      return;
+    }
+    const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const headCells = weeks.map((w) => `<th class="px-3 py-2 text-right text-label-caps font-bold text-text-muted uppercase tracking-wider">Wk of ${fmt(w)}</th>`).join("");
+    const maxHours = Math.max(1, ...platforms.flatMap((p) => p.weeks.map((w) => w.booked_hours)));
+    const bodyRows = platforms.map((platform) => {
+      const byWeek = new Map(platform.weeks.map((w) => [w.week_start, w.booked_hours]));
+      const cells = weeks.map((week) => {
+        const hours = byWeek.get(week) || 0;
+        const pct = Math.round((hours / maxHours) * 100);
+        return `<td class="px-3 py-2 text-right">
+          <div class="flex items-center justify-end gap-2">
+            <div class="hidden sm:block w-16 bg-outline-variant rounded-full h-2 overflow-hidden"><div class="bg-tertiary rounded-full h-2" style="width:${pct}%"></div></div>
+            <span class="text-data-tabular text-on-surface w-12">${hours.toFixed(1)}h</span>
+          </div>
+        </td>`;
+      }).join("");
+      return `<tr class="border-t border-outline-variant">
+        <td class="px-3 py-2 text-body-sm font-semibold text-on-surface">${escapeHtml(platform.platform_name)}</td>
+        ${cells}
+        <td class="px-3 py-2 text-right text-data-tabular font-semibold text-primary">${platform.total_hours.toFixed(1)}h</td>
+      </tr>`;
+    }).join("");
+    surface.innerHTML = `
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead><tr class="border-b border-outline-variant">
+            <th class="px-3 py-2 text-left text-label-caps font-bold text-text-muted uppercase tracking-wider">Platform</th>
+            ${headCells}
+            <th class="px-3 py-2 text-right text-label-caps font-bold text-text-muted uppercase tracking-wider">Total</th>
+          </tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>`;
+  } catch (error) {
+    surface.innerHTML = '<p class="text-body-sm text-error py-6 text-center">Portal usage report is unavailable right now.</p>'; 
+  }
 }
 
 async function submitDailyUpdate() {
@@ -2512,6 +2844,7 @@ async function bootPage() {
     "requisition-detail": loadRequisitionDetail,
     "assignment-history-drawer": loadAssignmentHistoryDrawer,
     "work-assignment": loadWorkAssignment,
+    "portal-accounts": loadPortalAccounts,
     "reassign-owner-dialog": loadReassignOwnerDialog,
     "reassignment-review-drawer": loadReassignmentReviewDrawer,
     "status-update-dialog": loadStatusUpdateDialog,
@@ -2628,6 +2961,7 @@ async function bootPage() {
       "business-titles": ["settings.read"],
       "visibility-rules": ["settings.read"],
       "work-assignment": ["assignment.read", "requisition.read"],
+      "portal-accounts": ["portal.read"],
       "approvals-inbox": ["approval.read"],
       "client-directory": ["client.read"],
       "client-detail": ["client.read"],

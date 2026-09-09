@@ -1348,8 +1348,8 @@ Page names below are the live routed pages under `frontend/pages/` (see
   Uses `candidate_applications`, `interview_rounds`
 - Interview Scheduler (`interview-scheduler.html`)
   Uses `interview_rounds`, `candidate_applications`
-- Portal Accounts
-  (no live page yet) Uses `portal_accounts`, `portal_account_slots`
+- Portal Accounts (`portal-accounts.html`)
+  Uses `portal_accounts`, `portal_account_slots`
 - Delivery Reports (`reports.html`)
   Uses `daily_updates`, `reports`, `report_rows`
 - Notifications Center (`notifications-center.html`)

@@ -15,6 +15,7 @@ from app.api.v1 import (
     offers,
     permissions,
     pipeline,
+    portal,
     requisitions,
     roles,
     system,
@@ -33,6 +34,7 @@ api_router.include_router(clients.router, prefix="/clients", tags=["clients"])
 api_router.include_router(requisitions.router, prefix="/requisitions", tags=["requisitions"])
 api_router.include_router(candidates.router, prefix="/candidates", tags=["candidates"])
 api_router.include_router(pipeline.router, prefix="/pipeline", tags=["pipeline"])
+api_router.include_router(portal.router, prefix="/portal-accounts", tags=["portal-accounts"])
 api_router.include_router(interviews.router, prefix="/interviews", tags=["interviews"])
 api_router.include_router(offers.router, prefix="/offers", tags=["offers"])
 api_router.include_router(daily_updates.router, prefix="/daily-updates", tags=["daily-updates"])
