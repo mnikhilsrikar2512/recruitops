@@ -342,17 +342,16 @@ async function handleLogin(form) {
       location_name: data.primary_location?.name || data.primary_location?.location_name || "",
     });
     RecruitOpsLive.session = readSession();
-    /* Fetch user permissions for RBAC enforcement */
+    /* Fetch the user's effective permissions for RBAC enforcement.
+       /permissions/me resolves role + branch-role grants server-side and also
+       returns the canonical role_code, so admins are recognized correctly. */
     try {
-      const roleId = data.primary_role?.id;
-      if (roleId) {
-        const permData = await apiRequest(`/roles/${roleId}/permissions`).catch(() => ({}));
-        const session = RecruitOpsLive.session || readSession();
-        session.permissions = permData.permission_codes || [];
-        session.role_code = data.primary_role?.code || session.role;
-        writeSession(session);
-        RecruitOpsLive.session = session;
-      }
+      const permData = await apiRequest("/permissions/me").catch(() => ({}));
+      const session = RecruitOpsLive.session || readSession();
+      session.permissions = permData.permissions || [];
+      if (permData.role_code) session.role_code = permData.role_code;
+      writeSession(session);
+      RecruitOpsLive.session = session;
     } catch {}
     if (typeof showAlertState === "function") {
       showAlertState({ bgClass: "bg-success-bg", textClass: "text-success-text", borderClass: "border-[#c5dac9]", icon: "check_circle", title: "Authenticated", message: "Redirecting to your workspace..." });
@@ -976,6 +975,7 @@ let workAssignmentReqId = null;
 
 async function loadWorkAssignment() {
   workAssignmentReqId = queryInt("requisition_id") || workAssignmentReqId;
+  const canManageAssignments = isAdmin() || hasAnyPermission("assignment.create", "assignment.update");
   const [requisitions, users] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] })),
@@ -1008,7 +1008,7 @@ async function loadWorkAssignment() {
             </div>
             <div class="flex items-center gap-2">
               ${a.assignment_type === "primary_owner" ? '<span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-container text-on-primary text-[10px] font-bold uppercase tracking-wide">Owner</span>' : ""}
-              <button type="button" class="text-text-muted hover:text-danger-text transition-colors p-1 rounded hover:bg-danger-bg" title="Remove assignment" data-remove-assignment="${a.id}" aria-label="Remove assignment"><span class="material-symbols-outlined text-[18px]">close</span></button>
+              ${canManageAssignments ? `<button type="button" class="text-text-muted hover:text-danger-text transition-colors p-1 rounded hover:bg-danger-bg" title="Remove assignment" data-remove-assignment="${a.id}" aria-label="Remove assignment"><span class="material-symbols-outlined text-[18px]">close</span></button>` : ""}
             </div>
           </div>`).join("")
         : '<div class="px-4 py-6 text-text-muted font-body-sm">No team members assigned yet.</div>')
@@ -1023,7 +1023,7 @@ async function loadWorkAssignment() {
                 <p class="text-text-muted font-body-sm text-[11px]">${escapeLiveHtml(u.business_title || u.role_name || "Team member")}</p>
               </div>
             </div>
-            <button type="button" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary font-body-sm text-[12px] font-semibold hover:bg-primary-hover transition-colors" data-assign-user="${u.id}" title="Assign as contributor"><span class="material-symbols-outlined text-[16px]">add</span> Assign</button>
+            ${canManageAssignments ? `<button type="button" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary font-body-sm text-[12px] font-semibold hover:bg-primary-hover transition-colors" data-assign-user="${u.id}" title="Assign as contributor"><span class="material-symbols-outlined text-[16px]">add</span> Assign</button>` : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface-dim text-text-muted font-body-sm text-[11px]" title="Read-only: you need assignment permissions to edit"><span class="material-symbols-outlined text-[14px]">lock</span>View</span>`}
           </div>`).join("")
         : '<div class="px-4 py-6 text-text-muted font-body-sm">Everyone is already assigned.</div>')
     : '<div class="px-4 py-6 text-text-muted font-body-sm">Select a requisition first.</div>';
@@ -1033,6 +1033,7 @@ async function loadWorkAssignment() {
       <div>
         <h1 class="text-headline-lg font-bold text-on-surface">Work Assignment</h1>
         <p class="font-body-sm text-body-sm text-text-muted mt-1">Assign team members across requisitions. Owner transfers require the primary-owner assignment type.</p>
+        ${canManageAssignments ? "" : '<p class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-surface-dim border border-border px-3 py-1.5 font-body-sm text-[12px] text-text-muted"><span class="material-symbols-outlined text-[15px]">lock</span>Read-only — you can view assignments but not change them</p>'}
       </div>
       <span class="inline-flex items-center rounded-full bg-success-bg px-2.5 py-1 font-label-caps text-label-caps text-success-text">Live API data</span>
     </div>
@@ -1074,12 +1075,14 @@ async function loadWorkAssignment() {
       loadWorkAssignment();
     });
   }
-  surface.querySelectorAll("[data-assign-user]").forEach((button) => {
-    button.addEventListener("click", () => createRequisitionAssignment(button));
-  });
-  surface.querySelectorAll("[data-remove-assignment]").forEach((button) => {
-    button.addEventListener("click", () => removeRequisitionAssignment(button));
-  });
+  if (canManageAssignments) {
+    surface.querySelectorAll("[data-assign-user]").forEach((button) => {
+      button.addEventListener("click", () => createRequisitionAssignment(button));
+    });
+    surface.querySelectorAll("[data-remove-assignment]").forEach((button) => {
+      button.addEventListener("click", () => removeRequisitionAssignment(button));
+    });
+  }
 }
 
 async function createRequisitionAssignment(button) {
@@ -1246,8 +1249,10 @@ async function loadDailyUpdates() {
 }
 
 /* Loader for the daily-updates-submission page: populate the requisition select,
-   date input, and the recent-updates list. Never touches the form fields. */
+   date input, and the recent-updates list. Never touches the form fields.
+   Users without daily_update.create_main get a read-only view (no submit controls). */
 async function loadDailyUpdateSubmission() {
+  const canSubmit = isAdmin() || hasPermission("daily_update.create_main");
   const [requisitions, updates] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
@@ -1268,6 +1273,26 @@ async function loadDailyUpdateSubmission() {
           <span class="ml-3 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.submission_status === "draft" ? "bg-surface-dim text-text-muted" : "bg-success-container text-success-text"}">${escapeLiveHtml(u.submission_status || "submitted")}</span>
         </div>`).join("")
       : '<p class="text-text-muted">No updates submitted yet — your first one will appear here.</p>';
+  }
+
+  /* Read-only mode: strip submit controls and disable the form inputs */
+  if (!canSubmit) {
+    const surface = document.querySelector(".workspace-surface");
+    if (surface) {
+      surface.querySelectorAll("[data-route-submit]").forEach((btn) => btn.remove());
+      const draftBtn = [...surface.querySelectorAll("button")].find((b) => /^save draft/i.test((b.textContent || "").replace(/\s+/g, " ").trim()));
+      if (draftBtn) draftBtn.remove();
+      const heading = surface.querySelector("h1");
+      if (heading) heading.textContent = "Daily Updates";
+      const notice = document.createElement("p");
+      notice.className = "mt-2 inline-flex items-center gap-1.5 rounded-lg bg-surface-dim border border-border px-3 py-1.5 font-body-sm text-[12px] text-text-muted";
+      notice.innerHTML = '<span class="material-symbols-outlined text-[15px]">lock</span>Read-only — you can view updates but not submit them';
+      heading?.after(notice);
+      ["update-summary", "requisition_id", "update-date", "profiles-sourced-count", "profiles-screened-count", "profiles-submitted-count", "interviews-scheduled-count", "blockers", "next-actions"].forEach((id) => {
+        const field = document.getElementById(id);
+        if (field) { field.disabled = true; field.classList.add("opacity-60", "cursor-not-allowed"); }
+      });
+    }
   }
 }
 
@@ -2602,7 +2627,7 @@ async function bootPage() {
       "role-dashboard": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr"],
       "business-titles": ["settings.read"],
       "visibility-rules": ["settings.read"],
-      "work-assignment": ["assignment.read"],
+      "work-assignment": ["assignment.read", "requisition.read"],
       "approvals-inbox": ["approval.read"],
       "client-directory": ["client.read"],
       "client-detail": ["client.read"],
@@ -2628,7 +2653,7 @@ async function bootPage() {
       "follow-up-form-dialog": ["meeting.create"],
       "join-tracker": ["offer.read"],
       "daily-updates-workspace": ["daily_update.read"],
-      "daily-updates-submission": ["daily_update.create_main"],
+      "daily-updates-submission": ["daily_update.create_main", "daily_update.read"],
       "daily-updates-review": ["daily_update.read"],
       "daily-update-detail-panel": ["daily_update.read"],
       "notifications-center": ["notification.read"],
