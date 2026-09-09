@@ -2,9 +2,17 @@
 
 Last generated: August 20, 2026
 
+> **Archived:** The original design-tool export folders and the one-shot build scripts below
+> (`build_integrated_frontend.py`, `verify_frontend_integrity.py`,
+> `smoke_integrated_frontend.mjs`, `check_frontend_readiness.py`) were removed after the
+> integrated frontend was wired to the live FastAPI backend. This document is kept as a
+> historical snapshot of the pre-API integration gate; use the backend test suite
+> (`backend/scripts/run_tests_ci.sh`) and the live pages under `frontend/pages/` for
+> current verification.
+
 ## Scope
 
-This audit covers the stitched frontend generated from `stitch_guided_web_development` into the live routed frontend under `frontend/`.
+This audit covers the frontend that was generated from the original design exports into the live routed frontend under `frontend/`.
 
 Current generated inventory:
 
@@ -41,16 +49,16 @@ Current generated inventory:
 
 ## Commands Used As Evidence
 
-These are the current repeatable checks for the integrated frontend:
+The original one-shot build/verify/smoke scripts were removed once the frontend was integrated with the live API:
 
 ```bash
-python3 scripts/build_integrated_frontend.py
-python3 scripts/verify_frontend_integrity.py
-node scripts/smoke_integrated_frontend.mjs
-python3 scripts/check_frontend_readiness.py
+# removed: python3 scripts/build_integrated_frontend.py
+# removed: python3 scripts/verify_frontend_integrity.py
+# removed: node scripts/smoke_integrated_frontend.mjs
+# removed: python3 scripts/check_frontend_readiness.py
 ```
 
-`scripts/check_frontend_readiness.py` is the preferred single command because it runs build, structural verification, and browser smoke testing in the correct serial order.
+Current verification is the backend test suite plus serving `frontend/` and exercising the routed pages directly.
 
 ## Generated Handoff Artifacts
 
@@ -62,7 +70,7 @@ python3 scripts/check_frontend_readiness.py
 
 ## Readiness Interpretation
 
-The frontend is in a strong pre-API state for the current stitched scope:
+The frontend was in a strong pre-API state for the integrated scope at the time of this audit:
 
 - route structure is consistent
 - shared shell behavior is unified

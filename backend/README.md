@@ -119,9 +119,4 @@ python -m app.scripts.db_status
 
 ## Current Source SQL
 
-The canonical SQL files are still the root project scripts:
-
-- `/Users/bhargavnikhil/Desktop/recrutment system/scripts/001_recruitment_system_mssql_schema.sql`
-- `/Users/bhargavnikhil/Desktop/recrutment system/scripts/002_seed_master_data.sql`
-- `/Users/bhargavnikhil/Desktop/recrutment system/scripts/003_seed_permissions_and_role_mappings.sql`
-- `/Users/bhargavnikhil/Desktop/recrutment system/scripts/004_seed_sample_business_data.sql`
+The canonical schema is `backend/db/schema.sql` (60 tables; regenerate from the live database with `backend/scripts/dump_schema.py`). CI replay uses `backend/scripts/run_tests_ci.sh` with seeding from `backend/scripts/seed_ci.py`. The original planning scripts (`scripts/001_*`–`004_*`) were superseded and removed.

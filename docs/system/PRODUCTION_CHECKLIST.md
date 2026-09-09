@@ -28,12 +28,12 @@ Current status:
 - [x] Database design document created and updated
 - [x] API endpoint list created and updated
 - [x] Report structure planning improved beyond a raw weekly tracking table
-- [x] Stitch prompt set created for the major screens
+- [x] Screen prompt set created for the major screens
 - [x] Separate page prompts created from login through the operational workflows
-- [x] Global design direction documented for Stitch
+- [x] Global design direction documented
 - [x] Frontend page set integrated into `frontend/`
 - [x] Shared CSS and shared JS structure centralized
-- [x] Loader integrated from Stitch and adapted for shared frontend usage
+- [x] Loader adapted for shared frontend usage
 - [x] Notifications, success toasts, empty states, 404, and access denied screens added
 - [x] Admin pages added, including audit-related pages
 - [x] Manager pages added, including team performance and meetings/follow-ups

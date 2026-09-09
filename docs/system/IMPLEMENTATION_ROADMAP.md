@@ -23,8 +23,10 @@ The repository already has strong planning assets:
 - product and system documentation in `docs/system/`
 - a broad API scope in `docs/system/API_ENDPOINTS.md`
 - a detailed SQL-first schema draft in `scripts/001_recruitment_system_mssql_schema.sql`
+  (superseded — the canonical schema now lives in `backend/db/schema.sql`)
 - seed data scripts in `scripts/002_*`, `003_*`, and `004_*`
-- a large stitched frontend prototype in `frontend/`
+  (superseded — CI seeding now lives in `backend/scripts/seed_ci.py`)
+- a large frontend prototype in `frontend/`
 
 The repository does not yet have a real application backend, running API server, migrations framework, authentication implementation, or persistent integration between the frontend and backend.
 
@@ -248,7 +250,7 @@ Exit criteria:
 
 Objective:
 
-Connect the stitched frontend only after the backend slice is stable.
+Connect the frontend to the backend only after the backend slice is stable.
 
 Tasks:
 

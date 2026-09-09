@@ -19,23 +19,16 @@ This project is a recruitment operations system for a multi-location company tha
   Active FastAPI backend foundation for the recruitment system
 - `frontend/`
   Live prototype pages, shared CSS/JS, and the current routed frontend
-- `frontend/archive/`
-  Older prototypes, placeholder exports, and non-live frontend references
-- `frontend/previews/`
-  Loader previews and visual reference captures
-- `design/`
-  Stitch prompts and raw Stitch export source files
 - `docs/`
   Product, API, database, roadmap, and reporting documentation
 - `scripts/`
-  SQL setup, seed scripts, and supporting utilities
+  Seed scripts and supporting utilities
 
 ## Implementation Status
 
-- Frontend planning and stitched MVP pages exist
-- Integrated stitched frontend routes now exist in `frontend/` with shared shell, overlay, and validation behavior
-- Frontend readiness can be checked with `python3 scripts/check_frontend_readiness.py`
-- The latest frontend audit summary is documented in `docs/system/INTEGRATED_FRONTEND_READINESS_AUDIT.md`
+- Live routed frontend exists in `frontend/` with shared shell, overlay, and validation behavior
+- Frontend is wired to the FastAPI backend for login, dashboard, requisitions, candidates, pipeline, and daily updates
+- The historical frontend audit is archived in `docs/system/INTEGRATED_FRONTEND_READINESS_AUDIT.md`
 - SQL planning and seed scripts exist
 - FastAPI backend now exists in `backend/` as the active API implementation
 - The old non-FastAPI backend has been removed

@@ -2060,21 +2060,24 @@ Purpose:
 
 ## Frontend Page To API Mapping
 
+Page names below are the live routed pages under `frontend/pages/` (see
+`frontend/route-manifest.json`).
+
 ## Login
 
-- Login (`login_executive_heritage/code.html`)
+- Login (`login.html`)
   - `POST /api/v1/auth/login`
   - `GET /api/v1/auth/me`
 
 ## Admin pages
 
-- Admin Dashboard (`admin_dashboard_executive_heritage_fixed/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   - `GET /api/v1/dashboards/admin`
-- Location Management (`location_management_executive_heritage/code.html`)
+- Location Management (`location-management.html`)
   - `GET /api/v1/locations`
   - `POST /api/v1/locations`
   - `PATCH /api/v1/locations/{location_id}`
-- User Management (`user_management_executive_heritage/code.html`)
+- User Management (`user-management.html`)
   - `GET /api/v1/users`
   - `POST /api/v1/users`
   - `POST /api/v1/users/invitations`
@@ -2082,11 +2085,11 @@ Purpose:
   - `POST /api/v1/users/{user_id}/credentials/reset`
   - `POST /api/v1/users/{user_id}/credentials/resend`
   - `GET /api/v1/user-location-roles`
-- Client Directory (`client_companies_executive_heritage/code.html`)
+- Client Directory (`client-directory.html`)
   - `GET /api/v1/clients`
   - `POST /api/v1/clients`
   - `GET /api/v1/clients/{client_id}/contacts`
-- Reports Center (`reports_center_executive_heritage/code.html`)
+- Reports (`reports.html`)
   - `GET /api/v1/reports`
   - `GET /api/v1/reports/summary/admin`
   - `GET /api/v1/reports/export`
@@ -2095,45 +2098,45 @@ Purpose:
   - `PATCH /api/v1/report-locks/{lock_id}`
   - `POST /api/v1/automation/report-jobs`
   - `POST /api/v1/reports/{report_id}/publish`
-- Approvals Inbox (`approvals_inbox_executive_heritage/code.html`)
+- Approvals Inbox (`approvals-inbox.html`)
   - `GET /api/v1/approvals`
   - `POST /api/v1/approvals/{approval_id}/approve`
   - `POST /api/v1/approvals/{approval_id}/reject`
-- Notifications Center (`admin_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   - `GET /api/v1/notifications`
 
 ## Manager pages
 
-- Manager Dashboard (`manager_dashboard_executive_heritage_fixed/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   - `GET /api/v1/dashboards/manager`
-- Client Portfolio (`client_portfolio_executive_heritage/code.html`)
+- Client Directory (`client-directory.html`), Client Detail (`client-detail.html`)
   - `GET /api/v1/clients`
   - `GET /api/v1/clients/{client_id}`
-- Meetings and Follow-ups (`meetings_follow_ups_executive_heritage/code.html`)
+- Meetings (`meetings.html`)
   - `GET /api/v1/meetings`
   - `POST /api/v1/meetings`
   - `PATCH /api/v1/meetings/{meeting_id}/outcome`
-- Managed Requisitions (`managed_requisitions_perfectly_balanced_layout/code.html`)
+- Requisition List (`requisition-list.html`), Requisition Detail (`requisition-detail.html`)
   - `GET /api/v1/requisitions`
   - `GET /api/v1/requisitions/{requisition_id}`
-- Manager Reports (`manager_reports_executive_heritage/code.html`)
+- Reports (`reports.html`)
   - `GET /api/v1/reports`
   - `GET /api/v1/reports/summary/manager`
   - `GET /api/v1/report-locks`
   - `POST /api/v1/automation/report-jobs`
-- Notifications Center (`manager_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   - `GET /api/v1/notifications`
 
 ## HR pages
 
-- Delivery Dashboard (`hr_dashboard_executive_heritage/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   - `GET /api/v1/dashboards/hr`
-- Requisition Intake (`structured_requisition_intake_layout_fixes/code.html`)
+- Requisition Intake (`requisition-intake.html`)
   - `POST /api/v1/requisitions`
   - `PUT /api/v1/requisitions/{requisition_id}/end-clients`
   - `PUT /api/v1/requisitions/{requisition_id}/screening-rules`
   - `PUT /api/v1/requisitions/{requisition_id}/required-documents`
-- Candidate Profiles (`candidate_profiles_refined_structure/code.html`)
+- Candidate Profiles (`candidate-profiles.html`)
   - `GET /api/v1/candidates`
   - `POST /api/v1/candidates`
   - `POST /api/v1/candidates/resume-upload`
@@ -2147,44 +2150,37 @@ Purpose:
   - `GET /api/v1/candidate-applications`
   - `POST /api/v1/candidate-applications/{application_id}/client-feedback`
   - `POST /api/v1/candidate-applications/{application_id}/escalate`
-- Candidate Screening (`candidate_screening_arjun_mehta/code.html`)
+- Candidate Screening (`candidate-screening.html`)
   - `GET /api/v1/screening/queue`
   - `POST /api/v1/candidate-applications/{application_id}/screening-checks`
   - `POST /api/v1/candidate-applications/{application_id}/complete-screening`
   - `POST /api/v1/candidate-applications/{application_id}/reject`
-- Pipeline Board (`pipeline_board_executive_heritage/code.html`)
+- Pipeline Board (`pipeline-board.html`)
   - `GET /api/v1/pipeline/board`
   - `GET /api/v1/pipeline/summary`
-- Interview Schedule (`interview_schedule_executive_heritage/code.html`)
+- Interview Scheduler (`interview-scheduler.html`)
   - `GET /api/v1/interviews`
   - `POST /api/v1/interviews`
   - `POST /api/v1/interviews/{interview_id}/feedback`
-- Portal Accounts (`portal_accounts_executive_heritage/code.html`)
-  - `GET /api/v1/portal-accounts`
-  - `GET /api/v1/portal-accounts/{portal_account_id}/slots`
-  - `POST /api/v1/portal-accounts/{portal_account_id}/slots`
-- Delivery Reports (`hr_reports_executive_heritage/code.html`)
+- Delivery Reports (`reports.html`)
   - `GET /api/v1/reports`
   - `GET /api/v1/reports/summary/hr`
   - `GET /api/v1/daily-updates/mine/today`
   - `POST /api/v1/daily-updates`
-- Notifications Center (`hr_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   - `GET /api/v1/notifications`
   - `PATCH /api/v1/notifications/read-all`
 
 ## Recruiter pages
 
-- Recruiter Dashboard (`hr_dashboard_executive_heritage/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   - `GET /api/v1/dashboards/hr`
-- Candidate Profiles (`candidate_profiles_refined_structure/code.html`)
+- Candidate Profiles (`candidate-profiles.html`)
   - `GET /api/v1/candidates`
   - `POST /api/v1/candidates/resume-upload`
   - `GET /api/v1/candidates/resume-parse-jobs/{parse_job_id}`
   - `POST /api/v1/candidates/{candidate_id}/save-draft`
-- Portal Accounts (`portal_accounts_executive_heritage/code.html`)
-  - `GET /api/v1/portal-accounts`
-  - `GET /api/v1/portal-accounts/{portal_account_id}/slots`
-- Recruiter Productivity Reports (`recruiter_reports_productivity_executive_heritage/code.html`)
+- Recruiter Productivity Reports (`user-performance-reports.html`)
   - `GET /api/v1/reports/summary/recruiter`
   - `GET /api/v1/daily-updates/mine/today`
   - `POST /api/v1/daily-updates`

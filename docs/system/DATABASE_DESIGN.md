@@ -1299,68 +1299,71 @@ Includes:
 
 ## Frontend to Database Mapping
 
+Page names below are the live routed pages under `frontend/pages/` (see
+`frontend/route-manifest.json`).
+
 ## Admin frontend
 
-- Admin Dashboard (`admin_dashboard_executive_heritage_fixed/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   Uses `locations`, `user_location_roles`, `requisitions`, `approval_requests`, `reports`
-- Location Management (`location_management_executive_heritage/code.html`)
+- Location Management (`location-management.html`)
   Uses `locations`, `user_location_roles`
-- User Management (`user_management_executive_heritage/code.html`)
+- User Management (`user-management.html`)
   Uses `users`, `roles`, `user_location_roles`, `user_invitations`, `portal_account_slots`
-- Client Directory (`client_companies_executive_heritage/code.html`)
+- Client Directory (`client-directory.html`)
   Uses `clients`, `client_contacts`, `meetings`, `requisitions`
-- Reports Center (`reports_center_executive_heritage/code.html`)
+- Reports (`reports.html`)
   Uses `reports`, `report_rows`, `report_locks`, `daily_updates`, dashboard views
-- Approvals Inbox (`approvals_inbox_executive_heritage/code.html`)
+- Approvals Inbox (`approvals-inbox.html`)
   Uses `approval_requests`, `audit_logs`
-- Notifications Center (`admin_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   Uses `notifications`
 
 ## Manager frontend
 
-- Manager Dashboard (`manager_dashboard_executive_heritage_fixed/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   Uses `user_location_roles`, `requisitions`, `meetings`, `reports`
-- Client Portfolio (`client_portfolio_executive_heritage/code.html`)
+- Client Directory (`client-directory.html`), Client Detail (`client-detail.html`)
   Uses `clients`, `client_contacts`, `requisitions`
-- Meetings and Follow-ups (`meetings_follow_ups_executive_heritage/code.html`)
+- Meetings (`meetings.html`)
   Uses `meetings`, `meeting_attendees`
-- Managed Requisitions (`managed_requisitions_perfectly_balanced_layout/code.html`)
+- Requisition List (`requisition-list.html`)
   Uses `requisitions`, `candidate_applications`, `requisition_screening_rules`
-- Manager Reports (`manager_reports_executive_heritage/code.html`)
+- Reports (`reports.html`)
   Uses `reports`, `report_rows`, dashboard views
-- Notifications Center (`manager_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   Uses `notifications`
 
 ## HR frontend
 
-- Delivery Dashboard (`hr_dashboard_executive_heritage/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   Uses `requisitions`, `candidate_applications`, `portal_account_slots`, `daily_updates`
-- Requisition Intake (`structured_requisition_intake_layout_fixes/code.html`)
+- Requisition Intake (`requisition-intake.html`)
   Uses `requisitions`, `requisition_end_clients`, `requisition_skill_requirements`, `requisition_screening_rules`, `requisition_documents_required`
-- Candidate Profiles (`candidate_profiles_refined_structure/code.html`)
+- Candidate Profiles (`candidate-profiles.html`)
   Uses `candidates`, `candidate_skills`, `candidate_resume_parse_logs`, `candidate_duplicate_checks`, `candidate_documents`, `candidate_applications`
-- Candidate Screening (`candidate_screening_arjun_mehta/code.html`)
+- Candidate Screening (`candidate-screening.html`)
   Uses `candidate_applications`, `candidate_screening_checks`, `requisition_screening_rules`
-- Pipeline Board (`pipeline_board_executive_heritage/code.html`)
+- Pipeline Board (`pipeline-board.html`)
   Uses `candidate_applications`, `interview_rounds`
-- Interview Schedule (`interview_schedule_executive_heritage/code.html`)
+- Interview Scheduler (`interview-scheduler.html`)
   Uses `interview_rounds`, `candidate_applications`
-- Portal Accounts (`portal_accounts_executive_heritage/code.html`)
-  Uses `portal_accounts`, `portal_account_slots`
-- Delivery Reports (`hr_reports_executive_heritage/code.html`)
+- Portal Accounts
+  (no live page yet) Uses `portal_accounts`, `portal_account_slots`
+- Delivery Reports (`reports.html`)
   Uses `daily_updates`, `reports`, `report_rows`
-- Notifications Center (`hr_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   Uses `notifications`
 
 ## Recruiter frontend
 
-- Recruiter Dashboard (`hr_dashboard_executive_heritage/code.html`)
+- Role Dashboard (`role-dashboard.html`)
   Uses `requisitions`, `candidates`, `portal_account_slots`, `daily_updates`
-- Candidate Profiles (`candidate_profiles_refined_structure/code.html`)
+- Candidate Profiles (`candidate-profiles.html`)
   Uses `candidates`, `candidate_resume_parse_logs`, `candidate_duplicate_checks`, `candidate_documents`
-- Recruiter Productivity Reports (`recruiter_reports_productivity_executive_heritage/code.html`)
+- Recruiter Productivity Reports (`user-performance-reports.html`)
   Uses `daily_updates`, `reports`, `report_rows`
-- Notifications Center (`hr_notifications_executive_heritage/code.html`)
+- Notifications Center (`notifications-center.html`)
   Uses `notifications`
 
 ## Key Relationships

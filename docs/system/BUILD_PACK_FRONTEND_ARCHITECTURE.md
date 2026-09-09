@@ -586,9 +586,9 @@ Before generating many pages, first build:
 
 Only after that should page generation continue at scale.
 
-## Practical Rule For Stitch
+## Page Generation Rule
 
-When using Stitch, do not generate pages as unrelated standalone designs.
+Do not generate pages as unrelated standalone designs.
 
 Generate in this order:
 

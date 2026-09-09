@@ -40,14 +40,6 @@ This index groups the core execution documents required to build the MVP end to 
 - [MVP Backend Build Sequence Pack](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/MVP_BACKEND_BUILD_SEQUENCE_PACK.md)
 - [Backend Stack Decision](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BACKEND_STACK_DECISION.md)
 - [MVP FastAPI Readiness Tracker](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/MVP_FASTAPI_READINESS_TRACKER.md)
-- [Stitch File Usage Flow](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/STITCH_FILE_USAGE_FLOW.md)
-- [Stitch Foundation Prompt Pack](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_STITCH_FOUNDATION_PROMPTS.md)
-- [Stitch Foundation Execution Sheet](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_STITCH_FOUNDATION_EXECUTION_SHEET.md)
-- [Stitch Foundation Upload Pack](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/stitch_foundation/README.md)
-- [Stitch Prompt Pack](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_STITCH_PROMPTS.md)
-- [Stitch Execution Sheet](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_STITCH_EXECUTION_SHEET.md)
-- [Stitch Refinement Prompt Pack](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_STITCH_REFINEMENT_PROMPTS.md)
-- [Stitch QA Checklist](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_STITCH_QA_CHECKLIST.md)
 - [Screen Field Specification](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_SCREEN_FIELD_SPEC.md)
 - [Final API Contract Baseline](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_API_CONTRACT_BASELINE.md)
 - [API Implementation Contract](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_API_IMPLEMENTATION_CONTRACT.md)
@@ -87,18 +79,12 @@ This index groups the core execution documents required to build the MVP end to 
 28. MVP Backend Build Sequence Pack
 29. Backend Stack Decision
 30. MVP FastAPI Readiness Tracker
-31. Stitch Foundation Prompt Pack
-32. Stitch Foundation Execution Sheet
-33. Stitch Prompt Pack
-34. Stitch Execution Sheet
-35. Stitch Refinement Prompt Pack
-36. Stitch QA Checklist
-37. Final Permission And Action Matrix
-38. Screen Field Specification
-39. Final API Contract Baseline
-40. API Implementation Contract
-41. Backend Implementation Checklist
-42. Phased Implementation Backlog
+31. Final Permission And Action Matrix
+32. Screen Field Specification
+33. Final API Contract Baseline
+34. API Implementation Contract
+35. Backend Implementation Checklist
+36. Phased Implementation Backlog
 
 ## Current Readiness Position
 

@@ -41,31 +41,17 @@ Current frontend evidence in the workspace is now a mix of:
 - standalone modal or drawer mockups
 - standalone success toasts
 - shared CSS and JS support files
-- Stitch and design export assets
 
 ## Current Live Prototype Surface
 
-The active lightweight prototype currently uses:
+The active frontend now uses:
 
 - `frontend/index.html`
-- `frontend/pages/login.html`
-- `frontend/pages/dashboard.html`
-- `frontend/pages/users.html`
-- `frontend/pages/locations.html`
-- `frontend/pages/clients.html`
-- `frontend/pages/requisitions.html`
-- `frontend/pages/candidates.html`
-- `frontend/pages/pipeline.html`
-- `frontend/pages/daily-updates.html`
-- `frontend/pages/notifications.html`
-- `frontend/pages/access-denied.html`
+- live routed pages under `frontend/pages/` (see `frontend/route-manifest.json`)
+- shared CSS/JS in `frontend/shared/` (`global.css`, `api-client.js`, `app.js`, and friends)
 
-This live layer is supported by:
-
-- `frontend/shared/prototype.css`
-- `frontend/shared/prototype.js`
-
-These files are now part of the active product surface and should not be classified as legacy artifacts.
+The sections below are the historical reference inventory; the legacy pages they listed were
+removed once the live routed frontend replaced them.
 
 ## Current Reference Artifact Type
 
@@ -75,7 +61,6 @@ Reference artifact evidence in the workspace is mainly:
 - standalone modal or drawer mockups
 - standalone success toasts
 - shared CSS and JS support files
-- Stitch and design export assets
 
 This means the reference baseline is useful for comparison, but not as the frontend architecture we plan to ship.
 
@@ -84,13 +69,12 @@ This means the reference baseline is useful for comparison, but not as the front
 These files appear reusable as shared assets:
 
 - `frontend/shared/global.css`
-- `frontend/shared/global.js`
-- `frontend/shared/tailwind-generated.css`
-- `frontend/shared/tailwind-source.css`
 - `frontend/shared/brand-logo.svg`
 - `frontend/shared/avatar-placeholder.svg`
 
-Some of these support the live prototype directly, while others remain visual references only.
+(`frontend/shared/global.js`, `tailwind-generated.css`, and `tailwind-source.css` from the
+earlier prototype were removed; the live runtime uses `api-client.js`, `app.js`, and
+`tailwind.config.js`.)
 
 ## Current Artifact Groups By MVP Relevance
 

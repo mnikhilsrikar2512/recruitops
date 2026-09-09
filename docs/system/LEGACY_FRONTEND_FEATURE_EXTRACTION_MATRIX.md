@@ -1,8 +1,13 @@
 # Legacy Frontend Feature Extraction Matrix
 
+> **Archived:** the legacy prototype pages referenced throughout this document (the
+> `*_executive_heritage*` files and similar one-off mockups under `frontend/pages/`) were
+> removed once the live routed frontend replaced them. The idea categories and cautions
+> below remain valid as design guidance; the file references are historical.
+
 ## Purpose
 
-This document extracts the most useful ideas from the current legacy frontend artifacts and maps them to the target MVP pages.
+This document extracts the most useful ideas from the earlier legacy frontend artifacts and maps them to the target MVP pages.
 
 It is not a final selection document.
 

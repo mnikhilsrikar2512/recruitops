@@ -69,7 +69,7 @@ Examples:
 - `Pipeline History`
   may open as a drawer or side panel
 
-If a Stitch page includes a button such as:
+If a page includes a button such as:
 
 - view
 - edit

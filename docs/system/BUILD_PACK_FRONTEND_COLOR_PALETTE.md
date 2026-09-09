@@ -10,8 +10,6 @@ This document locks the MVP visual palette for RecruitOps.
 
 Use this across:
 
-- Stitch foundation prompts
-- Stitch page prompts
 - frontend tokens
 - shared components
 - future refinements
@@ -66,7 +64,3 @@ The goal is to keep the product consistent, calm, and reusable.
 - do not mix multiple primary colors
 - do not rely on heavy gradients for structure
 - do not create different color systems for different modules
-
-## Stitch Rule
-
-Any Stitch prompt for the MVP should explicitly mention this palette and ask Stitch not to invent extra brand colors.

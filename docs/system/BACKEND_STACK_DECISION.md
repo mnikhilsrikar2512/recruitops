@@ -12,21 +12,20 @@ This document locks the MVP backend implementation direction so the repository c
 
 ### Application Stack
 
-- Runtime: `Node.js`
-- Language: `TypeScript`
-- HTTP framework: `Express`
+- Runtime: `Python`
+- Language: `Python 3.12+`
+- HTTP framework: `FastAPI`
 
 Reason:
 
-- fast MVP bootstrap
-- simple route-first API build
-- easy alignment with the current frontend and JS-heavy workflow
+- typed, validated request/response models via Pydantic
+- simple route-first API build that aligns with the existing API contracts
 - low friction for building module by module from the existing API contracts
 
 ### Database
 
 - Primary engine: `Microsoft SQL Server`
-- Source-of-truth schema: [scripts/001_recruitment_system_mssql_schema.sql](/Users/bhargavnikhil/Desktop/recrutment%20system/scripts/001_recruitment_system_mssql_schema.sql)
+- Source-of-truth schema: [backend/db/schema.sql](/Users/bhargavnikhil/Desktop/recrutment%20system/backend/db/schema.sql) (regenerate with `backend/scripts/dump_schema.py`)
 
 Reason:
 
@@ -35,15 +34,14 @@ Reason:
 
 ### Migration Strategy
 
-- Keep versioned SQL files in `backend/database/migrations/`
-- Treat the root `scripts/` folder as the planning and bootstrap source until the migration files are fully split out
-- Move toward one executable migration per change instead of editing one giant schema forever
+- Schema changes land in the live database and are committed to `backend/db/schema.sql` via `backend/scripts/dump_schema.py`
+- CI replay: `backend/scripts/run_tests_ci.sh` rebuilds a throwaway database from the committed schema
 
 ### Authentication Strategy
 
 - MVP auth style: opaque bearer session token
 - Session persistence table: `user_sessions`
-- Password storage: hashed password only
+- Password storage: bcrypt password hashing (legacy unsalted hashes migrate on login)
 
 Reason:
 
@@ -60,7 +58,7 @@ Reason:
 
 ### Validation Strategy
 
-- request validation with `zod`
+- request validation with `pydantic`
 - service-layer business validation for ownership, scope, transitions, and duplicate rules
 
 ### File Storage Strategy
@@ -82,12 +80,7 @@ The `backend/` folder will hold:
 
 ## Non-Goals For This First Scaffold
 
-This first scaffold does not yet complete:
-
-- real authentication
-- real DB execution
-- real file upload handling
-- real permission resolution
-- real audit logging
-
-It exists to give the repository a clean implementation base that matches the locked product decisions.
+Historical note: the original scaffold deliberately deferred authentication, DB execution,
+file upload handling, permission resolution, and audit logging. All of those are implemented
+now (see `backend/tests/` and the CI runner); this section is kept to explain the scaffold's
+original intent.

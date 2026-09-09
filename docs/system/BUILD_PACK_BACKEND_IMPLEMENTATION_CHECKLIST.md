@@ -21,7 +21,7 @@ Read this together with:
 - [BUILD_PACK_BACKEND_EXECUTION_PLAN.md](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_BACKEND_EXECUTION_PLAN.md)
 - [BUILD_PACK_API_IMPLEMENTATION_CONTRACT.md](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/BUILD_PACK_API_IMPLEMENTATION_CONTRACT.md)
 - [MVP_SCHEMA_V2.md](/Users/bhargavnikhil/Desktop/recrutment%20system/docs/system/MVP_SCHEMA_V2.md)
-- [scripts/001_recruitment_system_mssql_schema.sql](/Users/bhargavnikhil/Desktop/recrutment%20system/scripts/001_recruitment_system_mssql_schema.sql)
+- [backend/db/schema.sql](/Users/bhargavnikhil/Desktop/recrutment%20system/backend/db/schema.sql) (canonical schema)
 
 ## Core Rule
 
