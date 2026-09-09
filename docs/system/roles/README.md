@@ -21,19 +21,19 @@ These guides are based on:
 
 ## Role Files
 
-- [Platform Admin Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/PLATFORM_ADMIN_LIFECYCLE.md>)
-- [Operations Admin Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/OPERATIONS_ADMIN_LIFECYCLE.md>)
-- [Business Lead Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/BUSINESS_LEAD_LIFECYCLE.md>)
-- [Client Manager Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/CLIENT_MANAGER_LIFECYCLE.md>)
-- [Delivery Lead Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/DELIVERY_LEAD_LIFECYCLE.md>)
-- [Recruiter Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/RECRUITER_LIFECYCLE.md>)
-- [Sourcing Support Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/SOURCING_SUPPORT_LIFECYCLE.md>)
-- [Reviewer Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/REVIEWER_LIFECYCLE.md>)
-- [External User Lifecycle](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/EXTERNAL_USER_LIFECYCLE.md>)
+- [Platform Admin Lifecycle](PLATFORM_ADMIN_LIFECYCLE.md)
+- [Operations Admin Lifecycle](OPERATIONS_ADMIN_LIFECYCLE.md)
+- [Business Lead Lifecycle](BUSINESS_LEAD_LIFECYCLE.md)
+- [Client Manager Lifecycle](CLIENT_MANAGER_LIFECYCLE.md)
+- [Delivery Lead Lifecycle](DELIVERY_LEAD_LIFECYCLE.md)
+- [Recruiter Lifecycle](RECRUITER_LIFECYCLE.md)
+- [Sourcing Support Lifecycle](SOURCING_SUPPORT_LIFECYCLE.md)
+- [Reviewer Lifecycle](REVIEWER_LIFECYCLE.md)
+- [External User Lifecycle](EXTERNAL_USER_LIFECYCLE.md)
 
 ## Access Mapping
 
-- [Role Access Matrix](</Users/bhargavnikhil/Desktop/recrutment system/docs/system/roles/ROLE_ACCESS_MATRIX.md>)
+- [Role Access Matrix](ROLE_ACCESS_MATRIX.md)
 
 ## Usage Rule
 
