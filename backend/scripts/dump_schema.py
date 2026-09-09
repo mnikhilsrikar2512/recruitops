@@ -55,16 +55,22 @@ def main() -> None:
             c for c in stripped.constraints if not isinstance(c, ForeignKeyConstraint)
         }
         lines.append(str(CreateTable(stripped).compile(dialect=dialect)).strip() + ";")
-        for index in stripped.indexes:
+        # indexes is a set: sort for deterministic output across runs (hash seed)
+        for index in sorted(stripped.indexes, key=lambda i: i.name or ""):
             lines.append(str(CreateIndex(index).compile(dialect=dialect)).strip() + ";")
         lines.append("")
 
     lines.append("")
-    lines.append("-- Pass 2: foreign keys")
+    lines.append("-- Pass 2: foreign keys (sorted by constraint name for stable diffs)")
     lines.append("")
     fk_count = 0
-    for table in tables:
-        for constraint in foreign_keys(table):
+    # Reflection returns constraints as an unordered set: sort globally by name
+    # so consecutive dumps are byte-identical.
+    all_fks = sorted(
+        ((table, c) for table in tables for c in foreign_keys(table)),
+        key=lambda tc: tc[1].name or "",
+    )
+    for table, constraint in all_fks:
             pairs = [(e.parent.name, e.column.name) for e in constraint.elements]
             columns = ", ".join(f"[{local}]" for local, _ in pairs)
             referred_columns = ", ".join(f"[{remote}]" for _, remote in pairs)

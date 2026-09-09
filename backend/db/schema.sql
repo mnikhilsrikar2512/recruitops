@@ -44,8 +44,8 @@ CREATE TABLE company_entities (
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	CONSTRAINT [PK__company___3213E83FC196E6AC] PRIMARY KEY CLUSTERED (id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_company_entities_company_code] ON company_entities (company_code);
 CREATE NONCLUSTERED INDEX [IX_company_entities_status_primary] ON company_entities (status, is_primary, display_name);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_company_entities_company_code] ON company_entities (company_code);
 
 CREATE TABLE locations (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -201,9 +201,9 @@ CREATE TABLE users (
 	CONSTRAINT [PK__users__3213E83F483BB8ED] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_users_email] ON users (email);
+CREATE NONCLUSTERED INDEX [IX_users_location_role] ON users (location_id, primary_role_id);
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_users_email] ON users (email);
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_users_employee_code] ON users (employee_code);
-CREATE NONCLUSTERED INDEX [IX_users_location_role] ON users (location_id, primary_role_id);
 
 CREATE TABLE approvals (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -365,8 +365,8 @@ CREATE TABLE master_data_values (
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	CONSTRAINT [PK__master_d__3213E83F25DD59C5] PRIMARY KEY CLUSTERED (id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_master_data_values_category_code] ON master_data_values (category_id, code);
 CREATE NONCLUSTERED INDEX [IX_master_data_values_category_active_sort] ON master_data_values (category_id, is_active, sort_order, name);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_master_data_values_category_code] ON master_data_values (category_id, code);
 
 CREATE TABLE password_reset_tokens (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -514,8 +514,8 @@ CREATE TABLE workflow_action_items (
 	row_version TIMESTAMP NOT NULL, 
 	CONSTRAINT [PK__workflow__3213E83F2E067BDA] PRIMARY KEY CLUSTERED (id)
 );
-CREATE NONCLUSTERED INDEX [IX_workflow_action_items_scope_status] ON workflow_action_items (location_id, status, source, priority);
 CREATE NONCLUSTERED INDEX [IX_workflow_action_items_assigned_user] ON workflow_action_items (assigned_user_id, status, due_at);
+CREATE NONCLUSTERED INDEX [IX_workflow_action_items_scope_status] ON workflow_action_items (location_id, status, source, priority);
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_workflow_action_items_action_key] ON workflow_action_items (action_key);
 
 CREATE TABLE approval_requests (
@@ -963,8 +963,8 @@ CREATE TABLE daily_updates (
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	CONSTRAINT [PK__daily_up__3213E83F37D6E63C] PRIMARY KEY CLUSTERED (id)
 );
-CREATE NONCLUSTERED INDEX [IX_daily_updates_user_date] ON daily_updates (submitted_by_user_id, update_date);
 CREATE NONCLUSTERED INDEX [IX_daily_updates_requisition_date] ON daily_updates (requisition_id, update_date);
+CREATE NONCLUSTERED INDEX [IX_daily_updates_user_date] ON daily_updates (submitted_by_user_id, update_date);
 
 CREATE TABLE requisition_assignments (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -1112,155 +1112,155 @@ CREATE TABLE report_rows (
 CREATE NONCLUSTERED INDEX [IX_report_rows_report_id] ON report_rows (report_id);
 
 
--- Pass 2: foreign keys
+-- Pass 2: foreign keys (sorted by constraint name for stable diffs)
 
-ALTER TABLE [dbo].[locations] ADD CONSTRAINT [FK_locations_location_head_user] FOREIGN KEY ([location_head_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[roles] ADD CONSTRAINT [FK_roles_created_by_user] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_created_by_user] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_reporting_manager] FOREIGN KEY ([reporting_manager_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_primary_role] FOREIGN KEY ([primary_role_id]) REFERENCES [dbo].[roles] ([id]);
-ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_default_role] FOREIGN KEY ([default_role_id]) REFERENCES [dbo].[roles] ([id]);
-ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_requester] FOREIGN KEY ([requester_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_decision] FOREIGN KEY ([decision_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_accessed_user] FOREIGN KEY ([accessed_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [FK_automation_jobs_triggered_by] FOREIGN KEY ([triggered_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[branches] ADD CONSTRAINT [FK_branches_manager_user] FOREIGN KEY ([manager_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_source_owner] FOREIGN KEY ([source_owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_primary_owner] FOREIGN KEY ([primary_owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_parent] FOREIGN KEY ([parent_client_id]) REFERENCES [dbo].[clients] ([id]);
-ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_owner] FOREIGN KEY ([client_owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_business_source_owner] FOREIGN KEY ([business_source_owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_parent] FOREIGN KEY ([parent_value_id]) REFERENCES [dbo].[master_data_values] ([id]);
-ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_category] FOREIGN KEY ([category_id]) REFERENCES [dbo].[master_data_categories] ([id]);
-ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [FK_password_reset_tokens_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [FK_password_reset_tokens_issued_by] FOREIGN KEY ([issued_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[role_permissions] ADD CONSTRAINT [FK_role_permissions_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
-ALTER TABLE [dbo].[role_permissions] ADD CONSTRAINT [FK_role_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
-ALTER TABLE [dbo].[role_scope_rules] ADD CONSTRAINT [FK_role_scope_rules_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
-ALTER TABLE [dbo].[role_template_permissions] ADD CONSTRAINT [FK_role_template_permissions_template] FOREIGN KEY ([role_template_id]) REFERENCES [dbo].[role_templates] ([id]);
-ALTER TABLE [dbo].[role_template_permissions] ADD CONSTRAINT [FK_role_template_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
-ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [FK_user_extra_permissions_granted_by] FOREIGN KEY ([granted_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [FK_user_extra_permissions_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [FK_user_extra_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
-ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [FK_user_invitations_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [FK_user_invitations_sent_by] FOREIGN KEY ([sent_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
-ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_notification_preferences] ADD CONSTRAINT [FK_user_notification_preferences_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_sessions] ADD CONSTRAINT [FK_user_sessions_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_assigned_to] FOREIGN KEY ([assigned_to_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [FK_audit_logs_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_decision] FOREIGN KEY ([decision_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_requester] FOREIGN KEY ([requester_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_accessed_user] FOREIGN KEY ([accessed_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [FK_audit_logs_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_verified_by] FOREIGN KEY ([verified_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [FK_audit_logs_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [FK_automation_jobs_triggered_by] FOREIGN KEY ([triggered_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[branches] ADD CONSTRAINT [FK_branches_manager_user] FOREIGN KEY ([manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_feedback_recorded_by] FOREIGN KEY ([client_feedback_recorded_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_owner] FOREIGN KEY ([owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_pipeline_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_rejected_by] FOREIGN KEY ([rejected_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
 ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_uploaded_by] FOREIGN KEY ([uploaded_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_to_location] FOREIGN KEY ([to_location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_from_location] FOREIGN KEY ([from_location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
-ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [FK_candidate_resume_parse_logs_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [FK_candidate_resume_parse_logs_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
-ALTER TABLE [dbo].[candidate_skills] ADD CONSTRAINT [FK_candidate_skills_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
-ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_requesting_location] FOREIGN KEY ([requesting_location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
-ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_account_manager] FOREIGN KEY ([account_manager_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_parent] FOREIGN KEY ([parent_client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
-ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
-ALTER TABLE [dbo].[portal_accounts] ADD CONSTRAINT [FK_portal_accounts_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[portal_accounts] ADD CONSTRAINT [FK_portal_accounts_owned_by] FOREIGN KEY ([owned_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [FK_recruiter_daily_updates_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [FK_recruiter_daily_updates_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [FK_report_locks_reopened_by] FOREIGN KEY ([reopened_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [FK_report_locks_locked_by] FOREIGN KEY ([locked_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [FK_report_locks_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_generation_job] FOREIGN KEY ([generation_job_id]) REFERENCES [dbo].[automation_jobs] ([id]);
-ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
-ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_item] FOREIGN KEY ([action_item_id]) REFERENCES [dbo].[workflow_action_items] ([id]);
-ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_verified_by] FOREIGN KEY ([verified_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [FK_candidate_duplicate_checks_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [FK_candidate_duplicate_checks_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [FK_candidate_duplicate_checks_matched_candidate] FOREIGN KEY ([matched_candidate_id]) REFERENCES [dbo].[candidates] ([id]);
 ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [FK_candidate_duplicate_checks_parse_log] FOREIGN KEY ([parse_log_id]) REFERENCES [dbo].[candidate_resume_parse_logs] ([id]);
-ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [FK_candidate_duplicate_checks_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_from_location] FOREIGN KEY ([from_location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [FK_candidate_location_transfer_requests_to_location] FOREIGN KEY ([to_location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [FK_candidate_resume_parse_logs_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [FK_candidate_resume_parse_logs_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [FK_candidate_screening_checks_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
+ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [FK_candidate_screening_checks_checked_by] FOREIGN KEY ([checked_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_skills] ADD CONSTRAINT [FK_candidate_skills_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [FK_candidate_stage_history_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
+ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [FK_candidate_stage_history_changed_by] FOREIGN KEY ([changed_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_primary_owner] FOREIGN KEY ([primary_owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_source_owner] FOREIGN KEY ([source_owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
+ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_requesting_location] FOREIGN KEY ([requesting_location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_account_manager] FOREIGN KEY ([account_manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_parent] FOREIGN KEY ([parent_client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[client_contacts] ADD CONSTRAINT [FK_client_contacts_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[client_contacts] ADD CONSTRAINT [FK_client_contacts_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[client_contacts] ADD CONSTRAINT [FK_client_contacts_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[pipeline_template_stages] ADD CONSTRAINT [FK_pipeline_template_stages_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
-ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_portal_account] FOREIGN KEY ([portal_account_id]) REFERENCES [dbo].[portal_accounts] ([id]);
-ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_duplicate_check] FOREIGN KEY ([candidate_duplicate_check_id]) REFERENCES [dbo].[candidate_duplicate_checks] ([id]);
-ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
-ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_assigned_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_secondary_contact] FOREIGN KEY ([secondary_contact_id]) REFERENCES [dbo].[client_contacts] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_primary_owner] FOREIGN KEY ([primary_owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_primary_contact] FOREIGN KEY ([primary_contact_id]) REFERENCES [dbo].[client_contacts] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_owner] FOREIGN KEY ([owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_pipeline_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_delivery_owner] FOREIGN KEY ([delivery_owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_owner] FOREIGN KEY ([owner_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_feedback_recorded_by] FOREIGN KEY ([client_feedback_recorded_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_rejected_by] FOREIGN KEY ([rejected_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_pipeline_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
-ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_business_source_owner] FOREIGN KEY ([business_source_owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_owner] FOREIGN KEY ([client_owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_parent] FOREIGN KEY ([parent_client_id]) REFERENCES [dbo].[clients] ([id]);
 ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
-ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [FK_requisition_assignments_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
-ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [FK_requisition_assignments_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_assigned_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_duplicate_check] FOREIGN KEY ([candidate_duplicate_check_id]) REFERENCES [dbo].[candidate_duplicate_checks] ([id]);
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
+ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_interviewer_user] FOREIGN KEY ([interviewer_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[locations] ADD CONSTRAINT [FK_locations_location_head_user] FOREIGN KEY ([location_head_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_category] FOREIGN KEY ([category_id]) REFERENCES [dbo].[master_data_categories] ([id]);
+ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_parent] FOREIGN KEY ([parent_value_id]) REFERENCES [dbo].[master_data_values] ([id]);
+ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [FK_password_reset_tokens_issued_by] FOREIGN KEY ([issued_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [FK_password_reset_tokens_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[pipeline_template_stages] ADD CONSTRAINT [FK_pipeline_template_stages_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
+ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
+ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_portal_account] FOREIGN KEY ([portal_account_id]) REFERENCES [dbo].[portal_accounts] ([id]);
+ALTER TABLE [dbo].[portal_accounts] ADD CONSTRAINT [FK_portal_accounts_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[portal_accounts] ADD CONSTRAINT [FK_portal_accounts_owned_by] FOREIGN KEY ([owned_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [FK_recruiter_daily_updates_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [FK_recruiter_daily_updates_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [FK_report_locks_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [FK_report_locks_locked_by] FOREIGN KEY ([locked_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [FK_report_locks_reopened_by] FOREIGN KEY ([reopened_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_candidate_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_hr] FOREIGN KEY ([hr_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_manager] FOREIGN KEY ([manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_recruiter] FOREIGN KEY ([recruiter_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_report] FOREIGN KEY ([report_id]) REFERENCES [dbo].[reports] ([id]);
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_generation_job] FOREIGN KEY ([generation_job_id]) REFERENCES [dbo].[automation_jobs] ([id]);
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [FK_reports_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [FK_requisition_assignments_assigned_by] FOREIGN KEY ([assigned_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [FK_requisition_assignments_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [FK_requisition_assignments_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [FK_requisition_assignments_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[requisition_documents_required] ADD CONSTRAINT [FK_requisition_documents_required_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
-ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
-ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_end_client] FOREIGN KEY ([end_client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_client] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
+ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_end_client] FOREIGN KEY ([end_client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
+ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[requisition_screening_rules] ADD CONSTRAINT [FK_requisition_screening_rules_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[requisition_skill_requirements] ADD CONSTRAINT [FK_requisition_skill_requirements_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
-ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [FK_candidate_screening_checks_checked_by] FOREIGN KEY ([checked_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [FK_candidate_screening_checks_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
-ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [FK_candidate_stage_history_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
-ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [FK_candidate_stage_history_changed_by] FOREIGN KEY ([changed_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_interviewer_user] FOREIGN KEY ([interviewer_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_recruiter] FOREIGN KEY ([recruiter_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_manager] FOREIGN KEY ([manager_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_hr] FOREIGN KEY ([hr_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_candidate_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
-ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [FK_report_rows_report] FOREIGN KEY ([report_id]) REFERENCES [dbo].[reports] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_delivery_owner] FOREIGN KEY ([delivery_owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_owner] FOREIGN KEY ([owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_pipeline_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_primary_contact] FOREIGN KEY ([primary_contact_id]) REFERENCES [dbo].[client_contacts] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_primary_owner] FOREIGN KEY ([primary_owner_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_secondary_contact] FOREIGN KEY ([secondary_contact_id]) REFERENCES [dbo].[client_contacts] ([id]);
+ALTER TABLE [dbo].[role_permissions] ADD CONSTRAINT [FK_role_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
+ALTER TABLE [dbo].[role_permissions] ADD CONSTRAINT [FK_role_permissions_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
+ALTER TABLE [dbo].[role_scope_rules] ADD CONSTRAINT [FK_role_scope_rules_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
+ALTER TABLE [dbo].[role_template_permissions] ADD CONSTRAINT [FK_role_template_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
+ALTER TABLE [dbo].[role_template_permissions] ADD CONSTRAINT [FK_role_template_permissions_template] FOREIGN KEY ([role_template_id]) REFERENCES [dbo].[role_templates] ([id]);
+ALTER TABLE [dbo].[roles] ADD CONSTRAINT [FK_roles_created_by_user] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
+ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
+ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [FK_user_extra_permissions_granted_by] FOREIGN KEY ([granted_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [FK_user_extra_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
+ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [FK_user_extra_permissions_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [FK_user_invitations_sent_by] FOREIGN KEY ([sent_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [FK_user_invitations_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
+ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_notification_preferences] ADD CONSTRAINT [FK_user_notification_preferences_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_sessions] ADD CONSTRAINT [FK_user_sessions_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_created_by_user] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_default_role] FOREIGN KEY ([default_role_id]) REFERENCES [dbo].[roles] ([id]);
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_primary_role] FOREIGN KEY ([primary_role_id]) REFERENCES [dbo].[roles] ([id]);
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_reporting_manager] FOREIGN KEY ([reporting_manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_item] FOREIGN KEY ([action_item_id]) REFERENCES [dbo].[workflow_action_items] ([id]);
+ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
