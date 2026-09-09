@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text  # noqa: E402
 
-from app.core.security import create_sha256_password_hash  # noqa: E402
+from app.core.security import hash_password  # noqa: E402
 from app.db.session import create_db_engine  # noqa: E402
 
 ADMIN_PASSWORD = "admin123"
@@ -138,7 +138,7 @@ def main() -> None:
         )
 
         # Admin user
-        password_hash = create_sha256_password_hash(ADMIN_PASSWORD)
+        password_hash = hash_password(ADMIN_PASSWORD)
         admin_user_id = connection.execute(
             text(
                 """

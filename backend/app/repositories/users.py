@@ -603,6 +603,21 @@ def transfer_active_user_work_and_move(
     return updated
 
 
+def update_user_password_hash(engine: Engine, user_id: int, password_hash: str) -> None:
+    """Re-hash in place, preserving password_setup_status and force-change flags."""
+    query = text(
+        """
+        UPDATE dbo.users
+        SET
+          password_hash = :password_hash,
+          updated_at = SYSUTCDATETIME()
+        WHERE id = :user_id;
+        """
+    )
+    with engine.begin() as connection:
+        connection.execute(query, {"user_id": user_id, "password_hash": password_hash})
+
+
 def update_user_password_state(
     engine: Engine,
     user_id: int,

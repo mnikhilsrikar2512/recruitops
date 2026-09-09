@@ -183,18 +183,59 @@ def find_pipeline_application_by_id(engine: Engine, application_id: int) -> Pipe
     return PipelineApplicationDetailRecord(**row) if row else None
 
 
+def _resolve_pipeline_template_id(engine: Engine, application_id: int) -> int | None:
+    """Template governing an application: its own link, else its requisition's."""
+    query = text(
+        """
+        SELECT TOP 1
+          COALESCE(ca.pipeline_template_id, r.pipeline_template_id) AS pipeline_template_id
+        FROM dbo.candidate_applications AS ca
+        INNER JOIN dbo.requisitions AS r
+          ON r.id = ca.requisition_id
+        WHERE ca.id = :application_id;
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(query, {"application_id": application_id}).mappings().first()
+    return int(row["pipeline_template_id"]) if row and row["pipeline_template_id"] is not None else None
+
+
+def application_has_pipeline_template(engine: Engine, application_id: int) -> bool:
+    template_id = _resolve_pipeline_template_id(engine, application_id)
+    if template_id is None:
+        return False
+    query = text("SELECT 1 FROM dbo.pipeline_templates WHERE id = :template_id;")
+    with engine.connect() as connection:
+        return connection.execute(query, {"template_id": template_id}).first() is not None
+
+
 def find_pipeline_template_stage_for_application(
     engine: Engine,
     application_id: int,
     stage_code: str,
 ) -> PipelineTemplateStageRecord | None:
-    _ = (engine, application_id, stage_code)
-    return None
-
-
-def application_has_pipeline_template(engine: Engine, application_id: int) -> bool:
-    _ = (engine, application_id)
-    return False
+    template_id = _resolve_pipeline_template_id(engine, application_id)
+    if template_id is None:
+        return None
+    query = text(
+        """
+        SELECT TOP 1
+          pipeline_template_id,
+          stage_code,
+          stage_order,
+          stage_type,
+          allows_rejection
+        FROM dbo.pipeline_template_stages
+        WHERE pipeline_template_id = :template_id
+          AND stage_code = :stage_code;
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(
+            query,
+            {"template_id": template_id, "stage_code": stage_code},
+        ).mappings().first()
+    return PipelineTemplateStageRecord(**row) if row else None
 
 
 def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineStageMove) -> tuple[str, PipelineApplicationDetailRecord]:

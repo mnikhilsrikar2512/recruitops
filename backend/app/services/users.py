@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 from app.core.config import settings
-from app.core.security import create_sha256_password_hash, hash_session_token, random_secret
+from app.core.security import hash_password, hash_session_token, random_secret
 
 from app.repositories.audit import insert_audit_log
 from app.repositories.users import (
@@ -121,7 +121,7 @@ def create_user_service(engine: Engine, payload: UserCreate) -> UserResponse:
         reporting_manager_user_id=payload.reporting_manager_user_id,
     )
 
-    created = create_user(engine, payload, create_sha256_password_hash(random_secret(24)))
+    created = create_user(engine, payload, hash_password(random_secret(24)))
     return UserResponse.model_validate(created)
 
 
@@ -156,7 +156,7 @@ def reset_user_credentials_service(
         update_user_password_state(
             engine,
             user_id=user_id,
-            password_hash=create_sha256_password_hash(temporary_password),
+            password_hash=hash_password(temporary_password),
             password_setup_status="reset-required",
             force_password_change_on_first_login=True,
         )
@@ -195,7 +195,7 @@ def reset_user_credentials_service(
     update_user_password_state(
         engine,
         user_id=user_id,
-        password_hash=create_sha256_password_hash(random_secret(24)),
+        password_hash=hash_password(random_secret(24)),
         password_setup_status="reset-required",
         force_password_change_on_first_login=True,
     )

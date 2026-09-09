@@ -139,6 +139,16 @@ def move_pipeline_stage_service(
             detail="Rejection reason is required for rejection stages",
         )
 
+    if (
+        is_target_rejection
+        and current_stage_definition is not None
+        and not current_stage_definition.allows_rejection
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Rejection is not allowed from the current stage",
+        )
+
     if is_target_joining and payload.joining_date is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

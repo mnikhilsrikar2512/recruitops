@@ -17,7 +17,18 @@ def sha256_hex(value: str) -> str:
 
 
 def create_sha256_password_hash(password: str) -> str:
+    """Legacy unsalted hash. Kept only for verifying pre-bcrypt stored hashes."""
     return f"sha256:{sha256_hex(password)}"
+
+
+def hash_password(password: str) -> str:
+    """Hash a new password with bcrypt. The default for all new credentials."""
+    return create_bcrypt_password_hash(password)
+
+
+def needs_rehash(stored_hash: str) -> bool:
+    """True when the stored hash predates bcrypt and should be upgraded on next login."""
+    return bool(stored_hash) and not stored_hash.startswith("$2")
 
 
 def create_pbkdf2_password_hash(password: str, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> str:
@@ -27,10 +38,8 @@ def create_pbkdf2_password_hash(password: str, iterations: int = DEFAULT_PBKDF2_
 
 
 def create_bcrypt_password_hash(password: str) -> str:
-    try:
-        import bcrypt
-    except ModuleNotFoundError:
-        raise RuntimeError("bcrypt is required for bcrypt password hashing. Install with: pip install bcrypt")
+    import bcrypt
+
     salt = bcrypt.gensalt(rounds=12)
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
@@ -54,7 +63,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
             return False
         try:
             return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
-        except ValueError:
+        except (ValueError, UnicodeDecodeError):
             return False
 
     if stored_hash.startswith("sha256:"):

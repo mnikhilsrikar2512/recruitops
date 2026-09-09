@@ -8,9 +8,10 @@ from sqlalchemy import Engine
 
 from app.core.config import settings
 from app.core.security import (
-    create_sha256_password_hash,
     generate_session_token,
+    hash_password,
     hash_session_token,
+    needs_rehash,
     verify_password,
 )
 from app.repositories.auth import (
@@ -29,6 +30,7 @@ from app.repositories.users import (
     find_user_by_email,
     find_valid_password_reset_token,
     mark_password_reset_token_used,
+    update_user_password_hash,
     update_user_password_state,
 )
 from app.schemas.auth import (
@@ -135,6 +137,10 @@ def login_service(
     if user.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not allowed to access the system")
 
+    # Transparent migration: legacy unsalted hashes upgrade to bcrypt on next login.
+    if needs_rehash(user.password_hash):
+        update_user_password_hash(engine, user_id=user.id, password_hash=hash_password(payload.password))
+
     token = generate_session_token()
     session_hash = hash_session_token(token)
     session = insert_user_session(
@@ -221,7 +227,7 @@ def change_password_service(
     update_user_password_state(
         engine,
         user_id=auth_context.user.id,
-        password_hash=create_sha256_password_hash(payload.new_password),
+        password_hash=hash_password(payload.new_password),
         password_setup_status="setup-complete",
         force_password_change_on_first_login=False,
     )
@@ -244,7 +250,7 @@ def setup_password_service(
     update_user_password_state(
         engine,
         user_id=token_record["user_id"],
-        password_hash=create_sha256_password_hash(payload.new_password),
+        password_hash=hash_password(payload.new_password),
         password_setup_status="setup-complete",
         force_password_change_on_first_login=False,
     )
@@ -295,7 +301,7 @@ def reset_password_service(
     update_user_password_state(
         engine,
         user_id=token_record["user_id"],
-        password_hash=create_sha256_password_hash(payload.new_password),
+        password_hash=hash_password(payload.new_password),
         password_setup_status="setup-complete",
         force_password_change_on_first_login=False,
     )
