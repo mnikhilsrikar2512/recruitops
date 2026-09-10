@@ -813,15 +813,139 @@ async function loadEditableEntityForm() {
 }
 
 async function loadLocations() {
-  const payload = await apiRequest("/locations/?page_size=100");
-  fillExistingTable(payload.items || [], (row, item) => {
-    const cells = row.querySelectorAll("td");
-    setCellValue(cells[0], item.location_name || item.name || "—");
-    setCellValue(cells[1], `${item.city || ""}, ${item.country || ""}`.trim() || "—");
-    setCellValue(cells[2], mapLocationStatus(item.status));
-    const editLink = row.querySelector('[data-route*="location-form"]');
-    if (editLink) editLink.dataset.route = `location-form-drawer.html?location_id=${item.id}`;
-  });
+  const surface = document.querySelector('.workspace-surface');
+  if (!surface) return;
+  const tableWrap = document.getElementById('location-table-wrap');
+  const actionsEl = document.getElementById('location-actions');
+  const dialogHost = document.getElementById('location-dialog-host');
+  if (!tableWrap) return;
+  const canCreate = hasPermission('location.create');
+  const canEdit = hasPermission('location.update');
+  if (canCreate && actionsEl) {
+    actionsEl.innerHTML = '<button id="btn-add-location" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary font-body-sm font-semibold hover:opacity-90 transition-opacity"><span class="material-symbols-outlined text-[18px]">add</span>Add Location</button>';
+  }
+  try {
+    const payload = await apiRequest('/locations/?page_size=100');
+    const items = payload.items || [];
+    if (!items.length) {
+      tableWrap.innerHTML = '<div class="flex flex-col items-center justify-center py-16 text-center"><span class="material-symbols-outlined text-[48px] text-text-muted mb-3">location_on</span><p class="text-headline-sm font-semibold text-on-surface">No locations yet</p><p class="text-body-sm text-text-muted mt-1">Create your first location to get started.</p></div>';
+      return;
+    }
+    let rows = '';
+    items.forEach(v => {
+      const statusChip = v.status === 'active'
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">Active</span>'
+        : v.status === 'inactive'
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">Inactive</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold">' + escapeHtml(v.status) + '</span>';
+      const headCell = v.location_head_name
+        ? '<td class="px-4 py-3 text-on-surface">' + escapeHtml(v.location_head_name) + '</td>'
+        : '<td class="px-4 py-3 text-text-muted italic">Unassigned</td>';
+      const editBtn = canEdit ? '<button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant" data-edit-id="' + v.id + '" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>' : '';
+      rows += '<tr class="border-b border-border hover:bg-surface-variant/30 transition-colors">'
+        + '<td class="px-4 py-3"><div class="flex flex-col"><span class="font-medium text-on-surface">' + escapeHtml(v.location_name) + '</span><span class="text-[11px] text-text-muted font-mono">' + escapeHtml(v.location_code) + '</span></div></td>'
+        + headCell
+        + '<td class="px-4 py-3 text-text-muted text-[13px]">' + escapeHtml(v.address || '\u2014') + '</td>'
+        + '<td class="px-4 py-3">' + statusChip + '</td>'
+        + '<td class="px-4 py-3 text-right">' + editBtn + '</td>'
+        + '</tr>';
+    });
+    tableWrap.innerHTML = '<div class="mt-4 overflow-x-auto">'
+      + '<table class="w-full text-left">'
+      + '<thead><tr class="border-b border-border text-[11px] font-bold uppercase tracking-wider text-text-muted">'
+      + '<th class="px-4 py-2.5">Location</th>'
+      + '<th class="px-4 py-2.5">Head</th>'
+      + '<th class="px-4 py-2.5">Address</th>'
+      + '<th class="px-4 py-2.5">Status</th>'
+      + '<th class="px-4 py-2.5 text-right w-12"></th>'
+      + '</tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table>'
+      + '</div>';
+    if (canCreate) {
+      const btn = document.getElementById('btn-add-location');
+      if (btn) btn.onclick = () => openLocationDialog(null);
+    }
+    if (canEdit) {
+      tableWrap.querySelectorAll('[data-edit-id]').forEach(btn => {
+        btn.onclick = () => openLocationDialog({ id: btn.dataset.editId });
+      });
+    }
+  } catch (err) {
+    tableWrap.innerHTML = '<div class="flex flex-col items-center justify-center py-16 text-center"><span class="material-symbols-outlined text-[48px] text-red-400 mb-3">error</span><p class="text-body-sm text-red-600">Failed to load locations: ' + escapeHtml(String(err.message || err)) + '</p></div>';
+  }
+}
+
+async function openLocationDialog(existing) {
+  const isEdit = !!existing;
+  let locationData = null;
+  if (isEdit) {
+    try {
+      locationData = await apiRequest('/locations/' + existing.id);
+    } catch (e) { showToast('Failed to load location', e.message); return; }
+  }
+  const nameVal = isEdit ? (locationData.location_name || '') : '';
+  const codeVal = isEdit ? (locationData.location_code || '') : '';
+  const addrVal = isEdit ? (locationData.address || '') : '';
+  const existingOverlay = document.getElementById('location-overlay');
+  if (existingOverlay) existingOverlay.remove();
+  const wrapper = document.createElement('div');
+  wrapper.id = 'location-overlay';
+  wrapper.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/40';
+  wrapper.innerHTML = '<div class="bg-surface rounded-xl border border-border shadow-xl w-full max-w-md p-6">'
+    + '<div class="flex items-center justify-between mb-4">'
+    + '<h3 class="text-headline-sm font-semibold text-on-surface">' + (isEdit ? 'Edit Location' : 'Add Location') + '</h3>'
+    + '<button id="location-close" class="text-text-muted hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">close</span></button>'
+    + '</div>'
+    + '<form id="location-form">'
+    + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Name</span><input id="loc-name" type="text" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. Hyderabad Branch" value="' + escapeHtml(nameVal) + '" /></label>'
+    + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Code</span><input id="loc-code" type="text" required ' + (isEdit ? 'readonly class="mt-1 w-full rounded-lg border border-border bg-surface-variant px-3 py-2 text-text-muted text-sm"' : 'class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. HYD01"') + ' value="' + escapeHtml(codeVal) + '" /></label>'
+    + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Address</span><input id="loc-address" type="text" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. 123 Main St" value="' + escapeHtml(addrVal) + '" /></label>'
+    + '<div id="location-error" class="text-body-sm text-red-600 mb-3 hidden"></div>'
+    + '<div class="flex justify-end gap-2 mt-4">'
+    + '<button type="button" id="location-cancel" class="px-4 py-2 rounded-lg border border-border text-on-surface text-sm font-medium hover:bg-surface-variant">Cancel</button>'
+    + '<button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-semibold hover:opacity-90">' + (isEdit ? 'Save Changes' : 'Create') + '</button>'
+    + '</div>'
+    + '</form>'
+    + '</div>';
+  document.body.appendChild(wrapper);
+  const close = () => { wrapper.remove(); loadLocations(); };
+  document.getElementById('location-close').onclick = close;
+  document.getElementById('location-cancel').onclick = close;
+  wrapper.onclick = (e) => { if (e.target === wrapper) close(); };
+  if (!isEdit) {
+    const nameInput = document.getElementById('loc-name');
+    const codeInput = document.getElementById('loc-code');
+    nameInput.addEventListener('input', () => {
+      codeInput.value = nameInput.value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 50);
+    });
+  }
+  document.getElementById('location-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('location-error');
+    errEl.classList.add('hidden');
+    try {
+      if (isEdit) {
+        const payload = {};
+        const newName = document.getElementById('loc-name').value.trim();
+        const newAddr = document.getElementById('loc-address').value.trim();
+        if (newName) payload.location_name = newName;
+        if (newAddr !== undefined) payload.address = newAddr || null;
+        await apiRequest('/locations/' + existing.id, { method: 'PATCH', body: JSON.stringify(payload) });
+      } else {
+        const name = document.getElementById('loc-name').value.trim();
+        const code = document.getElementById('loc-code').value.trim();
+        if (!name || !code) throw new Error('Name and code are required');
+        const addr = document.getElementById('loc-address').value.trim();
+        await apiRequest('/locations/', { method: 'POST', body: JSON.stringify({ location_name: name, location_code: code, address: addr || null, status: 'active' }) });
+      }
+      close();
+      showToast(isEdit ? 'Location updated' : 'Location created', 'Changes saved successfully.');
+    } catch (err) {
+      errEl.textContent = err.message || 'Something went wrong';
+      errEl.classList.remove('hidden');
+    }
+  };
 }
 
 async function loadUsers() {
