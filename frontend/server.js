@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3000;
-const API_PORT = 8000;
+const API_PORT = process.env.API_PORT || 8000;
 const ROOT = __dirname;
 const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',

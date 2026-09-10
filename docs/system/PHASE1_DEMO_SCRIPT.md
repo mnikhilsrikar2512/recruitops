@@ -6,7 +6,7 @@ Show the live frontend instead of static mockups, using seeded demo data and rol
 This document reflects the live frontend in `frontend/` wired to the FastAPI backend.
 
 ## Demo Login Accounts
-- Admin: `admin@executiveconnection.com` / `Admin@123`
+- Admin: `admin@executiveconnection.com` / `admin123`
 - Manager: `manav.reddy@executiveconnection.com` / `Manager@123`
 - HR: `sneha.patel@executiveconnection.com` / `HR@123`
 - Recruiter: `arjun.mehta@executiveconnection.com` / `Recruiter@123`

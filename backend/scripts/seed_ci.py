@@ -50,6 +50,7 @@ PERMISSIONS = [
     ("role.permissions.assign", "role", "permissions_assign"),
     ("role.read", "role", "read"),
     ("role.update", "role", "update"),
+    ("settings.create", "settings", "create"),
     ("settings.read", "settings", "read"),
     ("settings.update", "settings", "update"),
     ("user.create", "user", "create"),

@@ -94,6 +94,47 @@ const FORCED_WORKSPACE_HEADINGS = {
   },
 };
 
+const SHORTCUTS = [
+  {
+    keys: ["AltLeft"],
+    label: "Back navigation",
+    action: () => history.back(),
+  },
+  {
+    keys: ["AltRight"],
+    label: "Forward navigation",
+    action: () => history.forward(),
+  },
+  {
+    keys: ["Escape"],
+    label: "Close overlays",
+    action: closeOpenOverlays,
+  },
+  {
+    keys: ["g", "g"],
+    label: "Go to dashboard",
+    action: () => navigateToRoute("role-dashboard.html"),
+    when: () => window.location.pathname.includes("pages/") || window.location.pathname.endsWith("index.html"),
+    preventDefault: true,
+  },
+  {
+    keys: ["n", "a"],
+    label: "New candidate",
+    action: () => navigateToRoute("candidate-review-drawer.html"),
+    when: () => window.location.pathname.includes("candidate-profiles"),
+    preventDefault: true,
+  },
+  {
+    keys: ["r", "e"],
+    label: "New requisition",
+    action: () => navigateToRoute("requisition-intake.html"),
+    when: () => window.location.pathname.includes("dashboard") || window.location.pathname.includes("status"),
+    preventDefault: true,
+  },
+];
+
+const SHORTCUT_HINT_ID = "shortcut-hint";
+
 const OVERLAY_BRIEFS = {
   "exception-request-dialog": {
     title: "Capture the exception clearly before you escalate it.",
@@ -121,6 +162,104 @@ const OVERLAY_BRIEFS = {
     pills: ["Audit trail", "Manual vs automation", "Stage continuity"],
   },
 };
+
+function isEditableElement(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function closeOpenOverlays() {
+  document.querySelectorAll("[data-overlay-surface='true']").forEach((surface) => {
+    const close = surface.querySelector("[data-overlay-close]") || surface.querySelector("button[aria-label*='close'], button[aria-label*='Close']");
+    if (close) close.click();
+  });
+  const mobileDialog = window._mobileDialog;
+  if (mobileDialog?.open) {
+    closeMobileNav(mobileDialog);
+  }
+  showToast("Overlays closed", "Dialogs and drawers were dismissed with the keyboard.");
+}
+
+function attachKeyboardShortcuts() {
+  document.removeEventListener("keydown", handleKeyDown);
+  document.addEventListener("keydown", handleKeyDown);
+}
+
+function handleKeyDown(event) {
+  // Don't steal keys from inputs unless we explicitly allow it.
+  const editing = isEditableElement(event.target);
+
+  if (event.key === "Escape" && !editing) {
+    closeOpenOverlays();
+    return;
+  }
+
+  if (editing) {
+    if (event.key === "Escape") {
+      event.target.blur();
+    }
+    return;
+  }
+
+  const ctrl = event.ctrlKey || event.metaKey;
+  if (ctrl && event.shiftKey && event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    const candidateRoute =
+      window.location.pathname.includes("candidate-profiles")
+        ? "candidate-review-drawer.html"
+        : "candidate-review-drawer.html";
+    navigateToRoute(candidateRoute);
+    showToast("New candidate opened", "The candidate entry drawer is ready.");
+    return;
+  }
+
+  if (event.altKey) {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      history.back();
+      return;
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      history.forward();
+      return;
+    }
+  }
+
+  if (event.key === "g" && event.shiftKey) {
+    event.preventDefault();
+    navigateToRoute("role-dashboard.html");
+    return;
+  }
+
+  if (event.key === "r" && event.ctrlKey) {
+    event.preventDefault();
+    const target =
+      window.location.pathname.includes("dashboard") || window.location.pathname.includes("status")
+        ? "requisition-intake.html"
+        : document.querySelector("[data-layout='requisition-list']") || null;
+    navigateToRoute("requisition-intake.html");
+    showToast("New requisition opened", "The requisition intake flow is ready.");
+  }
+}
+
+function attachShortcutHint() {
+  if (document.getElementById(SHORTCUT_HINT_ID)) return;
+  const hint = document.createElement("div");
+  hint.id = SHORTCUT_HINT_ID;
+  hint.className = "shortcut-hint";
+  hint.setAttribute("role", "note");
+  hint.setAttribute("aria-label", "Keyboard shortcuts");
+  hint.innerHTML = `
+    <div class="shortcut-hint-inner">
+      <span class="shortcut-hint-label">Shortcuts</span>
+      <kbd>Esc</kbd> close overlays
+      <kbd>Alt</kbd><kbd>←</kbd> back
+      <kbd>Alt</kbd><kbd>→</kbd> forward
+    </div>
+  `;
+  document.body.appendChild(hint);
+}
 
 function setupToggleGroups(scope = document) {
   scope.querySelectorAll("[data-toggle-group='true'], div[class*='space-x-1']").forEach((group) => {
@@ -2166,6 +2305,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (overlaySurface) {
     window.requestAnimationFrame(() => focusFirstInteractive(overlaySurface));
   }
+  attachShortcutHint();
 
   document.querySelectorAll("[data-toggle-group]").forEach((group) => {
     group.addEventListener("click", (event) => {

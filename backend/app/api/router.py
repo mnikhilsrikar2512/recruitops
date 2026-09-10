@@ -10,6 +10,7 @@ from app.api.v1 import (
     files,
     interviews,
     locations,
+    master_data,
     meetings,
     notifications,
     offers,
@@ -44,3 +45,4 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(files.router, prefix="/files", tags=["files"])
 api_router.include_router(workflow_actions.router, prefix="/workflow-actions", tags=["workflow-actions"])
 api_router.include_router(approvals.router, prefix="/approvals", tags=["approvals"])
+api_router.include_router(master_data.router, prefix="/master-data", tags=["master-data"])

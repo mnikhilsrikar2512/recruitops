@@ -945,8 +945,121 @@ async function loadClientDetail() {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadBusinessTitles() {
-  const payload = await apiRequest("/requisitions/?page_size=100");
-  renderBusinessTitles(payload.items || []);
+  const surface = document.querySelector('.workspace-surface');
+  if (!surface) return;
+  const header = document.getElementById('designation-header');
+  const tableWrap = document.getElementById('designation-table-wrap');
+  const actionsEl = document.getElementById('designation-actions');
+  const dialogHost = document.getElementById('designation-dialog-host');
+  if (!tableWrap) return;
+  const canManage = hasPermission('settings.create');
+  const canEdit = hasPermission('settings.update');
+  if (canManage && actionsEl) {
+    actionsEl.innerHTML = '<button id="btn-add-designation" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary font-body-sm font-semibold hover:opacity-90 transition-opacity"><span class="material-symbols-outlined text-[18px]">add</span>Add Designation</button>';
+  }
+  try {
+    const payload = await apiRequest('/master-data/categories/designation/values?page_size=100');
+    const items = payload.items || [];
+    if (!items.length) {
+      tableWrap.innerHTML = '<div class="flex flex-col items-center justify-center py-16 text-center"><span class="material-symbols-outlined text-[48px] text-text-muted mb-3">badge</span><p class="text-headline-sm font-semibold text-on-surface">No designations yet</p><p class="text-body-sm text-text-muted mt-1">Create your first designation to get started.</p></div>';
+      return;
+    }
+    let rows = '';
+    items.forEach(v => {
+      const statusChip = v.is_active
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">Active</span>'
+        : '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">Inactive</span>';
+      const editBtn = canEdit ? '<button class="text-text-muted hover:text-primary transition-colors p-1 rounded hover:bg-surface-variant" data-edit-id="' + v.id + '" data-edit-name="' + escapeHtml(v.name) + '" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>' : '';
+      rows += '<tr class="border-b border-border hover:bg-surface-variant/30 transition-colors">'
+        + '<td class="px-4 py-3 font-medium text-on-surface">' + escapeHtml(v.name) + '</td>'
+        + '<td class="px-4 py-3 text-text-muted font-mono text-[13px]">' + escapeHtml(v.code) + '</td>'
+        + '<td class="px-4 py-3 text-text-muted text-[13px]">' + escapeHtml(v.description || '\u2014') + '</td>'
+        + '<td class="px-4 py-3 text-right">' + statusChip + '</td>'
+        + '<td class="px-4 py-3 text-right">' + editBtn + '</td>'
+        + '</tr>';
+    });
+    tableWrap.innerHTML = '<div class="mt-4 overflow-x-auto">'
+      + '<table class="w-full text-left">'
+      + '<thead><tr class="border-b border-border text-[11px] font-bold uppercase tracking-wider text-text-muted">'
+      + '<th class="px-4 py-2.5">Name</th>'
+      + '<th class="px-4 py-2.5">Code</th>'
+      + '<th class="px-4 py-2.5">Description</th>'
+      + '<th class="px-4 py-2.5 text-right">Status</th>'
+      + '<th class="px-4 py-2.5 text-right w-12"></th>'
+      + '</tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table>'
+      + '</div>';
+    if (canManage) {
+      const btn = document.getElementById('btn-add-designation');
+      if (btn) btn.onclick = () => openDesignationDialog(null, dialogHost, tableWrap);
+    }
+    if (canEdit) {
+      tableWrap.querySelectorAll('[data-edit-id]').forEach(btn => {
+        btn.onclick = () => openDesignationDialog({ id: btn.dataset.editId, name: btn.dataset.editName }, dialogHost, tableWrap);
+      });
+    }
+  } catch (err) {
+    tableWrap.innerHTML = '<div class="flex flex-col items-center justify-center py-16 text-center"><span class="material-symbols-outlined text-[48px] text-red-400 mb-3">error</span><p class="text-body-sm text-red-600">Failed to load designations: ' + escapeHtml(String(err.message || err)) + '</p></div>';
+  }
+}
+
+function openDesignationDialog(existing, dialogHost, tableWrap) {
+  if (!dialogHost) return;
+  const isEdit = !!existing;
+  const title = isEdit ? 'Edit Designation' : 'Add Designation';
+  const nameVal = isEdit ? existing.name : '';
+  const codeField = isEdit ? '' : '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Code (auto-generated)</span><input id="designation-code" type="text" readonly class="mt-1 w-full rounded-lg border border-border bg-surface-variant px-3 py-2 text-text-muted text-sm" /></label>';
+  dialogHost.innerHTML = '<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" id="designation-overlay">'
+    + '<div class="bg-surface rounded-xl border border-border shadow-xl w-full max-w-md p-6">'
+    + '<div class="flex items-center justify-between mb-4">'
+    + '<h3 class="text-headline-sm font-semibold text-on-surface">' + title + '</h3>'
+    + '<button id="designation-close" class="text-text-muted hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">close</span></button>'
+    + '</div>'
+    + '<form id="designation-form">'
+    + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Name</span><input id="designation-name" type="text" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. Senior Software Engineer" value="' + escapeHtml(nameVal) + '" /></label>'
+    + codeField
+    + '<div id="designation-error" class="text-body-sm text-red-600 mb-3 hidden"></div>'
+    + '<div class="flex justify-end gap-2 mt-4">'
+    + '<button type="button" id="designation-cancel" class="px-4 py-2 rounded-lg border border-border text-on-surface text-sm font-medium hover:bg-surface-variant">Cancel</button>'
+    + '<button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-semibold hover:opacity-90">' + (isEdit ? 'Save Changes' : 'Create') + '</button>'
+    + '</div>'
+    + '</form>'
+    + '</div>'
+    + '</div>';
+  const overlay = document.getElementById('designation-overlay');
+  const close = () => { dialogHost.innerHTML = ''; loadBusinessTitles(); };
+  document.getElementById('designation-close').onclick = close;
+  document.getElementById('designation-cancel').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  if (!isEdit) {
+    const nameInput = document.getElementById('designation-name');
+    const codeInput = document.getElementById('designation-code');
+    nameInput.addEventListener('input', () => {
+      codeInput.value = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    });
+  }
+  document.getElementById('designation-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('designation-error');
+    errEl.classList.add('hidden');
+    try {
+      if (isEdit) {
+        const newName = document.getElementById('designation-name').value.trim();
+        await apiRequest('/master-data/values/' + existing.id, { method: 'PATCH', body: JSON.stringify({ name: newName }) });
+      } else {
+        const name = document.getElementById('designation-name').value.trim();
+        const code = document.getElementById('designation-code').value;
+        if (!name || !code) throw new Error('Name is required');
+        await apiRequest('/master-data/categories/designation/values', { method: 'POST', body: JSON.stringify({ code, name, sort_order: 99 }) });
+      }
+      close();
+      showToast(isEdit ? 'Designation updated' : 'Designation created', 'Changes saved to the designation catalog.');
+    } catch (err) {
+      errEl.textContent = err.message || 'Something went wrong';
+      errEl.classList.remove('hidden');
+    }
+  };
 }
 
 async function loadRequisitionDetail() {
