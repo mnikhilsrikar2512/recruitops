@@ -94,43 +94,14 @@ const FORCED_WORKSPACE_HEADINGS = {
   },
 };
 
-const SHORTCUTS = [
-  {
-    keys: ["AltLeft"],
-    label: "Back navigation",
-    action: () => history.back(),
-  },
-  {
-    keys: ["AltRight"],
-    label: "Forward navigation",
-    action: () => history.forward(),
-  },
-  {
-    keys: ["Escape"],
-    label: "Close overlays",
-    action: closeOpenOverlays,
-  },
-  {
-    keys: ["g", "g"],
-    label: "Go to dashboard",
-    action: () => navigateToRoute("role-dashboard.html"),
-    when: () => window.location.pathname.includes("pages/") || window.location.pathname.endsWith("index.html"),
-    preventDefault: true,
-  },
-  {
-    keys: ["n", "a"],
-    label: "New candidate",
-    action: () => navigateToRoute("candidate-review-drawer.html"),
-    when: () => window.location.pathname.includes("candidate-profiles"),
-    preventDefault: true,
-  },
-  {
-    keys: ["r", "e"],
-    label: "New requisition",
-    action: () => navigateToRoute("requisition-intake.html"),
-    when: () => window.location.pathname.includes("dashboard") || window.location.pathname.includes("status"),
-    preventDefault: true,
-  },
+const SHORTCUT_CATALOG = [
+  { keys: ["Esc"], label: "Close overlays" },
+  { keys: ["Alt", "←"], label: "Go back" },
+  { keys: ["Alt", "→"], label: "Go forward" },
+  { keys: ["Ctrl", "Shift", "N"], label: "New candidate" },
+  { keys: ["Shift", "G"], label: "Go to dashboard" },
+  { keys: ["/"], label: "Focus search" },
+  { keys: ["?"], label: "Show shortcuts" },
 ];
 
 const SHORTCUT_HINT_ID = "shortcut-hint";
@@ -190,6 +161,8 @@ function handleKeyDown(event) {
   const editing = isEditableElement(event.target);
 
   if (event.key === "Escape" && !editing) {
+    const helpOverlay = document.getElementById("shortcut-help-overlay");
+    if (helpOverlay) { helpOverlay.remove(); return; }
     closeOpenOverlays();
     return;
   }
@@ -226,21 +199,51 @@ function handleKeyDown(event) {
     }
   }
 
-  if (event.key === "g" && event.shiftKey) {
+  if (event.key.toLowerCase() === "g" && event.shiftKey) {
     event.preventDefault();
     navigateToRoute("role-dashboard.html");
     return;
   }
 
-  if (event.key === "r" && event.ctrlKey) {
+  if (event.key === "/" && !event.ctrlKey && !event.metaKey) {
     event.preventDefault();
-    const target =
-      window.location.pathname.includes("dashboard") || window.location.pathname.includes("status")
-        ? "requisition-intake.html"
-        : document.querySelector("[data-layout='requisition-list']") || null;
-    navigateToRoute("requisition-intake.html");
-    showToast("New requisition opened", "The requisition intake flow is ready.");
+    const searchInput = document.querySelector(".topbar-search input, #topbar-search");
+    if (searchInput) { searchInput.focus(); showToast("Search focused", "Type to search within RecruitOps."); }
+    return;
   }
+
+  if (event.key === "?" && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    toggleShortcutHelp();
+    return;
+  }
+}
+
+function toggleShortcutHelp() {
+  const existing = document.getElementById("shortcut-help-overlay");
+  if (existing) { existing.remove(); return; }
+  const overlay = document.createElement("div");
+  overlay.id = "shortcut-help-overlay";
+  overlay.className = "fixed inset-0 z-[9998] flex items-center justify-center bg-black/40";
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="bg-surface rounded-xl border border-border shadow-xl w-full max-w-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-headline-sm font-semibold text-on-surface">Keyboard Shortcuts</h3>
+        <button onclick="this.closest('#shortcut-help-overlay').remove()" class="text-text-muted hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">close</span></button>
+      </div>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Close overlays / dialogs</span><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Esc</kbd></div>
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Go back</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Alt</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">←</kbd></div></div>
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Go forward</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Alt</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">→</kbd></div></div>
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">New candidate</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Ctrl</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Shift</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">N</kbd></div></div>
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Go to dashboard</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Shift</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">G</kbd></div></div>
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Focus search</span><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">/</kbd></div>
+        <div class="flex justify-between py-1.5"><span class="text-on-surface">Show this help</span><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">?</kbd></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 }
 
 function attachShortcutHint() {
@@ -253,9 +256,10 @@ function attachShortcutHint() {
   hint.innerHTML = `
     <div class="shortcut-hint-inner">
       <span class="shortcut-hint-label">Shortcuts</span>
-      <kbd>Esc</kbd> close overlays
+      <kbd>Esc</kbd> close
       <kbd>Alt</kbd><kbd>←</kbd> back
       <kbd>Alt</kbd><kbd>→</kbd> forward
+      <kbd>?</kbd> help
     </div>
   `;
   document.body.appendChild(hint);
@@ -2305,6 +2309,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (overlaySurface) {
     window.requestAnimationFrame(() => focusFirstInteractive(overlaySurface));
   }
+  attachKeyboardShortcuts();
   attachShortcutHint();
 
   document.querySelectorAll("[data-toggle-group]").forEach((group) => {
