@@ -2417,6 +2417,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Buttons with their own click handler own their behavior — never
+    // hijack them with label-based contextual routing.
+    if (typeof button.onclick === "function") {
+      return;
+    }
+
     const contextualRoute = resolveContextualRoute(button);
     if (contextualRoute) {
       event.preventDefault();
