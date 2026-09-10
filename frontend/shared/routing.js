@@ -144,8 +144,6 @@ function resolveContextualRoute(button) {
   if (routeId === "location-management") {
     if (/^admin$/.test(label)) return "role-dashboard.html";
     if (/^setup$/.test(label)) return "location-management.html";
-    if (/create location/.test(label)) return "location-form-drawer.html";
-    if (/^edit$/.test(label)) return "location-form-drawer.html";
   }
 
   if (routeId === "location-form-drawer") {
