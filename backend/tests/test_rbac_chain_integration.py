@@ -107,6 +107,7 @@ def rbac_chain(client):
     if login is None:
         pytest.skip("Seed admin login failed; seed users first")
     admin_headers = {"Authorization": f"Bearer {login.json()['token']}"}
+    admin_user_id = login.json()["user"]["id"]
 
     suffix = uuid.uuid4().hex[:8]
     role = client.post(
@@ -167,6 +168,7 @@ def rbac_chain(client):
 
     yield {
         "admin_headers": admin_headers,
+        "admin_user_id": admin_user_id,
         "user_headers": user_headers,
         "role_id": role_id,
         "user_id": user_id,
@@ -241,3 +243,118 @@ class TestRbacChain:
         codes = set(payload.get("permissions") or payload.get("permission_codes") or payload)
         assert {"candidate.read", "notification.read", "user.read"} <= codes
         assert "role.read" not in codes
+
+
+class TestLastAdminGuard:
+    """The last active admin must not be demotable via user update — demoting
+    that account previously locked the workspace out of its own settings."""
+
+    @staticmethod
+    def _active_admin_count() -> int:
+        from sqlalchemy import text
+
+        from app.db.session import create_db_engine
+
+        engine = create_db_engine()
+        with engine.connect() as connection:
+            return int(
+                connection.execute(
+                    text(
+                        "SELECT COUNT(*) FROM dbo.users u "
+                        "INNER JOIN dbo.roles r ON r.id = u.default_role_id "
+                        "WHERE r.code = N'admin' AND u.status = N'active'"
+                    )
+                ).scalar_one()
+            )
+
+    def test_cannot_demote_last_active_admin(self, client, rbac_chain):
+        if self._active_admin_count() > 1:
+            pytest.skip(
+                "multiple active admins exist; the last-admin guard is not applicable"
+            )
+        # Point the seed admin at the minimal test role.
+        response = client.patch(
+            f"/api/v1/users/{rbac_chain['admin_user_id']}",
+            headers=rbac_chain["admin_headers"],
+            json={"primary_role_id": rbac_chain["role_id"]},
+        )
+        assert response.status_code == 409, response.text
+        assert "last active admin" in response.json()["detail"]
+
+    def test_admin_still_admin_after_attempt(self, client, rbac_chain):
+        me = client.get("/api/v1/users/", headers=rbac_chain["admin_headers"])
+        assert me.status_code == 200, me.text
+
+
+class TestLastAdminGuardUnit:
+    """Exercise the guard logic directly so it is covered even when the dev
+    database holds many admins (which makes the DB-backed probe inapplicable)."""
+
+    @staticmethod
+    def _admin_record() -> object:
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            id=1,
+            primary_role_id=1,
+            primary_role_code="admin",
+            primary_location_id=1,
+        )
+
+    def test_guard_blocks_when_single_admin(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        import app.services.users as users_service
+
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: self._admin_record()
+        )
+        monkeypatch.setattr(
+            users_service, "_assert_user_references", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(
+            users_service,
+            "update_user",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("update_user must not run")),
+        )
+
+        with pytest.raises(HTTPException) as excinfo:
+            users_service.update_user_service(
+                engine=SimpleNamespace(),
+                user_id=1,
+                payload=users_service.UserUpdate(primary_role_id=999),
+            )
+        assert excinfo.value.status_code == 409
+        assert "last active admin" in excinfo.value.detail
+
+    def test_guard_allows_when_multiple_admins(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(
+            users_service, "_assert_user_references", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(
+            users_service, "update_user", lambda engine, uid, payload, before: record
+        )
+        monkeypatch.setattr(
+            users_service,
+            "UserResponse",
+            SimpleNamespace(model_validate=lambda value: value),
+        )
+
+        result = users_service.update_user_service(
+            engine=SimpleNamespace(),
+            user_id=1,
+            payload=users_service.UserUpdate(primary_role_id=999),
+        )
+        assert result is record

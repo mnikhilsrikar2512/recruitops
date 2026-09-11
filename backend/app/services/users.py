@@ -9,6 +9,7 @@ from app.core.security import hash_password, hash_session_token, random_secret
 
 from app.repositories.audit import insert_audit_log
 from app.repositories.users import (
+    count_active_admins,
     count_user_active_assignments,
     count_user_active_candidate_ownership,
     count_user_active_pipeline_ownership,
@@ -136,6 +137,20 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
         primary_role_id=payload.primary_role_id,
         reporting_manager_user_id=payload.reporting_manager_user_id,
         user_id_to_exclude=user_id,
+    )
+
+    # Never allow the last active admin to lose the admin role — this account
+    # is the only path to role/user configuration, so demoting it would lock
+    # the workspace out of its own settings.
+    next_role_id = payload.primary_role_id or existing.primary_role_id
+    if (
+        existing.primary_role_code == "admin"
+        and next_role_id != existing.primary_role_id
+        and count_active_admins(engine) <= 1
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot change the role of the last active admin",
     )
 
     updated = update_user(engine, user_id, payload, existing)

@@ -22,6 +22,7 @@ class UserRecord:
     primary_location_name: str | None
     primary_role_id: int
     primary_role_name: str
+    primary_role_code: str | None
     reporting_manager_user_id: int | None
     reporting_manager_name: str | None
     password_setup_status: str
@@ -43,6 +44,7 @@ def _map_user(row: RowMapping) -> UserRecord:
         primary_location_name=row["primary_location_name"],
         primary_role_id=row["primary_role_id"],
         primary_role_name=row["primary_role_name"],
+        primary_role_code=row.get("primary_role_code"),
         reporting_manager_user_id=row["reporting_manager_user_id"],
         reporting_manager_name=row["reporting_manager_name"],
         password_setup_status=row["password_setup_status"],
@@ -66,6 +68,7 @@ def _user_select_sql() -> str:
           b.name AS primary_location_name,
           u.default_role_id AS primary_role_id,
           r.name AS primary_role_name,
+          r.code AS primary_role_code,
           u.reporting_manager_user_id,
           manager.full_name AS reporting_manager_name,
           u.password_setup_status,
@@ -182,6 +185,20 @@ def role_exists(engine: Engine, role_id: int) -> bool:
     with engine.connect() as connection:
         row = connection.execute(query, {"role_id": role_id}).first()
     return row is not None
+
+
+def count_active_admins(engine: Engine) -> int:
+    """Number of active users holding the fixed admin role."""
+    query = text(
+        """
+        SELECT COUNT(*) AS admin_count
+        FROM dbo.users AS u
+        INNER JOIN dbo.roles AS r ON r.id = u.default_role_id
+        WHERE r.code = N'admin' AND u.status = N'active';
+        """
+    )
+    with engine.connect() as connection:
+        return int(connection.execute(query).scalar_one())
 
 
 def count_user_active_requisitions(engine: Engine, user_id: int) -> int:
