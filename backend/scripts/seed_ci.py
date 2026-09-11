@@ -46,6 +46,7 @@ PERMISSIONS = [
     ("requisition.assign", "requisition", "assign"),
     ("requisition.create", "requisition", "create"),
     ("requisition.read", "requisition", "read"),
+    ("report.read", "report", "read"),
     ("role.create", "role", "create"),
     ("role.permissions.assign", "role", "permissions_assign"),
     ("role.read", "role", "read"),
