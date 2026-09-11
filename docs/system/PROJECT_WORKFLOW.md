@@ -675,7 +675,7 @@ LOCATION TRANSFER
 
 **Role Templates (6):** director, bdm, account_manager, lead_recruiter, recruiter, assistant_recruiter
 
-**Frontend Pages:** user-management, user-detail, user-form-drawer, role-management, role-permissions-editor, role-form-drawer, deactivate-user-dialog, reassignment-review-drawer
+**Frontend Pages:** user-management, user-detail, role-management, role-permissions-editor, deactivate-user-dialog, reassignment-review-drawer
 
 ---
 
@@ -714,7 +714,7 @@ CLIENT-REQUISITION LINK
    → requisition_end_clients for end-client mapping
 ```
 
-**Frontend Pages:** client-directory, client-detail, client-create-or-edit-drawer, contact-form-dialog
+**Frontend Pages:** client-directory, client-detail, contact-form-dialog
 
 ---
 
@@ -754,7 +754,7 @@ PERFORMANCE TRACKING
 
 **Seeded Locations (3):** Hyderabad (HYD01), Vijayawada (VJW01), Vizag (VZG01)
 
-**Frontend Pages:** location-management, location-dashboard, location-form-drawer
+**Frontend Pages:** location-management, location-dashboard
 
 ---
 
