@@ -175,10 +175,6 @@
       "nav": "location-management.html",
       "links": [
         {
-          "label": "Open Location Drawer",
-          "href": "location-form-drawer.html"
-        },
-        {
           "label": "Location Performance",
           "href": "location-dashboard.html"
         }
@@ -197,10 +193,6 @@
         {
           "label": "Manage Locations",
           "href": "location-management.html"
-        },
-        {
-          "label": "Open Location Drawer",
-          "href": "location-form-drawer.html"
         }
       ]
     },
@@ -214,10 +206,6 @@
       "source": "user_management_unified_shell",
       "nav": "user-management.html",
       "links": [
-        {
-          "label": "Open User Drawer",
-          "href": "user-form-drawer.html"
-        },
         {
           "label": "Open User Detail",
           "href": "user-detail.html"
@@ -239,10 +227,6 @@
           "href": "user-management.html"
         },
         {
-          "label": "Edit User",
-          "href": "user-form-drawer.html"
-        },
-        {
           "label": "Deactivate User",
           "href": "deactivate-user-dialog.html"
         },
@@ -261,12 +245,7 @@
       "subtitle": "Permission control page using the standardized navigation model.",
       "source": "role_management",
       "nav": "role-management.html",
-      "links": [
-        {
-          "label": "Open Role Drawer",
-          "href": "role-form-drawer.html"
-        }
-      ]
+      "links": []
     },
     {
       "file": "client-directory.html",
@@ -278,10 +257,6 @@
       "source": "client_directory",
       "nav": "client-directory.html",
       "links": [
-        {
-          "label": "Open Client Drawer",
-          "href": "client-create-or-edit-drawer.html"
-        },
         {
           "label": "Open Client Detail",
           "href": "client-detail.html"
@@ -1524,19 +1499,6 @@
       "required_selectors": []
     },
     {
-      "file": "client-create-or-edit-drawer.html",
-      "route_id": "client-create-or-edit-drawer",
-      "kind": "overlay",
-      "title": "Create Client",
-      "overlay_kind": "drawer",
-      "parent": "client-directory.html",
-      "parent_route_id": "client-directory",
-      "parent_title": "Client Directory",
-      "parent_section": "Clients",
-      "source": "client_create_or_edit_drawer",
-      "required_selectors": []
-    },
-    {
       "file": "contact-form-dialog.html",
       "route_id": "contact-form-dialog",
       "kind": "overlay",
@@ -1635,19 +1597,6 @@
       ]
     },
     {
-      "file": "location-form-drawer.html",
-      "route_id": "location-form-drawer",
-      "kind": "overlay",
-      "title": "Add New Location",
-      "overlay_kind": "drawer",
-      "parent": "location-management.html",
-      "parent_route_id": "location-management",
-      "parent_title": "Location Management",
-      "parent_section": "Administration",
-      "source": "v3:location_form_drawer_refined_structure",
-      "required_selectors": []
-    },
-    {
       "file": "link-to-requisition-dialog.html",
       "route_id": "link-to-requisition-dialog",
       "kind": "overlay",
@@ -1713,19 +1662,6 @@
       "required_selectors": []
     },
     {
-      "file": "role-form-drawer.html",
-      "route_id": "role-form-drawer",
-      "kind": "overlay",
-      "title": "Configure Role",
-      "overlay_kind": "drawer",
-      "parent": "role-management.html",
-      "parent_route_id": "role-management",
-      "parent_title": "Role Management",
-      "parent_section": "Administration",
-      "source": "role_form_drawer",
-      "required_selectors": []
-    },
-    {
       "file": "stage-move-dialog.html",
       "route_id": "stage-move-dialog",
       "kind": "overlay",
@@ -1750,24 +1686,6 @@
       "parent_section": "Requisitions",
       "source": "v3:status_update_dialog",
       "required_selectors": []
-    },
-    {
-      "file": "user-form-drawer.html",
-      "route_id": "user-form-drawer",
-      "kind": "overlay",
-      "title": "Add New User",
-      "overlay_kind": "drawer",
-      "parent": "user-management.html",
-      "parent_route_id": "user-management",
-      "parent_title": "User Management",
-      "parent_section": "Administration",
-      "source": "user_form_drawer",
-      "required_selectors": [
-        "#fullName",
-        "#email",
-        "#primaryLocation",
-        "#primaryRole"
-      ]
     },
     {
       "file": "interview-feedback-dialog.html",

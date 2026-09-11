@@ -171,15 +171,7 @@ async function fillSelect(selectId, items, labelFn, valueFn, selectedValue) {
 }
 
 async function hydrateSelects() {
-  const route = routeId();
-  if (route === "location-form-drawer" || route === "user-form-drawer") {
-    const locations = await apiRequest("/locations/?page_size=100").catch(() => ({ items: [] }));
-    await fillSelect("location_id", locations.items || [], (l) => l.location_name || l.name || `Location ${l.id}`, (l) => l.id, queryInt("location_id"));
-  }
-  if (route === "user-form-drawer" || route === "role-form-drawer") {
-    const roles = await apiRequest("/roles/?page_size=50").catch(() => ({ items: [] }));
-    await fillSelect("role_id", roles.items || [], (r) => r.role_name || r.name || `Role ${r.id}`, (r) => r.id, queryInt("role_id"));
-  }
+  /* Select hydration for remaining overlay form pages lives with their loaders. */
 }
 
 
@@ -208,12 +200,9 @@ function decorateShell() {
 const SIDEBAR_PERMISSION_MAP = {
   /* nav links → required permission(s) */
   "location-management.html": ["location.read", "location.create"],
-  "location-form-drawer.html": ["location.create"],
   "location-dashboard.html": ["location.read"],
   "user-management.html": ["user.read", "user.create"],
-  "user-form-drawer.html": ["user.create"],
   "role-management.html": ["role.read", "role.create"],
-  "role-form-drawer.html": ["role.create"],
   "role-permissions-editor.html": ["role.permissions.assign"],
   "business-titles.html": ["settings.read"],
   "visibility-rules.html": ["settings.read", "role.read"],
@@ -407,10 +396,6 @@ async function handleForgot(form) {
 }function handleFormSubmit(form) {
   const route = routeId();
   const submitMap = {
-    "location-form-drawer": submitLocation,
-    "user-form-drawer": submitUser,
-    "role-form-drawer": submitRole,
-    "client-create-or-edit-drawer": submitClient,
     "contact-form-dialog": submitContact,
     "requisition-intake": submitRequisition,
     "requisition-intake-edit": submitRequisition,
@@ -428,10 +413,6 @@ async function handleForgot(form) {
   /* RBAC: Check form submission permissions */
   if (!isAdmin()) {
     const formPermMap = {
-      "location-form-drawer": "location.create",
-      "user-form-drawer": "user.create",
-      "role-form-drawer": "role.create",
-      "client-create-or-edit-drawer": "client.create",
       "contact-form-dialog": "client.contact.create",
       "requisition-intake": "requisition.create",
       "requisition-intake-edit": "requisition.update",
@@ -473,86 +454,8 @@ async function submitLocation() {
   } catch (error) { showLiveError(error); }
 }
 
-async function submitUser() {
-  const id = queryInt("user_id");
-  const session = RecruitOpsLive.session || readSession();
-  const name = firstValueOf(["full_name"], [/full name/i]);
-  const email = firstValueOf(["email"], [/email/i]);
-  const roleId = intOrNull(document.getElementById("role_id")?.value) || intOrNull(document.getElementById("primary_role_id")?.value);
-  const locationId = intOrNull(document.getElementById("location_id")?.value) || intOrNull(document.getElementById("primary_location_id")?.value) || session?.location_id;
-  const payload = {
-    full_name: name,
-    email: email,
-    employee_code: (name || "USR").substring(0, 8).toUpperCase().replace(/\s+/g, "") + Math.floor(Math.random() * 1000),
-    primary_role_id: roleId,
-    primary_location_id: locationId,
-    phone: firstValueOf(["phone"], [/phone/i]) || null,
-    business_title: firstValueOf(["business_title"], [/title/i, /designation/i]) || null,
-    status: "active",
-  };
-  if (!payload.full_name || !payload.email) { showLiveError(new Error("Name and email are required.")); return; }
-  try {
-    if (id) await apiRequest(`/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
-    else await apiRequest("/users/", { method: "POST", body: JSON.stringify(payload) });
-    showLiveSuccess("User saved", payload.full_name);
-    setTimeout(() => { window.location.href = pageHref("user-management.html"); }, 1000);
-  } catch (error) { showLiveError(error); }
-}
 
-async function submitRole() {
-  const id = queryInt("role_id");
-  const name = firstValueOf(["role_name", "name"], [/role name/i, /name/i]);
-  const payload = {
-    name: name,
-    code: (name || "role").toLowerCase().replace(/\s+/g, "_").substring(0, 30),
-    description: firstValueOf(["description"], [/description/i]) || null,
-    status: "active",
-  };
-  if (!payload.name) { showLiveError(new Error("Role name is required.")); return; }
-  try {
-    if (id) await apiRequest(`/roles/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
-    else await apiRequest("/roles/", { method: "POST", body: JSON.stringify(payload) });
-    showLiveSuccess("Role saved", payload.name);
-    setTimeout(() => { window.location.href = pageHref("role-management.html"); }, 1000);
-  } catch (error) { showLiveError(error); }
-}
 
-async function submitClient() {
-  const id = queryInt("client_id");
-  const session = RecruitOpsLive.session || readSession();
-  /* Read from actual HTML field IDs: client-name, client-code, industry, location, client-owner, business-source, status */
-  const name = document.getElementById("client-name")?.value?.trim() || firstValueOf(["client_name"], [/client name/i]);
-  const code = document.getElementById("client-code")?.value?.trim() || null;
-  const industry = document.getElementById("industry")?.value || firstValueOf(["industry"], [/industry/i]) || null;
-  const locationId = intOrNull(document.getElementById("location_id")?.value) || intOrNull(document.getElementById("location")?.value) || session?.location_id;
-  const ownerSelect = document.getElementById("client-owner");
-  const sourceSelect = document.getElementById("business-source");
-  const statusVal = document.getElementById("status")?.value || "active";
-  const notes = document.getElementById("commercial-notes")?.value || null;
-  const createPayload = {
-    client_name: name,
-    client_code: code,
-    industry,
-    location_id: locationId,
-    client_owner_user_id: intOrNull(ownerSelect?.value) || session?.user_id,
-    business_source_owner_user_id: intOrNull(sourceSelect?.value) || session?.user_id,
-    status: statusVal,
-    notes,
-  };
-  const updatePayload = {
-    client_name: name || undefined,
-    industry,
-    status: statusVal,
-    notes,
-  };
-  if (!name) { showLiveError(new Error("Client name is required.")); return; }
-  try {
-    if (id) await apiRequest(`/clients/${id}`, { method: "PATCH", body: JSON.stringify(updatePayload) });
-    else await apiRequest("/clients/", { method: "POST", body: JSON.stringify(createPayload) });
-    showLiveSuccess("Client saved", name);
-    setTimeout(() => { window.location.href = pageHref("client-directory.html"); }, 1000);
-  } catch (error) { showLiveError(error); }
-}
 
 async function submitContact() {
   const clientId = queryInt("client_id");
@@ -795,22 +698,6 @@ async function uploadCandidateResume(input) {
    PAGE LOADERS — CRUD
    ═══════════════════════════════════════════════════════════════ */
 
-async function loadEditableEntityForm() {
-  const route = routeId();
-  const id = queryInt("location_id", "user_id", "role_id", "client_id");
-  if (!id) return;
-  try {
-    const pathMap = { "location-form-drawer": `/locations/${id}`, "user-form-drawer": `/users/${id}`, "role-form-drawer": `/roles/${id}`, "client-create-or-edit-drawer": `/clients/${id}` };
-    const data = await apiRequest(pathMap[route] || "");
-    /* API keys use underscores (client_name), HTML IDs use hyphens (client-name) */
-    Object.entries(data).forEach(([key, value]) => {
-      if (value == null) return;
-      const hyphenated = key.replace(/_/g, "-");
-      const field = document.getElementById(key) || document.getElementById(hyphenated) || document.querySelector(`[name="${key}"]`) || document.querySelector(`[name="${hyphenated}"]`);
-      if (field) field.value = value;
-    });
-  } catch {}
-}
 
 async function loadLocations() {
   const surface = document.querySelector('.workspace-surface');
@@ -874,6 +761,258 @@ async function loadLocations() {
   } catch (err) {
     tableWrap.innerHTML = '<div class="flex flex-col items-center justify-center py-16 text-center"><span class="material-symbols-outlined text-[48px] text-red-400 mb-3">error</span><p class="text-body-sm text-red-600">Failed to load locations: ' + escapeHtml(String(err.message || err)) + '</p></div>';
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INLINE ENTITY DIALOGS
+   One helper for create/edit overlays opened directly from list
+   pages (users, roles, clients — same pattern as locations).
+   The helper owns the overlay shell, close behavior, and inline
+   error display; callers supply fields + a submit handler.
+   ═══════════════════════════════════════════════════════════════ */
+
+function openEntityDialog({ id, title, fields, submitLabel = "Save", onSubmit, onClose }) {
+  const existingOverlay = document.getElementById(id);
+  if (existingOverlay) existingOverlay.remove();
+  const wrapper = document.createElement("div");
+  wrapper.id = id;
+  wrapper.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
+  const fieldHtml = fields.map((field) => {
+    const value = field.value == null ? "" : String(field.value);
+    if (field.type === "select") {
+      const options = (field.options || []).map((option) =>
+        `<option value="${escapeHtml(String(option.value))}" ${String(option.value) === String(field.value) ? "selected" : ""}>${escapeHtml(option.label)}</option>`,
+      ).join("");
+      return `<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeHtml(field.label)}</span><select id="${field.name}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary">${options}</select></label>`;
+    }
+    const commonClass = field.readonly
+      ? "mt-1 w-full rounded-lg border border-border bg-surface-variant px-3 py-2 text-text-muted text-sm"
+      : "mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary";
+    return `<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeHtml(field.label)}</span><input id="${field.name}" name="${field.name}" type="${field.type || "text"}" ${field.required ? "required" : ""} ${field.readonly ? "readonly" : ""} placeholder="${escapeHtml(field.placeholder || "")}" value="${escapeHtml(value)}" class="${commonClass}" /></label>`;
+  }).join("");
+  wrapper.innerHTML = `<div class="bg-surface rounded-xl border border-border shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-headline-sm font-semibold text-on-surface">${escapeHtml(title)}</h3>
+      <button type="button" data-dialog-close class="text-text-muted hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">close</span></button>
+    </div>
+    <form data-entity-dialog-form>
+      ${fieldHtml}
+      <div data-dialog-error class="text-body-sm text-red-600 mb-3 hidden"></div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button type="button" data-dialog-cancel class="px-4 py-2 rounded-lg border border-border text-on-surface text-sm font-medium hover:bg-surface-variant">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-semibold hover:opacity-90">${escapeHtml(submitLabel)}</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(wrapper);
+  const close = () => {
+    wrapper.remove();
+    if (onClose) onClose();
+  };
+  wrapper.querySelector("[data-dialog-close]").onclick = close;
+  wrapper.querySelector("[data-dialog-cancel]").onclick = close;
+  wrapper.addEventListener("click", (event) => { if (event.target === wrapper) close(); });
+  wrapper.querySelector("[data-entity-dialog-form]").onsubmit = async (event) => {
+    event.preventDefault();
+    const errorEl = wrapper.querySelector("[data-dialog-error]");
+    errorEl.classList.add("hidden");
+    const values = {};
+    fields.forEach((field) => { values[field.name] = wrapper.querySelector(`#${field.name}`)?.value ?? ""; });
+    try {
+      await onSubmit(values, close);
+    } catch (err) {
+      errorEl.textContent = err.message || "Something went wrong";
+      errorEl.classList.remove("hidden");
+    }
+  };
+  return wrapper;
+}
+
+function entitySelectOptions(items, labelKey, valueKey = "id") {
+  return [{ value: "", label: "— Select —" }].concat(
+    (items || []).map((item) => ({ value: item[valueKey], label: item[labelKey] || `#${item[valueKey]}` })),
+  );
+}
+
+function paintPlainCell(td, value) {
+  if (!td) return;
+  td.textContent = value == null || value === "" ? "—" : String(value);
+}
+
+function paintStackedUserCell(td, name, subtitle) {
+  if (!td) return;
+  td.innerHTML = `<div class="flex flex-col">
+    <span class="font-medium text-on-surface">${escapeHtml(name || "—")}</span>
+    <span class="text-[11px] text-text-muted">${escapeHtml(subtitle || "")}</span>
+  </div>`;
+}
+
+function paintStatusChip(td, status) {
+  if (!td) return;
+  const normalized = String(status || "active").toLowerCase();
+  const active = normalized === "active" || normalized === "open";
+  const pending = normalized === "pending" || normalized === "pending-setup" || normalized === "prospect";
+  const chipClass = active
+    ? "bg-success-bg text-success-text border border-success-text/20"
+    : pending
+      ? "bg-warning-bg text-warning-text border border-warning-text/20"
+      : "bg-surface-dim text-text-muted border border-outline-variant";
+  td.innerHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${chipClass}">${escapeHtml(String(status || "active"))}</span>`;
+}
+
+/** Bind Add + row-edit actions for a list page using inline dialogs.
+ * Every table row that contains an edit affordance gets a data-edit-id so
+ * the click handler knows which record to load; RBAC hides what the role
+ * lacks. Idempotent per page load. */
+function wireEntityTableActions({ addPermission, editPermission, addSelector, onAdd, onEdit }) {
+  const canAdd = hasPermission(addPermission);
+  const canEdit = hasPermission(editPermission);
+  if (canAdd) {
+    document.querySelectorAll(addSelector).forEach((button) => {
+      button.onclick = (event) => { event.preventDefault(); onAdd(); };
+    });
+  } else {
+    document.querySelectorAll(addSelector).forEach((button) => {
+      button.classList.add("hidden");
+    });
+  }
+  if (!canEdit) return;
+  document.querySelectorAll(".workspace-surface tbody tr").forEach((row) => {
+    /* Re-wire on every call: fillExistingTable clones the first <tr> as its
+     * template, so "wired" markers propagate to fresh rows while their
+     * property-assigned onclick handlers do not survive the clone. */
+    const editButton = row.querySelector('button[aria-label*="Edit" i], button[title*="Edit" i], a[data-route*="form-drawer" i], a[data-route*="client-create"]');
+    if (!editButton) return;
+    const recordId = row.dataset.recordId;
+    if (!recordId) return;
+    editButton.onclick = (event) => {
+      event.preventDefault();
+      onEdit(recordId);
+    };
+  });
+}
+
+async function openUserDialog(userId, refresh) {
+  const isEdit = !!userId;
+  let user = null;
+  if (isEdit) {
+    user = await apiRequest(`/users/${userId}`).catch(() => null);
+    if (!user) { showToast("Failed to load user", "Could not fetch this user for editing."); return; }
+  }
+  const [roles, locations] = await Promise.all([
+    apiRequest("/roles/?page_size=50").catch(() => ({ items: [] })),
+    apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
+  ]);
+  openEntityDialog({
+    id: "user-dialog-overlay",
+    title: isEdit ? "Edit User" : "Add User",
+    submitLabel: isEdit ? "Save Changes" : "Create User",
+    onClose: refresh,
+    fields: [
+      { name: "full_name", label: "Full Name", required: true, value: user?.full_name || "", placeholder: "e.g. Priya Sharma" },
+      { name: "email", label: "Email", type: "email", required: true, value: user?.email || "", placeholder: "name@company.com" },
+      { name: "phone", label: "Phone", value: user?.phone || "", placeholder: "Optional" },
+      { name: "business_title", label: "Business Title", value: user?.business_title || "", placeholder: "e.g. Senior Recruiter" },
+      { name: "primary_role_id", label: "Role", type: "select", required: true, value: user?.primary_role_id ?? "", options: entitySelectOptions(roles.items, "role_name", "id") },
+      { name: "primary_location_id", label: "Location", type: "select", value: user?.primary_location_id ?? user?.location_id ?? "", options: entitySelectOptions(locations.items, "location_name", "id") },
+      { name: "status", label: "Status", type: "select", value: user?.status || "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+    ],
+    onSubmit: async (values, close) => {
+      const payload = {
+        full_name: values.full_name.trim(),
+        email: values.email.trim(),
+        phone: values.phone.trim() || null,
+        business_title: values.business_title.trim() || null,
+        primary_role_id: intOrNull(values.primary_role_id),
+        primary_location_id: intOrNull(values.primary_location_id),
+        status: values.status,
+      };
+      if (!payload.full_name || !payload.email) throw new Error("Name and email are required.");
+      if (!payload.primary_role_id) throw new Error("Role is required.");
+      if (isEdit) await apiRequest(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) });
+      else await apiRequest("/users/", { method: "POST", body: JSON.stringify(payload) });
+      close();
+      showToast(isEdit ? "User updated" : "User created", payload.full_name);
+    },
+  });
+}
+
+async function openRoleDialog(roleId, refresh) {
+  const isEdit = !!roleId;
+  let role = null;
+  if (isEdit) {
+    role = await apiRequest(`/roles/${roleId}`).catch(() => null);
+    if (!role) { showToast("Failed to load role", "Could not fetch this role for editing."); return; }
+  }
+  openEntityDialog({
+    id: "role-dialog-overlay",
+    title: isEdit ? "Edit Role" : "Create Role",
+    submitLabel: isEdit ? "Save Changes" : "Create Role",
+    onClose: refresh,
+    fields: [
+      { name: "name", label: "Role Name", required: true, value: role?.role_name || role?.name || "", placeholder: "e.g. Lead Recruiter" },
+      { name: "description", label: "Description", value: role?.description || "", placeholder: "What this role is responsible for" },
+      { name: "status", label: "Status", type: "select", value: role?.status || "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+    ],
+    onSubmit: async (values, close) => {
+      const payload = {
+        name: values.name.trim(),
+        code: values.name.trim().toLowerCase().replace(/\s+/g, "_").substring(0, 30),
+        description: values.description.trim() || null,
+        status: values.status,
+      };
+      if (!payload.name) throw new Error("Role name is required.");
+      if (isEdit) await apiRequest(`/roles/${roleId}`, { method: "PATCH", body: JSON.stringify(payload) });
+      else await apiRequest("/roles/", { method: "POST", body: JSON.stringify(payload) });
+      close();
+      showToast(isEdit ? "Role updated" : "Role created", payload.name);
+    },
+  });
+}
+
+async function openClientDialog(clientId, refresh) {
+  const isEdit = !!clientId;
+  let client = null;
+  if (isEdit) {
+    client = await apiRequest(`/clients/${clientId}`).catch(() => null);
+    if (!client) { showToast("Failed to load client", "Could not fetch this client for editing."); return; }
+  }
+  const session = RecruitOpsLive.session || readSession();
+  const locations = await apiRequest("/locations/?page_size=100").catch(() => ({ items: [] }));
+  openEntityDialog({
+    id: "client-dialog-overlay",
+    title: isEdit ? "Edit Client" : "Add Client",
+    submitLabel: isEdit ? "Save Changes" : "Create Client",
+    onClose: refresh,
+    fields: [
+      { name: "client_name", label: "Client Name", required: true, value: client?.client_name || "", placeholder: "e.g. Acme Corp" },
+      { name: "client_code", label: "Client Code", value: client?.client_code || "", placeholder: "Auto-generated if blank", readonly: isEdit },
+      { name: "industry", label: "Industry", value: client?.industry || "", placeholder: "e.g. Technology" },
+      { name: "location_id", label: "Location", type: "select", value: client?.location_id ?? "", options: entitySelectOptions(locations.items, "location_name", "id") },
+      { name: "status", label: "Status", type: "select", value: client?.status || "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+      { name: "notes", label: "Commercial Notes", value: client?.notes || "", placeholder: "Optional" },
+    ],
+    onSubmit: async (values, close) => {
+      const name = values.client_name.trim();
+      if (!name) throw new Error("Client name is required.");
+      if (isEdit) {
+        await apiRequest(`/clients/${clientId}`, { method: "PATCH", body: JSON.stringify({ client_name: name, industry: values.industry || null, status: values.status, notes: values.notes || null }) });
+      } else {
+        await apiRequest("/clients/", { method: "POST", body: JSON.stringify({
+          client_name: name,
+          client_code: values.client_code.trim() || null,
+          industry: values.industry || null,
+          location_id: intOrNull(values.location_id) || session?.location_id,
+          client_owner_user_id: session?.user_id,
+          business_source_owner_user_id: session?.user_id,
+          status: values.status,
+          notes: values.notes || null,
+        }) });
+      }
+      close();
+      showToast(isEdit ? "Client updated" : "Client created", name);
+    },
+  });
 }
 
 async function openLocationDialog(existing) {
@@ -952,10 +1091,19 @@ async function loadUsers() {
   const payload = await apiRequest("/users/?page_size=100");
   fillExistingTable(payload.items || [], (row, item) => {
     const cells = row.querySelectorAll("td");
-    setStackedCell(cells[1], item.full_name || item.email, item.email || "");
-    setCellValue(cells[2], item.role || "—");
-    setCellValue(cells[3], item.location_name || "—");
-    setCellValue(cells[4], item.status || "active");
+    paintStackedUserCell(cells[1], item.full_name, item.employee_code);
+    paintPlainCell(cells[2], item.email);
+    paintPlainCell(cells[3], item.role || item.role_name);
+    paintPlainCell(cells[4], item.location_name);
+    paintPlainCell(cells[5], item.manager_name || "—");
+    paintStatusChip(cells[6], item.status);
+  });
+  wireEntityTableActions({
+    addPermission: "user.create",
+    editPermission: "user.update",
+    addSelector: "[data-open-user-dialog]",
+    onAdd: () => openUserDialog(null, loadUsers),
+    onEdit: (id) => openUserDialog(id, loadUsers),
   });
 }
 
@@ -980,9 +1128,18 @@ async function loadRoles() {
   const payload = await apiRequest("/roles/?page_size=50");
   fillExistingTable(payload.items || [], (row, item) => {
     const cells = row.querySelectorAll("td");
-    setCellValue(cells[0], item.role_name || item.name || "—");
-    setCellValue(cells[1], item.description || "—");
-    setCellValue(cells[2], item.status || "active");
+    paintPlainCell(cells[0], item.role_name || item.name);
+    paintStatusChip(cells[1], item.status || "active");
+    paintPlainCell(cells[2], "—");
+    paintPlainCell(cells[3], "Global");
+    paintPlainCell(cells[4], item.description || "—");
+  });
+  wireEntityTableActions({
+    addPermission: "role.create",
+    editPermission: "role.update",
+    addSelector: "[data-open-role-dialog]",
+    onAdd: () => openRoleDialog(null, loadRoles),
+    onEdit: (id) => openRoleDialog(id, loadRoles),
   });
 }
 
@@ -1046,10 +1203,19 @@ async function loadClients() {
   const payload = await apiRequest("/clients/?page_size=100");
   fillExistingTable(payload.items || [], (row, item) => {
     const cells = row.querySelectorAll("td");
-    setStackedCell(cells[0], item.client_name, item.industry || "");
-    setCellValue(cells[1], item.status || "active");
-    const editLink = row.querySelector('[data-route*="client-create"]');
-    if (editLink) editLink.dataset.route = `client-create-or-edit-drawer.html?client_id=${item.id}`;
+    paintPlainCell(cells[0], item.client_name);
+    paintPlainCell(cells[1], item.location_name);
+    paintPlainCell(cells[2], item.client_owner_name || item.owner_name);
+    paintPlainCell(cells[3], item.industry);
+    paintStatusChip(cells[4], item.status);
+    paintPlainCell(cells[5], item.updated_at ? `Updated ${formatWhen(item.updated_at)}` : "—");
+  });
+  wireEntityTableActions({
+    addPermission: "client.create",
+    editPermission: "client.update",
+    addSelector: "[data-open-client-dialog]",
+    onAdd: () => openClientDialog(null, loadClients),
+    onEdit: (id) => openClientDialog(id, loadClients),
   });
 }
 
@@ -2032,19 +2198,55 @@ function timeToFillRecords(requisitions, offers) {
   return "bg-danger-bg text-danger-text";
 }
 
+function setMetricCardValue(labelText, valueText, hintHtml = "") {
+  const card = Array.from(document.querySelectorAll(".metric-card")).find((node) =>
+    new RegExp(labelText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(node.textContent || ""),
+  );
+  if (!card) return;
+  const headline = card.querySelector("p[class*='headline'], .text-headline-lg");
+  if (headline) headline.textContent = valueText;
+  const hint = card.querySelector("p.text-body-sm:last-of-type");
+  if (hint && hintHtml) hint.innerHTML = hintHtml;
+}
+
 async function loadTimeToFillReport() {
-  const [requisitions, offers] = await Promise.all([
-    apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/offers/?page_size=50").catch(() => ({ items: [] })),
-  ]);
-  const records = timeToFillRecords(requisitions.items || [], offers.items || []);
-  renderTimeToFillBars("Average Time to Fill", records.slice(0, 8));
-  renderTimeToFillTrend(records.slice(0, 6));
+  const report = await apiRequest("/reports/time-to-fill").catch(() => null);
+  if (!report) return;
+  const summary = report.summary || {};
+  setMetricCardValue("Avg Time to Fill", summary.avg_days != null ? `${summary.avg_days} days` : "—",
+    summary.filled_count ? `<span class="text-body-sm text-text-muted">across ${summary.filled_count} filled role${summary.filled_count === 1 ? "" : "s"}</span>` : "");
+  setMetricCardValue("Fastest Fill", summary.fastest_days != null ? `${summary.fastest_days} days` : "—",
+    summary.fastest_requisition ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(summary.fastest_requisition)}</span>` : "");
+  setMetricCardValue("Slowest Fill", summary.slowest_days != null ? `${summary.slowest_days} days` : "—",
+    summary.slowest_requisition ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(summary.slowest_requisition)}</span>` : "");
+  setMetricCardValue("Within SLA", summary.within_sla_percent != null ? `${summary.within_sla_percent}%` : "—",
+    summary.filled_count ? `<span class="text-body-sm text-text-muted">${summary.within_sla} of ${summary.filled_count} fills</span>` : "");
+  renderTimeToFillBars("Time to Fill by Department", (report.by_department || []).map((row) => ({ label: row.label, days: row.avg_days })));
+  renderTimeToFillBars("Time to Fill by Seniority", (report.by_seniority || []).map((row) => ({ label: row.label, days: row.avg_days })));
 }
 
 async function loadSourceEffectiveness() {
-  const candidates = await apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] }));
-  renderSourceEffectiveness(candidates.items || []);
+  const report = await apiRequest("/reports/source-effectiveness").catch(() => null);
+  if (!report) return;
+  setMetricCardValue("Total Sources", String(report.total_sources || 0));
+  setMetricCardValue("Best Source", report.best_source || "—",
+    report.best_source_conversion != null ? `<span class="text-body-sm text-success">${report.best_source_conversion}% conversion rate</span>` : "");
+  renderSourceEffectivenessTable(report.rows || []);
+}
+
+async function loadSlaTracker() {
+  const dataset = await apiRequest("/reports/datasets/sla").catch(() => null);
+  if (!dataset) return;
+  const rows = dataset.rows || [];
+  const breached = rows.filter((row) => row.current_days > row.sla_target_days);
+  const atRisk = rows.filter((row) => row.status !== "closed" && row.status !== "filled" && Math.abs(row.current_days - row.sla_target_days) <= 5);
+  setMetricCardValue("Overall Compliance", rows.length ? `${Math.round(((rows.length - breached.length) / rows.length) * 100)}%` : "—");
+  setMetricCardValue("At Risk", String(atRisk.length));
+  setMetricCardValue("Breached", String(breached.length));
+  const open = rows.filter((row) => row.status !== "closed" && row.status !== "filled");
+  const avgOpen = open.length ? Math.round(open.reduce((sum, row) => sum + (row.current_days || 0), 0) / open.length) : null;
+  setMetricCardValue("Avg Time to Fill", avgOpen != null ? `${avgOpen} days` : "—");
+  renderSlaTrackerTable(rows);
 }/* ═══════════════════════════════════════════════════════════════
    WORKFLOW ACTIONS & OVERLAY
    ═══════════════════════════════════════════════════════════════ */
@@ -2725,29 +2927,80 @@ async function loadLinkToRequisitionDialog() {
    CUSTOM REPORT BUILDER
    ═══════════════════════════════════════════════════════════════ */
 
+const CUSTOM_REPORT_METRIC_TO_DATASET = [
+  { match: /time to fill/i, dataset: "time_to_fill" },
+  { match: /conversion rate|pipeline/i, dataset: "pipeline" },
+  { match: /source roi|source/i, dataset: "source_effectiveness" },
+  { match: /sla/i, dataset: "sla" },
+  { match: /team utilization|requisition/i, dataset: "requisitions" },
+  { match: /daily|update/i, dataset: "daily_updates" },
+];
+
 async function loadCustomReportBuilder() {
-  const [company, pipeline, requisitions, users, candidates, offers, dailyUpdates] = await Promise.all([
-    apiRequest("/dashboards/company-summary").catch(() => ({})),
-    apiRequest("/pipeline/board").catch(() => []),
-    apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/users/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/offers/?page_size=50").catch(() => ({ items: [] })),
-    apiRequest("/daily-updates/?page_size=50").catch(() => ({ items: [] })),
-  ]);
   const root = document.querySelector(".workspace-surface");
   if (!root) return;
-  const context = {
-    company,
-    pipelineItems: Array.isArray(pipeline) ? pipeline : pipeline.items || [],
-    requisitions: requisitions.items || [],
-    users: users.items || [],
-    candidates: candidates.items || [],
-    offers: offers.items || [],
-    dailyUpdates: dailyUpdates.items || [],
-  };
   styleCustomReportChoices(root);
-  renderCustomReportPreview(context);
+  bindCustomReportBuilder(root);
+}
+
+function customReportSelectedDataset(root) {
+  const inputs = customReportInputs(root);
+  const joined = inputs.selectedMetrics.join(" ");
+  return CUSTOM_REPORT_METRIC_TO_DATASET.find((item) => item.match.test(joined))?.dataset || "requisitions";
+}
+
+function bindCustomReportBuilder(root) {
+  if (root.dataset.liveCustomReportBound === "true") return;
+  root.dataset.liveCustomReportBound = "true";
+  root.addEventListener("change", () => styleCustomReportChoices(root));
+  const generateButton = Array.from(root.querySelectorAll("button")).find((button) => /generate now/i.test(button.textContent || ""));
+  if (generateButton) generateButton.addEventListener("click", () => runCustomReport(root));
+}
+
+function renderCustomReportDatasetTable(root, dataset, dimension, rows) {
+  const host = root.querySelector(".chart-placeholder");
+  if (!host) return;
+  const columns = (dimension?.columns || []).filter((column) => rows.length === 0 || rows.some((row) => row[column.key] != null));
+  host.classList.remove("chart-placeholder");
+  host.innerHTML = `<div class="rounded-lg border border-outline-variant bg-surface overflow-hidden">
+    <div class="flex items-center justify-between p-3 border-b border-outline-variant">
+      <div>
+        <p class="text-headline-sm font-semibold text-on-surface">${escapeLiveHtml(dimension?.label || dataset)}</p>
+        <p class="text-body-sm text-text-muted">${rows.length} row${rows.length === 1 ? "" : "s"} from live data</p>
+      </div>
+    </div>
+    <div class="overflow-x-auto max-h-80">
+      <table class="w-full">
+        <thead><tr class="border-b border-outline-variant">
+          ${columns.map((column) => `<th class="text-left px-3 py-2 text-label-caps font-bold text-text-muted uppercase tracking-wider">${escapeLiveHtml(column.label)}</th>`).join("")}
+        </tr></thead>
+        <tbody>
+          ${rows.length
+            ? rows.slice(0, 50).map((row) => `<tr class="border-b border-outline-variant hover:bg-highlight-soft">
+                ${columns.map((column) => {
+                  const value = row[column.key];
+                  const display = value == null ? "—" : column.type === "date" && value ? String(value).slice(0, 10) : String(value);
+                  return `<td class="px-3 py-2 text-body-sm ${column.type === "number" ? "text-data-tabular" : ""} text-on-surface">${escapeLiveHtml(display.length > 80 ? `${display.slice(0, 80)}…` : display)}</td>`;
+                }).join("")}
+              </tr>`).join("")
+            : `<tr><td class="px-3 py-6 text-body-sm text-text-muted" colspan="${columns.length || 1}">No rows returned for this dataset.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+async function runCustomReport(root) {
+  const dataset = customReportSelectedDataset(root);
+  const inputs = customReportInputs(root);
+  try {
+    const payload = await apiRequest(`/reports/datasets/${dataset}`);
+    const dimension = payload.dimensions?.[0];
+    renderCustomReportDatasetTable(root, dataset, dimension, payload.rows || []);
+    root.dataset.liveCustomReportDestination = customReportDestination(inputs.selectedMetrics);
+  } catch (error) {
+    showLiveError(error);
+  }
 }
 
 
@@ -2877,7 +3130,7 @@ function bindLiveApiInteractions() {
     // Form submissions
     const routeSubmitButton = target?.closest("button");
     const route = routeId();
-    const submitRoutes = new Set(["location-form-drawer", "user-form-drawer", "role-form-drawer", "client-create-or-edit-drawer", "contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "meeting-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer", "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup", "onboarding-hiring-teams"]);
+    const submitRoutes = new Set(["contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "meeting-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer", "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup", "onboarding-hiring-teams"]);
     const label = (routeSubmitButton?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
     if (routeSubmitButton && submitRoutes.has(route) && /^(save|create|update|submit|schedule|confirm|continue|next|add|send|save changes|save user|save client|save contact|save role|create requisition|save candidate)/.test(label)) {
       event.preventDefault();
@@ -3074,7 +3327,6 @@ async function bootPage() {
     "stage-history-audit-log": loadPipelineApplicationHistory,
     "client-directory": loadClients,
     "client-detail": loadClientDetail,
-    "client-create-or-edit-drawer": loadEditableEntityForm,
     "contact-form-dialog": loadContactFormDialog,
     "requisition-intake": loadRequisitionIntake,
     "requisition-intake-edit": loadRequisitionIntake,
@@ -3089,17 +3341,14 @@ async function bootPage() {
     "clarification-request-dialog": loadWorkflowOverlay,
     "user-management": loadUsers,
     "user-detail": loadUserDetail,
-    "user-form-drawer": loadEditableEntityForm,
     "deactivate-user-dialog": loadDeactivateUserDialog,
     "role-management": loadRoles,
-    "role-form-drawer": loadEditableEntityForm,
     "role-permissions-editor": loadRolePermissionsEditor,
     "role-dashboard": async () => { await Promise.all([loadRoleDashboard().catch(() => {}), loadWorkflowActions().catch(() => {})]); },
     "my-work-dashboard": loadDashboards,
     "company-dashboard": loadDashboards,
     "location-management": loadLocations,
     "location-detail": loadLocationDashboard,
-    "location-form-drawer": loadEditableEntityForm,
     "location-dashboard": loadLocationDashboard,
     "visibility-rules": loadVisibilityRules,
     "business-titles": loadBusinessTitles,
@@ -3133,7 +3382,7 @@ async function bootPage() {
     "user-performance-reports": loadUserPerformanceReports,
     "time-to-fill-report": loadTimeToFillReport,
     "source-effectiveness": loadSourceEffectiveness,
-    "sla-tracker": loadSourceEffectiveness,
+    "sla-tracker": loadSlaTracker,
     "pipeline-analytics": loadPipelineAnalytics,
     "analytics-dashboard": loadAnalyticsDashboard,
     "reports": loadReportsLibrary,
@@ -3185,14 +3434,11 @@ async function bootPage() {
   if (!isAdmin() && !PUBLIC_ROUTES.has(route)) {
     const pagePermMap = {
       "location-management": ["location.read"],
-      "location-form-drawer": ["location.create"],
       "location-detail": ["location.read"],
       "location-dashboard": ["location.read"],
       "user-management": ["user.read"],
-      "user-form-drawer": ["user.create"],
       "user-detail": ["user.read"],
       "role-management": ["role.read"],
-      "role-form-drawer": ["role.create"],
       "role-permissions-editor": ["role.permissions.assign"],
       "role-dashboard": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr"],
       "business-titles": ["settings.read"],
@@ -3202,7 +3448,6 @@ async function bootPage() {
       "approvals-inbox": ["approval.read"],
       "client-directory": ["client.read"],
       "client-detail": ["client.read"],
-      "client-create-or-edit-drawer": ["client.create"],
       "contact-form-dialog": ["client.contact.create"],
       "candidate-profiles": ["candidate.read"],
       "candidate-detail": ["candidate.read"],
@@ -3233,13 +3478,13 @@ async function bootPage() {
       "company-dashboard": ["dashboard.view_admin"],
       "user-performance-reports": ["dashboard.view_admin", "dashboard.view_manager"],
       "team-workload": ["dashboard.view_admin", "dashboard.view_manager"],
-      "reports": ["report.read_recruiter", "report.read_hr", "report.read_manager", "report.read_admin"],
-      "reports-library": ["report.read_recruiter", "report.read_hr", "report.read_manager", "report.read_admin"],
-      "custom-report-builder": ["report.generate"],
+      "reports": ["report.read"],
+      "reports-library": ["report.read"],
+      "custom-report-builder": ["report.read"],
       "pipeline-analytics": ["pipeline.read.summary"],
-      "time-to-fill-report": ["report.read_admin", "report.read_manager"],
-      "source-effectiveness": ["report.read_admin", "report.read_manager"],
-      "sla-tracker": ["report.read_admin", "report.read_manager"],
+      "time-to-fill-report": ["report.read"],
+      "source-effectiveness": ["report.read"],
+      "sla-tracker": ["report.read"],
     };
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {

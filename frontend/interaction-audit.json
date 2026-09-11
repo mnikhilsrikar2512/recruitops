@@ -2,32 +2,6 @@
   "generatedAt": "2026-09-01T08:54:15.245Z",
   "failures": [
     {
-      "fileName": "client-create-or-edit-drawer.html",
-      "issues": [
-        {
-          "fileName": "client-create-or-edit-drawer.html",
-          "type": "hover-reveal-controls-not-visible",
-          "label": "group 1",
-          "className": "",
-          "failed": 1
-        },
-        {
-          "fileName": "client-create-or-edit-drawer.html",
-          "type": "hover-reveal-controls-not-visible",
-          "label": "group 2",
-          "className": "",
-          "failed": 1
-        },
-        {
-          "fileName": "client-create-or-edit-drawer.html",
-          "type": "hover-reveal-controls-not-visible",
-          "label": "group 3",
-          "className": "",
-          "failed": 1
-        }
-      ]
-    },
-    {
       "fileName": "client-directory.html",
       "issues": [
         {

@@ -478,11 +478,11 @@ function setupRecordLinkPolish() {
     });
   }
 
-  if (routeId === "location-management" || routeId === "location-form-drawer") {
+  if (routeId === "location-management") {
     document.querySelectorAll("span, div").forEach((node) => {
       const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
       if (/^(HQ - San Francisco|London Hub|Austin Tech Center|LOC-001|LOC-042|LOC-088)$/i.test(label)) {
-        promoteSurfaceRoute(node, "location-form-drawer.html", `Open ${label}`);
+        promoteSurfaceRoute(node, "location-management.html", `Open ${label}`);
       }
     });
   }
@@ -647,7 +647,7 @@ function setupWorkflowActionPolish() {
     });
   }
 
-  if (routeId === "location-management" || routeId === "location-form-drawer") {
+  if (routeId === "location-management") {
     document.querySelectorAll("button").forEach((button) => {
       const label = getActionLabel(button);
       if (/archive/.test(label)) {
@@ -675,7 +675,7 @@ function setupWorkflowActionPolish() {
     });
   }
 
-  if (routeId === "role-management" || routeId === "role-form-drawer") {
+  if (routeId === "role-management") {
     document.querySelectorAll("button").forEach((button) => {
       const label = getActionLabel(button);
       if (/duplicate/.test(label)) {
@@ -837,7 +837,7 @@ function setupOverlayContextPolish() {
   const routeContainsHeading = normalize(routeTitle).includes(normalize(primaryHeading));
   const headingContainsRoute = normalize(primaryHeading).includes(normalize(routeTitle));
   const meaningfullyDifferentTitle = !routeContainsHeading && !headingContainsRoute;
-  const explicitActionTitleRoutes = new Set(["location-form-drawer"]);
+  const explicitActionTitleRoutes = new Set();
   const shouldPromoteTitle = !explicitActionTitleRoutes.has(routeId) && meaningfullyDifferentTitle && (actionLikeHeading || genericRouteTitle);
 
   if (shouldPromoteTitle) {

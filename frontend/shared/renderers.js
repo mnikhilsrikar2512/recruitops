@@ -719,63 +719,87 @@ function renderUserPerformanceWorkloadChart(members) {
 function renderTimeToFillBars(panelTitle, rows) {
   const panel = findPanelByHeading(panelTitle);
   if (!panel) return;
-  const host = panel.querySelector(".space-y-3") || panel;
-  const max = Math.max(...rows.map((r) => r.days || 0), 1);
-  host.innerHTML = rows.length
-    ? rows.map((row) => `<div class="flex items-center gap-3">
+  const host = panel.querySelector(".space-y-4") || panel.querySelector(".space-y-3") || panel;
+  if (!host) return;
+  if (!rows || !rows.length) {
+    host.innerHTML = `<div class="p-2 text-body-sm text-text-muted">No closed requisitions to report on yet.</div>`;
+    return;
+  }
+  const max = Math.max(...rows.map((row) => row.days || 0), 1);
+  host.innerHTML = rows.map((row) => `<div class="flex items-center gap-3">
         <span class="w-28 truncate text-body-sm text-on-surface">${escapeLiveHtml(row.label || row.title || "Role")}</span>
         <div class="h-4 flex-1 overflow-hidden rounded bg-outline-variant">
           <div class="h-4 rounded bg-primary" style="width:${Math.round(((row.days || 0) / max) * 100)}%"></div>
         </div>
-        <span class="w-12 text-right text-[11px] font-semibold text-on-surface">${row.days || 0}d</span>
-      </div>`).join("")
-    : `<div class="p-2 text-body-sm text-text-muted">No time-to-fill data available.</div>`;
+        <span class="w-14 text-right text-[11px] font-semibold text-on-surface">${row.days != null ? `${row.days} days` : "—"}</span>
+      </div>`).join("");
 }
 
 function renderTimeToFillTrend(records) {
-  const panel = findPanelByHeading("Fill Time Trend");
+  const panel = findPanelByHeading("Time to Fill Trend");
   if (!panel) return;
   const host = panel.querySelector(".space-y-3") || panel;
-  host.innerHTML = records.length
-    ? records.map((r) => `<div class="flex items-center justify-between rounded-lg p-2 transition-colors hover:bg-highlight-soft">
-        <span class="text-body-sm text-on-surface">${escapeLiveHtml(r.period || r.label || "Period")}</span>
-        <span class="text-data-tabular font-semibold text-on-surface">${r.days || 0} days</span>
-      </div>`).join("")
-    : `<div class="p-2 text-body-sm text-text-muted">No trend data available.</div>`;
+  if (!host || !records || !records.length) return; // trend placeholder stays when no monthly data
 }/* ═══════════════════════════════════════════════════════════════
    SOURCE EFFECTIVENESS
    ═══════════════════════════════════════════════════════════════ */
 
-function buildSourceRows(candidates) {
-  const sources = {};
-  (candidates || []).forEach((c) => {
-    const src = c.source_type || "Unknown";
-    if (!sources[src]) sources[src] = { source: src, count: 0, hired: 0 };
-    sources[src].count++;
-    if (c.profile_status === "hired" || c.application_status === "joined") sources[src].hired++;
-  });
-  return Object.values(sources).sort((a, b) => b.count - a.count);
+function sourceQualityMeta(row) {
+  const score = row.quality_score;
+  if (score == null) return `<span class="text-body-sm text-text-muted">—</span>`;
+  const color = score >= 7 ? "bg-success" : score >= 4 ? "bg-warning" : "bg-error";
+  return `<div class="flex items-center gap-2">
+    <div class="w-16 bg-outline-variant rounded-full h-2"><div class="${color} rounded-full" style="width:${Math.round((score / 10) * 100)}%"></div></div>
+    <span class="text-data-tabular text-on-surface">${score}</span>
+  </div>`;
 }
 
-function renderSourceRows(rows) {
-  return rows.map((row) => {
-    const conversion = row.count ? Math.round((row.hired / row.count) * 100) : 0;
-    return `<tr class="hover:bg-highlight-soft transition-colors">
-      <td class="py-2 px-4 font-medium text-on-surface">${escapeLiveHtml(row.source)}</td>
-      <td class="py-2 px-4 text-data-tabular text-on-surface">${row.count}</td>
-      <td class="py-2 px-4 text-data-tabular text-success-text">${row.hired}</td>
-      <td class="py-2 px-4 text-data-tabular text-on-surface">${conversion}%</td>
-    </tr>`;
-  }).join("");
-}
-
-function renderSourceEffectiveness(candidates) {
-  const rows = buildSourceRows(candidates);
+function renderSourceEffectivenessTable(rows) {
   const tbody = document.querySelector(".workspace-surface tbody");
   if (!tbody) return;
   tbody.innerHTML = rows.length
-    ? renderSourceRows(rows)
-    : `<tr><td class="px-4 py-6 text-text-muted" colspan="4">No source effectiveness data available.</td></tr>`;
+    ? rows.map((row) => {
+        const conversion = row.conversion_rate;
+        const badgeClass = conversion == null ? "bg-surface-alt text-text-muted" : conversion >= 20 ? "bg-success-bg text-success" : conversion >= 10 ? "bg-warning-bg text-warning" : "bg-surface-alt text-on-surface";
+        return `<tr class="hover:bg-highlight-soft transition-colors">
+      <td class="px-4 py-3 font-medium text-on-surface">${escapeLiveHtml(row.source)}</td>
+      <td class="px-4 py-3 text-data-tabular text-on-surface">${row.candidates}</td>
+      <td class="px-4 py-3 text-data-tabular text-success">${row.hired}</td>
+      <td class="px-4 py-3"><span class="px-2 py-0.5 rounded ${badgeClass} text-label-caps font-semibold">${conversion == null ? "—" : `${conversion}%`}</span></td>
+      <td class="px-4 py-3">${sourceQualityMeta(row)}</td>
+    </tr>`;
+      }).join("")
+    : `<tr><td class="px-4 py-6 text-text-muted" colspan="5">No candidate source data available yet.</td></tr>`;
+}
+
+function slaRowStatus(row) {
+  if (row.status === "closed" || row.status === "filled") {
+    return row.current_days <= row.sla_target_days
+      ? { label: "Met", badge: "bg-success-bg text-success" }
+      : { label: `Breached (+${row.current_days - row.sla_target_days}d)`, badge: "bg-danger-bg text-danger" };
+  }
+  const over = row.current_days - row.sla_target_days;
+  if (over > 0) return { label: `Overdue +${over}d`, badge: "bg-danger-bg text-danger" };
+  if (over > -6) return { label: "At risk", badge: "bg-warning-bg text-warning" };
+  return { label: "On track", badge: "bg-success-bg text-success" };
+}
+
+function renderSlaTrackerTable(rows) {
+  const tbody = document.querySelector(".workspace-surface tbody");
+  if (!tbody) return;
+  tbody.innerHTML = rows.length
+    ? rows.slice(0, 50).map((row) => {
+        const status = slaRowStatus(row);
+        return `<tr class="hover:bg-highlight-soft transition-colors">
+      <td class="px-4 py-3 font-medium text-on-surface">${escapeLiveHtml(row.mandate)}</td>
+      <td class="px-4 py-3 text-body-sm text-on-surface">${escapeLiveHtml(row.client || "—")}</td>
+      <td class="px-4 py-3 text-data-tabular text-on-surface">${row.sla_target_days}d</td>
+      <td class="px-4 py-3 text-data-tabular text-on-surface">${row.current_days}d</td>
+      <td class="px-4 py-3"><span class="px-2 py-0.5 rounded ${status.badge} text-label-caps font-semibold">${status.label}</span></td>
+      <td class="px-4 py-3 text-body-sm text-on-surface">${escapeLiveHtml(row.owner || "—")}</td>
+    </tr>`;
+      }).join("")
+    : `<tr><td class="px-4 py-6 text-text-muted" colspan="6">No requisitions to track yet.</td></tr>`;
 }/* ═══════════════════════════════════════════════════════════════
    MEETING RENDERERS
    ═══════════════════════════════════════════════════════════════ */

@@ -131,12 +131,6 @@ function resolveContextualRoute(button) {
   }
 
   if (routeId === "client-directory") {
-    if (/add client/.test(label)) return "client-create-or-edit-drawer.html";
-    if (/view detail/.test(label)) return "client-detail.html";
-    if (/new requisition/.test(label)) return "requisition-intake.html";
-  }
-
-  if (routeId === "client-create-or-edit-drawer") {
     if (/view detail/.test(label)) return "client-detail.html";
     if (/new requisition/.test(label)) return "requisition-intake.html";
   }
@@ -146,27 +140,11 @@ function resolveContextualRoute(button) {
     if (/^setup$/.test(label)) return "location-management.html";
   }
 
-  if (routeId === "location-form-drawer") {
-    if (/^admin$/.test(label)) return "role-dashboard.html";
-    if (/^setup$/.test(label)) return "location-management.html";
-    if (/create location/.test(label)) return "location-form-drawer.html";
-    if (/^edit$/.test(label)) return "location-form-drawer.html";
-  }
-
   if (routeId === "role-management") {
-    if (/create new role/.test(label)) return "role-form-drawer.html";
     if (/\\b\\d+\\s+users?\\b/.test(label)) return "user-management.html";
-    if (/edit permissions/.test(label)) return "role-form-drawer.html";
   }
 
   if (routeId === "user-management") {
-    if (/add user/.test(label)) return "user-form-drawer.html";
-    if (/^edit$/.test(label)) return "user-form-drawer.html";
-    if (/edit user/.test(label)) return "user-form-drawer.html";
-  }
-
-  if (routeId === "user-form-drawer") {
-    if (/edit user/.test(label)) return "user-form-drawer.html";
   }
 
   if (routeId === "role-dashboard") {
@@ -242,11 +220,6 @@ function resolveContextualRoute(button) {
 
   if (routeId === "stage-move-dialog") {
     if (/confirm transition|move stage/.test(label)) return "pipeline-board.html";
-  }
-
-  if (routeId === "role-form-drawer") {
-    if (/\\b\\d+\\s+users?\\b/.test(label)) return "user-management.html";
-    if (/edit permissions/.test(label)) return "role-form-drawer.html";
   }
 
   if (routeId === "login") {
