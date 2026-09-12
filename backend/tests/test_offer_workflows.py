@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from tests.stubs import make_user_record
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters
 from app.services.offers import create_offer_service, get_offer_detail_service, list_offers_service, update_offer_decision_service
 
@@ -112,7 +113,7 @@ def test_create_offer_rejects_missing_application(monkeypatch) -> None:
 def test_create_offer_succeeds_and_routes_approval(monkeypatch) -> None:
     captured = {}
     monkeypatch.setattr("app.services.offers.find_pipeline_application_by_id", lambda *args, **kwargs: _application())
-    monkeypatch.setattr("app.services.offers.find_user_by_id", lambda *args, **kwargs: SimpleNamespace(id=601))
+    monkeypatch.setattr("app.services.offers.find_user_by_id", lambda *args, **kwargs: make_user_record(user_id=601))
 
     def fake_create(_engine, payload, *, location_id, actor_user_id):
         captured["location_id"] = location_id

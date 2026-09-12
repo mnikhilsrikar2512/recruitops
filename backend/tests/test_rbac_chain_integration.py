@@ -17,6 +17,8 @@ import time
 import uuid
 
 import pytest
+
+from tests.stubs import make_role_record, make_user_record
 from fastapi.testclient import TestClient
 
 from app.api.deps import _has_permission
@@ -292,11 +294,10 @@ class TestLastAdminGuardUnit:
 
     @staticmethod
     def _admin_record() -> object:
-        from types import SimpleNamespace
-
-        return SimpleNamespace(
-            id=1,
+        return make_user_record(
+            user_id=1,
             primary_role_id=1,
+            primary_role_name="Admin",
             primary_role_code="admin",
             primary_location_id=1,
         )
@@ -392,12 +393,11 @@ class TestLastAdminDeactivateGuardUnit:
 
     @staticmethod
     def _admin_record() -> object:
-        from types import SimpleNamespace
-
-        return SimpleNamespace(
-            id=1,
+        return make_user_record(
+            user_id=1,
             status="active",
             primary_role_id=1,
+            primary_role_name="Admin",
             primary_role_code="admin",
             primary_location_id=1,
         )
@@ -491,12 +491,11 @@ class TestAdminRoleProtectionUnit:
 
     @staticmethod
     def _admin_role() -> object:
-        from types import SimpleNamespace
-
-        return SimpleNamespace(
-            id=1, code="admin", name="Administrator", description=None,
-            is_system_role=True, status="active", created_by_user_id=None,
-            created_at=None, updated_at=None,
+        return make_role_record(
+            role_id=1,
+            code="admin",
+            name="Administrator",
+            is_system_role=True,
         )
 
     def test_guard_blocks_partial_set(self, monkeypatch) -> None:
@@ -605,12 +604,11 @@ class TestLastAdminPatchGuards:
 
     @staticmethod
     def _admin_record() -> object:
-        from types import SimpleNamespace
-
-        return SimpleNamespace(
-            id=1,
+        return make_user_record(
+            user_id=1,
             status="active",
             primary_role_id=1,
+            primary_role_name="Admin",
             primary_role_code="admin",
             primary_location_id=1,
         )

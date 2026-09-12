@@ -6,20 +6,18 @@ from fastapi import HTTPException
 from app.schemas.user import UserDeactivateRequest
 from app.services.auth import AuthContext
 from app.services.users import deactivate_user_service
+from tests.stubs import make_user_record
 
 
 def _auth_context(user_id: int, location_id: int | None, role_code: str = "admin") -> AuthContext:
+    from types import SimpleNamespace
+
     user = SimpleNamespace(id=user_id, location_id=location_id, role_code=role_code)
     return AuthContext(session_id=1, session_token_hash="token", user=user)
 
 
 def _user_record(status: str = "active", location_id: int = 4) -> SimpleNamespace:
-    return SimpleNamespace(
-        id=22,
-        status=status,
-        primary_location_id=location_id,
-        primary_role_code="recruiter",
-    )
+    return make_user_record(status=status, primary_location_id=location_id)
 
 
 def test_deactivate_user_requires_review_when_active_work_exists(monkeypatch) -> None:
@@ -59,7 +57,7 @@ def test_deactivate_user_succeeds_with_transfer_and_audit(monkeypatch) -> None:
     captured = {}
     monkeypatch.setattr(
         "app.services.users.find_user_by_id",
-        lambda engine, user_id: existing if user_id == 22 else SimpleNamespace(id=30, status="active", primary_location_id=4, primary_role_code="recruiter"),
+        lambda engine, user_id: existing if user_id == 22 else make_user_record(user_id=30, primary_location_id=4),
     )
     monkeypatch.setattr("app.services.users.count_user_active_requisitions", lambda *args, **kwargs: 1)
     monkeypatch.setattr("app.services.users.count_user_active_assignments", lambda *args, **kwargs: 2)

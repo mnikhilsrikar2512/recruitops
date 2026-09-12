@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from tests.stubs import make_user_record
 from app.schemas.interview import InterviewCreate, InterviewFeedbackUpdate, InterviewListFilters
 from app.services.interviews import create_interview_service, get_interview_detail_service, list_interviews_service, update_interview_feedback_service
 
@@ -109,7 +110,7 @@ def test_create_interview_rejects_missing_application(monkeypatch) -> None:
 
 def test_create_interview_succeeds_with_valid_refs(monkeypatch) -> None:
     monkeypatch.setattr("app.services.interviews.find_pipeline_application_by_id", lambda *args, **kwargs: _application())
-    monkeypatch.setattr("app.services.interviews.find_user_by_id", lambda *args, **kwargs: SimpleNamespace(id=601))
+    monkeypatch.setattr("app.services.interviews.find_user_by_id", lambda *args, **kwargs: make_user_record(user_id=601))
     monkeypatch.setattr("app.services.interviews.create_interview", lambda *args, **kwargs: _interview())
 
     response = create_interview_service(

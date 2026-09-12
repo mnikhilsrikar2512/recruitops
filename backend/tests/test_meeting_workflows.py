@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from tests.stubs import make_user_record
 from app.schemas.meeting import MeetingCreate, MeetingUpdate
 from app.services.meetings import create_meeting_service, get_meeting_detail_service, update_meeting_service
 
@@ -72,7 +73,7 @@ def test_create_meeting_rejects_unknown_client(monkeypatch) -> None:
 def test_create_meeting_rejects_owner_from_other_location(monkeypatch) -> None:
     monkeypatch.setattr("app.services.meetings.location_exists", lambda *args, **kwargs: True)
     monkeypatch.setattr("app.services.meetings.meeting_client_exists", lambda *args, **kwargs: True)
-    monkeypatch.setattr("app.services.meetings.find_user_by_id", lambda *args, **kwargs: SimpleNamespace(primary_location_id=8))
+    monkeypatch.setattr("app.services.meetings.find_user_by_id", lambda *args, **kwargs: make_user_record(primary_location_id=8))
 
     with pytest.raises(HTTPException) as exc_info:
         create_meeting_service(object(), _create_payload())
@@ -84,7 +85,7 @@ def test_create_meeting_rejects_owner_from_other_location(monkeypatch) -> None:
 def test_create_meeting_succeeds_with_valid_refs(monkeypatch) -> None:
     monkeypatch.setattr("app.services.meetings.location_exists", lambda *args, **kwargs: True)
     monkeypatch.setattr("app.services.meetings.meeting_client_exists", lambda *args, **kwargs: True)
-    monkeypatch.setattr("app.services.meetings.find_user_by_id", lambda *args, **kwargs: SimpleNamespace(primary_location_id=4))
+    monkeypatch.setattr("app.services.meetings.find_user_by_id", lambda *args, **kwargs: make_user_record(primary_location_id=4))
     monkeypatch.setattr("app.services.meetings.create_meeting", lambda *args, **kwargs: _meeting())
 
     response = create_meeting_service(object(), _create_payload())
@@ -95,7 +96,7 @@ def test_create_meeting_succeeds_with_valid_refs(monkeypatch) -> None:
 
 def test_update_meeting_records_outcome(monkeypatch) -> None:
     monkeypatch.setattr("app.services.meetings.find_meeting_by_id", lambda *args, **kwargs: _meeting())
-    monkeypatch.setattr("app.services.meetings.find_user_by_id", lambda *args, **kwargs: SimpleNamespace(primary_location_id=4))
+    monkeypatch.setattr("app.services.meetings.find_user_by_id", lambda *args, **kwargs: make_user_record(primary_location_id=4))
     monkeypatch.setattr(
         "app.services.meetings.update_meeting",
         lambda *args, **kwargs: _meeting(

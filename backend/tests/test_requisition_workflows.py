@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from tests.stubs import make_user_record
 from app.schemas.requisition import (
     RequisitionAssignmentCreate,
     RequisitionCreate,
@@ -80,9 +81,9 @@ def test_create_requisition_rejects_owner_from_other_location(monkeypatch) -> No
 
     def _find_user(engine, user_id):
         if user_id == 21:
-            return SimpleNamespace(id=21, primary_location_id=5)
+            return make_user_record(user_id=21, primary_location_id=5)
         if user_id == 22:
-            return SimpleNamespace(id=22, primary_location_id=4)
+            return make_user_record(user_id=22, primary_location_id=4)
         return None
 
     monkeypatch.setattr("app.services.requisitions.find_user_by_id", _find_user)
@@ -136,7 +137,7 @@ def test_create_requisition_succeeds_with_valid_mappings(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "app.services.requisitions.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(primary_location_id=4),
+        lambda *args, **kwargs: make_user_record(primary_location_id=4),
     )
     monkeypatch.setattr("app.services.requisitions.create_requisition", lambda *args, **kwargs: created)
 
@@ -203,7 +204,7 @@ def test_create_requisition_assignment_rejects_user_from_other_location(monkeypa
     monkeypatch.setattr("app.services.requisitions.find_requisition_by_id", lambda *args, **kwargs: requisition)
     monkeypatch.setattr(
         "app.services.requisitions.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(id=77, primary_location_id=9),
+        lambda *args, **kwargs: make_user_record(user_id=77, primary_location_id=9),
     )
 
     with pytest.raises(HTTPException) as exc_info:

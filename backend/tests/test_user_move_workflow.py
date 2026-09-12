@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from app.schemas.user import UserMoveRequest
 from app.services.auth import AuthContext
 from app.services.users import move_user_service
+from tests.stubs import make_user_record
 
 
 def _auth_context(user_id: int, location_id: int | None, role_code: str = "admin") -> AuthContext:
@@ -20,12 +21,11 @@ def _user_record(
     location_id: int = 4,
     role_id: int = 7,
 ) -> SimpleNamespace:
-    return SimpleNamespace(
-        id=user_id,
+    return make_user_record(
+        user_id=user_id,
         status=status,
         primary_location_id=location_id,
         primary_role_id=role_id,
-        primary_role_code="recruiter",
     )
 
 

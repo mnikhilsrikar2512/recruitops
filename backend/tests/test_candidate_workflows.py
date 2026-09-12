@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from tests.stubs import make_user_record
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDocumentCreate,
@@ -234,7 +235,7 @@ def test_finalize_candidate_succeeds_with_valid_context(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "app.services.candidates.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(id=22, primary_location_id=4),
+        lambda *args, **kwargs: make_user_record(user_id=22, primary_location_id=4),
     )
     monkeypatch.setattr("app.services.candidates._assert_user_exists", lambda *args, **kwargs: None)
     monkeypatch.setattr(

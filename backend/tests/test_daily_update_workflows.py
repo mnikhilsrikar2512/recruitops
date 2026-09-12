@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from tests.stubs import make_user_record
 from app.schemas.daily_update import DailyUpdateCreate
 from app.services.daily_updates import create_daily_update_service
 
@@ -34,7 +35,7 @@ def test_create_daily_update_rejects_missing_submitter(monkeypatch) -> None:
 def test_create_daily_update_rejects_wrong_location_submitter(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.daily_updates.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(id=22, primary_location_id=9),
+        lambda *args, **kwargs: make_user_record(user_id=22, primary_location_id=9),
     )
     monkeypatch.setattr(
         "app.services.daily_updates.find_requisition_by_id",
@@ -51,7 +52,7 @@ def test_create_daily_update_rejects_wrong_location_submitter(monkeypatch) -> No
 def test_create_daily_update_rejects_unlinked_submitter(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.daily_updates.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(id=22, primary_location_id=4),
+        lambda *args, **kwargs: make_user_record(user_id=22, primary_location_id=4),
     )
     monkeypatch.setattr(
         "app.services.daily_updates.find_requisition_by_id",
@@ -69,7 +70,7 @@ def test_create_daily_update_rejects_unlinked_submitter(monkeypatch) -> None:
 def test_create_daily_update_rejects_duplicate_same_date(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.daily_updates.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(id=22, primary_location_id=4),
+        lambda *args, **kwargs: make_user_record(user_id=22, primary_location_id=4),
     )
     monkeypatch.setattr(
         "app.services.daily_updates.find_requisition_by_id",
@@ -112,7 +113,7 @@ def test_create_daily_update_succeeds_when_valid(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "app.services.daily_updates.find_user_by_id",
-        lambda *args, **kwargs: SimpleNamespace(id=22, primary_location_id=4),
+        lambda *args, **kwargs: make_user_record(user_id=22, primary_location_id=4),
     )
     monkeypatch.setattr(
         "app.services.daily_updates.find_requisition_by_id",

@@ -10,6 +10,8 @@ from app.services.auth import (
     reset_password_service,
     setup_password_service,
 )
+from tests.stubs import make_login_user_record
+
 from app.schemas.auth import (
     PasswordChangeRequest,
     PasswordForgotRequest,
@@ -45,7 +47,7 @@ def test_change_password_succeeds_with_correct_password(monkeypatch) -> None:
     correct_hash = f"sha256:{sha256_hex('oldpassword')}"
     monkeypatch.setattr(
         "app.services.auth.find_user_for_login",
-        lambda engine, email: SimpleNamespace(password_hash=correct_hash),
+        lambda engine, email: make_login_user_record(password_hash=correct_hash),
     )
     captured = {}
     monkeypatch.setattr(
@@ -122,7 +124,7 @@ def test_forgot_password_always_returns_success_message(monkeypatch) -> None:
 def test_forgot_password_creates_token_for_existing_user(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.auth.find_user_by_email",
-        lambda engine, email: SimpleNamespace(id=22, status="active"),
+        lambda engine, email: make_login_user_record(),
     )
     captured = {}
     monkeypatch.setattr(

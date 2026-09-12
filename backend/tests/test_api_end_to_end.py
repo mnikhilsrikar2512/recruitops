@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 
 from app.main import create_application
 from app.api.deps import get_engine, get_current_auth_context
+from tests.stubs import make_login_user_record
+
 from app.services.auth import AuthContext
 
 
@@ -115,7 +117,7 @@ class TestForgotPasswordEndpoint:
     def test_forgot_password_existing_user_returns_200(self, monkeypatch):
         monkeypatch.setattr(
             "app.services.auth.find_user_by_email",
-            lambda engine, email: SimpleNamespace(id=22, status="active"),
+            lambda engine, email: make_login_user_record(),
         )
         monkeypatch.setattr(
             "app.services.auth.create_password_reset_token",
@@ -398,12 +400,9 @@ class TestLoginEndpoint:
         correct_hash = f"sha256:{sha256_hex('correctpass')}"
         monkeypatch.setattr(
             "app.services.auth.find_user_for_login",
-            lambda engine, email: SimpleNamespace(
-                id=22, email=email, password_hash=correct_hash,
-                status="active", role_code="recruiter", location_id=4,
-                full_name="Test User", business_title="Recruiter",
-                role_id=1, role_name="Recruiter", location_code="NYC",
-                location_name="New York", force_password_change_on_first_login=False,
+            lambda engine, email: make_login_user_record(
+                password_hash=correct_hash, role_id=1, location_id=4,
+                location_code="NYC", location_name="New York",
             ),
         )
         monkeypatch.setattr(
