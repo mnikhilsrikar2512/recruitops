@@ -830,7 +830,10 @@ function openEntityDialog({ id, title, fields, submitLabel = "Save", onSubmit, o
 
 function entitySelectOptions(items, labelKey, valueKey = "id") {
   return [{ value: "", label: "— Select —" }].concat(
-    (items || []).map((item) => ({ value: item[valueKey], label: item[labelKey] || `#${item[valueKey]}` })),
+    (items || []).map((item) => ({
+      value: item[valueKey],
+      label: item[labelKey] || item.name || item.location_name || `#${item[valueKey]}`,
+    })),
   );
 }
 
@@ -903,6 +906,11 @@ async function openUserDialog(userId, refresh) {
     apiRequest("/roles/?page_size=50").catch(() => ({ items: [] })),
     apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
   ]);
+  // The roles list is newest-first and capped, so the user's current role may
+  // be missing from the fetched page — inject it so the dropdown can show it.
+  if (user?.primary_role_id && !roles.items.some((r) => String(r.id) === String(user.primary_role_id))) {
+    roles.items.push({ id: user.primary_role_id, name: user.primary_role_name || `Role #${user.primary_role_id}` });
+  }
   openEntityDialog({
     id: "user-dialog-overlay",
     title: isEdit ? "Edit User" : "Add User",
@@ -913,7 +921,7 @@ async function openUserDialog(userId, refresh) {
       { name: "email", label: "Email", type: "email", required: true, value: user?.email || "", placeholder: "name@company.com" },
       { name: "phone", label: "Phone", value: user?.phone || "", placeholder: "Optional" },
       { name: "business_title", label: "Business Title", value: user?.business_title || "", placeholder: "e.g. Senior Recruiter" },
-      { name: "primary_role_id", label: "Role", type: "select", required: true, value: user?.primary_role_id ?? "", options: entitySelectOptions(roles.items, "role_name", "id") },
+      { name: "primary_role_id", label: "Role", type: "select", required: true, value: user?.primary_role_id ?? "", options: entitySelectOptions(roles.items, "name", "id") },
       { name: "primary_location_id", label: "Location", type: "select", value: user?.primary_location_id ?? user?.location_id ?? "", options: entitySelectOptions(locations.items, "location_name", "id") },
       { name: "status", label: "Status", type: "select", value: user?.status || "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
     ],
@@ -1093,9 +1101,9 @@ async function loadUsers() {
     const cells = row.querySelectorAll("td");
     paintStackedUserCell(cells[1], item.full_name, item.employee_code);
     paintPlainCell(cells[2], item.email);
-    paintPlainCell(cells[3], item.role || item.role_name);
-    paintPlainCell(cells[4], item.location_name);
-    paintPlainCell(cells[5], item.manager_name || "—");
+    paintPlainCell(cells[3], item.primary_role_name || item.role || item.role_name);
+    paintPlainCell(cells[4], item.primary_location_name || item.location_name);
+    paintPlainCell(cells[5], item.reporting_manager_name || item.manager_name || "—");
     paintStatusChip(cells[6], item.status);
   });
   wireEntityTableActions({

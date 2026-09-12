@@ -63,7 +63,7 @@ def _user_select_sql() -> str:
           u.phone,
           u.employee_code,
           u.status,
-          CAST(NULL AS NVARCHAR(100)) AS business_title,
+          u.business_title,
           ubr.branch_id AS primary_location_id,
           b.name AS primary_location_name,
           u.default_role_id AS primary_role_id,
@@ -341,6 +341,7 @@ def update_user(engine: Engine, user_id: int, payload: UserUpdate, before: UserR
         SET
           full_name = COALESCE(:full_name, full_name),
           phone = CASE WHEN :has_phone = 1 THEN :phone ELSE phone END,
+          business_title = CASE WHEN :has_business_title = 1 THEN :business_title ELSE business_title END,
           default_role_id = COALESCE(:primary_role_id, default_role_id),
           reporting_manager_user_id = CASE
             WHEN :has_reporting_manager_user_id = 1 THEN :reporting_manager_user_id
