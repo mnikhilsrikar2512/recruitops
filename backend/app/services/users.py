@@ -137,9 +137,7 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
         primary_role_id=payload.primary_role_id,
         reporting_manager_user_id=payload.reporting_manager_user_id,
         user_id_to_exclude=user_id,
-    )
-
-    # Never allow the last active admin to lose the admin role — this account
+    )    # Never allow the last active admin to lose the admin role — this account
     # is the only path to role/user configuration, so demoting it would lock
     # the workspace out of its own settings.
     next_role_id = payload.primary_role_id or existing.primary_role_id
@@ -151,7 +149,23 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot change the role of the last active admin",
-    )
+        )
+
+    # Status changes must not bypass the deactivate flow's lockout guard —
+    # PATCH with {"status": "inactive"} would otherwise suspend or
+    # deactivate the last active admin without any of the work-transfer
+    # review the dedicated endpoint enforces. Only non-active targets are
+    # blocked, so a legacy suspended admin can still be restored to active.
+    if (
+        payload.status is not None
+        and payload.status != "active"
+        and existing.primary_role_code == "admin"
+        and count_active_admins(engine) <= 1
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot deactivate the last active admin via status update; use the deactivate flow",
+        )
 
     updated = update_user(engine, user_id, payload, existing)
     return UserResponse.model_validate(updated)
@@ -367,6 +381,18 @@ def move_user_service(
     role_changed = next_primary_role_id != existing.primary_role_id
     if not location_changed and not role_changed:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User move does not change location or role")
+
+    # Moving is the third path that can strip the admin role — guard it like
+    # PATCH and deactivate so no endpoint can demote the last active admin.
+    if (
+        role_changed
+        and existing.primary_role_code == "admin"
+        and count_active_admins(engine) <= 1
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot change the role of the last active admin",
+        )
 
     _assert_transfer_target(engine, user_id, payload.transfer_to_user_id, existing.primary_location_id)
 

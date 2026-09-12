@@ -25,6 +25,7 @@ def _user_record(
         status=status,
         primary_location_id=location_id,
         primary_role_id=role_id,
+        primary_role_code="recruiter",
     )
 
 

@@ -596,3 +596,129 @@ class TestAdminRoleProtectionUnit:
             ),
         )
         assert response.permission_codes == ["a.read"]
+
+
+class TestLastAdminPatchGuards:
+    """PATCH /users/{id} writes both role and status, and move can change
+    the role — both were unguarded paths to lock out the last active admin
+    (PATCH {"status": "inactive"} was confirmed live with a 200)."""
+
+    @staticmethod
+    def _admin_record() -> object:
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            id=1,
+            status="active",
+            primary_role_id=1,
+            primary_role_code="admin",
+            primary_location_id=1,
+        )
+
+    @staticmethod
+    def _patch_admin(monkeypatch, count: int, payload: "object") -> None:
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(
+            users_service, "_assert_user_references", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: count)
+        try:
+            users_service.update_user_service(
+                engine=SimpleNamespace(), user_id=1, payload=payload
+            )
+        except HTTPException:
+            raise
+
+    def test_patch_cannot_set_last_admin_inactive(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(
+            users_service, "_assert_user_references", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+
+        with pytest.raises(HTTPException) as excinfo:
+            users_service.update_user_service(
+                engine=SimpleNamespace(),
+                user_id=1,
+                payload=users_service.UserUpdate(status="inactive"),
+            )
+        assert excinfo.value.status_code == 409
+        assert "last active admin" in excinfo.value.detail
+
+    def test_patch_status_allowed_when_multiple_admins(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(
+            users_service, "_assert_user_references", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(
+            users_service, "update_user", lambda engine, uid, payload, before: record
+        )
+        monkeypatch.setattr(
+            users_service,
+            "UserResponse",
+            SimpleNamespace(model_validate=lambda value: value),
+        )
+
+        result = users_service.update_user_service(
+            engine=SimpleNamespace(),
+            user_id=1,
+            payload=users_service.UserUpdate(status="inactive"),
+        )
+        assert result is record
+
+    def test_move_cannot_change_last_admin_role(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(
+            users_service, "_assert_user_references", lambda *args, **kwargs: None
+        )
+
+        with pytest.raises(HTTPException) as excinfo:
+            users_service.move_user_service(
+                engine=SimpleNamespace(),
+                user_id=1,
+                payload=users_service.UserMoveRequest(
+                    new_primary_role_id=999,
+                    new_primary_location_id=1,
+                    reason="guard probe",
+                    review_confirmed=True,
+                    transfer_to_user_id=None,
+                ),
+            )
+        assert excinfo.value.status_code == 409
+        assert "last active admin" in excinfo.value.detail
