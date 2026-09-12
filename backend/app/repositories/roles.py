@@ -181,6 +181,19 @@ def update_role(engine: Engine, role_id: int, payload: RoleUpdate) -> RoleRecord
     return find_role_by_id(engine, role_id) if row else None
 
 
+def list_all_permission_codes(engine: Engine) -> list[str]:
+    query = text(
+        """
+        SELECT p.code
+        FROM dbo.permissions AS p
+        ORDER BY p.code;
+        """
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [str(row["code"]) for row in rows]
+
+
 def list_permission_codes_for_role(engine: Engine, role_id: int) -> list[str]:
     query = text(
         """

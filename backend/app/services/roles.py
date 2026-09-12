@@ -6,6 +6,7 @@ from app.repositories.roles import (
     create_role,
     find_role_by_code,
     find_role_by_id,
+    list_all_permission_codes,
     list_permission_codes_for_role,
     list_roles,
     list_scope_rules_for_role,
@@ -102,6 +103,17 @@ def assign_role_permissions_service(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Role was not found",
+        )
+
+    # The admin role is the anchor of the permission bypass — stripping its
+    # permission rows corrupts seeds and any code that reads them, even though
+    # role_code-based bypass keeps working. Keep it all-access by definition.
+    if existing.code == "admin" and set(payload.permission_codes) != set(
+        list_all_permission_codes(engine)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The admin role must keep full access; its permissions cannot be changed",
         )
 
     permission_count = count_permissions_by_codes(engine, payload.permission_codes)

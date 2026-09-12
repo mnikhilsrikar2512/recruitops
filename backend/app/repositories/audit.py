@@ -16,11 +16,13 @@ def insert_audit_log(
     old_values: dict | None = None,
     new_values: dict | None = None,
 ) -> None:
+    """The audit_logs column is named branch_id; callers pass the app's
+    location_id, which is the same scoping concept."""
     query = text(
         """
         INSERT INTO dbo.audit_logs (
           actor_user_id,
-          location_id,
+          branch_id,
           entity_type,
           entity_id,
           action_type,

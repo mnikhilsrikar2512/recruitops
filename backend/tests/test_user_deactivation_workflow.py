@@ -18,6 +18,7 @@ def _user_record(status: str = "active", location_id: int = 4) -> SimpleNamespac
         id=22,
         status=status,
         primary_location_id=location_id,
+        primary_role_code="recruiter",
     )
 
 
@@ -58,7 +59,7 @@ def test_deactivate_user_succeeds_with_transfer_and_audit(monkeypatch) -> None:
     captured = {}
     monkeypatch.setattr(
         "app.services.users.find_user_by_id",
-        lambda engine, user_id: existing if user_id == 22 else SimpleNamespace(id=30, status="active", primary_location_id=4),
+        lambda engine, user_id: existing if user_id == 22 else SimpleNamespace(id=30, status="active", primary_location_id=4, primary_role_code="recruiter"),
     )
     monkeypatch.setattr("app.services.users.count_user_active_requisitions", lambda *args, **kwargs: 1)
     monkeypatch.setattr("app.services.users.count_user_active_assignments", lambda *args, **kwargs: 2)

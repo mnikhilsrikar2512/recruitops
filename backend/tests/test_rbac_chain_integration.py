@@ -358,3 +358,241 @@ class TestLastAdminGuardUnit:
             payload=users_service.UserUpdate(primary_role_id=999),
         )
         assert result is record
+
+
+class TestLastAdminDeactivateGuard:
+    """Deactivating the last active admin would lock the workspace out of
+    role/user configuration, so it must be refused (mirror of the role-change
+    guard on the other admin-lockout path)."""
+
+    def test_cannot_deactivate_last_active_admin(self, client, rbac_chain):
+        if TestLastAdminGuard._active_admin_count() > 1:
+            pytest.skip(
+                "multiple active admins exist; the last-admin guard is not applicable"
+            )
+        response = client.post(
+            f"/api/v1/users/{rbac_chain['admin_user_id']}/deactivate",
+            headers=rbac_chain["admin_headers"],
+            json={"review_confirmed": True, "transfer_to_user_id": None},
+        )
+        assert response.status_code == 409, response.text
+        assert "last active admin" in response.json()["detail"]
+
+    def test_admin_still_active_after_attempt(self, client, rbac_chain):
+        response = client.get(
+            f"/api/v1/users/{rbac_chain['admin_user_id']}",
+            headers=rbac_chain["admin_headers"],
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "active"
+
+
+class TestLastAdminDeactivateGuardUnit:
+    """Unit coverage that runs regardless of dev-database admin count."""
+
+    @staticmethod
+    def _admin_record() -> object:
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            id=1,
+            status="active",
+            primary_role_id=1,
+            primary_role_code="admin",
+            primary_location_id=1,
+        )
+
+    def test_guard_blocks_when_single_admin(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+
+        with pytest.raises(HTTPException) as excinfo:
+            users_service.deactivate_user_service(
+                engine=SimpleNamespace(),
+                user_id=1,
+                payload=users_service.UserDeactivateRequest(
+                    reason="test lockout probe",
+                    review_confirmed=True,
+                    transfer_to_user_id=None,
+                ),
+            )
+        assert excinfo.value.status_code == 409
+        assert "last active admin" in excinfo.value.detail
+
+    def test_guard_allows_when_multiple_admins(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        import app.services.users as users_service
+
+        record = self._admin_record()
+        monkeypatch.setattr(
+            users_service, "find_user_by_id", lambda engine, user_id: record
+        )
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        for count_fn in (
+            "count_user_active_requisitions",
+            "count_user_active_assignments",
+            "count_user_active_candidate_ownership",
+            "count_user_active_pipeline_ownership",
+        ):
+            monkeypatch.setattr(users_service, count_fn, lambda engine, user_id: 0)
+        monkeypatch.setattr(
+            users_service,
+            "transfer_active_user_work_and_deactivate",
+            lambda engine, user_id, transfer_to_user_id: record,
+        )
+
+        result = users_service.deactivate_user_service(
+            engine=SimpleNamespace(),
+            user_id=1,
+            payload=users_service.UserDeactivateRequest(
+                reason="test multi-admin probe",
+                review_confirmed=True,
+                transfer_to_user_id=None,
+            ),
+        )
+        assert result.user_id == 1
+        assert result.new_status == "active"
+
+
+class TestAdminRoleProtection:
+    """The admin role is the anchor of the permission bypass — its permission
+    set must stay equal to the full catalog."""
+
+    def test_admin_role_permissions_cannot_be_stripped(self, client, rbac_chain):
+        response = client.put(
+            "/api/v1/roles/1/permissions",
+            headers=rbac_chain["admin_headers"],
+            json={"permission_codes": ["candidate.read"], "scope_rules": {}},
+        )
+        assert response.status_code == 409, response.text
+        assert "full access" in response.json()["detail"]
+
+    def test_admin_role_permissions_unchanged_after_attempt(self, client, rbac_chain):
+        response = client.get(
+            "/api/v1/roles/1/permissions", headers=rbac_chain["admin_headers"]
+        )
+        assert response.status_code == 200, response.text
+        assert len(response.json()["permission_codes"]) > 1
+
+
+class TestAdminRoleProtectionUnit:
+    """Unit coverage: guard fires exactly when the submitted set differs from
+    the full catalog, and passes through when it matches."""
+
+    @staticmethod
+    def _admin_role() -> object:
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            id=1, code="admin", name="Administrator", description=None,
+            is_system_role=True, status="active", created_by_user_id=None,
+            created_at=None, updated_at=None,
+        )
+
+    def test_guard_blocks_partial_set(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        import app.services.roles as roles_service
+
+        monkeypatch.setattr(
+            roles_service, "find_role_by_id", lambda engine, role_id: self._admin_role()
+        )
+        monkeypatch.setattr(
+            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
+        )
+
+        with pytest.raises(HTTPException) as excinfo:
+            roles_service.assign_role_permissions_service(
+                engine=SimpleNamespace(),
+                role_id=1,
+                payload=roles_service.RolePermissionsUpdate(
+                    permission_codes=["a.read"], scope_rules={}
+                ),
+            )
+        assert excinfo.value.status_code == 409
+        assert "full access" in excinfo.value.detail
+
+    def test_guard_passes_full_catalog(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        import app.services.roles as roles_service
+
+        monkeypatch.setattr(
+            roles_service, "find_role_by_id", lambda engine, role_id: self._admin_role()
+        )
+        monkeypatch.setattr(
+            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
+        )
+        monkeypatch.setattr(
+            roles_service, "count_permissions_by_codes", lambda engine, codes: len(codes)
+        )
+        monkeypatch.setattr(
+            roles_service, "replace_role_permissions", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(
+            roles_service,
+            "list_permission_codes_for_role",
+            lambda engine, role_id: ["a.read", "b.read"],
+        )
+        monkeypatch.setattr(
+            roles_service, "list_scope_rules_for_role", lambda engine, role_id: {}
+        )
+
+        response = roles_service.assign_role_permissions_service(
+            engine=SimpleNamespace(),
+            role_id=1,
+            payload=roles_service.RolePermissionsUpdate(
+                permission_codes=["a.read", "b.read"], scope_rules={}
+            ),
+        )
+        assert response.permission_codes == ["a.read", "b.read"]
+
+    def test_guard_does_not_touch_non_admin_roles(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        import app.services.roles as roles_service
+
+        role = self._admin_role()
+        role.code = "recruiter"
+        role.is_system_role = False
+        monkeypatch.setattr(
+            roles_service, "find_role_by_id", lambda engine, role_id: role
+        )
+        monkeypatch.setattr(
+            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
+        )
+        monkeypatch.setattr(
+            roles_service, "count_permissions_by_codes", lambda engine, codes: len(codes)
+        )
+        monkeypatch.setattr(
+            roles_service, "replace_role_permissions", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(
+            roles_service,
+            "list_permission_codes_for_role",
+            lambda engine, role_id: ["a.read"],
+        )
+        monkeypatch.setattr(
+            roles_service, "list_scope_rules_for_role", lambda engine, role_id: {}
+        )
+
+        response = roles_service.assign_role_permissions_service(
+            engine=SimpleNamespace(),
+            role_id=2,
+            payload=roles_service.RolePermissionsUpdate(
+                permission_codes=["a.read"], scope_rules={}
+            ),
+        )
+        assert response.permission_codes == ["a.read"]

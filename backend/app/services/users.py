@@ -249,6 +249,13 @@ def deactivate_user_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User was not found")
     if existing.status == "inactive":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is already inactive")
+    # Same lockout rule as the role-change guard: the workspace must always
+    # keep at least one active admin account.
+    if existing.primary_role_code == "admin" and count_active_admins(engine) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot deactivate the last active admin",
+        )
 
     actor_location_id = existing.primary_location_id
     _assert_transfer_target(engine, user_id, payload.transfer_to_user_id, actor_location_id)
