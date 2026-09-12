@@ -762,88 +762,111 @@ def find_duplicate_review_case_by_id(engine: Engine, case_id: int) -> DuplicateR
 
 
 def finalize_candidate_into_requisition(engine: Engine, candidate_id: int, payload: CandidateFinalizePayload) -> CandidateFinalizeRecord:
-    query = text(
-        """
-        DECLARE @application_id TABLE (id BIGINT);
-
-        UPDATE dbo.candidates
-        SET
-          profile_status = N'active',
-          intake_stage = N'finalized',
-          finalized_at = SYSUTCDATETIME(),
-          duplicate_check_status = CASE
-            WHEN duplicate_check_status = N'not-started' THEN N'cleared'
-            ELSE duplicate_check_status
-          END,
-          updated_at = SYSUTCDATETIME()
-        WHERE id = :candidate_id;
-
-        INSERT INTO dbo.candidate_applications (
-          candidate_id,
-          requisition_id,
-          owner_user_id,
-          current_stage,
-          screening_status,
-          application_status,
-          applied_at,
-          stage_updated_at
-        )
-        OUTPUT INSERTED.id INTO @application_id(id)
-        SELECT
-          :candidate_id,
-          :requisition_id,
-          :owner_user_id,
-          :initial_stage,
-          N'pending',
-          N'active',
-          SYSUTCDATETIME(),
-          SYSUTCDATETIME()
-        FROM dbo.requisitions AS r
-        WHERE r.id = :requisition_id;
-
-        INSERT INTO dbo.candidate_stage_history (
-          candidate_application_id,
-          from_stage,
-          to_stage,
-          change_reason,
-          changed_by_user_id,
-          changed_at,
-          source_type
-        )
-        SELECT
-          id,
-          NULL,
-          :initial_stage,
-          N'Candidate finalized into requisition pipeline',
-          :finalized_by_user_id,
-          SYSUTCDATETIME(),
-          N'manual'
-        FROM @application_id;
-
-        SELECT
-          c.id AS candidate_id,
-          ca.requisition_id,
-          ca.id AS application_id,
-          ca.current_stage,
-          ca.application_status,
-          c.finalized_at
-        FROM dbo.candidates AS c
-        INNER JOIN dbo.candidate_applications AS ca
-          ON ca.id = (SELECT TOP 1 id FROM @application_id)
-        WHERE c.id = :candidate_id;
-        """
-    )
+    """Run as discrete statements inside one transaction: with this ODBC
+    driver, a single batch that mixes DML with a trailing SELECT returns no
+    rows, so the historical table-variable batch silently produced 500s."""
     with engine.begin() as connection:
-        row = connection.execute(
-            query,
+        connection.execute(
+            text(
+                """
+                UPDATE dbo.candidates
+                SET
+                  profile_status = N'active',
+                  intake_stage = N'finalized',
+                  finalized_at = SYSUTCDATETIME(),
+                  duplicate_check_status = CASE
+                    WHEN duplicate_check_status = N'not-started' THEN N'cleared'
+                    ELSE duplicate_check_status
+                  END,
+                  updated_at = SYSUTCDATETIME()
+                WHERE id = :candidate_id;
+                """
+            ),
+            {"candidate_id": candidate_id},
+        )
+        application_id = connection.execute(
+            text(
+                """
+                INSERT INTO dbo.candidate_applications (
+                  candidate_id,
+                  requisition_id,
+                  owner_user_id,
+                  current_stage,
+                  screening_status,
+                  application_status,
+                  applied_at,
+                  stage_updated_at
+                )
+                OUTPUT INSERTED.id
+                SELECT
+                  :candidate_id,
+                  :requisition_id,
+                  :owner_user_id,
+                  :initial_stage,
+                  N'pending',
+                  N'active',
+                  SYSUTCDATETIME(),
+                  SYSUTCDATETIME()
+                FROM dbo.requisitions AS r
+                WHERE r.id = :requisition_id;
+                """
+            ),
             {
                 "candidate_id": candidate_id,
                 "requisition_id": payload.requisition_id,
-                "submitted_by_user_id": payload.submitted_by_user_id,
                 "owner_user_id": payload.owner_user_id,
+                "initial_stage": payload.initial_stage,
+            },
+        ).scalar_one_or_none()
+        if application_id is None:
+            raise RuntimeError("Requisition was not found")
+
+        connection.execute(
+            text(
+                """
+                INSERT INTO dbo.candidate_stage_history (
+                  candidate_application_id,
+                  from_stage,
+                  to_stage,
+                  change_reason,
+                  changed_by_user_id,
+                  changed_at,
+                  source_type
+                )
+                VALUES (
+                  :application_id,
+                  NULL,
+                  :initial_stage,
+                  N'Candidate finalized into requisition pipeline',
+                  :finalized_by_user_id,
+                  SYSUTCDATETIME(),
+                  N'manual'
+                );
+                """
+            ),
+            {
+                "application_id": application_id,
                 "initial_stage": payload.initial_stage,
                 "finalized_by_user_id": payload.finalized_by_user_id or payload.owner_user_id,
             },
+        )
+        row = connection.execute(
+            text(
+                """
+                SELECT
+                  c.id AS candidate_id,
+                  ca.requisition_id,
+                  ca.id AS application_id,
+                  ca.current_stage,
+                  ca.application_status,
+                  c.finalized_at
+                FROM dbo.candidates AS c
+                INNER JOIN dbo.candidate_applications AS ca
+                  ON ca.id = :application_id
+                WHERE c.id = :candidate_id;
+                """
+            ),
+            {"application_id": application_id, "candidate_id": candidate_id},
         ).mappings().one()
     return CandidateFinalizeRecord(
         candidate_id=row["candidate_id"],
