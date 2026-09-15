@@ -2256,6 +2256,72 @@ async function loadDashboards() {
       pcts[4].textContent = Math.round((joined / total) * 100) + "%";
     }
   }
+
+  /* Revenue by Client chart */
+  const revenueContainer = document.querySelector("[data-live-revenue-chart]");
+  if (revenueContainer && typeof renderBarChart !== "undefined") {
+    try {
+      const placements = await apiRequest("/reports/placements").catch(() => ({ rows: [] }));
+      const clientRevenue = {};
+      (placements.rows || []).forEach((row) => {
+        const client = row.client || "Unknown";
+        clientRevenue[client] = (clientRevenue[client] || 0) + (row.revenue || 0);
+      });
+      const revenueData = Object.entries(clientRevenue)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([client, revenue]) => ({
+          label: client.length > 12 ? client.slice(0, 12) + "..." : client,
+          value: Math.round(revenue)
+        }));
+      if (revenueData.length) {
+        renderBarChart(revenueContainer, revenueData, { color: "#1E293B", label: "revenue" });
+      } else {
+        revenueContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">No placement revenue this month</div>';
+      }
+    } catch (e) {
+      revenueContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">Revenue data unavailable</div>';
+    }
+  }
+
+  /* Recruiter Performance chart */
+  const recruiterContainer = document.querySelector("[data-live-recruiter-chart]");
+  if (recruiterContainer && typeof renderBarChart !== "undefined") {
+    try {
+      const [users, reqs, cands] = await Promise.all([
+        apiRequest("/users/?page_size=100").catch(() => ({ items: [] })),
+        apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
+        apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] })),
+      ]);
+      const userMap = {};
+      (users.items || []).forEach((u) => { userMap[u.id] = u.full_name || u.email; });
+      const reqCounts = {};
+      (reqs.items || []).forEach((r) => {
+        const owner = userMap[r.owner_user_id] || "Unassigned";
+        reqCounts[owner] = (reqCounts[owner] || 0) + 1;
+      });
+      const candCounts = {};
+      (cands.items || []).forEach((c) => {
+        const owner = userMap[c.owner_user_id] || userMap[c.sourced_by_user_id] || "Unassigned";
+        candCounts[owner] = (candCounts[owner] || 0) + 1;
+      });
+      const allNames = [...new Set([...Object.keys(reqCounts), ...Object.keys(candCounts)])];
+      const recruiterData = allNames
+        .map((name) => ({
+          label: name.length > 10 ? name.slice(0, 10) + "..." : name,
+          value: (reqCounts[name] || 0) + (candCounts[name] || 0)
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+      if (recruiterData.length) {
+        renderBarChart(recruiterContainer, recruiterData, { color: "#4B5257", label: "recruiter" });
+      } else {
+        recruiterContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">No recruiter activity yet</div>';
+      }
+    } catch (e) {
+      recruiterContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">Recruiter data unavailable</div>';
+    }
+  }
 }
 
 
