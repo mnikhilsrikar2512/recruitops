@@ -771,7 +771,7 @@ async function loadLocations() {
    error display; callers supply fields + a submit handler.
    ═══════════════════════════════════════════════════════════════ */
 
-function openEntityDialog({ id, title, fields, submitLabel = "Save", onSubmit, onClose }) {
+function openEntityDialog({ id, title, fields, submitLabel = "Save", onSubmit, onClose, onChange }) {
   const existingOverlay = document.getElementById(id);
   if (existingOverlay) existingOverlay.remove();
   const wrapper = document.createElement("div");
@@ -779,16 +779,17 @@ function openEntityDialog({ id, title, fields, submitLabel = "Save", onSubmit, o
   wrapper.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
   const fieldHtml = fields.map((field) => {
     const value = field.value == null ? "" : String(field.value);
+    const hintHtml = field.hint ? `<span class="mt-1 block text-[11px] leading-snug text-text-muted">${escapeHtml(field.hint)}</span>` : "";
     if (field.type === "select") {
       const options = (field.options || []).map((option) =>
         `<option value="${escapeHtml(String(option.value))}" ${String(option.value) === String(field.value) ? "selected" : ""}>${escapeHtml(option.label)}</option>`,
       ).join("");
-      return `<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeHtml(field.label)}</span><select id="${field.name}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary">${options}</select></label>`;
+      return `<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeHtml(field.label)}</span><select id="${field.name}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary">${options}</select>${hintHtml}</label>`;
     }
     const commonClass = field.readonly
       ? "mt-1 w-full rounded-lg border border-border bg-surface-variant px-3 py-2 text-text-muted text-sm"
       : "mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary";
-    return `<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeHtml(field.label)}</span><input id="${field.name}" name="${field.name}" type="${field.type || "text"}" ${field.required ? "required" : ""} ${field.readonly ? "readonly" : ""} placeholder="${escapeHtml(field.placeholder || "")}" value="${escapeHtml(value)}" class="${commonClass}" /></label>`;
+    return `<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeHtml(field.label)}</span><input id="${field.name}" name="${field.name}" type="${field.type || "text"}" ${field.required ? "required" : ""} ${field.readonly ? "readonly" : ""} ${field.step ? `step="${field.step}"` : ""} ${field.min != null ? `min="${field.min}"` : ""} ${field.max != null ? `max="${field.max}"` : ""} ${field.accept ? `accept="${field.accept}"` : ""} placeholder="${escapeHtml(field.placeholder || "")}" value="${escapeHtml(value)}" class="${commonClass}" />${hintHtml}</label>`;
   }).join("");
   wrapper.innerHTML = `<div class="bg-surface rounded-xl border border-border shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
     <div class="flex items-center justify-between mb-4">
@@ -825,6 +826,13 @@ function openEntityDialog({ id, title, fields, submitLabel = "Save", onSubmit, o
       errorEl.classList.remove("hidden");
     }
   };
+  /* Optional live rewiring: callers can react to field changes (e.g. filter
+     the owner dropdown when the client's location changes). */
+  if (onChange) {
+    fields.forEach((field) => {
+      wrapper.querySelector(`#${field.name}`)?.addEventListener("change", (event) => onChange(field.name, event.target.value));
+    });
+  }
   return wrapper;
 }
 
@@ -987,35 +995,91 @@ async function openClientDialog(clientId, refresh) {
   }
   const session = RecruitOpsLive.session || readSession();
   const locations = await apiRequest("/locations/?page_size=100").catch(() => ({ items: [] }));
+  /* Owners must belong to the client's location (location-integrity rule), so
+     fetch staff once; the owner dropdown is filtered live as the location
+     changes. Admins can own a client in another office — they just have to be
+     one of that office's people. */
+  /* Owners must belong to the client's location (location-integrity rule), so
+     fetch staff filtered to a location — the server caps pages at 100 and a
+     location-scoped list is always complete. Re-fetched as location changes. */
+  const canReadUsers = isAdmin() || hasPermission("user.read");
+  const users = canReadUsers && session?.location_id
+    ? await apiRequest(`/users/?page_size=100&location_id=${session.location_id}`).catch(() => ({ items: [] }))
+    : { items: [] };
+  /* One owner-option builder shared by the initial paint and location changes. */
+  const ownerOptionsFor = (locationId) => {
+    const eligible = (users.items || []).filter((u) => u.status === "active");
+    const options = eligible.map((u) => ({ value: u.id, label: u.id === session?.user_id ? `${u.full_name} (you)` : u.full_name }));
+    if (locationId === session?.location_id && !eligible.some((u) => u.id === session?.user_id)) {
+      options.unshift({ value: session?.user_id ?? "", label: "You" });
+    }
+    return options;
+  };
+  /* Location only drives the create path (the backend does not support moving
+     a client between locations), so it is a create-only field. It defaults to
+     the creator's own location, which the location-integrity rules require the
+     client owner to belong to. */
   openEntityDialog({
     id: "client-dialog-overlay",
     title: isEdit ? "Edit Client" : "Add Client",
     submitLabel: isEdit ? "Save Changes" : "Create Client",
     onClose: refresh,
-    fields: [
+    fields: isEdit ? [
       { name: "client_name", label: "Client Name", required: true, value: client?.client_name || "", placeholder: "e.g. Acme Corp" },
-      { name: "client_code", label: "Client Code", value: client?.client_code || "", placeholder: "Auto-generated if blank", readonly: isEdit },
       { name: "industry", label: "Industry", value: client?.industry || "", placeholder: "e.g. Technology" },
-      { name: "location_id", label: "Location", type: "select", value: client?.location_id ?? "", options: entitySelectOptions(locations.items, "location_name", "id") },
       { name: "status", label: "Status", type: "select", value: client?.status || "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+      { name: "placement_fee_pct", label: "Placement Fee %", type: "number", value: client?.placement_fee_pct ?? "", placeholder: "e.g. 8.33", step: "0.01", min: 0, max: 100, hint: "Used to compute revenue on the placements and client-summary reports." },
       { name: "notes", label: "Commercial Notes", value: client?.notes || "", placeholder: "Optional" },
+    ] : [
+      { name: "client_name", label: "Client Name", required: true, value: "", placeholder: "e.g. Acme Corp" },
+      { name: "client_code", label: "Client Code", value: "", placeholder: "Auto-generated if blank" },
+      { name: "industry", label: "Industry", value: "", placeholder: "e.g. Technology" },
+      { name: "location_id", label: "Location", type: "select", value: session?.location_id ?? "", options: entitySelectOptions(locations.items, "location_name", "id"), hint: session?.location_name ? `You work from ${session.location_name}. Clients belong to one office — pick a different one only if this client is owned there.` : "Clients belong to one office." },
+      { name: "client_owner_user_id", label: "Client Owner", type: "select", value: session?.user_id ?? "", options: ownerOptionsFor(session?.location_id) },
+      { name: "status", label: "Status", type: "select", value: "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+      { name: "placement_fee_pct", label: "Placement Fee %", type: "number", value: "", placeholder: "e.g. 8.33", step: "0.01", min: 0, max: 100, hint: "Used to compute revenue on the placements and client-summary reports." },
+      { name: "notes", label: "Commercial Notes", value: "", placeholder: "Optional" },
     ],
+    onChange: async (fieldName, newValue) => {
+      /* Owners must belong to the chosen location — refetch for it. */
+      if (fieldName !== "location_id" || isEdit) return;
+      const ownerSelect = document.querySelector("#client-dialog-overlay #client_owner_user_id");
+      if (!ownerSelect) return;
+      const chosenId = intOrNull(newValue) || session?.location_id;
+      if (canReadUsers && chosenId) {
+        const fresh = await apiRequest(`/users/?page_size=100&location_id=${chosenId}`).catch(() => ({ items: [] }));
+        users.items = fresh.items || [];
+      }
+      const options = ownerOptionsFor(chosenId);
+      ownerSelect.innerHTML = options.map((o) => `<option value="${escapeHtml(String(o.value))}">${escapeHtml(o.label)}</option>`).join("");
+      ownerSelect.value = options[0]?.value ?? "";
+    },
     onSubmit: async (values, close) => {
       const name = values.client_name.trim();
       if (!name) throw new Error("Client name is required.");
       if (isEdit) {
-        await apiRequest(`/clients/${clientId}`, { method: "PATCH", body: JSON.stringify({ client_name: name, industry: values.industry || null, status: values.status, notes: values.notes || null }) });
+        await apiRequest(`/clients/${clientId}`, { method: "PATCH", body: JSON.stringify({ client_name: name, industry: values.industry || null, status: values.status, notes: values.notes || null, placement_fee_pct: values.placement_fee_pct === "" ? null : intOrNull(values.placement_fee_pct) === null ? null : Number(values.placement_fee_pct) }) });
       } else {
+        const chosenLocationId = intOrNull(values.location_id) || session?.location_id;
+        const ownerId = intOrNull(values.client_owner_user_id) || session?.user_id;
+        if (!ownerId) throw new Error("Select a client owner who belongs to the chosen location.");
         await apiRequest("/clients/", { method: "POST", body: JSON.stringify({
           client_name: name,
           client_code: values.client_code.trim() || null,
           industry: values.industry || null,
-          location_id: intOrNull(values.location_id) || session?.location_id,
-          client_owner_user_id: session?.user_id,
-          business_source_owner_user_id: session?.user_id,
+          location_id: chosenLocationId,
+          client_owner_user_id: ownerId,
+          business_source_owner_user_id: ownerId,
           status: values.status,
           notes: values.notes || null,
+          placement_fee_pct: values.placement_fee_pct === "" ? null : Number(values.placement_fee_pct),
         }) });
+        /* Warn when the client belongs to a different office than the creator:
+           requisitions and users must also match that location downstream. */
+        if (chosenLocationId && session?.location_id && chosenLocationId !== session.location_id) {
+          const chosen = (locations.items || []).find((loc) => loc.id === chosenLocationId);
+          showToast("Client created in another location", `${name} belongs to ${chosen?.location_name || "that office"} — requisitions there must be staffed by users of the same location.`);
+        }
       }
       close();
       showToast(isEdit ? "Client updated" : "Client created", name);
@@ -2217,6 +2281,349 @@ function setMetricCardValue(labelText, valueText, hintHtml = "") {
   if (hint && hintHtml) hint.innerHTML = hintHtml;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   REPORT VIEWER — letterhead reports (placements / client summary)
+   One owner for the loaded report payload: reportState. The toolbar,
+   KPI strip, table, CSV export and print button all read from it.
+   ═══════════════════════════════════════════════════════════════ */
+const reportState = { type: "placements", data: null, columns: [], profile: null };
+
+function reportIsoDaysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function reportIsoDate(d) {
+  /* Local-date ISO string — toISOString() shifts by timezone (IST gave Aug 31 for Sep 1). */
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function reportDefaultPeriod() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { from: reportIsoDate(from), to: reportIsoDate(to) };
+}
+
+function reportFormatNumber(value) {
+  if (value == null || value === "") return "—";
+  return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function reportMoney(value, currency) {
+  if (value == null) return "—";
+  const num = Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return currency ? `${num} ${currency}` : num;
+}
+
+async function loadReportLetterhead() {
+  if (reportState.profile) return reportState.profile;
+  const profile = await apiRequest("/settings/profile").catch(() => null);
+  if (!profile) return null;
+  reportState.profile = profile;
+  setFirstText("#lh-company", profile.display_name || "Company");
+  const addressBits = [profile.registered_address, profile.hq_city, profile.hq_state, profile.country_name]
+    .filter(Boolean)
+    .filter((part, index, all) =>
+      /* Skip city/state/country when the street address already contains them. */
+      index === 0 || !all[0].toLowerCase().includes(part.toLowerCase())
+    );
+  setFirstText("#lh-address", addressBits.join(", "));
+  const contactBits = [profile.support_phone, profile.support_email, profile.website_url]
+    .filter(Boolean);
+  setFirstText("#lh-contact", contactBits.join(" · "));
+  if (profile.has_logo) {
+    const img = document.querySelector("#lh-logo");
+    const fallback = document.querySelector("#lh-logo-fallback");
+    if (img) {
+      img.src = `/api/v1/settings/logo?t=${Date.now()}`;
+      img.classList.remove("hidden");
+      if (fallback) fallback.classList.add("hidden");
+    }
+  }
+  return profile;
+}
+
+function renderReportKpis(kpis) {
+  const strip = document.querySelector("#report-kpis");
+  if (!strip) return;
+  strip.innerHTML = kpis
+    .map(
+      (k) => `
+      <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-label-caps font-bold text-text-muted uppercase tracking-wider">${escapeLiveHtml(k.label)}</span>
+          <span class="material-symbols-outlined text-[20px] text-primary">${k.icon || "bar_chart"}</span>
+        </div>
+        <p class="text-headline-md font-bold text-on-surface">${escapeLiveHtml(k.value)}</p>
+        ${k.hint ? `<p class="text-body-sm text-text-muted mt-1">${escapeLiveHtml(k.hint)}</p>` : ""}
+      </div>`
+    )
+    .join("");
+}
+
+function renderReportTable(columns, rows, footerRow) {
+  const head = document.querySelector("#report-table-head");
+  const body = document.querySelector("#report-table-body");
+  const foot = document.querySelector("#report-table-foot");
+  if (!head || !body) return;
+  head.innerHTML = `<tr>${columns.map((c) => `<th class="${c.num ? "num" : ""}">${escapeLiveHtml(c.label)}</th>`).join("")}</tr>`;
+  body.innerHTML = rows.length
+    ? rows
+        .map(
+          (row) =>
+            `<tr>${columns
+              .map((c) => `<td class="${c.num ? "num" : ""}">${escapeLiveHtml(String(row[c.key] ?? "—"))}</td>`)
+              .join("")}</tr>`
+        )
+        .join("")
+    : `<tr><td colspan="${columns.length}" class="text-center text-text-muted py-8">No placements recorded in this period.</td></tr>`;
+  if (foot) {
+    foot.innerHTML = footerRow
+      ? `<tr>${columns
+          .map((c) => `<td class="${c.num ? "num" : ""}">${escapeLiveHtml(String(footerRow[c.key] ?? ""))}</td>`)
+          .join("")}</tr>`
+      : "";
+  }
+  reportState.columns = columns;
+}
+
+function downloadReportCsv() {
+  const { columns, data, type } = reportState;
+  if (!data || !columns.length) return;
+  const rows = type === "placements" ? data.rows : data.rows;
+  const lines = [columns.map((c) => c.label).join(",")];
+  for (const row of rows) {
+    lines.push(
+      columns
+        .map((c) => {
+          const raw = row[c.key];
+          const text = raw == null ? "" : String(raw);
+          return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        })
+        .join(",")
+    );
+  }
+  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${type}-report-${data.period_from}-to-${data.period_to}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  if (typeof showToast === "function") showToast("Excel (CSV) downloaded", "Your export is ready");
+}
+
+const REPORT_DEFS = {
+  placements: {
+    name: "Placements Report",
+    sectionTitle: "1. Placement Details",
+    columns: (currency) => [
+      { key: "candidate", label: "Candidate" },
+      { key: "client", label: "Client" },
+      { key: "requisition", label: "Requisition" },
+      { key: "consultant", label: "Consultant" },
+      { key: "joining_date", label: "Joining Date" },
+      { key: "ctc_display", label: "CTC (incl. bonus)", num: true },
+      { key: "fee_pct_display", label: "Fee %", num: true },
+      { key: "revenue_display", label: "Revenue", num: true },
+      { key: "days_to_fill", label: "Days to Fill", num: true },
+      ...(currency ? [] : []),
+    ],
+  },
+  "client-summary": {
+    name: "Client Summary Report",
+    sectionTitle: "1. Client Summary",
+    columns: () => [
+      { key: "client_name", label: "Client" },
+      { key: "requisitions", label: "Requisitions", num: true },
+      { key: "open_requisitions", label: "Open", num: true },
+      { key: "placements", label: "Placements", num: true },
+      { key: "revenue_display", label: "Revenue", num: true },
+      { key: "avg_days_to_fill_display", label: "Avg Days to Fill", num: true },
+    ],
+  },
+};
+
+function applyPeriodToUi(data, reportName) {
+  setFirstText("#report-title", reportName);
+  setFirstText("#lh-report-name", reportName);
+  const label = `Reporting period: ${data.period_from} to ${data.period_to}`;
+  setFirstText("#report-period-label", label);
+  setFirstText("#lh-ref", `Ref: RPT-${data.period_from.slice(0, 7)} · Generated ${new Date().toLocaleDateString()}`);
+  setFirstText("#report-footer", `Generated ${new Date().toLocaleString()} · Confidential — for internal and client use only`);
+  const from = document.querySelector("#report-period-from");
+  const to = document.querySelector("#report-period-to");
+  if (from && !from.value) from.value = data.period_from;
+  if (to && !to.value) to.value = data.period_to;
+}
+
+async function fetchAndRenderReport() {
+  const typeSel = document.querySelector("#report-type");
+  const type = typeSel ? typeSel.value : reportState.type;
+  reportState.type = type;
+  const fromInput = document.querySelector("#report-period-from");
+  const toInput = document.querySelector("#report-period-to");
+  const params = new URLSearchParams();
+  if (fromInput && fromInput.value) params.set("period_from", fromInput.value);
+  if (toInput && toInput.value) params.set("period_to", toInput.value);
+  const query = params.toString() ? `?${params}` : "";
+  const data = await apiRequest(`/reports/${type}${query}`).catch(() => null);
+  if (!data) {
+    if (typeof showToast === "function") showToast("Could not load report", "Please check your connection and try again");
+    return;
+  }
+  reportState.data = data;
+  const def = REPORT_DEFS[type];
+  const currency = data.currency || null;
+  applyPeriodToUi(data, def.name);
+  setFirstText("#report-section-title", def.sectionTitle);
+  const subtitle = document.querySelector("#report-section-subtitle");
+  if (subtitle) {
+    subtitle.textContent = type === "placements"
+      ? "Every candidate who joined in the period, with derived commercial value."
+      : "Requisitions, placements, and revenue aggregated per client for the period.";
+  }
+  document.title = `${def.name} - RecruitOps`;
+  const shellTitle = document.querySelector("[data-shell-page-title]");
+  if (shellTitle) shellTitle.textContent = def.name;
+
+  if (type === "placements") {
+    const s = data.summary || {};
+    renderReportKpis([
+      { label: "Placements", value: String(s.placements ?? 0), icon: "how_to_reg", hint: `${s.distinct_requisitions ?? 0} requisition(s) · ${s.distinct_clients ?? 0} client(s)` },
+      { label: "Total Revenue", value: reportMoney(s.total_revenue, currency), icon: "payments" },
+      { label: "Total CTC", value: reportMoney(s.total_ctc, currency), icon: "account_balance_wallet" },
+      { label: "Avg Days to Fill", value: s.avg_days_to_fill != null ? `${s.avg_days_to_fill} days` : "—", icon: "schedule" },
+    ]);
+    const columns = def.columns(currency).map((c) => ({ ...c }));
+    const rows = (data.rows || []).map((r) => ({
+      ...r,
+      ctc_display: reportMoney(r.ctc, r.currency || currency),
+      fee_pct_display: r.fee_pct != null ? `${r.fee_pct}%` : "standard",
+      revenue_display: reportMoney(r.revenue, r.currency || currency),
+    }));
+    const footerRow = rows.length
+      ? { candidate: "Total", ctc_display: reportMoney(s.total_ctc, currency), revenue_display: reportMoney(s.total_revenue, currency) }
+      : null;
+    renderReportTable(columns, rows, footerRow);
+  } else {
+    const t = data.totals || {};
+    renderReportKpis([
+      { label: "Clients", value: String(t.clients ?? 0), icon: "business" },
+      { label: "Requisitions", value: `${t.requisitions ?? 0} (${t.open_requisitions ?? 0} open)`, icon: "work" },
+      { label: "Placements", value: String(t.placements ?? 0), icon: "how_to_reg" },
+      { label: "Total Revenue", value: reportMoney(t.revenue, currency), icon: "payments" },
+    ]);
+    const rows = (data.rows || []).map((r) => ({
+      ...r,
+      revenue_display: reportMoney(r.revenue, currency),
+      avg_days_to_fill_display: r.avg_days_to_fill != null ? `${r.avg_days_to_fill} days` : "—",
+    }));
+    const footerRow = rows.length
+      ? { client_name: "Total", requisitions: t.requisitions, open_requisitions: t.open_requisitions, placements: t.placements, revenue_display: reportMoney(t.revenue, currency) }
+      : null;
+    renderReportTable(def.columns(currency), rows, footerRow);
+  }
+}
+
+/* Letterhead editor — company profile fields + logo, edited inline from the
+   report viewer. Admin-gated: only shown when the actor has settings.update. */
+function openLetterheadDialog(onSaved) {
+  const canEdit = isAdmin() || hasPermission("settings.update");
+  if (!canEdit) {
+    showToast("Not permitted", "Only admins can change the company letterhead.");
+    return;
+  }
+  apiRequest("/settings/profile")
+    .then(async (profile) => {
+      openEntityDialog({
+        id: "letterhead-dialog-overlay",
+        title: "Company Letterhead",
+        submitLabel: "Save Letterhead",
+        fields: [
+          { name: "display_name", label: "Company Name", required: true, value: profile.display_name || "" },
+          { name: "registered_address", label: "Registered Address", value: profile.registered_address || "", placeholder: "Street, area" },
+          { name: "hq_city", label: "City", value: profile.hq_city || "" },
+          { name: "hq_state", label: "State", value: profile.hq_state || "" },
+          { name: "country_name", label: "Country", value: profile.country_name || "" },
+          { name: "support_phone", label: "Phone", value: profile.support_phone || "" },
+          { name: "support_email", label: "Email", value: profile.support_email || "" },
+          { name: "website_url", label: "Website", value: profile.website_url || "", placeholder: "https://" },
+          { name: "logo_data_url", label: "Logo (PNG/JPG, ≤ 300KB)", type: "file", accept: "image/*" },
+        ],
+        onSubmit: async (values, close) => {
+          await apiRequest("/settings/profile", {
+            method: "PATCH",
+            body: JSON.stringify({
+              display_name: values.display_name.trim(),
+              registered_address: values.registered_address || null,
+              hq_city: values.hq_city || null,
+              hq_state: values.hq_state || null,
+              country_name: values.country_name || null,
+              support_phone: values.support_phone || null,
+              support_email: values.support_email || null,
+              website_url: values.website_url || null,
+            }),
+          });
+          const logoInput = document.querySelector("#letterhead-dialog-overlay #logo_data_url");
+          const file = logoInput && logoInput.files && logoInput.files[0];
+          if (file) {
+            if (file.size > 300 * 1024) throw new Error("Logo must be 300KB or smaller.");
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = () => reject(new Error("Could not read the logo file."));
+              reader.readAsDataURL(file);
+            });
+            await apiRequest("/settings/logo", { method: "PUT", body: JSON.stringify({ data_url: dataUrl }) });
+          }
+          reportState.profile = null; // force letterhead refresh
+          await loadReportLetterhead();
+          close();
+          showToast("Letterhead updated", "Reports will now use the new branding.");
+          if (onSaved) onSaved();
+        },
+      });
+    })
+    .catch(() => showToast("Could not load letterhead", "Please try again."));
+}
+
+async function loadReportViewer() {
+  await loadReportLetterhead();
+  const defaults = reportDefaultPeriod();
+  const from = document.querySelector("#report-period-from");
+  const to = document.querySelector("#report-period-to");
+  if (from && !from.value) from.value = defaults.from;
+  if (to && !to.value) to.value = defaults.to;
+
+  /* Deep links: report-viewer.html?type=client-summary opens the client view. */
+  const typeParam = new URLSearchParams(location.search).get("type");
+  const typeSelect = document.querySelector("#report-type");
+  if (typeParam && typeSelect && REPORT_DEFS[typeParam]) {
+    typeSelect.value = typeParam;
+    reportState.type = typeParam;
+  }
+
+  const apply = document.querySelector("#report-apply");
+  const print = document.querySelector("#report-print");
+  const csv = document.querySelector("#report-csv");
+  const letterhead = document.querySelector("#report-letterhead");
+  if (apply && !apply.dataset.wired) {
+    apply.dataset.wired = "1";
+    apply.addEventListener("click", fetchAndRenderReport);
+    typeSelect && typeSelect.addEventListener("change", fetchAndRenderReport);
+    print && print.addEventListener("click", () => window.print());
+    csv && csv.addEventListener("click", downloadReportCsv);
+    letterhead && letterhead.addEventListener("click", () => openLetterheadDialog(fetchAndRenderReport));
+  }
+  await fetchAndRenderReport();
+}
+
 async function loadTimeToFillReport() {
   const report = await apiRequest("/reports/time-to-fill").catch(() => null);
   if (!report) return;
@@ -2567,9 +2974,45 @@ async function loadApprovalsInbox() {
   if (metrics[0]) metrics[0].textContent = pending;
   if (metrics[1]) metrics[1].textContent = overdue;
   if (metrics[2]) metrics[2].textContent = awaiting;
-  /* Render table */
+  /* Update the mobile tab strip: live count + active-tab filtering */
+  const pendingCount = document.querySelector('[data-approval-count="pending"]');
+  if (pendingCount) pendingCount.textContent = pending;
+  wireApprovalTabs(items);
+  /* Render table filtered to the active tab */
   const tbody = document.querySelector("tbody");
   if (!tbody) return;
+  const activeTab = document.querySelector('[data-approval-tab].bg-secondary-container')?.dataset.approvalTab || "pending";
+  renderApprovalRows(tbody, filterApprovalsByTab(items, activeTab));
+  const paginationText = document.querySelector(".border-t span");
+  if (paginationText) paginationText.textContent = `Showing 1 to ${(payload.items || []).length} of ${total} entries`;
+}
+
+function filterApprovalsByTab(items, tab) {
+  if (tab === "pending") return items.filter((i) => i.status === "pending");
+  if (tab === "actioned") return items.filter((i) => i.status !== "pending");
+  return items;
+}
+
+function wireApprovalTabs(items) {
+  const tabs = document.querySelectorAll("[data-approval-tab]");
+  if (!tabs.length || tabs[0].dataset.wired === "true") return;
+  tabs.forEach((tab) => {
+    tab.dataset.wired = "true";
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => {
+        const selected = t === tab;
+        t.classList.toggle("bg-secondary-container", selected);
+        t.classList.toggle("text-on-secondary-container", selected);
+        t.classList.toggle("text-text-muted", !selected);
+        t.setAttribute("aria-selected", String(selected));
+      });
+      const tbody = document.querySelector("tbody");
+      if (tbody) renderApprovalRows(tbody, filterApprovalsByTab(items, tab.dataset.approvalTab));
+    });
+  });
+}
+
+function renderApprovalRows(tbody, items) {
   if (!items.length) {
     tbody.innerHTML = `<tr><td class="px-4 py-12 text-center text-text-muted" colspan="7">No approvals found.</td></tr>`;
     return;
@@ -2598,9 +3041,6 @@ async function loadApprovalsInbox() {
   /* Wire approve/reject buttons */
   tbody.querySelectorAll(".approve-btn").forEach((btn) => btn.addEventListener("click", () => decideApproval(btn.dataset.approvalId, "approved")));
   tbody.querySelectorAll(".reject-btn").forEach((btn) => btn.addEventListener("click", () => decideApproval(btn.dataset.approvalId, "rejected")));
-  /* Update pagination text */
-  const paginationText = document.querySelector(".border-t span");
-  if (paginationText) paginationText.textContent = `Showing 1 to ${items.length} of ${total} entries`;
 }
 
 async function decideApproval(approvalId, decision) {
@@ -3172,6 +3612,46 @@ function bindLiveApiInteractions() {
    ONBOARDING — Setup Flow Submissions
    ═══════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════
+   ONBOARDING — Location guidance
+   Locations scope clients, requisitions and users, so during setup
+   we surface the admin's working location and make switching to a
+   newly created HQ one click. This prevents the "client owner must
+   belong to the same location" rejection from surprising new users.
+   ═══════════════════════════════════════════════════════════════ */
+
+function wireOnboardingLocationGuidance() {
+  const session = RecruitOpsLive.session || readSession();
+  const banner = document.querySelector("[data-current-location-banner]");
+  if (!banner) return;
+  const nameEl = banner.querySelector("[data-current-location-name]");
+  const locationName = session?.location_name || "your primary location";
+  if (nameEl && session?.location_name) nameEl.textContent = session.location_name;
+  else if (nameEl) nameEl.textContent = "your primary location";
+  banner.classList.remove("hidden");
+  banner.classList.add("flex");
+  /* Keep the session location fresh after the admin moves to a new HQ. */
+  banner.querySelector("[data-switch-location-btn]")?.addEventListener("click", async () => {
+    const created = banner.querySelector("[data-created-location-name]")?.textContent || "";
+    const locations = session.onboarding?.locations || [];
+    const target = locations.find((loc) => loc.name === created);
+    if (!target) return;
+    try {
+      await apiRequest(`/users/${session.user_id}/move`, {
+        method: "POST",
+        body: JSON.stringify({ new_primary_location_id: target.id, reason: "Set as company headquarters during onboarding", review_confirmed: true }),
+      });
+      session.location_id = target.id;
+      session.location_name = target.name;
+      writeSession(session);
+      RecruitOpsLive.session = session;
+      if (nameEl) nameEl.textContent = target.name;
+      banner.querySelector("[data-switch-location-row]")?.classList.add("hidden");
+      showLiveSuccess("Working location updated", `You now work from ${target.name}.`);
+    } catch (error) { showLiveError(error); }
+  });
+}
+
 async function submitOnboardingCompanyProfile() {
   const session = RecruitOpsLive.session || readSession();
   const legalName = document.getElementById("legalName")?.value?.trim();
@@ -3225,6 +3705,15 @@ async function submitOnboardingLocation() {
     RecruitOpsLive.session = session;
     showLiveSuccess("Location created", name);
     if (nameInput) nameInput.value = "";
+    /* If this differs from the admin's working location, offer a one-click move. */
+    if (session.location_id && result.id !== session.location_id) {
+      const banner = document.querySelector("[data-current-location-banner]");
+      if (banner) {
+        const createdEl = banner.querySelector("[data-created-location-name]");
+        if (createdEl) createdEl.textContent = name;
+        banner.querySelector("[data-switch-location-row]")?.classList.remove("hidden");
+      }
+    }
   } catch (error) { showLiveError(error); }
 }
 
@@ -3396,16 +3885,21 @@ async function bootPage() {
     "reports": loadReportsLibrary,
     "reports-library": loadReportsLibrary,
     "custom-report-builder": loadCustomReportBuilder,
+    "report-viewer": loadReportViewer,
     "review-matches-workspace": loadReviewMatchesWorkspace,
     "requisition-list": async () => {
       const payload = await apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] }));
       fillExistingTable(payload.items || [], (row, item) => {
         const cells = row.querySelectorAll("td");
+        /* Column order: Requisition | Client | Openings | Ownership | Location | Priority | Status | Age */
         setStackedCell(cells[0], item.title || item.requisition_code, item.client_name || "");
-        setCellValue(cells[1], item.client_name || "—");
-        setCellValue(cells[2], item.status || "open");
-        setCellValue(cells[3], item.priority || "—");
-        setCellValue(cells[4], item.primary_owner_name || "—");
+        paintPersonCell(cells[1], item.client_name);
+        setCellValue(cells[2], `${item.openings_count ?? "—"} opening${item.openings_count === 1 ? "" : "s"}`);
+        paintPersonCell(cells[3], item.primary_owner_name);
+        setCellValue(cells[4], item.work_mode || "—");
+        paintPriorityBadge(cells[5], item.priority);
+        setCellValue(cells[6], item.status || "—");
+        setCellValue(cells[7], ageDaysLabel(item.created_at));
         const editLink = row.querySelector('[data-route*="requisition-detail"]');
         if (editLink) editLink.dataset.route = `requisition-detail.html?requisition_id=${item.id}`;
       });
@@ -3429,9 +3923,9 @@ async function bootPage() {
     "support-workspace": async () => {
       // Support page - no API needed, shows static help content
     },
-    "onboarding-company-profile": async () => {},
+    "onboarding-company-profile": async () => { wireOnboardingLocationGuidance(); },
     "onboarding-hiring-teams": async () => {},
-    "onboarding-locations": async () => {},
+    "onboarding-locations": async () => { wireOnboardingLocationGuidance(); },
     "onboarding-role-setup": async () => {},
     "onboarding-pipeline-stage-builder": async () => {},
     "onboarding-integrations": async () => {},
@@ -3489,6 +3983,7 @@ async function bootPage() {
       "reports": ["report.read"],
       "reports-library": ["report.read"],
       "custom-report-builder": ["report.read"],
+      "report-viewer": ["report.read"],
       "pipeline-analytics": ["pipeline.read.summary"],
       "time-to-fill-report": ["report.read"],
       "source-effectiveness": ["report.read"],
@@ -3535,7 +4030,10 @@ function startLiveApiClient() {
     hidePageLoader();
     return;
   }
-  decorateShell();
+  /* Marketing pages load the app scripts but must never receive app chrome
+     (connection pill, sidebar RBAC, badge polling) — even when a session exists. */
+  const isLandingPage = !!document.querySelector(".landing-nav, .landing-hero");
+  if (!isLandingPage) decorateShell();
   bindLiveApiInteractions();
 
   // Handle logout links — call API, clear session, redirect
@@ -3556,7 +4054,7 @@ function startLiveApiClient() {
     hidePageLoader();
   });
 
-  if (RecruitOpsLive.session || readSession()) {
+  if (!isLandingPage && (RecruitOpsLive.session || readSession())) {
     refreshNotificationBadge();
     setInterval(() => refreshNotificationBadge(), 30000);
   }

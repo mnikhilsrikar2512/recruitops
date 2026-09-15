@@ -26,6 +26,7 @@ class ClientRecord:
     business_source_owner_name: str | None
     client_owner_user_id: int | None
     client_owner_name: str | None
+    placement_fee_pct: float | None
     notes: str | None
     created_by_user_id: int | None
     created_at: object
@@ -62,6 +63,9 @@ def _map_client(row: RowMapping) -> ClientRecord:
         business_source_owner_name=row["business_source_owner_name"],
         client_owner_user_id=row["client_owner_user_id"],
         client_owner_name=row["client_owner_name"],
+        placement_fee_pct=(
+            float(row["placement_fee_pct"]) if row["placement_fee_pct"] is not None else None
+        ),
         notes=row["notes"],
         created_by_user_id=row["created_by_user_id"],
         created_at=row["created_at"],
@@ -99,6 +103,7 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
             c.name AS client_name,
             c.industry,
             c.status,
+            c.placement_fee_pct,
             c.account_manager_user_id AS business_source_owner_user_id,
             source_owner.full_name AS business_source_owner_name,
             c.account_manager_user_id AS client_owner_user_id,
@@ -163,6 +168,7 @@ def _client_select_sql() -> str:
           source_owner.full_name AS business_source_owner_name,
           c.account_manager_user_id AS client_owner_user_id,
           client_owner.full_name AS client_owner_name,
+          c.placement_fee_pct,
           c.notes,
           CAST(NULL AS BIGINT) AS created_by_user_id,
           c.created_at,
@@ -199,7 +205,8 @@ def create_client(engine: Engine, payload: ClientCreate) -> ClientRecord:
           industry,
           status,
           account_manager_user_id,
-          notes
+          notes,
+          placement_fee_pct
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -209,7 +216,8 @@ def create_client(engine: Engine, payload: ClientCreate) -> ClientRecord:
           :industry,
           :status,
           :client_owner_user_id,
-          :notes
+          :notes,
+          :placement_fee_pct
         );
         """
     )
@@ -225,6 +233,7 @@ def create_client(engine: Engine, payload: ClientCreate) -> ClientRecord:
                 "business_source_owner_user_id": payload.business_source_owner_user_id,
                 "client_owner_user_id": payload.client_owner_user_id,
                 "notes": payload.notes,
+                "placement_fee_pct": payload.placement_fee_pct,
                 "created_by_user_id": payload.created_by_user_id,
             },
         ).scalar_one()
@@ -244,6 +253,7 @@ def update_client(engine: Engine, client_id: int, payload: ClientUpdate) -> Clie
           account_manager_user_id = COALESCE(:client_owner_user_id, account_manager_user_id),
           status = COALESCE(:status, status),
           notes = CASE WHEN :has_notes = 1 THEN :notes ELSE notes END,
+          placement_fee_pct = CASE WHEN :has_fee = 1 THEN :placement_fee_pct ELSE placement_fee_pct END,
           updated_at = SYSUTCDATETIME()
         WHERE id = :client_id;
         """
@@ -261,6 +271,8 @@ def update_client(engine: Engine, client_id: int, payload: ClientUpdate) -> Clie
                 "status": payload.status,
                 "has_notes": 1 if "notes" in payload.model_fields_set else 0,
                 "notes": payload.notes,
+                "has_fee": 1 if "placement_fee_pct" in payload.model_fields_set else 0,
+                "placement_fee_pct": payload.placement_fee_pct,
             },
         )
     updated = find_client_by_id(engine, client_id)

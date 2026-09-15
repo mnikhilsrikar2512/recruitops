@@ -91,6 +91,44 @@ PERMISSIONS = [
 ]
 
 
+# (name, query, description) — post-seed invariants; each must return >= 1 row
+VERIFICATIONS = [
+    (
+        "open requisition 'CI Test Requisition'",
+        "SELECT 1 FROM dbo.requisitions WHERE title = N'CI Test Requisition' AND status = N'open'",
+    ),
+    (
+        "candidate 'CI Test Candidate'",
+        "SELECT 1 FROM dbo.candidates WHERE full_name = N'CI Test Candidate'",
+    ),
+    (
+        "portal account 'CI Shared Portal Account'",
+        "SELECT 1 FROM dbo.portal_accounts WHERE account_name = N'CI Shared Portal Account' AND status = N'active'",
+    ),
+    (
+        "primary company entity (letterhead)",
+        "SELECT 1 FROM dbo.company_entities WHERE is_primary = 1 AND status = N'active'",
+    ),
+]
+
+
+def verify_seed(engine) -> None:
+    """Fail loudly (non-zero exit) if any seeded row the tests depend on is missing."""
+    with engine.connect() as connection:
+        missing = [
+            description
+            for description, query in VERIFICATIONS
+            if connection.execute(text(query)).first() is None
+        ]
+    if missing:
+        for item in missing:
+            print(f"SEED VERIFICATION FAILED: missing {item}", file=sys.stderr)
+        raise SystemExit(1)
+    print(
+        "CI seed verified: requisition/candidate pair and portal account are present"
+    )
+
+
 def main() -> None:
     engine = create_db_engine()
     with engine.begin() as connection:
@@ -247,7 +285,78 @@ def main() -> None:
             {"password_hash": password_hash, "role_id": role_id, "location_id": location_id},
         )
 
-    print("CI seed complete: permissions, admin role/user (ci.admin@recruitops-test.com / admin123), Head Office location")
+        # Open requisition + candidate pair — the pipeline-template validation
+        # fixture hangs a test application on a candidate × open-requisition
+        # pair, so a bare CI database must provide one.
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (SELECT 1 FROM dbo.requisitions WHERE title = N'CI Test Requisition')
+                    INSERT INTO dbo.requisitions (
+                        branch_id, hiring_type, title, owner_user_id, status,
+                        open_positions, target_close_date, job_description
+                    )
+                    VALUES (
+                        :location_id, N'internal', N'CI Test Requisition', 1, N'open',
+                        1, CAST(DATEADD(day, 30, CAST(SYSUTCDATETIME() AS DATE)) AS DATE),
+                        N'CI-seeded requisition for pipeline tests.'
+                    );
+                """
+            ),
+            {"location_id": location_id},
+        )
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (SELECT 1 FROM dbo.candidates WHERE full_name = N'CI Test Candidate')
+                    INSERT INTO dbo.candidates (full_name, source, created_by_user_id)
+                    VALUES (N'CI Test Candidate', N'ci-seed', 1);
+                """
+            )
+        )
+
+        # Portal account — portal-accounts integration asserts the list shows
+        # at least one seeded row with the branch join resolved.
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (SELECT 1 FROM dbo.portal_accounts WHERE account_name = N'CI Shared Portal Account')
+                    INSERT INTO dbo.portal_accounts (
+                        branch_id, platform_name, account_name, status,
+                        ownership_type, is_shared, has_full_access
+                    )
+                    VALUES (
+                        :location_id, N'LinkedIn', N'CI Shared Portal Account', N'active',
+                        N'company-shared', 1, 0
+                    );
+                """
+            ),
+            {"location_id": location_id},
+        )
+
+        # Primary company entity — the letterhead source of truth that the
+        # settings endpoints and report letterheads read.
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (
+                    SELECT 1 FROM dbo.company_entities WHERE is_primary = 1 AND status = N'active'
+                )
+                    INSERT INTO dbo.company_entities (
+                        display_name, legal_name, company_code, company_type_code,
+                        hq_city, country_name, support_email, website_url, is_primary, status
+                    )
+                    VALUES (
+                        N'RecruitOps Demo', N'RecruitOps Demo Pvt Ltd', N'RCI', N'recruitment-agency',
+                        N'Hyderabad', N'India', N'hello@recruitops-demo.test', N'https://recruitops-demo.test',
+                        1, N'active'
+                    );
+                """
+            ),
+        )
+
+    verify_seed(engine)
+    print("CI seed complete: permissions, admin role/user (ci.admin@recruitops-test.com / admin123), Head Office location, requisition/candidate pair, portal account")
 
 
 if __name__ == "__main__":

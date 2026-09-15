@@ -34,6 +34,7 @@ class ClientCreate(BaseModel):
     industry: str | None = Field(default=None, max_length=100)
     client_owner_user_id: int = Field(ge=1)
     business_source_owner_user_id: int = Field(ge=1)
+    placement_fee_pct: float | None = Field(default=None, ge=0, le=100)
     status: ClientStatus = "active"
     notes: str | None = None
     created_by_user_id: int | None = Field(default=None, ge=1)
@@ -60,6 +61,7 @@ class ClientUpdate(BaseModel):
     industry: str | None = Field(default=None, max_length=100)
     client_owner_user_id: int | None = Field(default=None, ge=1)
     business_source_owner_user_id: int | None = Field(default=None, ge=1)
+    placement_fee_pct: float | None = Field(default=None, ge=0, le=100)
     status: ClientStatus | None = None
     notes: str | None = None
 
@@ -150,6 +152,7 @@ class ClientResponse(BaseModel):
     business_source_owner_name: str | None
     client_owner_user_id: int | None
     client_owner_name: str | None
+    placement_fee_pct: float | None
     notes: str | None
     created_by_user_id: int | None
     created_at: datetime

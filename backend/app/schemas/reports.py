@@ -1,5 +1,5 @@
 """Reports API schemas."""
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 
@@ -58,3 +58,62 @@ class ReportDimension(BaseModel):
 class ReportDatasetResponse(BaseModel):
     dimensions: list[ReportDimension]
     rows: list[dict] = Field(default_factory=list)
+
+
+class PlacementsSummary(BaseModel):
+    placements: int
+    distinct_requisitions: int
+    distinct_clients: int
+    total_ctc: float | None
+    total_revenue: float
+    avg_days_to_fill: float | None
+
+
+class PlacementRow(BaseModel):
+    application_id: int
+    candidate: str
+    client: str | None
+    requisition: str
+    department: str | None
+    consultant: str | None
+    joining_date: date | None
+    ctc: float | None
+    currency: str | None
+    signing_bonus: float | None
+    fee_pct: float | None
+    revenue: float
+    days_to_fill: int | None
+
+
+class PlacementsReportResponse(BaseModel):
+    period_from: date
+    period_to: date
+    currency: str | None
+    summary: PlacementsSummary
+    rows: list[PlacementRow]
+
+
+class ClientSummaryRow(BaseModel):
+    client_id: int
+    client_name: str
+    requisitions: int
+    open_requisitions: int
+    placements: int
+    revenue: float
+    avg_days_to_fill: float | None
+
+
+class ClientSummaryTotals(BaseModel):
+    clients: int
+    requisitions: int
+    open_requisitions: int
+    placements: int
+    revenue: float
+
+
+class ClientSummaryReportResponse(BaseModel):
+    period_from: date
+    period_to: date
+    currency: str | None
+    rows: list[ClientSummaryRow]
+    totals: ClientSummaryTotals

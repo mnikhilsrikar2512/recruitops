@@ -1,16 +1,27 @@
 """Reports services — orchestration between repository and schemas."""
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
 from app.repositories.reports import (
+    get_client_summary,
+    get_dominant_currency,
     get_report_dataset,
     get_source_effectiveness,
     get_time_to_fill_breakdown,
     get_time_to_fill_summary,
+    get_placements,
 )
 from app.schemas.reports import (
+    ClientSummaryReportResponse,
+    ClientSummaryRow,
+    ClientSummaryTotals,
+    PlacementRow,
+    PlacementsReportResponse,
+    PlacementsSummary,
     ReportColumn,
     ReportDatasetResponse,
     ReportDimension,
@@ -21,6 +32,29 @@ from app.schemas.reports import (
     TimeToFillSummary,
 )
 from app.services.auth import AuthContext
+
+
+def _resolve_period(from_str: str | None, to_str: str | None) -> tuple[date, date]:
+    """Defaults to the current calendar month; validates ordering loudly."""
+    today = date.today()
+    try:
+        period_from = date.fromisoformat(from_str) if from_str else today.replace(day=1)
+        period_to = (
+            date.fromisoformat(to_str)
+            if to_str
+            else (today.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Period must use ISO dates (YYYY-MM-DD)",
+        ) from exc
+    if period_to < period_from:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="period_to must be on or after period_from",
+        )
+    return period_from, period_to
 
 
 def get_time_to_fill_report_service(engine: Engine, auth_context: AuthContext) -> TimeToFillReportResponse:
@@ -171,3 +205,96 @@ def get_report_dataset_service(
     is_admin = auth_context.user.role_code == "admin"
     record = get_report_dataset(engine, dataset, auth_context.user.location_id, is_admin)
     return ReportDatasetResponse(dimensions=[dimension], rows=record.rows)
+
+
+def get_placements_report_service(
+    engine: Engine,
+    auth_context: AuthContext,
+    period_from: str | None,
+    period_to: str | None,
+) -> PlacementsReportResponse:
+    start, end = _resolve_period(period_from, period_to)
+    is_admin = auth_context.user.role_code == "admin"
+    records = get_placements(
+        engine, start, end, auth_context.user.location_id, is_admin
+    )
+    total_ctc = sum(r.ctc or 0 for r in records) or None
+    total_revenue = round(sum(r.revenue for r in records), 2)
+    filled = [
+        (r.days_to_fill, r.joining_date)
+        for r in records
+        if r.days_to_fill is not None and r.joining_date is not None
+    ]
+    avg_days = round(sum(d for d, _ in filled) / len(filled), 1) if filled else None
+    currency = next((r.currency for r in records if r.currency), None) or get_dominant_currency(
+        engine
+    )
+    return PlacementsReportResponse(
+        period_from=start,
+        period_to=end,
+        currency=currency,
+        summary=PlacementsSummary(
+            placements=len(records),
+            distinct_requisitions=len({r.requisition for r in records}),
+            distinct_clients=len({r.client for r in records if r.client}),
+            total_ctc=total_ctc,
+            total_revenue=total_revenue,
+            avg_days_to_fill=avg_days,
+        ),
+        rows=[
+            PlacementRow(
+                application_id=r.application_id,
+                candidate=r.candidate,
+                client=r.client,
+                requisition=r.requisition,
+                department=r.department,
+                consultant=r.consultant,
+                joining_date=r.joining_date.date() if hasattr(r.joining_date, "date") else r.joining_date,
+                ctc=r.ctc,
+                currency=r.currency,
+                signing_bonus=r.signing_bonus,
+                fee_pct=r.fee_pct,
+                revenue=r.revenue,
+                days_to_fill=r.days_to_fill,
+            )
+            for r in records
+        ],
+    )
+
+
+def get_client_summary_report_service(
+    engine: Engine,
+    auth_context: AuthContext,
+    period_from: str | None,
+    period_to: str | None,
+) -> ClientSummaryReportResponse:
+    start, end = _resolve_period(period_from, period_to)
+    is_admin = auth_context.user.role_code == "admin"
+    records = get_client_summary(
+        engine, start, end, auth_context.user.location_id, is_admin
+    )
+    currency = get_dominant_currency(engine)
+    return ClientSummaryReportResponse(
+        period_from=start,
+        period_to=end,
+        currency=currency,
+        rows=[
+            ClientSummaryRow(
+                client_id=r.client_id,
+                client_name=r.client_name,
+                requisitions=r.requisitions,
+                open_requisitions=r.open_requisitions,
+                placements=r.placements,
+                revenue=round(r.revenue, 2),
+                avg_days_to_fill=round(r.avg_days_to_fill, 1) if r.avg_days_to_fill else None,
+            )
+            for r in records
+        ],
+        totals=ClientSummaryTotals(
+            clients=len(records),
+            requisitions=sum(r.requisitions for r in records),
+            open_requisitions=sum(r.open_requisitions for r in records),
+            placements=sum(r.placements for r in records),
+            revenue=round(sum(r.revenue for r in records), 2),
+        ),
+    )

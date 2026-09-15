@@ -1,15 +1,20 @@
-"""Reports API — time-to-fill, source effectiveness, and report datasets."""
-from fastapi import APIRouter, Depends
+"""Reports API — time-to-fill, source effectiveness, placements, client summary,
+and report datasets."""
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Engine
 
 from app.api.deps import get_current_auth_context, get_engine, require_permissions
 from app.schemas.reports import (
+    ClientSummaryReportResponse,
+    PlacementsReportResponse,
     ReportDatasetResponse,
     SourceEffectivenessReportResponse,
     TimeToFillReportResponse,
 )
 from app.services.auth import AuthContext
 from app.services.reports import (
+    get_client_summary_report_service,
+    get_placements_report_service,
     get_report_dataset_service,
     get_report_datasets_service,
     get_source_effectiveness_report_service,
@@ -35,6 +40,28 @@ def source_effectiveness_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> SourceEffectivenessReportResponse:
     return get_source_effectiveness_report_service(engine, auth_context)
+
+
+@router.get("/placements", response_model=PlacementsReportResponse)
+def placements_report_endpoint(
+    _auth: object = Depends(require_permissions("report.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+    period_from: str | None = Query(default=None),
+    period_to: str | None = Query(default=None),
+) -> PlacementsReportResponse:
+    return get_placements_report_service(engine, auth_context, period_from, period_to)
+
+
+@router.get("/client-summary", response_model=ClientSummaryReportResponse)
+def client_summary_report_endpoint(
+    _auth: object = Depends(require_permissions("report.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+    period_from: str | None = Query(default=None),
+    period_to: str | None = Query(default=None),
+) -> ClientSummaryReportResponse:
+    return get_client_summary_report_service(engine, auth_context, period_from, period_to)
 
 
 @router.get("/datasets", response_model=ReportDatasetResponse)

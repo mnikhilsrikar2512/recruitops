@@ -43,6 +43,34 @@ class ReportDatasetRowRecord:
     rows: list[dict]
 
 
+@dataclass
+class PlacementRecord:
+    application_id: int
+    candidate: str
+    client: str | None
+    requisition: str
+    department: str | None
+    consultant: str | None
+    joining_date: object
+    ctc: float | None
+    currency: str | None
+    signing_bonus: float | None
+    fee_pct: float | None
+    revenue: float
+    days_to_fill: int | None
+
+
+@dataclass
+class ClientSummaryRecord:
+    client_id: int
+    client_name: str
+    requisitions: int
+    open_requisitions: int
+    placements: int
+    revenue: float
+    avg_days_to_fill: float | None
+
+
 def _location_scope_clause(is_admin: bool) -> str:
     """Requisitions are location-bound via branch_id."""
     return "" if is_admin else "AND r.branch_id = :actor_location_id"
@@ -419,3 +447,176 @@ def get_report_dataset(
         serializable.append(record)
 
     return ReportDatasetRowRecord(dataset=dataset, rows=serializable[:500])
+
+
+# Compensation basis for revenue: offered CTC + signing bonus at join time,
+# valued at the client's negotiated placement fee percentage.
+_PLACEMENT_SELECT = """
+    SELECT
+        ca.id AS application_id,
+        cand.full_name AS candidate,
+        cc.name AS client,
+        r.title AS requisition,
+        r.department_name AS department,
+        owner_u.full_name AS consultant,
+        jh.changed_at AS joining_date,
+        ca.offered_ctc + ISNULL(ca.signing_bonus, 0) AS ctc,
+        ca.offer_currency AS currency,
+        ca.signing_bonus AS signing_bonus,
+        cc.placement_fee_pct AS fee_pct,
+        CAST(ROUND(
+            (ca.offered_ctc + ISNULL(ca.signing_bonus, 0))
+            * ISNULL(cc.placement_fee_pct, 0) / 100.0, 2) AS FLOAT) AS revenue,
+        CASE
+            WHEN DATEDIFF(DAY, r.created_at, jh.changed_at) < 0 THEN 0
+            ELSE DATEDIFF(DAY, r.created_at, jh.changed_at)
+        END AS days_to_fill
+    FROM dbo.candidate_applications AS ca
+    INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
+    INNER JOIN dbo.candidates AS cand ON cand.id = ca.candidate_id
+    LEFT JOIN dbo.client_companies AS cc ON cc.id = r.client_company_id
+    LEFT JOIN dbo.users AS owner_u
+        ON owner_u.id = COALESCE(r.delivery_owner_user_id, r.primary_owner_user_id, r.owner_user_id)
+    OUTER APPLY (
+        SELECT TOP (1) h.changed_at
+        FROM dbo.candidate_stage_history AS h
+        WHERE h.candidate_application_id = ca.id
+          AND h.to_stage IN (N'joined', N'hired')
+        ORDER BY h.changed_at ASC
+    ) AS jh
+"""
+
+
+def get_placements(
+    engine: Engine,
+    period_from,
+    period_to,
+    actor_location_id: int | None,
+    is_admin: bool,
+) -> list[PlacementRecord]:
+    scope = "" if is_admin else "AND r.branch_id = :actor_location_id"
+    query = text(
+        f"""
+        {_PLACEMENT_SELECT}
+        WHERE ca.current_stage IN (N'joined', N'hired')
+          AND jh.changed_at >= :period_from
+          AND jh.changed_at < DATEADD(DAY, 1, :period_to)
+          {scope}
+        ORDER BY jh.changed_at DESC
+        """
+    )
+    params = {
+        "period_from": period_from,
+        "period_to": period_to,
+        "actor_location_id": actor_location_id,
+    }
+    with engine.connect() as connection:
+        rows = connection.execute(query, params).mappings().all()
+    return [
+        PlacementRecord(
+            application_id=row["application_id"],
+            candidate=row["candidate"],
+            client=row["client"],
+            requisition=row["requisition"],
+            department=row["department"],
+            consultant=row["consultant"],
+            joining_date=row["joining_date"],
+            ctc=row["ctc"],
+            currency=row["currency"],
+            signing_bonus=row["signing_bonus"],
+            fee_pct=row["fee_pct"],
+            revenue=row["revenue"] or 0.0,
+            days_to_fill=row["days_to_fill"],
+        )
+        for row in rows
+    ]
+
+
+def get_client_summary(
+    engine: Engine,
+    period_from,
+    period_to,
+    actor_location_id: int | None,
+    is_admin: bool,
+) -> list[ClientSummaryRecord]:
+    scope = "" if is_admin else "WHERE cc.branch_id = :actor_location_id"
+    query = text(
+        f"""
+        SELECT
+            cc.id AS client_id,
+            cc.name AS client_name,
+            ISNULL(req_stats.requisitions, 0) AS requisitions,
+            ISNULL(req_stats.open_requisitions, 0) AS open_requisitions,
+            ISNULL(pl.placements, 0) AS placements,
+            CAST(ISNULL(pl.comp_total, 0) * ISNULL(cc.placement_fee_pct, 0) / 100.0 AS FLOAT) AS revenue,
+            pl.avg_days_to_fill
+        FROM dbo.client_companies AS cc
+        OUTER APPLY (
+            SELECT
+                COUNT(*) AS requisitions,
+                SUM(CASE WHEN r.status = N'open' THEN 1 ELSE 0 END) AS open_requisitions
+            FROM dbo.requisitions AS r
+            WHERE r.client_company_id = cc.id
+        ) AS req_stats
+        OUTER APPLY (
+            SELECT
+                COUNT(*) AS placements,
+                SUM(ca.offered_ctc + ISNULL(ca.signing_bonus, 0)) AS comp_total,
+                AVG(CAST(
+                    CASE
+                        WHEN DATEDIFF(DAY, r.created_at, jh.changed_at) < 0 THEN 0
+                        ELSE DATEDIFF(DAY, r.created_at, jh.changed_at)
+                    END AS FLOAT)) AS avg_days_to_fill
+            FROM dbo.candidate_applications AS ca
+            INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
+            OUTER APPLY (
+                SELECT TOP (1) h.changed_at
+                FROM dbo.candidate_stage_history AS h
+                WHERE h.candidate_application_id = ca.id
+                  AND h.to_stage IN (N'joined', N'hired')
+                ORDER BY h.changed_at ASC
+            ) AS jh
+            WHERE r.client_company_id = cc.id
+              AND ca.current_stage IN (N'joined', N'hired')
+              AND jh.changed_at >= :period_from
+              AND jh.changed_at < DATEADD(DAY, 1, :period_to)
+        ) AS pl
+        {scope}
+        ORDER BY revenue DESC, cc.name ASC
+        """
+    )
+    params = {
+        "period_from": period_from,
+        "period_to": period_to,
+        "actor_location_id": actor_location_id,
+    }
+    with engine.connect() as connection:
+        rows = connection.execute(query, params).mappings().all()
+    return [
+        ClientSummaryRecord(
+            client_id=row["client_id"],
+            client_name=row["client_name"],
+            requisitions=row["requisitions"],
+            open_requisitions=row["open_requisitions"],
+            placements=row["placements"],
+            revenue=row["revenue"] or 0.0,
+            avg_days_to_fill=row["avg_days_to_fill"],
+        )
+        for row in rows
+    ]
+
+
+def get_dominant_currency(engine: Engine) -> str | None:
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                """
+                SELECT TOP (1) offer_currency
+                FROM dbo.candidate_applications
+                WHERE offer_currency IS NOT NULL
+                GROUP BY offer_currency
+                ORDER BY COUNT(*) DESC
+                """
+            )
+        ).first()
+    return row[0] if row else None

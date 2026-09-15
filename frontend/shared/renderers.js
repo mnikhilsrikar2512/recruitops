@@ -139,10 +139,32 @@ function setApiField(name, value) {
 function tableHeaders() {
   return Array.from(document.querySelectorAll(".workspace-surface thead th")).map((th) =>
     (th.textContent || "").replace(/\s+/g, " ").trim().toLowerCase(),
-  );
-}
-
-function setCellValue(td, value) {
+  );}function paintPersonCell(td, name) {
+  if (!td) return;
+  const label = String(name || "").trim();
+  const initials = label.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
+  const avatar = td.querySelector("div");
+  if (avatar) avatar.textContent = initials || "—";
+  const nameSpan = td.querySelector("span");
+  if (nameSpan) nameSpan.textContent = label || "—";
+}function paintPriorityBadge(td, priority) {
+  if (!td) return;
+  const p = String(priority || "").toLowerCase();
+  const tones = {
+    critical: "bg-danger-bg text-danger-text",
+    high: "bg-warning-bg text-warning-text",
+    medium: "bg-info-bg text-info-text",
+    low: "bg-surface-dim text-text-muted",
+  };
+  const badge = td.querySelector("span") || td;
+  badge.className = `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[p] || tones.low}`;
+  badge.textContent = p ? p.charAt(0).toUpperCase() + p.slice(1) : "—";
+}function ageDaysLabel(createdAt) {
+  const then = new Date(createdAt);
+  if (isNaN(then)) return "—";
+  const days = Math.max(0, Math.floor((Date.now() - then.getTime()) / 86400000));
+  return `${days}d`;
+}function setCellValue(td, value) {
   if (!td || value === undefined) return;
   const titleNode = td.querySelector(".font-headline-sm, .font-semibold, p.font-headline-sm, span.font-medium, .truncate");
   if (titleNode) {

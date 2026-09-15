@@ -42,6 +42,7 @@ CREATE TABLE company_entities (
 	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	logo_data NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	CONSTRAINT [PK__company___3213E83FC196E6AC] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_company_entities_status_primary] ON company_entities (status, is_primary, display_name);
@@ -641,6 +642,7 @@ CREATE TABLE client_companies (
 	notes NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	placement_fee_pct DECIMAL(5, 2) NULL, 
 	CONSTRAINT [PK__client_c__3213E83F78D7782D] PRIMARY KEY CLUSTERED (id)
 );
 
