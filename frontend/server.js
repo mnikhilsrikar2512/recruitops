@@ -8,6 +8,7 @@ const ROOT = __dirname;
 const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+  '.webp': 'image/webp', '.avif': 'image/avif',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
 };
 

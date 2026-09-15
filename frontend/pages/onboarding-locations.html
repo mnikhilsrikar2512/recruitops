@@ -46,6 +46,23 @@
             <p class="font-body-md text-body-md text-info-text max-w-2xl">Add your offices or remote regions. This helps optimize job postings and timezone scheduling.</p>
           </div>
 
+          <!-- Your active location: clients, requisitions and users are location-scoped, so make it explicit -->
+          <div data-current-location-banner class="hidden items-start gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+            <span class="material-symbols-outlined text-primary text-lg mt-0.5">location_on</span>
+            <div class="flex-1">
+              <p class="font-body-sm text-body-sm text-on-surface leading-snug">
+                You're currently working from <span data-current-location-name class="font-semibold">your primary location</span>.
+                Clients, requisitions and team members you create must belong to this location — pick it below to make it your company's headquarters, or add a new office and switch to it.
+              </p>
+              <div data-switch-location-row class="hidden mt-2 flex items-center gap-3">
+                <span class="font-body-sm text-body-sm text-on-surface">Just added <span data-created-location-name class="font-semibold"></span>.</span>
+                <button type="button" data-switch-location-btn class="h-8 px-3 rounded border border-border bg-surface-alt font-body-sm text-body-sm text-on-surface hover:bg-highlight-soft transition-colors flex items-center gap-1">
+                  <span class="material-symbols-outlined text-base">swap_horiz</span> Make this my working location
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Setup Grid Area -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
 

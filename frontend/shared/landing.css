@@ -29,6 +29,56 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 .btn-nav-primary { background: #24483C; color: #fff; }
 .btn-nav-primary:hover { background: #17362C; }
 
+/* ── Mobile menu ── */
+.nav-burger { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid #DDE3DD; border-radius: 8px; background: #fff; color: #24483C; cursor: pointer; }
+.mobile-menu {
+  list-style: none;
+  /* Slide-down: grid-template-rows 0fr→1fr animates to the content's real
+     height without JS measurement. The single .mobile-menu-clip child is the
+     min-height:0/overflow:hidden row that actually collapses — a grid can
+     only animate this way with ONE track, so the links live in an inner list. */
+  display: grid; grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22,1,0.36,1), visibility 0s linear 0.28s;
+}
+.mobile-menu-clip {
+  min-height: 0; overflow: hidden;
+  border-top: 1px solid #EDF1EC;
+  background: rgba(255,255,255,0.97); backdrop-filter: blur(16px);
+  padding: 0 16px;
+}
+.mobile-menu-list { list-style: none; padding: 8px 0 16px; margin: 0; }
+.mobile-menu.open {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22,1,0.36,1), visibility 0s;
+}
+.mobile-menu li { display: block; }
+/* Link cascade: each link fades/slides in slightly after the sheet starts
+   opening. Delays live only in the .open state so closing collapses
+   immediately with no lingering fade-out. */
+.mobile-menu-list li {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.mobile-menu.open .mobile-menu-list li { opacity: 1; transform: none; }
+.mobile-menu.open .mobile-menu-list li:nth-child(1) { transition-delay: 0.05s; }
+.mobile-menu.open .mobile-menu-list li:nth-child(2) { transition-delay: 0.10s; }
+.mobile-menu.open .mobile-menu-list li:nth-child(3) { transition-delay: 0.15s; }
+.mobile-menu.open .mobile-menu-list li:nth-child(4) { transition-delay: 0.20s; }
+.mobile-menu a { display: block; font-size: 14px; font-weight: 600; color: #49544F; text-decoration: none; padding: 12px 8px; border-radius: 8px; }
+.mobile-menu a:hover, .mobile-menu a.active { color: #24483C; background: #EDF1EC; }
+.mobile-menu .mobile-menu-cta { margin-top: 8px; background: #24483C; color: #fff !important; text-align: center; }
+.mobile-menu .mobile-menu-cta:hover { background: #17362C; }
+@media (max-width: 768px) {
+  .nav-burger { display: inline-flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-menu, .mobile-menu.open { transition: none; }
+  .mobile-menu-list li { transition: none; opacity: 1; transform: none; }
+}
+
 /* ── Footer ── */
 .landing-footer { background: #fff; border-top: 1px solid #DDE3DD; }
 .landing-footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
@@ -52,6 +102,19 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
   .landing-nav-links { display: none; }
   .landing-footer-main { flex-direction: column; gap: 32px; }
   .landing-footer-brand { max-width: none; }
+  /* Keep the nav row to one line when the burger appears */
+  .landing-nav-actions .btn-nav-ghost { display: none; }
+}
+/* Compact nav for phones — brand + both CTAs must fit 375px without panning.
+   clip (not hidden): keeps document from panning on transient reveal-card
+   transforms without creating a scroll container, so position:sticky
+   (product-tour stepper) keeps working. */
+@media (max-width: 480px) {
+  html, body { overflow-x: clip; }
+  .landing-nav-inner { padding: 0 16px; }
+  .landing-nav-brand { font-size: 16px; }
+  .landing-nav-actions { gap: 8px; }
+  .btn-nav { font-size: 12px; padding: 7px 12px; }
 }
 
 /* ── Buttons ── */
@@ -63,6 +126,150 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Hero ── */
 .landing-hero { position: relative; overflow: hidden; }
 .landing-hero-bg { position: absolute; inset: 0; background: linear-gradient(180deg, #F6F7F4 0%, #E9F2EB 50%, #F6F7F4 100%); }
+
+/* ── Hero layered background: dot grid + mesh glow + conic sweep ── */
+.hero-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(36,72,60,0.13) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%);
+}
+.hero-grid::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(58,122,95,0.08) 45%, rgba(255,255,255,0) 55%, transparent 70%);
+  background-size: 220% 220%;
+  animation: heroSweep 9s ease-in-out infinite;
+}
+@keyframes heroSweep { 0%, 100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
+
+/* ── Parallax layer (driven by landing.js) ── */
+.parallax-orb { will-change: transform; transition: transform 0.25s cubic-bezier(0.22,1,0.36,1); }
+
+/* ── 3D tilt product preview ── */
+.tilt-wrap { perspective: 1400px; }
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), box-shadow 0.4s;
+  will-change: transform;
+}
+.tilt-card:hover { box-shadow: 0 40px 100px rgba(36,72,60,0.18); }
+.tilt-glare {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5; border-radius: inherit;
+  background: radial-gradient(600px circle at var(--gx, 50%) var(--gy, 50%), rgba(255,255,255,0.28), transparent 45%);
+  opacity: 0; transition: opacity 0.3s;
+}
+.tilt-card:hover .tilt-glare { opacity: 1; }
+
+/* ── Floating UI chips around the preview ── */
+.float-chip {
+  position: absolute; z-index: 30;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+  border: 1px solid #DDE3DD; border-radius: 12px;
+  padding: 10px 14px; box-shadow: 0 12px 32px rgba(36,72,60,0.12);
+  font-size: 12px; font-weight: 600; color: #17201C;
+  animation: chipFloat 5s ease-in-out infinite;
+  pointer-events: none;
+}
+.float-chip .material-symbols-outlined { font-size: 18px; color: #24483C; }
+.float-chip .chip-sub { display: block; font-size: 10px; font-weight: 500; color: #69746F; }
+.float-chip-1 { top: -18px; left: -28px; animation-delay: 0s; }
+.float-chip-2 { top: 38%; right: -34px; animation-delay: 1.2s; }
+.float-chip-3 { bottom: -20px; left: 12%; animation-delay: 2.4s; }
+@keyframes chipFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@media (max-width: 900px) { .float-chip { display: none; } }
+
+/* ── Image/illustration reveal ── */
+.img-reveal {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 1s cubic-bezier(0.22,1,0.36,1);
+}
+.img-reveal.visible { clip-path: inset(0 0 0 0); }
+
+/* ── SVG line draw (workflow connectors) ── */
+.draw-line { stroke-dasharray: 240; stroke-dashoffset: 240; transition: stroke-dashoffset 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s; }
+.visible .draw-line, .draw-line.visible { stroke-dashoffset: 0; }
+
+/* ── Animated bar chart (report illustration) ── */
+.chart-bar { transform: scaleY(0); transform-origin: bottom; transition: transform 0.9s cubic-bezier(0.22,1,0.36,1); }
+.visible .chart-bar, .chart-bar.visible { transform: scaleY(1); }
+.chart-bar-1 { transition-delay: 0.1s; } .chart-bar-2 { transition-delay: 0.25s; }
+.chart-bar-3 { transition-delay: 0.4s; } .chart-bar-4 { transition-delay: 0.55s; }
+.chart-bar-5 { transition-delay: 0.7s; }
+
+/* ── Section band backgrounds ── */
+.band-grid {
+  background-image:
+    linear-gradient(rgba(36,72,60,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36,72,60,0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.band-fade-edges {
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+
+/* ── Product screenshot band (image with SVG fallback) ──
+   The band shows a real captured screenshot; if the image fails to
+   load, the onerror handler adds .img-failed to the band and the
+   hand-drawn SVG takes over. */
+.shot-frame { position: relative; }
+.shot-frame::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(23, 32, 28, 0.05), transparent);
+}
+.shot-fallback { display: none; }
+[data-shot-band].img-failed .shot-frame { display: none; }
+[data-shot-band].img-failed .shot-fallback { display: block; }
+
+/* ── Marquee (client logos / capabilities strip) ── */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-track { display: flex; gap: 48px; width: max-content; animation: marquee 28s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
+.marquee-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #69746F; white-space: nowrap; }
+.marquee-item .material-symbols-outlined { font-size: 18px; color: #24483C; opacity: 0.7; }
+
+/* ── Avatar stack ── */
+.avatar-stack { display: flex; }
+.avatar-stack .avatar {
+  width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; margin-left: -8px;
+}
+.avatar-stack .avatar:first-child { margin-left: 0; }
+
+/* ── CTA grid pattern (dark sections) ── */
+.cta-grid-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 60% 80% at 50% 50%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 80% at 50% 50%, black 20%, transparent 70%);
+}
+
+/* ── Parallax section headings (transform driven from landing.js) ── */
+.parallax-heading { will-change: transform; }
+
+/* ── Reduced motion: disable everything decorative ── */
+@media (prefers-reduced-motion: reduce) {
+  .hero-grid::after, .float-chip, .parallax-orb, .marquee-track { animation: none !important; }
+  .float-slow, .float-medium { animation: none !important; }
+  .tilt-card, .tilt-card:hover { transform: none !important; }
+  .parallax-heading { transform: none !important; will-change: auto; }
+  .img-reveal { clip-path: none; transition: none; }
+  .draw-line { stroke-dashoffset: 0; transition: none; }
+  .chart-bar { transform: scaleY(1); transition: none; }
+  .reveal, .reveal-scale, .reveal-left, .reveal-right, .reveal-pop {
+    opacity: 1 !important; transform: none !important; transition: none !important;
+  }
+}
 
 /* ── Scroll Reveal ── */
 .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1); }
@@ -93,6 +300,26 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Card Hover ── */
 .card-hover { transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s cubic-bezier(0.22,1,0.36,1); }
 .card-hover:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(36,72,60,0.1); }
+
+/* ── Scroll entrance variants (feature / role cards). Declared AFTER
+   .card-hover so the entrance transition wins the cascade — otherwise
+   card-hover's 0.3s transform-only transition would replace it. ── */
+.reveal-left,
+.reveal-right,
+.reveal-pop {
+  opacity: 0;
+  transition:
+    opacity 0.8s cubic-bezier(0.22,1,0.36,1),
+    transform 0.8s cubic-bezier(0.22,1,0.36,1);
+  transition-delay: calc(var(--i, 0) * 0.12s);
+  will-change: opacity, transform;
+}
+.reveal-left { transform: translateX(-56px); }
+.reveal-right { transform: translateX(56px); }
+.reveal-pop { transform: translateY(28px) scale(0.94); }
+.reveal-left.visible,
+.reveal-right.visible,
+.reveal-pop.visible { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
 
 /* ── Floating Orbs ── */
 .orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15; pointer-events: none; }

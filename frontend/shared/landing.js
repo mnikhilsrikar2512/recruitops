@@ -35,8 +35,21 @@
       <div class="landing-nav-actions">
         <a class="btn-nav btn-nav-ghost" href="${prefix}login.html">Sign In</a>
         <a class="btn-nav btn-nav-primary" href="${prefix}login.html">Start Free Trial</a>
+        <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false" aria-controls="mobileMenu">
+          <span class="material-symbols-outlined" style="font-size:22px">menu</span>
+        </button>
       </div>
     </div>
+    <ul class="mobile-menu" id="mobileMenu">
+      <li class="mobile-menu-clip">
+        <ul class="mobile-menu-list">
+          <li><a href="${prefix}product-tour.html"${isActive("product-tour")}>Product</a></li>
+          <li><a href="${prefix}use-cases.html"${isActive("use-cases")}>Use Cases</a></li>
+          <li><a href="${prefix}login.html">Sign In</a></li>
+          <li><a href="${prefix}login.html" class="mobile-menu-cta">Start Free Trial</a></li>
+        </ul>
+      </li>
+    </ul>
   </nav>`;
 
   /* ═══ INJECT FOOTER ═══ */
@@ -108,13 +121,102 @@
     },
     { threshold: 0.15, rootMargin: "0px 0px -40px 0px" }
   );
-  document.querySelectorAll(".reveal, .reveal-scale").forEach((el) => revealObserver.observe(el));
+  document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right, .reveal-pop").forEach((el) => revealObserver.observe(el));
 
   /* ═══ NAV SCROLL SHADOW ═══ */
   window.addEventListener("scroll", () => {
     const nav = document.getElementById("landingNav");
     if (nav) nav.classList.toggle("scrolled", window.scrollY > 20);
   });
+
+  /* ═══ REDUCED MOTION GUARD ═══ */
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ═══ PARALLAX DEPTH ON SECTION HEADINGS ═══
+     Headings drift behind the scroll while entering the viewport and
+     settle to rest by the time they reach the upper third — a subtle
+     depth cue. Scroll-linked via rAF; skipped under reduced motion. */
+  const parallaxHeadings = [];
+  if (!reduceMotion) {
+    document.querySelectorAll("main section h2").forEach((h) => {
+      h.classList.add("parallax-heading");
+      parallaxHeadings.push(h);
+    });
+  }
+  if (parallaxHeadings.length) {
+    const DEPTH = 28; // px of drift across the entry band
+    let ticking = false;
+    const updateHeadingParallax = () => {
+      ticking = false;
+      const vh = window.innerHeight;
+      for (const h of parallaxHeadings) {
+        const rect = h.getBoundingClientRect();
+        if (rect.bottom < -80 || rect.top > vh + 80) continue;
+        /* 0 entering at the bottom edge → 1 settled in the upper third */
+        const progress = Math.min(1, Math.max(0, (vh - rect.top) / (vh * 0.85)));
+        h.style.transform = `translateY(${((1 - progress) * DEPTH).toFixed(1)}px)`;
+      }
+    };
+    window.addEventListener("scroll", () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(updateHeadingParallax); }
+    }, { passive: true });
+    updateHeadingParallax();
+  }
+
+  /* ═══ MOUSE PARALLAX ON HERO ORBS ═══ */
+  const hero = document.querySelector(".landing-hero");
+  if (hero && !reduceMotion) {
+    const orbs = hero.querySelectorAll(".orb");
+    orbs.forEach((orb) => orb.classList.add("parallax-orb"));
+    hero.addEventListener("mousemove", (e) => {
+      const rect = hero.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width - 0.5;
+      const ny = (e.clientY - rect.top) / rect.height - 0.5;
+      orbs.forEach((orb, i) => {
+        const depth = (i + 1) * 14;
+        orb.style.transform = `translate(${(-nx * depth).toFixed(1)}px, ${(-ny * depth).toFixed(1)}px)`;
+      });
+    });
+    hero.addEventListener("mouseleave", () => {
+      orbs.forEach((orb) => (orb.style.transform = ""));
+    });
+  }
+
+  /* ═══ 3D TILT ON PRODUCT PREVIEW ═══ */
+  document.querySelectorAll(".tilt-wrap").forEach((wrap) => {
+    const card = wrap.querySelector(".tilt-card");
+    if (!card || reduceMotion) return;
+    wrap.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width;
+      const ny = (e.clientY - rect.top) / rect.height;
+      const rx = (0.5 - ny) * 8;
+      const ry = (nx - 0.5) * 10;
+      card.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`;
+      card.style.setProperty("--gx", `${(nx * 100).toFixed(1)}%`);
+      card.style.setProperty("--gy", `${(ny * 100).toFixed(1)}%`);
+    });
+    wrap.addEventListener("mouseleave", () => {
+      card.style.transform = "";
+    });
+  });
+
+  /* ═══ MOBILE MENU ═══ */
+  const burger = document.getElementById("navBurger");
+  const mobileMenu = document.getElementById("mobileMenu");
+  if (burger && mobileMenu) {
+    const isOpen = () => mobileMenu.classList.contains("open");
+    const setMenu = (open) => {
+      mobileMenu.classList.toggle("open", open);
+      burger.setAttribute("aria-expanded", String(open));
+      burger.querySelector(".material-symbols-outlined").textContent = open ? "close" : "menu";
+    };
+    burger.addEventListener("click", () => setMenu(!isOpen()));
+    /* Close on link tap, Escape, and resize back to desktop */
+    mobileMenu.addEventListener("click", (e) => { if (e.target.closest("a")) setMenu(false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) setMenu(false); });
+    window.matchMedia("(min-width: 769px)").addEventListener("change", (e) => { if (e.matches) setMenu(false); });
+  }
 
   /* ═══ SKIP LINK TARGET ═══ */
   const main = document.getElementById("main-content");

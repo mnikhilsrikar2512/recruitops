@@ -24,6 +24,10 @@
     .step-pill.active .step-label { color:#24483C; font-weight:700; }
     .step-pill.done .step-circle { background:#24483C; color:#fff; border-color:#24483C; }
     .step-pill.done .step-label { color:#24483C; }
+    /* Phones: labels don't fit — circles + connectors carry the progress */
+    @media (max-width: 480px) {
+      .step-label { display: none; }
+    }
     .step-circle { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; border:2px solid #DDE3DD; background:#FAFBF8; color:#69746F; transition:all 0.3s ease; }
     .step-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#69746F; transition:all 0.3s ease; white-space:nowrap; }
     .step-connector { width:40px; height:2px; background:#DDE3DD; transition:background 0.3s ease; flex-shrink:0; }
@@ -35,6 +39,9 @@
     <!-- HERO -->
     <section class="landing-hero py-20 px-6">
       <div class="landing-hero-bg"></div>
+      <div class="hero-grid"></div>
+      <div class="orb w-80 h-80 -top-40 -left-40 float-slow" style="background:#24483C"></div>
+      <div class="orb w-72 h-72 top-10 -right-36 float-medium" style="background:#3a7a5f"></div>
       <div class="max-w-4xl mx-auto text-center relative z-10">
         <span class="hero-badge inline-flex items-center gap-1.5 bg-success-bg px-3 py-1 rounded-full mb-6" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#24483C"><span class="material-symbols-outlined" style="font-size:14px">play_circle</span> Product Tour</span>
         <h1 class="hero-animate-1 font-extrabold text-on-surface mb-6" style="font-size:clamp(40px,5vw,52px);line-height:1.1">See the recruiting workflow<br/>end to end</h1>
@@ -42,6 +49,24 @@
         <div class="hero-animate-3 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a class="btn-primary w-full sm:w-auto" href="onboarding-welcome.html">Start Free Trial</a>
           <a class="btn-secondary w-full sm:w-auto" href="use-cases.html">View Use Cases</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLOATING PROOF CHIPS -->
+    <section class="px-6 pb-10 max-w-4xl mx-auto relative z-20 -mt-2">
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <div class="float-chip" style="position:static;animation-delay:0s">
+          <span class="material-symbols-outlined">description</span>
+          <span>Letterhead reports<span class="chip-sub">PDF + Excel export</span></span>
+        </div>
+        <div class="float-chip" style="position:static;animation-delay:1.2s">
+          <span class="material-symbols-outlined">trending_up</span>
+          <span>Revenue tracking<span class="chip-sub">fee % × joined CTC</span></span>
+        </div>
+        <div class="float-chip" style="position:static;animation-delay:2.4s">
+          <span class="material-symbols-outlined">notifications</span>
+          <span>Live notifications<span class="chip-sub">stage moves &amp; approvals</span></span>
         </div>
       </div>
     </section>
@@ -111,8 +136,9 @@
     </section>
 
     <!-- CTA -->
-    <section class="py-16 px-6 text-center" style="background:#24483C">
-      <div class="max-w-2xl mx-auto space-y-4 reveal"><h2 class="text-white font-extrabold" style="font-size:clamp(28px,4vw,32px)">Ready to see it in action?</h2><p style="font-size:16px;color:rgba(255,255,255,0.7)">Set up your recruitment OS in minutes.</p><a class="btn-primary bg-white hover:bg-surface-alt mt-4" href="onboarding-welcome.html" style="color:#24483C">Start Free Trial</a></div>
+    <section class="py-16 px-6 text-center relative overflow-hidden" style="background:#24483C">
+      <div class="cta-grid-bg"></div>
+      <div class="max-w-2xl mx-auto space-y-4 reveal relative z-10"><h2 class="text-white font-extrabold" style="font-size:clamp(28px,4vw,32px)">Ready to see it in action?</h2><p style="font-size:16px;color:rgba(255,255,255,0.7)">Set up your recruitment OS in minutes.</p><a class="btn-primary bg-white hover:bg-surface-alt mt-4" href="onboarding-welcome.html" style="color:#24483C">Start Free Trial</a></div>
     </section>
 
   </main>

@@ -3709,6 +3709,18 @@
       [data-layout="alert-strip"] {
         grid-template-columns: 1fr;
       }
+      /* Grid children with Tailwind min-w-[…] floors overflow their max-content
+         tracks (item wider than track = overlaps the neighbor). Cap them so each
+         control fills its track exactly. */
+      [data-layout="filter-toolbar-secondary"] > * {
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      [data-layout="filter-toolbar-secondary"] > * > select,
+      [data-layout="filter-toolbar-secondary"] > * > input {
+        width: 100% !important;
+      }
     }
     @media (max-width: 1024px) {
       [data-layout="resume-workspace-grid"],
@@ -3785,4 +3797,134 @@
     }
     footer > div {
       border: none !important;
+    }
+
+    /* ── Report viewer (print-optimized letterhead reports) ── */
+    .report-table thead th { white-space: nowrap; }
+    .report-table th, .report-table td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--outline-variant, #e0e0e0);
+      vertical-align: top;
+    }
+    .report-table thead th {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted, #5f6368);
+    }
+    .report-table tbody tr:hover { background: var(--highlight-soft, #f5f7fa); }
+    .report-table td.num, .report-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    @media print {
+      @page { size: A4; margin: 12mm; }
+      body { background: white !important; }
+      .app-sidebar, .app-topbar, .no-print, #mobile-nav, .toast-root { display: none !important; }
+      .app-shell { display: block !important; }
+      .app-main { margin: 0 !important; padding: 0 !important; max-width: none !important; }
+      .shell-card, .workspace-surface { border: none !important; box-shadow: none !important; background: white !important; padding: 0 !important; }
+      .report-sheet { break-inside: auto; }
+      .report-section { break-inside: avoid-page; }
+      .report-letterhead { break-after: avoid; }
+      .report-signatures { break-inside: avoid; }
+      table { break-inside: auto; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; }
+    }
+
+    /* ═══ MOBILE (≤640px) — in-app page fixes ═══
+      Targeted repairs for phone-width layouts of data-grid pages.
+      Desktop rules above are untouched. ═══ */
+    @media (max-width: 640px) {
+      /* Command headers must stack — auto-column grids crush the title */
+      body[data-route-id="company-dashboard"] [data-layout="report-command-header"] {
+        grid-template-columns: 1fr;
+      }
+      body[data-route-id="company-dashboard"] [data-layout="report-command-actions"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: stretch;
+      }
+      body[data-route-id="company-dashboard"] [data-layout="report-command-actions"] > * {
+        min-width: 0;
+      }
+
+      /* Toolbars: stack, full-width controls, no stretch-matched heights */
+      [data-layout="pipeline-toolbar"],
+      [data-layout="page-titlebar"],
+      [data-layout="pipeline-toolbar-actions"],
+      [data-layout="pipeline-filter-bar"],
+      [data-layout="page-titlebar-actions"],
+      [data-layout="workspace-header-actions"] {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      [data-layout="pipeline-toolbar"] > div:first-child {
+        grid-template-columns: 1fr;
+      }
+      [data-layout="pipeline-toolbar-actions"] {
+        grid-column: auto;
+        grid-row: auto;
+      }
+      [data-layout="pipeline-toolbar-actions"] > button,
+      [data-layout="pipeline-filter-bar"] > button,
+      [data-layout="pipeline-filter-bar"] input,
+      [data-layout="page-titlebar-actions"] > button,
+      [data-layout="page-titlebar-actions"] > a,
+      [data-layout="workspace-header-actions"] > button,
+      [data-layout="workspace-header-actions"] > a {
+        width: 100%;
+      }
+      /* Inputs: fixed rows, never inflated by a taller wrapped sibling.
+         filter-toolbar search inputs get flex:1 1 220px at ≤768px — on a
+         flexed column wrapper that basis becomes HEIGHT, so pin the row.
+         Same selector as the ≤768px rule so specificity ties break by order. */
+      [data-layout="pipeline-filter-bar"] input,
+      [data-layout="page-titlebar"] input,
+      [data-layout="filter-toolbar"] :is(input, select),
+      [data-layout="filter-toolbar"] input[placeholder*="Search"] {
+        height: 40px !important;
+        width: 100% !important;
+        flex: 0 0 auto !important;
+        min-height: 0;
+      }
+      /* stretch column parents inflate wrapped controls (246px search box);
+         ≤768px gives .relative wrappers flex-basis 280px/220px — those bases
+         become HEIGHTS on the stacked column, so pin them to content rows. */
+      [data-layout="filter-toolbar"] > div,
+      [data-layout="pipeline-filter-bar"] > div,
+      [data-layout="pipeline-filter-bar"] > .relative {
+        flex: 0 0 auto !important;
+        min-width: 0;
+        align-items: center;
+      }
+      [data-layout="pipeline-filter-bar"] > button {
+        flex: 0 0 auto !important;
+      }
+      /* same row-axis basis trap: title blocks carry flex-basis 240px which
+         becomes dead vertical space once the titlebar stacks as a column */
+      [data-layout="page-titlebar"] > div:first-child,
+      [data-layout="workspace-header"] > div:first-child,
+      [data-layout="dashboard-header"] > div:first-child {
+        flex: 0 0 auto !important;
+      }
+      /* action groups: direct children span the column; nested button-row DIVS
+         stack too — scoped to div so Tailwind's `.flex` on <button> doesn't
+         split icon from label */
+      [data-layout="page-titlebar-actions"] > *,
+      [data-layout="workspace-header-actions"] > *,
+      [data-layout="page-titlebar-actions"] div.flex,
+      [data-layout="workspace-header-actions"] div.flex {
+        width: 100%;
+        min-width: 0;
+      }
+      [data-layout="page-titlebar-actions"] div.flex,
+      [data-layout="workspace-header-actions"] div.flex {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      /* column+wrap would push later buttons into a phantom second column */
+      [data-layout="page-titlebar-actions"],
+      [data-layout="workspace-header-actions"] {
+        flex-wrap: nowrap;
+      }
     }
