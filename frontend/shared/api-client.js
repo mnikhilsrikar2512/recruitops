@@ -1592,7 +1592,10 @@ async function removeRequisitionAssignment(button) {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadCandidates() {
-  const payload = await apiRequest("/candidates/?page_size=100");
+  const tbody = document.querySelector(".workspace-surface tbody");
+  showSkeletonTable(tbody?.closest("table") || tbody, 6, 5);
+  const payload = await apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] }));
+  hideSkeleton(tbody?.closest("table") || tbody);
   fillExistingTable(payload.items || [], (row, item) => {
     const cells = row.querySelectorAll("td");
     setStackedCell(cells[0], item.full_name, item.email || "");
@@ -2200,6 +2203,30 @@ async function loadDashboards() {
         <span class="w-8 text-right text-[12px] font-semibold text-on-surface">${count}</span>
       </div>`;
     }).join("");
+
+    /* Stage distribution donut chart */
+    const donutContainer = document.querySelector("[data-live-stage-donut]");
+    if (donutContainer && typeof renderDonutChart !== "undefined") {
+      renderDonutChart(donutContainer, sorted.map(([stage, count]) => ({
+        label: stage.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        value: count
+      })), { size: 140 });
+    }
+
+    /* Update pipeline count in quick stats */
+    const countEl = document.querySelector("[data-live-pipeline-count]");
+    if (countEl) countEl.textContent = pipelineItems.length;
+  }
+
+  /* Pipeline trend line chart (simulated last 7 days) */
+  const trendContainer = document.querySelector("[data-live-pipeline-trend]");
+  if (trendContainer && typeof renderLineChart !== "undefined") {
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const trendData = days.map((day, i) => ({
+      label: day,
+      value: Math.max(1, pipelineItems.length - Math.floor(Math.random() * 3))
+    }));
+    renderLineChart(trendContainer, trendData, { color: "#1E293B", label: "pipeline-trend" });
   }
 
   /* Dynamic funnel from company-summary */
@@ -3015,7 +3042,10 @@ async function loadNotifications() {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadApprovalsInbox() {
+  const tbody = document.querySelector("[data-layout='table-surface'] tbody");
+  showSkeletonTable(tbody?.closest("table") || tbody, 5, 6);
   const payload = await apiRequest("/approvals/?page_size=50").catch(() => ({ items: [], meta: { total: 0 } }));
+  hideSkeleton(tbody?.closest("table") || tbody);
   const items = payload.items || [];
   const total = payload.meta?.total || items.length;
   const pending = items.filter((i) => i.status === "pending").length;
@@ -3031,10 +3061,10 @@ async function loadApprovalsInbox() {
   if (pendingCount) pendingCount.textContent = pending;
   wireApprovalTabs(items);
   /* Render table filtered to the active tab */
-  const tbody = document.querySelector("tbody");
-  if (!tbody) return;
+  const renderTbody = document.querySelector("tbody");
+  if (!renderTbody) return;
   const activeTab = document.querySelector('[data-approval-tab].bg-secondary-container')?.dataset.approvalTab || "pending";
-  renderApprovalRows(tbody, filterApprovalsByTab(items, activeTab));
+  renderApprovalRows(renderTbody, filterApprovalsByTab(items, activeTab));
   const paginationText = document.querySelector(".border-t span");
   if (paginationText) paginationText.textContent = `Showing 1 to ${(payload.items || []).length} of ${total} entries`;
 }

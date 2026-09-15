@@ -2812,3 +2812,400 @@ function toggleCommandPalette() {
 function setupCommandPalette() {
   buildCommandPalette();
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SKELETON LOADERS
+   Helper functions to show/hide skeleton placeholders while
+   API data loads. Call showSkeleton before fetch, hideSkeleton
+   after data renders.
+   ═══════════════════════════════════════════════════════════════ */
+function showSkeletonTable(container, rows = 5, cols = 4) {
+  if (!container) return;
+  const existing = container.querySelector(".skeleton-table");
+  if (existing) return;
+  const skeletonHtml = `
+    <table class="skeleton-table w-full">
+      <thead>
+        <tr>${Array.from({length: cols}, () => '<th><div class="skeleton skeleton-text-sm"></div></th>').join("")}</tr>
+      </thead>
+      <tbody>
+        ${Array.from({length: rows}, () => `
+          <tr class="skeleton-row">
+            ${Array.from({length: cols}, (_, i) => `<td><div class="skeleton skeleton-${i === 0 ? 'text' : 'text-sm'}" style="width:${60 + Math.random() * 30}%"></div></td>`).join("")}
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>`;
+  container.insertAdjacentHTML("afterbegin", skeletonHtml);
+}
+
+function showSkeletonCards(container, count = 3) {
+  if (!container) return;
+  const existing = container.querySelector(".skeleton-card");
+  if (existing) return;
+  const skeletonHtml = Array.from({length: count}, () => `
+    <div class="skeleton-card">
+      <div class="flex items-center gap-3">
+        <div class="skeleton skeleton-avatar"></div>
+        <div class="flex-1">
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton skeleton-text-sm mt-2"></div>
+        </div>
+      </div>
+      <div class="skeleton skeleton-text-lg"></div>
+      <div class="flex gap-2">
+        <div class="skeleton skeleton-badge"></div>
+        <div class="skeleton skeleton-badge"></div>
+      </div>
+    </div>
+  `).join("");
+  container.insertAdjacentHTML("afterbegin", skeletonHtml);
+}
+
+function hideSkeleton(container) {
+  if (!container) return;
+  container.querySelectorAll(".skeleton-table, .skeleton-card").forEach(el => el.remove());
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE TRANSITIONS
+   Smooth fade when navigating between pages.
+   ═══════════════════════════════════════════════════════════════ */
+function initPageTransition() {
+  const main = document.querySelector(".app-main, main, .workspace-surface");
+  if (main) main.classList.add("page-transition-enter");
+}
+document.addEventListener("DOMContentLoaded", initPageTransition);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PIPELINE DRAG-AND-DROP
+   Enables native HTML5 drag-and-drop on the pipeline board.
+   Cards carry their application_id via data attribute; columns
+   are the drop zones. On drop, PATCH /pipeline/applications/:id/stage
+   ═══════════════════════════════════════════════════════════════ */
+function setupPipelineDragDrop() {
+  const board = document.querySelector(".flex.gap-4.min-w-max");
+  if (!board) return;
+
+  // Make all candidate cards draggable
+  board.querySelectorAll("[cursor-grab], .cursor-grab").forEach((card) => {
+    card.setAttribute("draggable", "true");
+    card.addEventListener("dragstart", (e) => {
+      card.classList.add("opacity-50", "scale-95");
+      e.dataTransfer.setData("text/plain", card.dataset.applicationId || "");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("opacity-50", "scale-95");
+      board.querySelectorAll(".border-primary").forEach(el => el.classList.remove("border-primary", "bg-primary/5"));
+    });
+  });
+
+  // Set up drop zones on columns
+  board.querySelectorAll(".flex.flex-col.bg-surface-alt\\/50").forEach((col) => {
+    const stage = col.querySelector("h3")?.textContent.trim();
+    if (!stage) return;
+
+    col.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      col.classList.add("ring-2", "ring-primary/40", "ring-offset-1");
+    });
+
+    col.addEventListener("dragleave", () => {
+      col.classList.remove("ring-2", "ring-primary/40", "ring-offset-1");
+    });
+
+    col.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      col.classList.remove("ring-2", "ring-primary/40", "ring-offset-1");
+      const applicationId = e.dataTransfer.getData("text/plain");
+      if (!applicationId) return;
+
+      // Find the card and move it
+      const card = board.querySelector(`[data-application-id="${applicationId}"]`);
+      if (!card) return;
+      const dropZone = col.querySelector(".space-y-3, .flex-1");
+      if (dropZone) dropZone.appendChild(card);
+
+      // Update the stage badge count
+      board.querySelectorAll(".flex.flex-col.bg-surface-alt\\/50").forEach((c) => {
+        const count = c.querySelector(".space-y-3, .flex-1")?.children.length || 0;
+        const badge = c.querySelector("span.bg-surface");
+        if (badge) badge.textContent = count;
+      });
+
+      // Call the API
+      try {
+        await apiRequest(`/pipeline/applications/${applicationId}/stage`, {
+          method: "PATCH",
+          body: JSON.stringify({ to_stage: stage }),
+        });
+        showToast("Stage updated", `Candidate moved to ${stage}`);
+      } catch (err) {
+        showToast("Move failed", err.message || "Could not update stage");
+        // Revert on failure
+        location.reload();
+      }
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", setupPipelineDragDrop);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   BREADCRUMB NAVIGATION
+   Auto-generates breadcrumbs from the sidebar hierarchy.
+   Injects into .app-topbar on app pages.
+   ═══════════════════════════════════════════════════════════════ */
+function injectBreadcrumbs() {
+  const topbar = document.querySelector(".app-topbar");
+  if (!topbar) return;
+  const existing = topbar.querySelector(".breadcrumb-nav");
+  if (existing) return;
+
+  const routeId = document.body?.dataset.routeId || "";
+  const section = document.body?.dataset.routeKind || "";
+
+  // Map route IDs to breadcrumb paths
+  const breadcrumbMap = {
+    "company-dashboard": ["Reports", "Company Performance"],
+    "pipeline-board": ["Hiring", "Pipeline Board"],
+    "requisition-list": ["Hiring", "Requisitions"],
+    "candidate-profiles": ["Hiring", "Candidates"],
+    "client-directory": ["Hiring", "Clients"],
+    "user-management": ["Admin", "Users"],
+    "role-management": ["Admin", "Roles"],
+    "location-management": ["Admin", "Locations"],
+    "approvals-inbox": ["Inbox", "Approvals"],
+    "notifications-center": ["Inbox", "Notifications"],
+    "reports": ["Reports", "All Reports"],
+    "daily-review": ["Work", "Daily Review"],
+  };
+
+  const crumbs = breadcrumbMap[routeId];
+  if (!crumbs) return;
+
+  const nav = document.createElement("nav");
+  nav.className = "breadcrumb-nav flex items-center gap-1.5 text-[11px] text-text-muted mb-1";
+  nav.setAttribute("aria-label", "Breadcrumb");
+
+  crumbs.forEach((crumb, i) => {
+    const span = document.createElement("span");
+    span.textContent = crumb;
+    if (i < crumbs.length - 1) {
+      span.className = "hover:text-on-surface cursor-pointer transition-colors";
+    } else {
+      span.className = "text-on-surface font-medium";
+    }
+    nav.appendChild(span);
+
+    if (i < crumbs.length - 1) {
+      const sep = document.createElement("span");
+      sep.className = "text-text-muted/50";
+      sep.textContent = "›";
+      nav.appendChild(sep);
+    }
+  });
+
+  // Insert before the page title
+  const titleSection = topbar.querySelector(".min-w-0");
+  if (titleSection) {
+    titleSection.insertBefore(nav, titleSection.firstChild);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", injectBreadcrumbs);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   BOTTOM NAVIGATION (Mobile)
+   Injected into app pages on mobile viewports.
+   ═══════════════════════════════════════════════════════════════ */
+function injectBottomNav() {
+  if (document.querySelector(".bottom-nav")) return;
+  if (window.innerWidth > 768) return;
+
+  const routeId = document.body?.dataset.routeId || "";
+  const navItems = [
+    { icon: "dashboard", label: "Home", route: "company-dashboard.html" },
+    { icon: "work", label: "Reqs", route: "requisition-list.html" },
+    { icon: "groups", label: "People", route: "candidate-profiles.html" },
+    { icon: "view_kanban", label: "Pipeline", route: "pipeline-board.html" },
+    { icon: "approval", label: "Approvals", route: "approvals-inbox.html" },
+  ];
+
+  const nav = document.createElement("nav");
+  nav.className = "bottom-nav";
+  nav.setAttribute("aria-label", "Mobile navigation");
+
+  nav.innerHTML = navItems.map((item) => `
+    <a href="${item.route}" class="bottom-nav-item ${routeId === item.route.replace('.html', '') ? 'active' : ''}">
+      <span class="material-symbols-outlined">${item.icon}</span>
+      <span>${item.label}</span>
+    </a>
+  `).join("");
+
+  document.body.appendChild(nav);
+}
+
+document.addEventListener("DOMContentLoaded", injectBottomNav);
+window.addEventListener("resize", () => {
+  if (window.innerWidth <= 768) injectBottomNav();
+});
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PULL-TO-REFRESH (Mobile)
+   Pull down on list pages to reload data.
+   ═══════════════════════════════════════════════════════════════ */
+function setupPullToRefresh() {
+  if (window.innerWidth > 768) return;
+  const main = document.querySelector(".app-main, main");
+  if (!main) return;
+
+  let startY = 0;
+  let pulling = false;
+  const indicator = document.createElement("div");
+  indicator.className = "pull-to-refresh-indicator";
+  indicator.innerHTML = '<span class="material-symbols-outlined text-[18px]">refresh</span>';
+  document.body.appendChild(indicator);
+
+  main.addEventListener("touchstart", (e) => {
+    if (window.scrollY === 0) {
+      startY = e.touches[0].clientY;
+      pulling = true;
+    }
+  }, { passive: true });
+
+  main.addEventListener("touchmove", (e) => {
+    if (!pulling) return;
+    const diff = e.touches[0].clientY - startY;
+    if (diff > 0 && diff < 120) {
+      indicator.classList.add("pulling");
+      indicator.style.transform = `translateX(-50%) translateY(${Math.min(diff - 60, 8)}px)`;
+    }
+  }, { passive: true });
+
+  main.addEventListener("touchend", () => {
+    if (!pulling) return;
+    pulling = false;
+    const isRefreshing = indicator.classList.contains("pulling");
+    indicator.classList.remove("pulling");
+    indicator.style.transform = "";
+    if (isRefreshing) {
+      indicator.classList.add("refreshing");
+      location.reload();
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", setupPullToRefresh);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SVG CHART UTILITIES
+   Lightweight inline SVG charts for dashboards.
+   ═══════════════════════════════════════════════════════════════ */
+function renderLineChart(container, data, options = {}) {
+  if (!container || !data.length) return;
+  const { width = 400, height = 120, color = "#1E293B", label = "" } = options;
+  const max = Math.max(...data.map(d => d.value), 1);
+  const min = Math.min(...data.map(d => d.value), 0);
+  const range = max - min || 1;
+  const padding = 20;
+  const chartW = width - padding * 2;
+  const chartH = height - padding * 2;
+
+  const points = data.map((d, i) => {
+    const x = padding + (i / (data.length - 1)) * chartW;
+    const y = padding + chartH - ((d.value - min) / range) * chartH;
+    return { x, y, label: d.label, value: d.value };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const areaD = pathD + ` L ${points[points.length - 1].x} ${padding + chartH} L ${points[0].x} ${padding + chartH} Z`;
+
+  const svg = `
+    <svg width="100%" viewBox="0 0 ${width} ${height}" class="w-full">
+      <defs>
+        <linearGradient id="area-${label.replace(/\s/g, '')}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#area-${label.replace(/\s/g, '')})" />
+      <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      ${points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${color}" />`).join("")}
+      ${points.map(p => `<text x="${p.x}" y="${height - 2}" text-anchor="middle" font-size="9" fill="#6E7476">${p.label}</text>`).join("")}
+    </svg>`;
+  container.innerHTML = svg;
+}
+
+function renderBarChart(container, data, options = {}) {
+  if (!container || !data.length) return;
+  const { width = 400, height = 120, color = "#1E293B", label = "" } = options;
+  const max = Math.max(...data.map(d => d.value), 1);
+  const padding = 20;
+  const chartW = width - padding * 2;
+  const chartH = height - padding * 2;
+  const barW = Math.min(chartW / data.length - 4, 40);
+
+  const bars = data.map((d, i) => {
+    const x = padding + (i / data.length) * chartW + (chartW / data.length - barW) / 2;
+    const barH = (d.value / max) * chartH;
+    const y = padding + chartH - barH;
+    return { x, y, w: barW, h: barH, label: d.label, value: d.value };
+  });
+
+  const svg = `
+    <svg width="100%" viewBox="0 0 ${width} ${height}" class="w-full">
+      ${bars.map(b => `
+        <rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${color}" rx="3" opacity="0.8"/>
+        <text x="${b.x + b.w / 2}" y="${b.y - 4}" text-anchor="middle" font-size="9" fill="#6E7476">${b.value}</text>
+        <text x="${b.x + b.w / 2}" y="${height - 2}" text-anchor="middle" font-size="9" fill="#6E7476">${b.label}</text>
+      `).join("")}
+    </svg>`;
+  container.innerHTML = svg;
+}
+
+function renderDonutChart(container, data, options = {}) {
+  if (!container || !data.length) return;
+  const { size = 120, colors = ["#1E293B", "#4B5257", "#6E7476", "#A0A4A8", "#D4D8D6"] } = options;
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const r = size / 2 - 10;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  let currentAngle = -90;
+  const arcs = data.map((d, i) => {
+    const angle = (d.value / total) * 360;
+    const startAngle = currentAngle;
+    currentAngle += angle;
+    const endAngle = currentAngle;
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = (endAngle * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(startRad);
+    const y1 = cy + r * Math.sin(startRad);
+    const x2 = cx + r * Math.cos(endRad);
+    const y2 = cy + r * Math.sin(endRad);
+    const largeArc = angle > 180 ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    return { path, color: colors[i % colors.length], label: d.label, value: d.value, pct: Math.round((d.value / total) * 100) };
+  });
+
+  const svg = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      ${arcs.map(a => `<path d="${a.path}" fill="${a.color}" />`).join("")}
+      <circle cx="${cx}" cy="${cy}" r="${r * 0.55}" fill="#ffffff"/>
+      <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="14" font-weight="600" fill="#1E293B">${total}</text>
+      <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="9" fill="#6E7476">total</text>
+    </svg>
+    <div class="flex flex-wrap gap-2 mt-2">
+      ${arcs.map(a => `<div class="flex items-center gap-1 text-[10px] text-on-surface"><span class="w-2 h-2 rounded-full" style="background:${a.color}"></span>${a.label} (${a.pct}%)</div>`).join("")}
+    </div>`;
+  container.innerHTML = svg;
+}
