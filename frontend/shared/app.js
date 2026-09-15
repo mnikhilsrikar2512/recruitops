@@ -156,6 +156,58 @@ function attachKeyboardShortcuts() {
   document.addEventListener("keydown", handleKeyDown);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   TABLE DENSITY TOGGLE
+   Comfortable ↔ compact rows. One preference, persisted per user,
+   applied before first paint on every app page (see applyDensity
+   call at module top of DOMContentLoaded). Button lives in the
+   topbar, injected so every page gets it without HTML edits.
+   ═══════════════════════════════════════════════════════════════ */
+const DENSITY_KEY = "recruitops.table_density";
+
+function readDensityPreference() {
+  try { return localStorage.getItem(DENSITY_KEY) === "compact" ? "compact" : "comfortable"; }
+  catch { return "comfortable"; }
+}
+
+function applyDensityPreference(density) {
+  document.documentElement.classList.toggle("density-compact", density === "compact");
+  const btn = document.getElementById("density-toggle");
+  if (btn) {
+    const compact = density === "compact";
+    btn.setAttribute("aria-pressed", String(compact));
+    btn.title = compact ? "Table density: compact (click for comfortable)" : "Table density: comfortable (click for compact)";
+    const icon = btn.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = compact ? "density_small" : "density_medium";
+  }
+}
+
+function setDensityPreference(density) {
+  try { localStorage.setItem(DENSITY_KEY, density); } catch { /* private mode */ }
+  applyDensityPreference(density);
+}
+
+function injectDensityToggle() {
+  if (document.getElementById("density-toggle")) return;
+  const topbar = document.querySelector(".app-topbar");
+  if (!topbar) return;
+  const actions = topbar.querySelector(".flex.items-center.gap-2") || topbar;
+  const btn = document.createElement("button");
+  btn.id = "density-toggle";
+  btn.type = "button";
+  btn.className = "topbar-action rounded-full border border-border bg-surface p-2 text-on-surface";
+  btn.setAttribute("aria-pressed", "false");
+  btn.setAttribute("aria-label", "Toggle table density");
+  btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">density_medium</span>';
+  btn.addEventListener("click", () => {
+    setDensityPreference(readDensityPreference() === "compact" ? "comfortable" : "compact");
+    showToast("Table density changed", readDensityPreference() === "compact" ? "Rows are compacted to fit more on screen." : "Rows are back to comfortable spacing.");
+  });
+  const search = topbar.querySelector(".topbar-search");
+  if (search) { search.after(btn); } else { actions.appendChild(btn); }
+  applyDensityPreference(readDensityPreference());
+}
+
 function handleKeyDown(event) {
   // Don't steal keys from inputs unless we explicitly allow it.
   const editing = isEditableElement(event.target);
@@ -163,6 +215,7 @@ function handleKeyDown(event) {
   if (event.key === "Escape" && !editing) {
     const helpOverlay = document.getElementById("shortcut-help-overlay");
     if (helpOverlay) { helpOverlay.remove(); return; }
+    if (paletteElements && !paletteElements.overlay.classList.contains("hidden")) { closeCommandPalette(); return; }
     closeOpenOverlays();
     return;
   }
@@ -175,6 +228,11 @@ function handleKeyDown(event) {
   }
 
   const ctrl = event.ctrlKey || event.metaKey;
+  if (ctrl && !event.shiftKey && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    toggleCommandPalette();
+    return;
+  }
   if (ctrl && event.shiftKey && event.key.toLowerCase() === "n") {
     event.preventDefault();
     const candidateRoute =
@@ -233,6 +291,7 @@ function toggleShortcutHelp() {
         <button onclick="this.closest('#shortcut-help-overlay').remove()" class="text-text-muted hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">close</span></button>
       </div>
       <div class="space-y-2 text-sm">
+        <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Command palette</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Ctrl</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">K</kbd></div></div>
         <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Close overlays / dialogs</span><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Esc</kbd></div>
         <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Go back</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Alt</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">←</kbd></div></div>
         <div class="flex justify-between py-1.5 border-b border-border"><span class="text-on-surface">Go forward</span><div><kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">Alt</kbd> <kbd class="px-2 py-0.5 rounded bg-surface-alt border border-border font-mono text-[12px]">→</kbd></div></div>
@@ -2276,6 +2335,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setupGenericActionAnnotations(document);
   setupSidebarNav();
   setupRoutePrefetcher();
+  injectDensityToggle();
+  applyDensityPreference(readDensityPreference());
+  setupCommandPalette();
   const mobileDialog = document.getElementById("mobile-nav");
   const mobileOpen = document.querySelector("[data-mobile-nav-open]");
   const mobileClose = document.querySelector("[data-mobile-nav-close]");
@@ -2593,3 +2655,160 @@ document.addEventListener("DOMContentLoaded", () => {
 
     });
     
+
+/* ═══════════════════════════════════════════════════════════════
+   COMMAND PALETTE (Ctrl+K / ⌘K)
+   Fuzzy-lite search over: app navigation (from the sidebar),
+   primary pages, and quick actions. One owner: setupCommandPalette
+   builds the DOM lazily; toggleCommandPalette opens/closes.
+   ═══════════════════════════════════════════════════════════════ */
+const COMMAND_ITEMS = [
+  { label: "Company Performance", hint: "Dashboard", icon: "dashboard", route: "company-dashboard.html" },
+  { label: "My Work", hint: "Dashboard", icon: "assignment_ind", route: "my-work-dashboard.html" },
+  { label: "Role Dashboard", hint: "Dashboard", icon: "admin_panel_settings", route: "role-dashboard.html" },
+  { label: "Requisitions", hint: "Hiring", icon: "work", route: "requisition-list.html" },
+  { label: "New Requisition", hint: "Action", icon: "add_circle", route: "requisition-intake.html" },
+  { label: "Pipeline Board", hint: "Hiring", icon: "view_kanban", route: "pipeline-board.html" },
+  { label: "Candidates", hint: "Hiring", icon: "groups", route: "candidate-profiles.html" },
+  { label: "Clients", hint: "Hiring", icon: "business", route: "client-directory.html" },
+  { label: "Interviews", hint: "Hiring", icon: "calendar_month", route: "interview-scheduler.html" },
+  { label: "Offers", hint: "Hiring", icon: "description", route: "offer-management.html" },
+  { label: "Daily Review", hint: "Work", icon: "fact_check", route: "daily-review.html" },
+  { label: "Submit Daily Update", hint: "Action", icon: "upload_file", route: "daily-updates-submission.html" },
+  { label: "Approvals Inbox", hint: "Workflow", icon: "approval", route: "approvals-inbox.html" },
+  { label: "Notifications", hint: "Inbox", icon: "notifications", route: "notifications-center.html" },
+  { label: "Reports", hint: "Reports", icon: "analytics", route: "reports.html" },
+  { label: "Report Viewer", hint: "Reports", icon: "print", route: "report-viewer.html" },
+  { label: "Users", hint: "Admin", icon: "manage_accounts", route: "user-management.html" },
+  { label: "Roles & Permissions", hint: "Admin", icon: "shield", route: "role-management.html" },
+  { label: "Locations", hint: "Admin", icon: "location_on", route: "location-management.html" },
+  { label: "Business Titles", hint: "Admin", icon: "badge", route: "business-titles.html" },
+  { label: "Toggle table density", hint: "Action", icon: "density_medium", action: () => {
+      setDensityPreference(readDensityPreference() === "compact" ? "comfortable" : "compact");
+      showToast("Table density changed", readDensityPreference() === "compact" ? "Rows are compacted to fit more on screen." : "Rows are back to comfortable spacing.");
+    } },
+];
+
+let paletteElements = null;
+
+function collectSidebarCommands() {
+  const seen = new Set(COMMAND_ITEMS.map((i) => i.route));
+  document.querySelectorAll(".nav-link[href]").forEach((link) => {
+    const href = link.getAttribute("href");
+    if (!href || !href.endsWith(".html") || seen.has(href)) return;
+    const label = link.querySelector(".sidebar-label")?.textContent.trim();
+    if (!label) return;
+    seen.add(href);
+    COMMAND_ITEMS.push({ label, hint: "Menu", icon: link.querySelector(".material-symbols-outlined")?.textContent.trim() || "chevron_right", route: href });
+  });
+}
+
+function buildCommandPalette() {
+  if (paletteElements) return paletteElements;
+  collectSidebarCommands();
+  const overlay = document.createElement("div");
+  overlay.id = "command-palette";
+  overlay.className = "fixed inset-0 z-[9999] hidden items-start justify-center bg-black/35 pt-[12vh]";
+  overlay.innerHTML = `
+    <div class="w-full max-w-xl mx-4 bg-surface rounded-xl border border-border shadow-2xl overflow-hidden" role="dialog" aria-label="Command palette">
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-border">
+        <span class="material-symbols-outlined text-[20px] text-text-muted">search</span>
+        <input id="palette-input" type="text" placeholder="Search pages and actions..." autocomplete="off"
+          class="flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-text-muted" aria-label="Search commands" />
+        <kbd class="px-1.5 py-0.5 rounded bg-surface-alt border border-border font-mono text-[11px] text-text-muted">esc</kbd>
+      </div>
+      <div id="palette-results" class="max-h-[52vh] overflow-y-auto p-2" role="listbox"></div>
+      <div class="px-4 py-2 border-t border-border flex items-center gap-4 text-[11px] text-text-muted">
+        <span><kbd class="font-mono">↑↓</kbd> navigate</span><span><kbd class="font-mono">enter</kbd> open</span><span><kbd class="font-mono">esc</kbd> close</span>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector("#palette-input");
+  const results = overlay.querySelector("#palette-results");
+  let matches = [];
+  let activeIndex = 0;
+
+  function score(item, q) {
+    const hay = (item.label + " " + item.hint).toLowerCase();
+    const idx = hay.indexOf(q);
+    if (idx === -1) {
+      // subsequence fallback: all query chars in order
+      let pos = 0;
+      for (const ch of q) { pos = hay.indexOf(ch, pos); if (pos === -1) return -1; pos += 1; }
+      return 500 + pos;
+    }
+    // exact prefix ranks first (0), later substring matches rank by position
+    return idx + (item.label.toLowerCase().startsWith(q) ? 0 : 1);
+  }
+
+  function render() {
+    const q = input.value.trim().toLowerCase();
+    matches = q ? COMMAND_ITEMS
+      .map((item) => ({ item, s: score(item, q) }))
+      .filter((m) => m.s >= 0)
+      .sort((a, b) => a.s - b.s)
+      .map((m) => m.item)
+      .slice(0, 12)
+      : COMMAND_ITEMS.slice(0, 12);
+    activeIndex = 0;
+    if (!matches.length) {
+      results.innerHTML = '<div class="px-3 py-8 text-center text-sm text-text-muted">No matching pages or actions.</div>';
+      return;
+    }
+    results.innerHTML = matches.map((item, i) => `
+      <button type="button" role="option" aria-selected="${i === activeIndex}" data-palette-index="${i}"
+        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left ${i === activeIndex ? "bg-highlight-soft" : "hover:bg-highlight-soft"}">
+        <span class="material-symbols-outlined text-[18px] text-text-muted">${item.icon}</span>
+        <span class="flex-1 text-sm font-medium text-on-surface">${item.label}</span>
+        <span class="text-[11px] uppercase tracking-wide text-text-muted">${item.hint}</span>
+      </button>`).join("");
+  }
+
+  function run(item) {
+    closeCommandPalette();
+    if (item.action) { item.action(); return; }
+    if (item.route) navigateToRoute(item.route);
+  }
+
+  input.addEventListener("input", render);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") { event.preventDefault(); activeIndex = Math.min(activeIndex + 1, matches.length - 1); render(); scrollActive(); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); render(); scrollActive(); }
+    else if (event.key === "Enter") { event.preventDefault(); if (matches[activeIndex]) run(matches[activeIndex]); }
+  });
+  function scrollActive() {
+    const el = results.querySelector(`[data-palette-index="${activeIndex}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
+  results.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-palette-index]");
+    if (btn) run(matches[Number(btn.dataset.paletteIndex)]);
+  });
+  overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) closeCommandPalette(); });
+  paletteElements = { overlay, input, render };
+  return paletteElements;
+}
+
+function openCommandPalette() {
+  const { overlay, input, render } = buildCommandPalette();
+  overlay.classList.remove("hidden");
+  overlay.classList.add("flex");
+  input.value = "";
+  render();
+  input.focus();
+}
+
+function closeCommandPalette() {
+  if (!paletteElements) return;
+  paletteElements.overlay.classList.add("hidden");
+  paletteElements.overlay.classList.remove("flex");
+}
+
+function toggleCommandPalette() {
+  if (!paletteElements || paletteElements.overlay.classList.contains("hidden")) openCommandPalette();
+  else closeCommandPalette();
+}
+
+function setupCommandPalette() {
+  buildCommandPalette();
+}

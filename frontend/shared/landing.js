@@ -24,7 +24,7 @@
     <div class="landing-nav-inner">
       <div style="display:flex;align-items:center;gap:32px;">
         <a class="landing-nav-brand" href="${home}">
-          <span class="material-symbols-outlined" style="font-size:24px;color:#24483C;font-variation-settings:'FILL'1">widgets</span>
+          <span class="material-symbols-outlined" style="font-size:24px;color:#1e293b;font-variation-settings:'FILL'1">widgets</span>
           RecruitOps
         </a>
         <div class="landing-nav-links">
@@ -59,7 +59,7 @@
       <div class="landing-footer-main">
         <div class="landing-footer-brand">
           <a class="landing-nav-brand" href="${home}" style="margin-bottom:0">
-            <span class="material-symbols-outlined" style="font-size:22px;color:#24483C;font-variation-settings:'FILL'1">widgets</span>
+            <span class="material-symbols-outlined" style="font-size:22px;color:#1e293b;font-variation-settings:'FILL'1">widgets</span>
             RecruitOps
           </a>
           <p>The customizable recruitment operating system. Build your own designations, pipelines, and approval workflows.</p>

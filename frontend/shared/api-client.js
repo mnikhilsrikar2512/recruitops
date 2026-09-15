@@ -2177,6 +2177,58 @@ async function loadDashboards() {
     { label: "My Updates", value: myWork?.submitted_updates || 0, hint: "Submitted this week" },
     { label: "Pending Actions", value: myWork?.pending_actions || 0, hint: "Need attention" },
   ]);
+
+  /* Pipeline by Stage chart */
+  const stageContainer = document.querySelector("[data-live-stage-chart]");
+  if (stageContainer && pipelineItems.length) {
+    const stageCounts = {};
+    pipelineItems.forEach((item) => {
+      const stage = item.current_stage || "Unknown";
+      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    });
+    const sorted = Object.entries(stageCounts).sort((a, b) => b[1] - a[1]);
+    const maxCount = Math.max(...sorted.map((s) => s[1]), 1);
+    stageContainer.innerHTML = sorted.map(([stage, count]) => {
+      const pct = Math.round((count / maxCount) * 100);
+      const label = stage.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      return `<div class="flex items-center gap-3">
+        <span class="w-36 truncate text-[12px] text-on-surface">${escapeLiveHtml(label)}</span>
+        <div class="flex-1 h-6 bg-surface-alt rounded overflow-hidden relative">
+          <div class="h-full bg-primary/20 rounded" style="width:${pct}%"></div>
+          <div class="h-full bg-primary/60 rounded" style="width:${pct}%"></div>
+        </div>
+        <span class="w-8 text-right text-[12px] font-semibold text-on-surface">${count}</span>
+      </div>`;
+    }).join("");
+  }
+
+  /* Dynamic funnel from company-summary */
+  const funnelApplied = document.querySelector("[data-live-funnel-applied]");
+  const funnelScreening = document.querySelector("[data-live-funnel-screening]");
+  const funnelInterview = document.querySelector("[data-live-funnel-interview]");
+  const funnelOffer = document.querySelector("[data-live-funnel-offer]");
+  const funnelJoined = document.querySelector("[data-live-funnel-joined]");
+  if (funnelApplied) {
+    const total = company.total_submitted_profiles || company.total_active_applications || pipelineItems.length || 1;
+    const submitted = company.total_submitted_profiles || 0;
+    const active = company.total_active_applications || 0;
+    const joined = company.total_joined_applications || 0;
+    const offer = Math.max(active - joined, 0);
+    funnelApplied.textContent = submitted || active;
+    if (funnelScreening) funnelScreening.textContent = active;
+    if (funnelInterview) funnelInterview.textContent = Math.max(active - joined, 0);
+    if (funnelOffer) funnelOffer.textContent = offer;
+    if (funnelJoined) funnelJoined.textContent = joined;
+    /* Update percentage labels next to the bars */
+    const pcts = document.querySelectorAll("[data-live-funnel-pct]");
+    if (pcts.length >= 5 && total > 0) {
+      pcts[0].textContent = "100%";
+      pcts[1].textContent = Math.round(((submitted || active) / total) * 100) + "%";
+      pcts[2].textContent = Math.round((active / total) * 100) + "%";
+      pcts[3].textContent = Math.round((offer / total) * 100) + "%";
+      pcts[4].textContent = Math.round((joined / total) * 100) + "%";
+    }
+  }
 }
 
 
