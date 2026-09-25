@@ -15,6 +15,7 @@ from app.schemas.auth import (
     PasswordResetResponse,
     PasswordSetupRequest,
     PasswordSetupResponse,
+    ProfileUpdateRequest,
 )
 from app.services.auth import (
     AuthContext,
@@ -25,6 +26,7 @@ from app.services.auth import (
     logout_service,
     reset_password_service,
     setup_password_service,
+    update_own_profile_service,
 )
 
 router = APIRouter()
@@ -66,6 +68,15 @@ def me_endpoint(
     auth_context: AuthContext = Depends(get_current_auth_context),
 ) -> CurrentSessionResponse:
     return get_current_session_service(auth_context)
+
+
+@router.patch("/profile", response_model=CurrentSessionResponse)
+def update_profile_endpoint(
+    payload: ProfileUpdateRequest,
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> CurrentSessionResponse:
+    return update_own_profile_service(engine, auth_context, payload)
 
 
 @router.post("/password/change", response_model=PasswordChangeResponse)

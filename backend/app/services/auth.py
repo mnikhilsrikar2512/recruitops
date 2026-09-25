@@ -25,11 +25,13 @@ from app.repositories.auth import (
     touch_session,
     update_last_login,
 )
+from app.repositories.audit import insert_audit_log
 from app.repositories.users import (
     create_password_reset_token,
     find_user_by_email,
     find_valid_password_reset_token,
     mark_password_reset_token_used,
+    update_own_profile_fields,
     update_user_password_hash,
     update_user_password_state,
 )
@@ -46,6 +48,7 @@ from app.schemas.auth import (
     PasswordResetResponse,
     PasswordSetupRequest,
     PasswordSetupResponse,
+    ProfileUpdateRequest,
 )
 from app.schemas.permission import PermissionScopePayload, ResolvedPermissionsResponse
 
@@ -110,7 +113,9 @@ def _current_session_payload(user: LoginUserRecord) -> CurrentSessionResponse:
             "full_name": user.full_name,
             "email": user.email,
             "status": user.status,
-            "business_title": user.business_title,
+            "business_title": getattr(user, "business_title", None),
+            "phone": getattr(user, "phone", None),
+            "employee_code": getattr(user, "employee_code", None),
         },
         primary_role={
             "id": user.role_id,
@@ -160,7 +165,9 @@ def login_service(
             "full_name": user.full_name,
             "email": user.email,
             "status": user.status,
-            "business_title": user.business_title,
+            "business_title": getattr(user, "business_title", None),
+            "phone": getattr(user, "phone", None),
+            "employee_code": getattr(user, "employee_code", None),
         },
         primary_role={
             "id": user.role_id,
@@ -201,6 +208,44 @@ def logout_service(engine: Engine, auth_context: AuthContext) -> LogoutResponse:
 
 def get_current_session_service(auth_context: AuthContext) -> CurrentSessionResponse:
     return _current_session_payload(auth_context.user)
+
+
+def update_own_profile_service(
+    engine: Engine,
+    auth_context: AuthContext,
+    payload: ProfileUpdateRequest,
+) -> CurrentSessionResponse:
+    has_full_name = "full_name" in payload.model_fields_set
+    has_phone = "phone" in payload.model_fields_set
+    old_values = {
+        "full_name": auth_context.user.full_name,
+        "phone": getattr(auth_context.user, "phone", None),
+    }
+    update_own_profile_fields(
+        engine,
+        auth_context.user.id,
+        full_name=payload.full_name,
+        phone=payload.phone,
+        has_full_name=has_full_name,
+        has_phone=has_phone,
+    )
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="user",
+        entity_id=auth_context.user.id,
+        action_type="profile_updated",
+        old_values=old_values,
+        new_values={
+            "full_name": payload.full_name if has_full_name else old_values["full_name"],
+            "phone": payload.phone if has_phone else old_values["phone"],
+        },
+    )
+    refreshed = find_user_for_login(engine, auth_context.user.email)
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User was not found")
+    return _current_session_payload(refreshed)
 
 
 def get_resolved_permissions_service(engine: Engine, auth_context: AuthContext) -> ResolvedPermissionsResponse:

@@ -22,8 +22,8 @@ from app.services.auth import AuthContext
 # ---------------------------------------------------------------------------
 
 def _auth_ctx(user_id: int = 22, location_id: int = 4, role_code: str = "admin") -> AuthContext:
-    user = SimpleNamespace(
-        id=user_id,
+    user = make_login_user_record(
+        user_id=user_id,
         email="test@example.com",
         role_code=role_code,
         location_id=location_id,
@@ -461,6 +461,27 @@ class TestMeEndpoint:
         data = resp.json()
         assert data["user"]["id"] == 22
         assert data["primary_role"]["code"] == "admin"
+
+    def test_me_tolerates_partial_user_record(self):
+        user = SimpleNamespace(
+            id=22,
+            email="test@example.com",
+            role_code="admin",
+            location_id=4,
+            full_name="Test User",
+            business_title="Recruiter",
+            role_id=1,
+            role_name="Recruiter",
+            location_code="NYC",
+            location_name="New York",
+            status="active",
+        )
+        _, client = _make_app(AuthContext(session_id=1, session_token_hash="tok_hash", user=user))
+
+        resp = client.get("/api/v1/auth/me")
+        assert resp.status_code == 200
+        assert resp.json()["user"]["phone"] is None
+        assert resp.json()["user"]["employee_code"] is None
 
 
 # ===========================================================================

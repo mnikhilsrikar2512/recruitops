@@ -334,6 +334,45 @@ def create_user(engine: Engine, payload: UserCreate, password_hash: str) -> User
     return created
 
 
+def update_own_profile_fields(
+    engine: Engine,
+    user_id: int,
+    *,
+    full_name: str | None = None,
+    phone: str | None = None,
+    has_full_name: bool = False,
+    has_phone: bool = False,
+) -> None:
+    """Self-service profile write: only full_name and/or phone.
+
+    Decoupled from admin ``update_user`` so role/location/status side effects
+    cannot accidentally fire from ProfileUpdateRequest growth.
+    """
+    if not has_full_name and not has_phone:
+        return
+    update_sql = text(
+        """
+        UPDATE dbo.users
+        SET
+          full_name = CASE WHEN :has_full_name = 1 THEN :full_name ELSE full_name END,
+          phone = CASE WHEN :has_phone = 1 THEN :phone ELSE phone END,
+          updated_at = SYSUTCDATETIME()
+        WHERE id = :user_id;
+        """
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            update_sql,
+            {
+                "user_id": user_id,
+                "has_full_name": 1 if has_full_name else 0,
+                "full_name": full_name,
+                "has_phone": 1 if has_phone else 0,
+                "phone": phone,
+            },
+        )
+
+
 def update_user(engine: Engine, user_id: int, payload: UserUpdate, before: UserRecord) -> UserRecord:
     update_sql = text(
         """

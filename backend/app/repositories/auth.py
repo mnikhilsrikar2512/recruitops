@@ -51,7 +51,7 @@ def _user_auth_select_sql() -> str:
           u.phone,
           u.password_hash,
           u.status,
-          CAST(NULL AS NVARCHAR(100)) AS business_title,
+          u.business_title,
           u.force_password_change_on_first_login,
           ubr.branch_id AS location_id,
           r.id AS role_id,

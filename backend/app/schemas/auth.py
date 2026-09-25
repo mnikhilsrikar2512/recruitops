@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 def _normalize_text(value: str | None) -> str | None:
@@ -26,6 +26,8 @@ class AuthUserSummary(BaseModel):
     email: str
     status: str
     business_title: str | None
+    phone: str | None = None
+    employee_code: str | None = None
 
 
 class AuthRoleSummary(BaseModel):
@@ -71,6 +73,26 @@ class PasswordChangeRequest(BaseModel):
 
 class PasswordChangeResponse(BaseModel):
     message: str
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, min_length=1, max_length=200)
+    phone: str | None = Field(default=None, max_length=30)
+
+    @field_validator("full_name", "phone")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        return _normalize_text(value)
+
+    @model_validator(mode="after")
+    def ensure_any_field_present(self) -> "ProfileUpdateRequest":
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+        # Whitespace-only names normalize to None; treat that as invalid rather than
+        # a silent COALESCE no-op that returns 200.
+        if "full_name" in self.model_fields_set and self.full_name is None:
+            raise ValueError("full_name cannot be empty")
+        return self
 
 
 class PasswordSetupRequest(BaseModel):
