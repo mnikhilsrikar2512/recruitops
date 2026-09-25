@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
@@ -73,3 +73,8 @@ def create_application() -> FastAPI:
 
 
 app = create_application()
+
+
+@app.get("/", include_in_schema=False)
+def api_root() -> RedirectResponse:
+    return RedirectResponse(url="/docs", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
