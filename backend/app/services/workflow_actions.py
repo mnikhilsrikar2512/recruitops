@@ -146,7 +146,10 @@ def nudge_workflow_action_service(
     _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id)
 
     target_user_id = payload.target_user_id or action_item.assigned_user_id or auth_context.user.id
-    message = payload.message or f"Reminder: {action_item.title}"
+    message = payload.message or (
+        f"Reminder: the action \"{action_item.title}\" on {action_item.entity_type} is still open. "
+        "Complete it or pass it on."
+    )
     create_notification(
         engine,
         NotificationCreate(

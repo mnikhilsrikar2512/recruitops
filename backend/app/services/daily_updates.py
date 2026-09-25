@@ -36,8 +36,9 @@ def create_daily_update_service(engine: Engine, payload: DailyUpdateCreate) -> D
     requisition = find_requisition_by_id(engine, payload.requisition_id)
     if not requisition:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
+    is_admin = str(getattr(user, "primary_role_code", "") or "").lower() == "admin"
     same_location = user.primary_location_id == requisition.location_id
-    if not same_location:
+    if not is_admin and user.primary_location_id is not None and not same_location:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Submitted by user must belong to the same location as the requisition",
@@ -47,7 +48,7 @@ def create_daily_update_service(engine: Engine, payload: DailyUpdateCreate) -> D
         user_id=payload.submitted_by_user_id,
         requisition_id=payload.requisition_id,
     )
-    if not owns_requisition:
+    if not owns_requisition and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Submitted by user must be linked to the requisition",
@@ -75,7 +76,11 @@ def create_daily_update_service(engine: Engine, payload: DailyUpdateCreate) -> D
                     event_type="daily_update_submitted",
                     source_type="daily_update",
                     source_id=created.id,
-                    message="A daily update has been submitted for requisition",
+                    title="A daily update was submitted",
+                    message=(
+                        f"A daily update was submitted for {requisition.title}. "
+                        "Read it and follow up on blockers."
+                    ),
                     priority="low",
                     action_url=f"/daily-updates/{created.id}",
                 ),

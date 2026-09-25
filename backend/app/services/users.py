@@ -313,7 +313,11 @@ def deactivate_user_service(
                 event_type="user_deactivated",
                 source_type="user",
                 source_id=user_id,
-                message="Your account has been deactivated",
+                title="Your account was deactivated",
+                message=(
+                    "Your account has been deactivated and your active work was transferred "
+                    "to another user. Contact your administrator if you believe this is a mistake."
+                ),
                 priority="high",
                 action_url=None,
             ),
@@ -437,7 +441,11 @@ def move_user_service(
                 event_type="user_moved",
                 source_type="user",
                 source_id=user_id,
-                message="Your location or role has been updated",
+                title="Your role or branch was updated",
+                message=(
+                    "Your role or branch was updated and your active work was transferred. "
+                    "Review your new assignment so nothing is left behind."
+                ),
                 priority="normal",
                 action_url=None,
             ),

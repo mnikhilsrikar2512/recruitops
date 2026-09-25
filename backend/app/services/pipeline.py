@@ -167,7 +167,12 @@ def move_pipeline_stage_service(
                     event_type="pipeline_stage_changed",
                     source_type="pipeline",
                     source_id=application_id,
-                    message=f"Candidate moved from {from_stage} to {payload.to_stage}",
+                    title="Stage moved in the pipeline",
+                    message=(
+                        f"{application.candidate_name} moved from {from_stage} to "
+                        f"{payload.to_stage} on {application.requisition_title}. "
+                        "Open the pipeline board to continue their review."
+                    ),
                     priority="normal",
                     action_url=f"/pipeline/applications/{application_id}",
                 ),

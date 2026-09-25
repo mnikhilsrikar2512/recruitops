@@ -133,7 +133,11 @@ def create_candidate_service(engine: Engine, payload: CandidateCreate) -> Candid
                     event_type="candidate_assigned",
                     source_type="candidate",
                     source_id=created.id,
-                    message=f"New candidate {created.full_name} has been assigned to you",
+                    title="New candidate assigned to you",
+                    message=(
+                        f"{created.full_name} has been assigned to you as the sourcing owner. "
+                        "Review the profile and start screening."
+                    ),
                     priority="normal",
                     action_url=f"/candidates/{created.id}",
                 ),
@@ -315,7 +319,11 @@ def create_candidate_duplicate_decision_service(
                     event_type="duplicate_review_assigned",
                     source_type="candidate",
                     source_id=candidate_id,
-                    message="A duplicate review case has been assigned to you",
+                    title="Duplicate review to decide",
+                    message=(
+                        f"{candidate.full_name} may be a duplicate of an existing profile. "
+                        "Open the review case to keep, link, or discard the draft."
+                    ),
                     priority="high",
                     action_url=f"/candidates/{candidate_id}/duplicate-review",
                 ),
@@ -387,7 +395,11 @@ def finalize_candidate_service(
                     event_type="candidate_finalized",
                     source_type="requisition",
                     source_id=payload.requisition_id,
-                    message="Candidate has been finalized into requisition",
+                    title="Candidate linked to a requisition",
+                    message=(
+                        f"{candidate.full_name} was finalized into {requisition.title}. "
+                        "Open the requisition to confirm the move and plan next steps."
+                    ),
                     priority="normal",
                     action_url=f"/requisitions/{payload.requisition_id}",
                 ),
@@ -428,7 +440,11 @@ def reassign_candidate_owner_service(
                 event_type="candidate_owner_reassigned",
                 source_type="candidate",
                 source_id=candidate_id,
-                message="Candidate ownership has been reassigned to you",
+                title="You now own a candidate",
+                message=(
+                    f"You are now the primary owner of {candidate.full_name}. "
+                    "Open the profile and pick up their pipeline."
+                ),
                 priority="normal",
                 action_url=f"/candidates/{candidate_id}",
             ),

@@ -108,7 +108,11 @@ def create_requisition_service(engine: Engine, payload: RequisitionCreate) -> Re
                 event_type="requisition_created",
                 source_type="requisition",
                 source_id=created.id,
-                message="New requisition has been assigned to you as primary owner",
+                title="You are the primary owner of a new requisition",
+                message=(
+                    f"{created.title}{' for ' + created.client_name if created.client_name else ''} "
+                    "was created and assigned to you. Review intake and start sourcing."
+                ),
                 priority="normal",
                 action_url=f"/requisitions/{created.id}",
             ),
@@ -164,7 +168,11 @@ def update_requisition_status_service(
                     event_type="requisition_status_changed",
                     source_type="requisition",
                     source_id=requisition_id,
-                    message=f"Requisition status changed from {existing.status} to {payload.status}",
+                    title="Requisition status changed",
+                    message=(
+                        f"{existing.title} moved from {existing.status} to {payload.status}. "
+                        "Open the requisition to see what this changes for your pipeline."
+                    ),
                     priority="normal",
                     action_url=f"/requisitions/{requisition_id}",
                 ),
@@ -212,7 +220,11 @@ def create_requisition_assignment_service(
                 event_type="requisition_assigned",
                 source_type="requisition",
                 source_id=requisition_id,
-                message="You have been assigned to a requisition",
+                title="You were added to a requisition",
+                message=(
+                    f"You have been added as an assignee on {existing.title}. "
+                    "Open the requisition to see what you now own."
+                ),
                 priority="normal",
                 action_url=f"/requisitions/{requisition_id}",
             ),
@@ -277,7 +289,11 @@ def reassign_requisition_owners_service(
                 event_type="requisition_owner_reassigned",
                 source_type="requisition",
                 source_id=requisition_id,
-                message="You have been assigned as primary owner of a requisition",
+                title="You are now the requisition owner",
+                message=(
+                    f"You are now the primary owner of {existing.title}. "
+                    "Open it to review and prioritize the work."
+                ),
                 priority="normal",
                 action_url=f"/requisitions/{requisition_id}",
             ),
