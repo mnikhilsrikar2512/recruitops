@@ -231,6 +231,25 @@ CREATE NONCLUSTERED INDEX [IX_approvals_requester] ON approvals (requester_user_
 CREATE NONCLUSTERED INDEX [IX_approvals_status] ON approvals (status);
 CREATE NONCLUSTERED INDEX [IX_approvals_type] ON approvals (approval_type);
 
+CREATE TABLE agent_runs (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	agent_id NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	actor_user_id BIGINT NOT NULL, 
+	location_id BIGINT NULL, 
+	input_refs_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	output_draft_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	output_summary NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	decided_by_user_id BIGINT NULL, 
+	decided_at DATETIME2 NULL, 
+	decision_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK__agent_ru__3213E83F1A2B3C4D] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_agent_runs_actor] ON agent_runs (actor_user_id, created_at);
+CREATE NONCLUSTERED INDEX [IX_agent_runs_agent_status] ON agent_runs (agent_id, status, created_at);
+
 CREATE TABLE audit_log_access_events (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	actor_user_id BIGINT NOT NULL, 
@@ -1124,6 +1143,9 @@ ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_decision] FOREIGN KEY
 ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_requester] FOREIGN KEY ([requester_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_accessed_user] FOREIGN KEY ([accessed_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);

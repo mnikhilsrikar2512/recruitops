@@ -75,6 +75,10 @@ PERMISSION_ALIASES: dict[str, tuple[str, ...]] = {
     "workflow_action.resolve": ("workflow_action.resolve", "pipeline.stage.move", "candidate.update"),
     "workflow_action.nudge": ("workflow_action.nudge", "notification.manage", "notification.mark_read"),
     "workflow_overlay.submit": ("workflow_overlay.submit", "workflow_action.run", "candidate.update"),
+    "ai.use": ("ai.use",),
+    "ai.agent.resume_screener": ("ai.agent.resume_screener",),
+    "ai.agent.daily_brief": ("ai.agent.daily_brief",),
+    "ai.agent.inbox_triage": ("ai.agent.inbox_triage",),
 }
 
 _permission_cache: dict[int, tuple[float, set[str]]] = {}

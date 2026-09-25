@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     email_from_name: str = Field(default="Recruitment System", alias="EMAIL_FROM_NAME")
     email_from_address: str = Field(default="", alias="EMAIL_FROM_ADDRESS")
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
+    ai_provider: str = Field(default="mock", alias="AI_PROVIDER")
+    ai_max_items_per_run: int = Field(default=20, alias="AI_MAX_ITEMS_PER_RUN")
 
     model_config = SettingsConfigDict(
         env_file=".env",
