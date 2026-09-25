@@ -1,8 +1,8 @@
 {
- "generated_at_unix": 1787914846,
- "primary_route_count": 75,
- "overlay_route_count": 26,
- "total_route_count": 101,
+ "generated_at_unix": 1789682101,
+ "primary_route_count": 77,
+ "overlay_route_count": 22,
+ "total_route_count": 99,
  "primary_routes": [
   {
    "file": "login.html",
@@ -211,6 +211,17 @@
      "href": "user-detail.html"
     }
    ]
+  },
+  {
+   "file": "my-profile.html",
+   "route_id": "my-profile",
+   "kind": "app",
+   "title": "My Profile",
+   "section": "Administration",
+   "subtitle": "Profile overview with phone-safe edit behavior.",
+   "source": "my_profile",
+   "nav": "my-profile.html",
+   "links": []
   },
   {
    "file": "user-detail.html",

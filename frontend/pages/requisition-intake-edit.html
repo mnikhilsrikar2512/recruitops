@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Edit Requisition - RecruitOps</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<script src="../shared/tailwind.config.js"></script>
+<script src="../shared/tailwind.config.js?v=1789647200"></script>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=1787914846" />
+  <link rel="stylesheet" href="../shared/global.css?v=1789674001" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1789690200" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="requisition-intake-edit" data-route-kind="app" data-route-title="Edit Requisition" data-route-section="Requisitions">
   
@@ -163,12 +164,12 @@
         <main id="main-content" tabindex="-1" class="app-canvas">
           <div class="page-stack">
     
-    <section class="shell-card" data-demo-validate="true">
+    <section class="shell-card">
       <div class="workspace-surface">
-      <div class="bg-surface border-b border-border px-gutter py-6 mb-8 shadow-sm"> <div class="max-w-5xl mx-auto"> <div class="flex items-center text-body-sm text-text-muted mb-2 font-medium"> <a class="hover:text-primary transition-colors" href="requisition-list.html">Requisitions</a> <span class="material-symbols-outlined text-[16px] mx-1">chevron_right</span> <a class="hover:text-primary transition-colors" href="javascript:void(0)" data-toast="This helper action is preserved for later API or workflow wiring." data-toast-title="Placeholder action">REQ-1042</a> <span class="material-symbols-outlined text-[16px] mx-1">chevron_right</span> <span class="text-on-surface">Edit</span> </div> <div class="flex justify-between items-end"> <div class="flex items-center gap-4"> <h1 class="font-headline-lg text-headline-lg text-on-surface m-0">Edit Requisition</h1> <div class="bg-info-bg text-info-text border border-info-text/20 px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mt-2"> <span class="w-2 h-2 rounded-full bg-info-text">
+      <div class="bg-surface border-b border-border px-gutter py-6 mb-8 shadow-sm"> <div class="max-w-5xl mx-auto"> <div class="flex items-center text-body-sm text-text-muted mb-2 font-medium"> <a class="hover:text-primary transition-colors" href="requisition-list.html">Requisitions</a> <span class="material-symbols-outlined text-[16px] mx-1">chevron_right</span> <a class="hover:text-primary transition-colors" href="javascript:void(0)">REQ-1042</a> <span class="material-symbols-outlined text-[16px] mx-1">chevron_right</span> <span class="text-on-surface">Edit</span> </div> <div class="flex justify-between items-end"> <div class="flex items-center gap-4"> <h1 class="font-headline-lg text-headline-lg text-on-surface m-0">Edit Requisition</h1> <div class="bg-info-bg text-info-text border border-info-text/20 px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mt-2"> <span class="w-2 h-2 rounded-full bg-info-text">
 </span> Sourcing </div> </div> <div class="flex gap-3"> <button class="px-4 py-2 rounded font-body-sm text-body-sm font-semibold border border-border text-on-surface hover:bg-highlight-soft transition-colors bg-surface">View Detail</button> <button class="px-4 py-2 rounded font-body-sm text-body-sm font-semibold bg-primary-container text-on-primary-container hover:bg-primary-hover transition-colors">Save Changes</button> </div> </div> </div> </div> <div class="px-gutter max-w-5xl mx-auto"> <form> <!-- Section 2: Requisition basics --> <section class="section-card"> <h2 class="section-header">Basics</h2> <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"> <div class="form-group mb-0"> <label class="form-label">Job Title <span class="text-error">*</span>
 </label> <input class="form-input" type="text" value="Senior Frontend Engineer"> </div> <div class="form-group mb-0"> <label class="form-label">Internal Code</label> <input class="form-input bg-surface-soft text-text-muted" readonly="" type="text" value="REQ-1042"> </div> <div class="form-group mb-0"> <label class="form-label">Hiring Manager <span class="text-error">*</span>
-</label> <div class="relative"> <input class="form-input border-error ring-1 ring-error pr-10" type="text" value=""> <div class="absolute right-3 top-2 text-error"> <span class="material-symbols-outlined text-[20px]">error</span> </div> </div> <p class="text-[11px] text-error mt-1 font-medium">Hiring Manager is required.</p> </div> <div class="form-group mb-0"> <label class="form-label">Grade / Level</label> <select class="form-input"> <option>L4 (Mid)</option> <option selected="">L5 (Senior)</option> <option>L6 (Staff)</option> </select> </div> <div class="form-group mb-0"> <label class="form-label">Employment Type</label> <select class="form-input"> <option selected="">Full-Time (FTE)</option> <option>Contractor</option> <option>Temporary</option> </select> </div> <div class="form-group mb-0"> <label class="form-label">Location Model</label> <select class="form-input"> <option>On-site</option> <option>Hybrid</option> <option selected="">Remote</option> </select> </div> </div> </section> <!-- Section 3: Client and ownership --> <section class="section-card"> <h2 class="section-header">Client &amp; Ownership</h2> <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"> <div class="form-group mb-0"> <label class="form-label">Client Name</label> <input class="form-input" type="text" value="Acme Corp"> </div> <div class="form-group mb-0"> <label class="form-label">Account Owner</label> <input class="form-input" type="text" value="Sarah Jenkins"> </div> <div class="form-group mb-0 md:col-span-2"> <label class="form-label">Primary Stakeholder(s)</label> <input class="form-input" type="text" value="m.scott@acme.corp, d.schrute@acme.corp"> <p class="text-[11px] text-text-muted mt-1">Comma separated emails for automated updates.</p> </div> </div> </section> <!-- Section 4: Hiring and demand --> <section class="section-card"> <div class="flex justify-between items-center border-b border-border mb-stack-default pb-2"> <h2 class="font-headline-sm text-headline-sm text-on-surface m-0">Hiring &amp; Demand</h2> <span class="text-xs text-text-muted flex items-center gap-1.5">
+</label> <div class="relative"> <input class="form-input border-error ring-1 ring-error pr-10" type="text" value=""> <div class="absolute right-3 top-2 text-error"> <span class="material-symbols-outlined text-[20px]">error</span> </div> </div> <p class="text-[11px] text-error mt-1 font-medium">Hiring Manager is required.</p> </div> <div class="form-group mb-0"> <label class="form-label">Grade / Level</label> <select class="form-input"> <option>L4 (Mid)</option> <option selected="">L5 (Senior)</option> <option>L6 (Staff)</option> </select> </div> <div class="form-group mb-0"> <label class="form-label">Employment Type</label> <select class="form-input"> <option selected="">Full-Time (FTE)</option> <option>Contractor</option> <option>Temporary</option> </select> </div> <div class="form-group mb-0"> <label class="form-label">Location Model</label> <select class="form-input"> <option>On-site</option> <option>Hybrid</option> <option selected="">Remote</option> </select> </div> </div> </section> <!-- Section 3: Client and ownership --> <section class="section-card"> <h2 class="section-header">Client &amp; Ownership</h2> <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"> <div class="form-group mb-0"> <label class="form-label">Client Name</label> <input class="form-input" type="text" value="—"> </div> <div class="form-group mb-0"> <label class="form-label">Account Owner</label> <input class="form-input" type="text" value="—"> </div> <div class="form-group mb-0 md:col-span-2"> <label class="form-label">Primary Stakeholder(s)</label> <input class="form-input" type="text" value="m.scott@acme.corp, d.schrute@acme.corp"> <p class="text-[11px] text-text-muted mt-1">Comma separated emails for automated updates.</p> </div> </div> </section> <!-- Section 4: Hiring and demand --> <section class="section-card"> <div class="flex justify-between items-center border-b border-border mb-stack-default pb-2"> <h2 class="font-headline-sm text-headline-sm text-on-surface m-0">Hiring &amp; Demand</h2> <span class="text-xs text-text-muted flex items-center gap-1.5">
 <div class="w-1 h-3.5 bg-primary rounded-sm">
 </div> Modified fields</span> </div> <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
 <div class="form-group mb-0"> <label class="form-label">Target Headcount</label> <input class="form-input" type="number" value="2"> </div> <div class="form-group mb-0"> <label class="form-label">Target Start Date</label> <input class="form-input" type="date" value="2024-03-01"> </div> <div class="form-group mb-0 md:col-span-2"> <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6"> <div class="md:col-span-2" style="border-left: 3px solid #5e7464; padding-left: 12px;"> <label class="form-label">Budget Range (Annual) <span class="text-[10px] text-primary font-bold ml-1 uppercase tracking-wider">Edited</span>
@@ -185,15 +186,15 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
-    <script src="../shared/renderers.js"></script>
-    <script src="../shared/api-client.js?v=1787914846"></script>
-    <script src="../shared/ui-utils.js"></script>
-    <script src="../shared/tables.js"></script>
-    <script src="../shared/forms.js"></script>
-    <script src="../shared/sidebar.js"></script>
-    <script src="../shared/pipeline.js"></script>
-    <script src="../shared/routing.js"></script>
+    <script src="../shared/renderers.js?v=1789672601"></script>
+    <script src="../shared/api-client.js?v=1789701001"></script>
+    <script src="../shared/ui-utils.js?v=1789670400"></script>
+    <script src="../shared/tables.js?v=1789672710"></script>
+    <script src="../shared/forms.js?v=1789682100"></script>
+    <script src="../shared/sidebar.js?v=1789671410"></script>
+    <script src="../shared/pipeline.js?v=1789670400"></script>
+    <script src="../shared/routing.js?v=1789670400"></script>
 
-  <script src="../shared/app.js?v=1787914846"></script>
+  <script src="../shared/app.js?v=1789682101"></script>
 </body>
 </html>

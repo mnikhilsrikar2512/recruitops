@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Role Dashboard - RecruitOps</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<script src="../shared/tailwind.config.js"></script>
+<script src="../shared/tailwind.config.js?v=1789647200"></script>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=1787914846" />
+  <link rel="stylesheet" href="../shared/global.css?v=1789674001" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1789690200" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="role-dashboard" data-route-kind="app" data-route-title="Role Dashboard" data-route-section="Dashboard">
   
@@ -163,7 +164,7 @@
         <main id="main-content" tabindex="-1" class="app-canvas">
           <div class="page-stack">
     
-    <section class="shell-card" data-demo-validate="true">
+    <section class="shell-card">
       <div class="workspace-surface">
       <section class="flex-1 p-gutter min-w-0 transition-all duration-300"> <header class="mb-6 flex justify-between items-end"> <div> <h2 class="font-headline-lg text-headline-lg text-on-surface mb-1">Role Dashboard</h2> <p class="font-body-md text-body-md text-text-muted">Active decision-making command center.</p> </div> <div class="flex items-center gap-2"> <span class="flex items-center gap-1 font-label-caps text-label-caps text-success-text bg-success-bg px-2 py-1 rounded" data-role-system-status> <span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span> System Healthy </span> <span class="font-data-tabular text-data-tabular text-text-muted ml-2" data-role-last-sync>Loading…</span> </div> </header> <!-- KPI Strip --> <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6" data-role-kpi-strip> <!-- Metric 1: Open Requisitions --> <div class="bg-surface border border-border rounded p-4 relative group hover:bg-highlight-soft transition-colors cursor-pointer"> <div class="absolute top-0 left-0 w-1 bg-error"></div> <p class="font-label-caps text-label-caps text-text-muted mb-1 flex justify-between items-center"> Open Requisitions <span class="material-symbols-outlined text-[16px] text-error" data-icon="trending_up">trending_up</span> </p> <p class="font-headline-lg text-headline-lg text-on-surface" data-role-metric-open-reqs>—</p> <p class="font-body-sm text-body-sm text-danger-text mt-1" data-role-hint-open-reqs>Loading…</p> </div> <!-- Metric 2: Active Candidates --> <div class="bg-surface border border-border rounded p-4 relative group hover:bg-highlight-soft transition-colors cursor-pointer"> <div class="absolute top-0 left-0 w-1 bg-warning-text"></div> <p class="font-label-caps text-label-caps text-text-muted mb-1">Active Candidates</p> <p class="font-headline-lg text-headline-lg text-on-surface" data-role-metric-active-candidates>—</p> <p class="font-body-sm text-body-sm text-warning-text mt-1" data-role-hint-active-candidates>Loading…</p> </div> <!-- Metric 3: Active Applications --> <div class="bg-surface border border-border rounded p-4 group hover:bg-highlight-soft transition-colors cursor-pointer relative"> <div class="absolute top-0 left-0 w-1 bg-primary-container"></div> <p class="font-label-caps text-label-caps text-text-muted mb-1">Active Applications</p> <p class="font-headline-lg text-headline-lg text-on-surface" data-role-metric-active-apps>—</p> <p class="font-body-sm text-body-sm text-text-muted mt-1" data-role-hint-active-apps>Loading…</p> </div> <!-- Metric 4: Pending Updates --> <div class="bg-surface border border-border rounded p-4 group hover:bg-highlight-soft transition-colors cursor-pointer relative"> <div class="absolute top-0 left-0 w-1 bg-primary-container"></div> <p class="font-label-caps text-label-caps text-text-muted mb-1 flex justify-between items-center"> Pending Updates <span class="material-symbols-outlined text-[16px] text-success-text" data-icon="trending_up">trending_up</span> </p> <p class="font-headline-lg text-headline-lg text-on-surface" data-role-metric-pending-updates>—</p> <p class="font-body-sm text-body-sm text-success-text mt-1" data-role-hint-pending-updates>Loading…</p> </div> </div> <!-- Urgent Queue / Command List --> <div class="bg-surface border border-border rounded flex flex-col mb-6 shadow-[0_4px_12px_rgba(39,48,56,0.02)]"> <div class="bg-surface-alt px-inset-card py-3 border-b border-border flex justify-between items-center"> <div class="flex items-center gap-2"> <span class="material-symbols-outlined text-[18px] text-primary" data-icon="crisis_alert">crisis_alert</span> <h3 class="font-headline-sm text-headline-sm text-on-surface">Urgent Action Queue</h3> </div> <div class="flex items-center gap-2"> <button class="text-text-muted hover:text-on-surface font-body-sm text-body-sm flex items-center gap-1 transition-colors"> <span class="material-symbols-outlined text-[16px]" data-icon="filter_list">filter_list</span> Filter </button> </div> </div> <!-- Table Header --> <div class="grid grid-cols-12 gap-4 px-inset-card py-2 border-b border-border bg-surface font-label-caps text-label-caps text-text-muted"> <div class="col-span-5">Signal / Context</div> <div class="col-span-3">Entity</div> <div class="col-span-2">Age</div> <div class="col-span-2 text-right">Action</div> </div> <!-- List Items (Dense) --> <div class="flex flex-col" data-role-workflow-rows></div> <div class="p-3 text-center bg-surface rounded-b" data-role-queue-footer> <button class="font-body-sm text-body-sm text-primary hover:text-primary-hover transition-colors" type="button" data-route="approvals-inbox.html" data-role-queue-count>View all items in queue</button> </div> </div> <!-- Bento Layout for Secondary Monitoring --> <div class="grid grid-cols-1 lg:grid-cols-2 gap-6"> <!-- Stale Reqs Card --> <div class="bg-surface border border-border rounded flex flex-col"> <div class="bg-surface-alt px-4 py-3 border-b border-border flex justify-between items-center"> <h3 class="font-headline-sm text-headline-sm text-on-surface">Stale Requisitions</h3> <span class="font-label-caps text-label-caps text-warning-text bg-warning-bg px-2 py-0.5 rounded" data-role-stale-count>Action Req</span> </div> <div class="p-4 space-y-3 flex-1" data-role-stale-reqs> <p class="font-body-sm text-body-sm text-text-muted text-center py-4">Loading…</p> </div> </div> <!-- Daily Update Pressure --> <div class="rounded flex flex-col"> <div class="px-4 py-3 border-b border-border"> <h3 class="font-headline-sm text-headline-sm text-on-surface">Daily Update Pressure</h3> </div> <div class="p-4 flex-1 flex flex-col justify-center items-center relative" data-role-pressure> <div class="w-32 h-32 rounded-full border-4 border-surface-dim relative flex items-center justify-center"> <svg class="absolute inset-0 w-full -rotate-90" viewbox="0 0 100 100"> <circle class="text-warning-text opacity-80" cx="50" cy="50" fill="none" r="45" stroke="currentColor" stroke-dasharray="283" stroke-dashoffset="70" stroke-linecap="round" stroke-width="8"></circle> </svg> <div class="text-center"> <span class="font-headline-lg text-headline-lg text-on-surface block" data-role-pressure-value>—</span> <span class="font-label-caps text-label-caps text-text-muted">Load</span> </div> </div> <p class="font-body-sm text-body-sm text-text-muted mt-4 text-center" data-role-pressure-hint>Loading…</p> </div> </div> </div> </section>
       </div>
@@ -176,15 +177,15 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
-    <script src="../shared/renderers.js"></script>
-    <script src="../shared/api-client.js?v=1787914846"></script>
-    <script src="../shared/ui-utils.js"></script>
-    <script src="../shared/tables.js"></script>
-    <script src="../shared/forms.js"></script>
-    <script src="../shared/sidebar.js"></script>
-    <script src="../shared/pipeline.js"></script>
-    <script src="../shared/routing.js"></script>
+    <script src="../shared/renderers.js?v=1789672601"></script>
+    <script src="../shared/api-client.js?v=1789701001"></script>
+    <script src="../shared/ui-utils.js?v=1789670400"></script>
+    <script src="../shared/tables.js?v=1789672710"></script>
+    <script src="../shared/forms.js?v=1789682100"></script>
+    <script src="../shared/sidebar.js?v=1789671410"></script>
+    <script src="../shared/pipeline.js?v=1789670400"></script>
+    <script src="../shared/routing.js?v=1789670400"></script>
 
-  <script src="../shared/app.js?v=1787914846"></script>
+  <script src="../shared/app.js?v=1789682101"></script>
 </body>
 </html>
