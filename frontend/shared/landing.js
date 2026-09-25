@@ -12,11 +12,19 @@
   const prefix = isRoot ? "pages/" : "";
   const home = isRoot ? "index.html" : "../index.html";
   const currentPage = path.split("/").pop().replace(".html", "") || "index";
+  const routeKind = document.body?.dataset.routeKind || "";
+  const AUTH_PAGES = new Set(["login", "forgot-password", "reset-password", "password-setup"]);
+  if (routeKind === "auth" || AUTH_PAGES.has(currentPage)) {
+    return;
+  }
 
   /* ── Active nav link helper ── */
   function isActive(page) {
     return currentPage === page ? ' class="active"' : "";
   }
+
+  /* ── Brand mark: segmented ring + core dot (spins as a loader) ── */
+  const LOGO_SVG = `<svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg>`;
 
   /* ═══ INJECT NAV ═══ */
   const navHTML = `
@@ -24,7 +32,7 @@
     <div class="landing-nav-inner">
       <div style="display:flex;align-items:center;gap:32px;">
         <a class="landing-nav-brand" href="${home}">
-          <span class="material-symbols-outlined" style="font-size:24px;color:#1e293b;font-variation-settings:'FILL'1">widgets</span>
+          ${LOGO_SVG}
           RecruitOps
         </a>
         <div class="landing-nav-links">
@@ -59,7 +67,7 @@
       <div class="landing-footer-main">
         <div class="landing-footer-brand">
           <a class="landing-nav-brand" href="${home}" style="margin-bottom:0">
-            <span class="material-symbols-outlined" style="font-size:22px;color:#1e293b;font-variation-settings:'FILL'1">widgets</span>
+            ${LOGO_SVG}
             RecruitOps
           </a>
           <p>The customizable recruitment operating system. Build your own designations, pipelines, and approval workflows.</p>
@@ -110,6 +118,9 @@
             const suffix = el.dataset.suffix || "";
             let current = 0;
             const step = Math.max(1, Math.floor(target / 20));
+            if (el.textContent && el.textContent !== "0" && el.textContent !== "0" + suffix) {
+              return;
+            }
             const timer = setInterval(() => {
               current += step;
               if (current >= target) { current = target; clearInterval(timer); }
@@ -215,10 +226,12 @@
     /* Close on link tap, Escape, and resize back to desktop */
     mobileMenu.addEventListener("click", (e) => { if (e.target.closest("a")) setMenu(false); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) setMenu(false); });
-    window.matchMedia("(min-width: 769px)").addEventListener("change", (e) => { if (e.matches) setMenu(false); });
+    window.matchMedia("(min-width: 1024px)").addEventListener("change", (e) => { if (e.matches) setMenu(false); });
   }
 
   /* ═══ SKIP LINK TARGET ═══ */
   const main = document.getElementById("main-content");
-  if (main) main.style.paddingTop = "64px";
+  if (main && !main.querySelector(".landing-hero")) {
+    main.style.paddingTop = "64px";
+  }
 })();

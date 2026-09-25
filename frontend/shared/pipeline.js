@@ -4,7 +4,7 @@
 
 function normalizePipelineStage(value) {
   return (value || "")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -41,6 +41,26 @@ function getPipelineBoardTrack() {
 }
 
 
+function normalizePipelineDropZone(dropZone, stageName = "") {
+  if (!dropZone) return dropZone;
+  dropZone.classList.remove("flex", "items-center", "justify-center", "flex-row", "flex-wrap");
+  dropZone.classList.add("flex-1", "overflow-y-auto", "hide-scrollbar", "space-y-3", "p-1", "pipeline-drop-zone");
+  if (stageName) dropZone.dataset.pipelineDropZone = stageName;
+  const hasCards = dropZone.querySelector(":scope > .cursor-grab, :scope > [data-pipeline-candidate-card], :scope > [data-application-id]");
+  Array.from(dropZone.children).forEach((child) => {
+    const isCard = child.matches(".cursor-grab, [data-pipeline-candidate-card], [data-application-id], .pipeline-card");
+    if (!isCard) child.remove();
+  });
+  if (!hasCards) {
+    const empty = document.createElement("div");
+    empty.className = "pipeline-empty-note";
+    empty.textContent = `Drop candidates into ${stageName || "this stage"}`;
+    dropZone.appendChild(empty);
+  }
+  return dropZone;
+}
+
+
 function buildPipelineColumn(stageName, templateColumn = null) {
   const column = templateColumn?.cloneNode(true) || document.createElement("div");
   column.className = "w-[300px] flex flex-col bg-surface-alt/50 rounded-xl border border-border p-2";
@@ -54,14 +74,10 @@ function buildPipelineColumn(stageName, templateColumn = null) {
   const dropZone = Array.from(column.querySelectorAll(":scope > div")).find((zone) => zone.querySelector(".pipeline-empty-note"))
     || Array.from(column.querySelectorAll(":scope > div")).at(-1)
     || column.appendChild(document.createElement("div"));
-  dropZone.className = "flex-1 overflow-y-auto hide-scrollbar space-y-3 p-1 pipeline-drop-zone";
-  dropZone.dataset.pipelineDropZone = stageName;
-  dropZone.innerHTML = `<div class="pipeline-empty-note">Drop candidates into ${stageName}</div>`;
+  normalizePipelineDropZone(dropZone, stageName);
   const addButton = Array.from(column.querySelectorAll("button")).find((button) => /add/i.test(getActionLabel(button)) || button.querySelector(".material-symbols-outlined"));
   if (addButton) {
     addButton.type = "button";
-    addButton.dataset.toastTitle = "Candidate intake staged";
-    addButton.dataset.toast = `Add candidate to ${stageName} is ready for the live intake API.`;
   }
   return column;
 }
@@ -77,7 +93,7 @@ function applyPipelineFlowToBoard(stages = readPipelineFlow()) {
   const cardsByStage = new Map();
   const reassignedCards = [];
   columns.forEach((column) => {
-    const cards = Array.from(column.dropZone?.querySelectorAll(":scope > .cursor-grab, :scope > [data-pipeline-candidate-card]") || []);
+    const cards = Array.from(column.dropZone?.querySelectorAll(":scope > .cursor-grab, :scope > [data-pipeline-candidate-card], :scope > [data-application-id]") || []);
     cardsByStage.set(slugifyPipelineValue(column.name), cards);
   });
   track.innerHTML = "";
@@ -89,19 +105,8 @@ function applyPipelineFlowToBoard(stages = readPipelineFlow()) {
     nextColumn.style.opacity = "";
     const heading = nextColumn.querySelector("h3") || nextColumn.querySelector("h2");
     if (heading) heading.textContent = stageName;
-    const dropZone = Array.from(nextColumn.querySelectorAll(":scope > div")).find((zone) => zone.querySelector(".cursor-grab, [data-pipeline-candidate-card], .pipeline-empty-note"))
+    const dropZone = Array.from(nextColumn.querySelectorAll(":scope > div")).find((zone) => zone.querySelector(".cursor-grab, [data-pipeline-candidate-card], [data-application-id], .pipeline-empty-note"))
       || Array.from(nextColumn.querySelectorAll(":scope > div")).at(-1);
-    if (dropZone) {
-      dropZone.classList.add("pipeline-drop-zone");
-      dropZone.dataset.pipelineDropZone = stageName;
-      dropZone.querySelectorAll(".pipeline-empty-note").forEach((node) => node.remove());
-      if (!dropZone.querySelector(".cursor-grab, [data-pipeline-candidate-card]")) {
-        const empty = document.createElement("div");
-        empty.className = "pipeline-empty-note";
-        empty.textContent = `Drop candidates into ${stageName}`;
-        dropZone.appendChild(empty);
-      }
-    }
     track.appendChild(nextColumn);
     if (!matchedColumn) {
       (cardsByStage.get(slug) || []).forEach((card) => dropZone?.appendChild(card));
@@ -121,6 +126,7 @@ function applyPipelineFlowToBoard(stages = readPipelineFlow()) {
           });
         });
     }
+    if (dropZone) normalizePipelineDropZone(dropZone, stageName);
   });
   updatePipelineCounts(getPipelineColumns());
   if (reassignedCards.length) {
@@ -292,7 +298,7 @@ function extractPipelineCandidate(card, fallbackStage = "") {
   const meta = normalizePipelineStage(metaNode?.textContent);
   if (!name) return null;
   return {
-    id: slugifyPipelineValue(name),
+    id: card.dataset.applicationId || slugifyPipelineValue(name),
     name,
     meta,
     stage: fallbackStage,
@@ -348,6 +354,9 @@ function pipelineCandidateUrl(candidate, target = "stage-move-dialog.html") {
     stage: candidate.stage || "",
     owner: candidate.owner || "",
   });
+  if (/^\d+$/.test(String(candidate.id || ""))) {
+    params.set("application_id", String(candidate.id));
+  }
   return `${target}?${params.toString()}`;
 }
 
@@ -394,12 +403,7 @@ function setupPipelineBoardInteractions() {
     column.column.dataset.pipelineStage = column.name;
     column.dropZone?.classList.add("pipeline-drop-zone");
     column.dropZone?.setAttribute("data-pipeline-drop-zone", column.name);
-    const existingEmpty = column.dropZone?.querySelector(".pipeline-empty-note")
-      || (column.dropZone?.children.length === 1 && !column.dropZone.querySelector(".cursor-grab") ? column.dropZone.firstElementChild : null);
-    if (existingEmpty) {
-      existingEmpty.classList.add("pipeline-empty-note");
-      existingEmpty.textContent = `Drop candidates into ${column.name}`;
-    }
+    if (column.dropZone) normalizePipelineDropZone(column.dropZone, column.name);
 
     if (!column.dropZone?.dataset.pipelineDropBound) {
       column.dropZone.dataset.pipelineDropBound = "true";
@@ -419,7 +423,15 @@ function setupPipelineBoardInteractions() {
         const card = cardId ? document.querySelector(`[data-pipeline-card-id="${cardId}"]`) : null;
         if (!card || card.closest("[data-pipeline-drop-zone]") === column.dropZone) return;
         const previous = extractPipelineCandidate(card, card.closest("[data-pipeline-stage]")?.dataset.pipelineStage || "");
+        const sourceZone = card.closest("[data-pipeline-drop-zone]");
+        column.dropZone.classList.remove("flex", "items-center", "justify-center");
+        column.dropZone.querySelectorAll(".pipeline-empty-note, .border-dashed").forEach((node) => {
+          if (!node.closest(".cursor-grab, [data-pipeline-candidate-card], [data-application-id]")) node.remove();
+        });
         column.dropZone.appendChild(card);
+        if (sourceZone && sourceZone !== column.dropZone && !sourceZone.querySelector(".cursor-grab, [data-pipeline-candidate-card], [data-application-id]")) {
+          normalizePipelineDropZone(sourceZone, sourceZone.dataset.pipelineDropZone || "");
+        }
         card.querySelector(".pipeline-stage-status")?.remove();
         const status = document.createElement("div");
         status.className = "pipeline-stage-status mt-2 rounded-lg bg-success-bg px-2 py-1 text-[11px] font-semibold text-success-text";
@@ -439,20 +451,27 @@ function setupPipelineBoardInteractions() {
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", `Select ${name} for pipeline actions`);
-    if (!card.querySelector(".pipeline-card-action")) {
+    if (!card.querySelector(".pipeline-card-action, [data-route*='stage-move']")) {
       const action = document.createElement("button");
       action.type = "button";
       action.className = "pipeline-card-action";
       action.innerHTML = '<span class="material-symbols-outlined text-[16px]">move_up</span><span>Move stage</span>';
+      card.appendChild(action);
+    }
+    card.querySelectorAll(".pipeline-card-action, [data-route*='stage-move']").forEach((action) => {
+      if (action.dataset.pipelineMoveBound === "true") return;
+      action.dataset.pipelineMoveBound = "true";
+      action.type = "button";
       action.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         selectCard(card, true);
         const candidate = extractPipelineCandidate(card, card.closest("[data-pipeline-stage]")?.dataset.pipelineStage || "");
-        window.location.href = pipelineCandidateUrl(candidate);
+        const href = pipelineCandidateUrl(candidate);
+        if (typeof navigateToRoute === "function") navigateToRoute(href);
+        else window.location.href = typeof buildRouteHref === "function" ? buildRouteHref(href) : href;
       });
-      card.appendChild(action);
-    }
+    });
     if (!card.dataset.pipelineCardBound) {
       card.dataset.pipelineCardBound = "true";
       card.addEventListener("click", (event) => {
@@ -493,7 +512,9 @@ function setupPipelineBoardInteractions() {
       event.preventDefault();
       event.stopPropagation();
       rememberPipelineCandidate(candidate);
-      window.location.href = pipelineCandidateUrl(candidate, "stage-move-dialog.html");
+      const href = pipelineCandidateUrl(candidate, "stage-move-dialog.html");
+      if (typeof navigateToRoute === "function") navigateToRoute(href);
+      else window.location.href = typeof buildRouteHref === "function" ? buildRouteHref(href) : href;
     }, { capture: true });
   });
   if (document.body?.dataset.routeId === "pipeline-board") {
@@ -535,11 +556,16 @@ function setupStageMoveOverlay() {
     stage: column?.name || candidate.stage,
   }));
   const remembered = readRememberedPipelineCandidate();
-  const matchedCandidate = candidates.find((candidate) => candidate.id === remembered?.id)
-    || candidates.find((candidate) => candidate.name === remembered?.name);
-  let activeCandidate = matchedCandidate && remembered
-    ? { ...matchedCandidate, ...remembered, badges: matchedCandidate.badges || remembered.badges || [] }
-    : matchedCandidate || candidates[0] || remembered;
+  if (remembered?.name && !candidates.some((candidate) => candidate.id === remembered.id || candidate.name === remembered.name)) {
+    candidates.unshift(remembered);
+  }
+  const matchedCandidate = remembered
+    ? candidates.find((candidate) => candidate.id === remembered.id)
+      || candidates.find((candidate) => candidate.name === remembered.name)
+    : null;
+  let activeCandidate = remembered?.name
+    ? { ...(matchedCandidate || {}), ...remembered }
+    : matchedCandidate || candidates[0];
   const headerSubtitle = surface.querySelector("h2")?.parentElement?.querySelector("p");
   const stageRow = targetStage.closest(".flex.items-center.justify-between") || targetStage.closest(".flex");
   const currentStageLabel = stageRow?.querySelector(":scope > div:first-child div span:last-child");

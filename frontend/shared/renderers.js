@@ -75,8 +75,14 @@ function titleFromCode(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function activeSearchParams() {
+  const overlay = document.getElementById("ro-inpage-overlay");
+  if (overlay?.dataset.overlaySearch) return new URLSearchParams(overlay.dataset.overlaySearch);
+  return new URLSearchParams(window.location.search);
+}
+
 function queryInt(...names) {
-  const params = new URLSearchParams(window.location.search);
+  const params = activeSearchParams();
   for (const name of names) {
     const value = intOrNull(params.get(name));
     if (value) return value;
@@ -195,20 +201,54 @@ function tableHeaders() {
  * @param {number} opts.columnCount - colspan for the td
  * @returns {string} HTML string for the empty-state cell content
  */
+function emptyStateForRoute(filtered = false) {
+  const route = document.body?.dataset.routeId || "";
+  const map = {
+    "candidate-profiles": { title: "No candidates yet", hint: "Add a candidate to start building your talent pool.", cta: "Add Candidate", href: "candidate-review-drawer.html" },
+    "client-directory": { title: "No clients yet", hint: "Add a client to track accounts and requisitions.", cta: "Add Client", href: "" },
+    "requisition-list": { title: "No requisitions yet", hint: "Create a requisition to start hiring.", cta: "Create Requisition", href: "requisition-intake.html" },
+    "follow-ups": { title: "No follow-ups yet", hint: "Schedule a follow-up so nothing slips.", cta: "Add Follow-Up", href: "follow-up-form-dialog.html" },
+    "meetings": { title: "No meetings yet", hint: "Schedule a meeting with your team or a client.", cta: "Schedule Meeting", href: "meeting-form-dialog.html" },
+    "user-management": { title: "No users yet", hint: "Invite teammates so they can work in RecruitOps.", cta: "Add User", href: "" },
+    "role-management": { title: "No roles yet", hint: "Create a role to control access.", cta: "Create Role", href: "" },
+    "approvals-inbox": { title: "Nothing to approve", hint: "New requests will land here when they need a decision." },
+    "offer-management": { title: "No offers yet", hint: "Create an offer when a candidate is ready.", cta: "Create Offer", href: "offer-create-dialog.html" },
+    "interview-scheduler": { title: "No interviews yet", hint: "Interviews appear here once they are scheduled." },
+  };
+  if (filtered) {
+    return { title: "No matching records", hint: "Nothing matches this search or filter. Clear it to see all records.", cta: "Clear filters", clear: true };
+  }
+  return map[route] || { title: "Nothing here yet", hint: "Try a different filter, or add a new record." };
+}
+
+function renderEmptyStateCta(meta) {
+  if (!meta?.cta) return "";
+  if (meta.clear) {
+    return `<button type="button" data-clear-workspace-filters="true" class="mt-2 inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 text-[12px] font-semibold text-on-surface hover:bg-highlight-soft">Clear filters</button>`;
+  }
+  if (meta.href) {
+    return `<button type="button" data-empty-cta-route="${meta.href}" class="mt-2 inline-flex items-center rounded-lg bg-primary-container px-3 py-1.5 text-[12px] font-semibold text-on-primary hover:bg-primary-hover">${meta.cta}</button>`;
+  }
+  return `<button type="button" data-empty-cta="primary" class="mt-2 inline-flex items-center rounded-lg bg-primary-container px-3 py-1.5 text-[12px] font-semibold text-on-primary hover:bg-primary-hover">${meta.cta}</button>`;
+}
+
 function renderTableEmptyCell(opts) {
-  const { icon = "inventory_2", title, hint, hintClass = "text-[11px]", columnCount = 1 } = opts || {};
-  const heading = title || (() => {
+  const { icon = "inventory_2", title, hint, hintClass = "text-[11px]", columnCount = 1, filtered = false } = opts || {};
+  const fallback = emptyStateForRoute(filtered);
+  const heading = title || fallback.title || (() => {
     const surface = document.querySelector(".workspace-surface");
     return surface?.querySelector("h2, h3")?.textContent?.trim() || "records";
   })();
   const titleText = /no /i.test(heading) ? heading : `No ${heading.toLowerCase()} found.`;
-  const hintCopy = hint || "Try adjusting your filters or create a new record.";
+  const hintCopy = hint || fallback.hint || "Try adjusting your filters or create a new record.";
+  const cta = renderEmptyStateCta({ ...fallback, cta: opts?.cta || fallback.cta, href: opts?.href || fallback.href, clear: opts?.clear || fallback.clear });
   return `<td colspan="${columnCount}">
     <div class="table-empty-state-card">
       <div class="flex flex-col items-center gap-2">
         <span class="material-symbols-outlined text-3xl text-border">${icon}</span>
         <strong>${titleText}</strong>
         <p class="font-body-sm text-body-sm text-text-muted ${hintClass}">${hintCopy}</p>
+        ${cta}
       </div>
     </div>
   </td>`;
@@ -232,23 +272,56 @@ function renderTableEmptyState(opts) {
  * @param {number} opts.columnCount - colspan for the td
  * @returns {string} Full <tr> HTML string
  */
+function workspaceTbody() {
+  const tbodies = document.querySelectorAll(".workspace-surface tbody, section.shell-card tbody");
+  for (const tbody of tbodies) {
+    if (tbody.closest(".overlay-underlay, [data-overlay-surface]")) continue;
+    return tbody;
+  }
+  return null;
+}
+
 function fillExistingTable(items, paintRow) {
-  const tbody = document.querySelector(".workspace-surface tbody");
+  const tbody = workspaceTbody();
   if (!tbody) return;
-  const template = tbody.querySelector("tr");
+  if (!tbody._roTemplate) {
+    const first = tbody.querySelector("tr[data-row-template], tr:not(.skeleton-row):not([data-generated-empty-state])");
+    if (first) tbody._roTemplate = first.cloneNode(true);
+  }
+  const template = tbody._roTemplate || tbody.querySelector("tr");
   if (!template) return;
+  template.removeAttribute("hidden");
+  delete template.dataset.rowTemplate;
   tbody.innerHTML = "";
   if (!items.length) {
     const cols = template.children.length || 1;
-    tbody.innerHTML = renderTableEmptyState({ columnCount: cols });
+    tbody.innerHTML = renderTableEmptyState({ columnCount: cols, ...emptyStateForRoute(false) });
+    queueMicrotask(() => {
+      const table = tbody.closest("table");
+      if (table && typeof applyClientPagination === "function") applyClientPagination(table);
+    });
     return;
   }
   items.forEach((item, index) => {
     const row = template.cloneNode(true);
+    row.classList.remove("skeleton-row");
+    row.hidden = false;
     row.classList.toggle("bg-surface-alt", index % 2 === 1);
     row.dataset.recordId = item.id || item.application_id || "";
+    delete row.dataset.rowMenuWired;
+    row.querySelectorAll("[data-hover-menu-wired]").forEach((node) => {
+      delete node.dataset.hoverMenuWired;
+    });
     paintRow(row, item, index);
     tbody.appendChild(row);
+  });
+  queueMicrotask(() => {
+    const table = tbody.closest("table");
+    if (table && typeof wireLiveTableInteractions === "function") {
+      delete table.dataset.pageSize;
+      table.dataset.page = "1";
+      wireLiveTableInteractions(table);
+    }
   });
 }/* ═══════════════════════════════════════════════════════════════
    PAGE LOADING HELPERS
@@ -263,12 +336,137 @@ function fillDashboardMetrics(pairs) {
   const cards = surface.querySelectorAll(".lg\\:items-end .min-w-\\[160px\\], .flex-wrap.lg\\:flex-nowrap .min-w-\\[160px\\]");
   pairs.forEach((pair, index) => {
     const card = cards[index];
-    if (!card) return;
-    const headline = card.querySelector(".font-headline-md, .text-headline-md");
-    if (headline) headline.textContent = String(pair.value ?? "—");
-    const hint = card.querySelector(".font-body-sm, .text-body-sm, .text-text-muted");
-    if (hint && pair.hint) hint.textContent = pair.hint;
+    if (card) {
+      const headline = card.querySelector(".font-headline-md, .text-headline-md");
+      if (headline) headline.textContent = String(pair.value ?? "—");
+      const hint = card.querySelector(".font-body-sm, .text-body-sm, .text-text-muted");
+      if (hint && pair.hint) hint.textContent = pair.hint;
+    }
+    if (typeof setMetricCardValue === "function" && pair.label) {
+      setMetricCardValue(pair.label, String(pair.value ?? "—"), pair.hint
+        ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(pair.hint)}</span>`
+        : "");
+    }
   });
+}
+
+function hidePanelByHeading(text) {
+  const panel = findPanelByHeading(text);
+  if (!panel) return;
+  panel.setAttribute("data-ro-hidden-panel", "true");
+  panel.hidden = true;
+}
+
+function renderRankedMetricList(container, rows, options = {}) {
+  if (!container) return;
+  const format = options.format || ((value) => String(value));
+  const items = (rows || []).filter((row) => row && (row.label || row.name));
+  if (!items.length) {
+    container.innerHTML = `<p class="text-body-sm text-text-muted py-4 text-center">${escapeLiveHtml(options.empty || "No data yet.")}</p>`;
+    return;
+  }
+  const max = Math.max(...items.map((row) => Number(row.value) || 0), 1);
+  container.innerHTML = items.map((row) => {
+    const value = Number(row.value) || 0;
+    const width = Math.max(6, Math.round((value / max) * 100));
+    return `<div class="ro-ranked-row">
+      <span title="${escapeLiveHtml(row.label || row.name)}">${escapeLiveHtml(row.label || row.name)}</span>
+      <div class="ro-ranked-track"><div class="ro-ranked-fill" style="width:${width}%"></div></div>
+      <span class="ro-ranked-value">${escapeLiveHtml(format(value))}</span>
+    </div>`;
+  }).join("") + (options.insight ? `<p class="ro-chart-insight">${escapeLiveHtml(options.insight)}</p>` : "");
+}
+
+function paintChartPlaceholder(heading, html) {
+  const panel = findPanelByHeading(heading);
+  const host = panel?.querySelector(".chart-placeholder") || panel?.querySelector("[data-live-chart]") || panel?.querySelector(".p-4:last-child");
+  if (!host) return null;
+  host.classList.remove("chart-placeholder", "h-64", "h-48");
+  host.style.minHeight = "0";
+  host.style.height = "auto";
+  if (html) host.innerHTML = html;
+  return host;
+}
+
+function renderCompanySlaRisks(requisitions) {
+  const list = findPanelByHeading("Critical SLA Risks")?.querySelector("ul");
+  if (!list) return;
+  const now = Date.now();
+  const risks = (requisitions || [])
+    .filter((row) => String(row.status || "open") === "open")
+    .map((row) => {
+      const created = new Date(row.created_at).getTime();
+      const days = Number.isNaN(created) ? 0 : Math.floor((now - created) / 86400000);
+      const target = typeof slaTargetDays === "function" ? slaTargetDays(row) : 30;
+      return { ...row, days, over: days - target };
+    })
+    .filter((row) => row.over > 0)
+    .sort((a, b) => b.over - a.over)
+    .slice(0, 4);
+  list.innerHTML = risks.length
+    ? risks.map((row) => `<li class="p-4 hover:bg-highlight-soft transition-colors flex items-start gap-3">
+        <div class="w-8 h-8 rounded-DEFAULT ${row.over > 15 ? "bg-danger-bg text-danger-text" : "bg-warning-bg text-warning-text"} flex items-center justify-center shrink-0">
+          <span class="font-data-tabular font-bold text-sm">${row.over}</span>
+        </div>
+        <div class="min-w-0">
+          <h4 class="font-body-sm text-body-sm font-medium text-on-surface truncate">${escapeLiveHtml(row.title || "Requisition")}</h4>
+          <p class="font-body-sm text-body-sm text-text-muted mt-0.5">${row.days}d open · ${escapeLiveHtml(row.client_name || "No client")}</p>
+        </div>
+      </li>`).join("")
+    : `<li class="p-4 text-body-sm text-text-muted">No open requisitions past SLA.</li>`;
+}
+
+function renderCompanyLocations(locations) {
+  const panel = findPanelByHeading("Top 5 Locations (Volume vs Compliance)");
+  const thead = panel?.querySelector("thead tr");
+  const tbody = panel?.querySelector("tbody");
+  if (!tbody) return;
+  if (thead) {
+    thead.innerHTML = `<th class="pb-3 font-semibold">Location</th>
+      <th class="pb-3 text-right font-semibold">Open Reqs</th>
+      <th class="pb-3 text-right font-semibold">Pipeline</th>
+      <th class="pb-3 text-right font-semibold">Submitted</th>
+      <th class="pb-3 text-right font-semibold">Joined</th>`;
+  }
+  const rows = (locations || []).slice(0, 5);
+  tbody.innerHTML = rows.length
+    ? rows.map((loc) => `<tr class="hover:bg-highlight-soft/50 transition-colors">
+        <td class="py-3 font-medium text-on-surface">${escapeLiveHtml(loc.location_name || "Location")}</td>
+        <td class="py-3 text-right font-data-tabular">${loc.open_requisitions || 0}</td>
+        <td class="py-3 text-right font-data-tabular">${loc.active_candidates || loc.active_applications || 0}</td>
+        <td class="py-3 text-right font-data-tabular">${loc.submitted_profiles || 0}</td>
+        <td class="py-3 text-right font-data-tabular">${loc.joined_applications || 0}</td>
+      </tr>`).join("")
+    : `<tr><td class="py-4 text-text-muted" colspan="5">No location volume yet.</td></tr>`;
+}
+
+function renderCompanyClientDemand(requisitions) {
+  const panel = findPanelByHeading("Top Client Demand");
+  const tbody = panel?.querySelector("tbody");
+  if (!tbody) return;
+  const grouped = {};
+  (requisitions || []).filter((row) => String(row.status || "open") === "open").forEach((row) => {
+    const name = row.client_name || "Unassigned";
+    if (!grouped[name]) grouped[name] = { name, count: 0, days: 0 };
+    grouped[name].count += 1;
+    const created = new Date(row.created_at).getTime();
+    grouped[name].days += Number.isNaN(created) ? 0 : Math.floor((Date.now() - created) / 86400000);
+  });
+  const rows = Object.values(grouped).sort((a, b) => b.count - a.count).slice(0, 5);
+  tbody.innerHTML = rows.length
+    ? rows.map((row) => {
+        const avg = row.count ? Math.round(row.days / row.count) : 0;
+        const priority = avg > 40 || row.count >= 4 ? "High" : avg > 20 ? "Med" : "Low";
+        const badge = priority === "High" ? "bg-danger-bg text-danger-text" : priority === "Med" ? "bg-warning-bg text-warning-text" : "bg-info-bg text-info-text";
+        return `<tr class="h-table-row border-b border-border hover:bg-highlight-soft transition-colors">
+          <td class="px-5 py-2 font-medium text-on-surface">${escapeLiveHtml(row.name)}</td>
+          <td class="px-5 py-2 text-right font-data-tabular">${row.count}</td>
+          <td class="px-5 py-2"><span class="inline-flex items-center px-2 py-0.5 rounded-DEFAULT text-[11px] font-semibold ${badge}">${priority}</span></td>
+          <td class="px-5 py-2 text-right font-data-tabular">${avg}d</td>
+          <td class="px-5 py-2 text-center text-text-muted">—</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td class="px-5 py-6 text-text-muted" colspan="5">No open client demand yet.</td></tr>`;
 }
 
 
@@ -308,10 +506,40 @@ function workflowPriorityMeta(priority) {
 
 function findPanelByHeading(text) {
   const needle = String(text || "").toLowerCase();
-  const heading = Array.from(document.querySelectorAll(".workspace-surface h2, .workspace-surface h3")).find((node) =>
+  const headings = Array.from(document.querySelectorAll(".workspace-surface h2, .workspace-surface h3"));
+  const heading = headings.find((node) => readableText(node).toLowerCase() === needle)
+    || headings.find((node) => readableText(node).toLowerCase().endsWith(needle));
+  return heading?.closest(".bg-surface, section, .rounded-2xl, .rounded-lg") || null;
+}
+
+function paintLabeledKpi(labelText, valueText, hintText) {
+  const needle = String(labelText || "").toLowerCase();
+  const heading = Array.from(document.querySelectorAll(".workspace-surface h3, .workspace-surface .text-label-caps")).find((node) =>
     readableText(node).toLowerCase() === needle,
   );
-  return heading?.closest(".bg-surface, section, .rounded-2xl, .rounded-lg") || null;
+  if (!heading) {
+    if (typeof setMetricCardValue === "function") {
+      setMetricCardValue(labelText, String(valueText ?? "—"), hintText
+        ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(hintText)}</span>`
+        : "");
+    }
+    return;
+  }
+  const card = heading.closest(".bg-surface, .metric-card") || heading.parentElement;
+  const valueNode = card?.querySelector(".font-headline-lg, .text-headline-lg, p[class*='headline']");
+  if (valueNode) {
+    const unit = valueNode.querySelector("span");
+    if (unit && /days/i.test(unit.textContent || "") && String(valueText) !== "—" && !/%/.test(String(valueText))) {
+      valueNode.innerHTML = `${escapeLiveHtml(String(valueText ?? "—"))} <span class="text-headline-md text-text-muted font-normal">days</span>`;
+    } else {
+      valueNode.textContent = String(valueText ?? "—");
+    }
+  }
+  const hint = Array.from(card?.querySelectorAll("p.font-body-sm, p.text-body-sm") || []).pop();
+  if (hint && hintText) hint.textContent = hintText;
+  card?.querySelectorAll(".font-data-tabular").forEach((badge) => {
+    if (/trending_|12%|4d|1\.1%|\+12%|\+0\.4x|\+5%|-3 days/i.test(badge.textContent || "")) badge.remove();
+  });
 }
 
 
@@ -327,6 +555,15 @@ function renderRoleWorkflowQueue(items) {
     );
   })();
   if (!rowsHost) return;
+  const header = rowsHost.previousElementSibling;
+  if (header && header.classList.contains("grid")) {
+    header.hidden = items.length === 0;
+    header.style.display = items.length === 0 ? "none" : "";
+  }
+  const filterBtn = rowsHost.closest(".bg-surface")?.querySelector("h3")?.closest("div")?.parentElement?.querySelector("button");
+  if (filterBtn) filterBtn.hidden = items.length === 0;
+  const footer = rowsHost.parentElement?.querySelector("[data-role-queue-footer]");
+  if (footer) footer.hidden = items.length === 0;
   rowsHost.innerHTML = items.length
     ? items.map((item) => {
         const actionLabel = item.primary_action_label || "Do Now";
@@ -343,7 +580,15 @@ function renderRoleWorkflowQueue(items) {
           </div>
         </div>`;
       }).join("")
-    : `<div class="px-inset-card py-6 text-center text-text-muted">No open workflow actions from the API.</div>`;
+    : `<div class="px-4 py-6 text-center">
+        <span class="material-symbols-outlined text-[22px] text-text-muted">task_alt</span>
+        <p class="mt-1 text-sm text-text-muted">Nothing needs attention right now.</p>
+      </div>`;
+  if (typeof applyCollectionPagination === "function") {
+    delete rowsHost.dataset.pageSize;
+    rowsHost.dataset.page = "1";
+    applyCollectionPagination(rowsHost);
+  }
 }
 
 function renderNotificationWorkflowQueue(items) {
@@ -366,10 +611,11 @@ function renderNotificationWorkflowQueue(items) {
             <h3 class="font-headline-sm text-headline-sm text-on-surface">${escapeLiveHtml(item.title)}</h3>
             <p class="mt-1 font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(item.description || "")}</p>
           </div>
-          <button class="inline-flex items-center justify-center rounded-lg border border-primary/20 bg-surface px-3 py-2 font-data-tabular text-data-tabular font-semibold text-primary hover:bg-highlight-soft" type="button" data-live-workflow-action="${action}" data-action-item-id="${item.id}">${escapeLiveHtml(actionLabel)}</button>
+          ${cardKebabMenu(`<button type="button" role="menuitem" data-live-workflow-action="${action}" data-action-item-id="${item.id}">${escapeLiveHtml(actionLabel)}</button>`)}
         </article>`;
       }).join("")
     : `<div class="p-6 text-center text-text-muted">No open workflow actions from the API.</div>`;
+  if (typeof wireHoverKebabMenus === "function") wireHoverKebabMenus(rowsHost);
 }
 
 
@@ -390,60 +636,264 @@ function panelRowsHost(title) {
   return Array.from(panel?.children || []).find((child) =>
     child.classList?.contains("flex") && child.classList?.contains("flex-col") && !child.querySelector("h2, h3"),
   );
-}function renderDailyReviewQuickStats(myWork, pipelineItems) {
-  const surface = document.querySelector(".workspace-surface");
-  if (!surface) return;
-  const statCards = surface.querySelectorAll(".grid-cols-2 .bg-surface.border");
-  const stats = [
-    { value: myWork?.pending_actions ?? 0, hint: "Pending Actions" },
-    { value: myWork?.submitted_updates ?? 0, hint: "Updates Submitted" },
-    { value: pipelineItems?.length ?? 0, hint: "Pipeline Items" },
-  ];
-  stats.forEach((stat, index) => {
-    const card = statCards[index];
-    if (!card) return;
-    const headline = card.querySelector(".font-headline-md, .text-headline-md");
-    if (headline) headline.textContent = String(stat.value);
-  });
+}function dailyReviewListHost(title) {
+  const panel = findPanelByHeading(title);
+  return panel?.querySelector(".divide-y") || panelRowsHost(title);
+}
+
+function renderDailyReviewQuickStats(myWork, pipelineItems, extra = {}) {
+  const host = dailyReviewListHost("Quick Stats");
+  const pipelineCount = pipelineItems?.length ?? 0;
+  const interviews = extra.interviews ?? 0;
+  const offers = extra.offers ?? 0;
+  const ttf = extra.avgFillDays;
+  if (host) {
+    const rows = [
+      ["Candidates in pipeline", pipelineCount],
+      ["Interviews this week", interviews],
+      ["Offers pending", offers],
+      ["Time-to-hire (avg)", ttf != null ? `${ttf} days` : "—"],
+    ];
+    host.innerHTML = rows.map(([label, value]) => `<div class="px-inset-card py-3 flex items-center justify-between">
+      <span class="font-body-sm text-on-surface-variant text-[13px]">${escapeLiveHtml(label)}</span>
+      <span class="font-headline-sm font-bold text-on-surface">${escapeLiveHtml(String(value))}</span>
+    </div>`).join("");
+  }
+  const dateNode = document.querySelector(".workspace-surface h2")?.nextElementSibling;
+  if (dateNode && /daily recruitment operations digest/i.test(dateNode.textContent || "")) {
+    dateNode.textContent = `What needs a decision today · ${new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`;
+  }
+}
+
+function renderDailyReviewActions(items) {
+  const host = dailyReviewListHost("Action Items");
+  const panel = findPanelByHeading("Action Items");
+  const badge = panel?.querySelector("span.inline-flex, .rounded.bg-danger-bg, [class*='danger']");
+  if (badge && /item/i.test(badge.textContent || "")) {
+    badge.textContent = items.length ? `${items.length} open` : "Clear";
+  }
+  if (!host) return;
+  host.innerHTML = items.length
+    ? items.slice(0, 5).map((item) => `<div class="px-inset-card py-3 flex items-center gap-3 hover:bg-highlight-soft transition-colors">
+        <span class="material-symbols-outlined text-[18px] text-primary shrink-0">${escapeLiveHtml(item.icon || "task_alt")}</span>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-on-surface text-[13px] truncate">${escapeLiveHtml(item.title)}</p>
+        </div>
+        <a href="${escapeLiveHtml(item.href || "#")}" class="text-primary font-body-sm text-[12px] font-semibold hover:underline shrink-0">${escapeLiveHtml(item.action || "Open")}</a>
+      </div>`).join("")
+    : `<div class="px-inset-card py-5 text-body-sm text-text-muted">Nothing waiting. Pipeline and inbox are clear.</div>`;
 }
 
 function renderDailyReviewPipelineActivity(items) {
-  const host = panelRowsHost("Pipeline Activity");
+  const host = dailyReviewListHost("Pipeline Activity");
   if (!host) return;
   host.innerHTML = items.length
-    ? items.map((item) => `<div class="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-highlight-soft">
-        <span class="material-symbols-outlined text-[20px] text-primary">swap_horiz</span>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-body-sm font-medium text-on-surface">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
-          <p class="truncate text-body-sm text-text-muted">${escapeLiveHtml(item.current_stage || "Pipeline")}</p>
-        </div>
-        <span class="text-[11px] text-text-muted">${escapeLiveHtml(relativeTime(item.stage_updated_at))}</span>
+    ? items.map((item) => `<div class="px-inset-card py-3 flex items-center gap-3 hover:bg-highlight-soft transition-colors">
+        <div class="w-8 h-8 rounded-full bg-primary text-on-primary font-bold flex items-center justify-center shrink-0 text-[11px]">${escapeLiveHtml(personInitials(item.candidate_name || "C"))}</div>
+        <p class="flex-1 min-w-0 truncate font-semibold text-on-surface text-[13px]">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
+        <span class="text-[12px] text-text-muted shrink-0">${escapeLiveHtml(item.current_stage || "Pipeline")}</span>
       </div>`).join("")
-    : `<div class="p-4 text-body-sm text-text-muted">No recent pipeline activity.</div>`;
-}function notificationAccentClass(item) {
-  const status = String(item?.status || "").toLowerCase();
-  if (status === "unread") return "bg-danger-bg text-danger-text border-[#e4b6b0]";
-  return "bg-info-bg text-info-text border-outline-variant";
+    : `<div class="px-inset-card py-5 text-body-sm text-text-muted">No recent pipeline movement.</div>`;
+}
+
+function renderDailyReviewCompactList(title, items, emptyLabel) {
+  const panel = findPanelByHeading(title);
+  const badge = Array.from(panel?.querySelectorAll("span") || []).find((node) =>
+    /\d+\s*(event|item|update|notification)/i.test(node.textContent || "") && !node.classList.contains("material-symbols-outlined"),
+  );
+  if (badge) badge.textContent = items.length ? String(items.length) : "0";
+  const host = dailyReviewListHost(title);
+  if (!host) return;
+  host.innerHTML = items.length
+    ? items.slice(0, 5).map((item) => `<div class="px-inset-card py-3 flex items-center gap-3 hover:bg-highlight-soft transition-colors">
+        <span class="material-symbols-outlined text-[18px] text-primary shrink-0">${escapeLiveHtml(item.icon || "circle")}</span>
+        <p class="flex-1 min-w-0 truncate font-semibold text-on-surface text-[13px]">${escapeLiveHtml(item.title)}</p>
+        ${item.meta ? `<span class="text-[12px] text-text-muted shrink-0">${escapeLiveHtml(item.meta)}</span>` : ""}
+      </div>`).join("")
+    : `<div class="px-inset-card py-5 text-body-sm text-text-muted">${escapeLiveHtml(emptyLabel || "Nothing to show.")}</div>`;
+}const NOTIFICATION_EVENTS = {
+  pipeline_stage_changed: { label: "Stage moved", icon: "account_tree", category: "Pipeline", cta: "Open pipeline", next: "Check the candidate on the board" },
+  candidate_assigned: { label: "Candidate assigned", icon: "person_add", category: "Candidate", cta: "Open candidate", next: "Review the profile and start screening" },
+  duplicate_review_assigned: { label: "Duplicate to review", icon: "control_point_duplicate", category: "Candidate", cta: "Review duplicates", next: "Decide which profile to keep" },
+  candidate_finalized: { label: "Candidate linked", icon: "how_to_reg", category: "Requisition", cta: "Open requisition", next: "Confirm the hire on the requisition" },
+  candidate_owner_reassigned: { label: "Ownership changed", icon: "swap_horiz", category: "Candidate", cta: "Open candidate", next: "Pick up ownership of this candidate" },
+  daily_update_submitted: { label: "Daily update in", icon: "assignment", category: "Daily update", cta: "Open update", next: "Read the update and follow up if needed" },
+  requisition_created: { label: "New requisition", icon: "work", category: "Requisition", cta: "Open requisition", next: "Review intake and start sourcing" },
+  requisition_status_changed: { label: "Requisition status changed", icon: "flag", category: "Requisition", cta: "Open requisition", next: "See the new status and adjust work" },
+  requisition_assigned: { label: "Assigned to a requisition", icon: "group_add", category: "Requisition", cta: "Open requisition", next: "See what you now own" },
+  requisition_owner_reassigned: { label: "You are now the owner", icon: "badge", category: "Requisition", cta: "Open requisition", next: "Take over as primary owner" },
+  user_deactivated: { label: "Account deactivated", icon: "person_off", category: "Account", cta: "View account", next: "Your access was turned off" },
+  user_moved: { label: "Role or location updated", icon: "transfer_within_a_station", category: "Account", cta: "View account", next: "Review your new assignment" },
+  "workflow_action.nudge": { label: "Follow-up needed", icon: "task_alt", category: "Workflow", cta: "Open work item", next: "Finish the waiting action" },
+};
+
+function notificationEventMeta(item) {
+  const key = String(item?.event_type || "").trim();
+  return NOTIFICATION_EVENTS[key] || null;
+}
+
+function notificationRecordHref(item) {
+  const url = String(item?.action_url || "");
+  const source = String(item?.source_type || item?.entity_type || "").toLowerCase();
+  const id = item?.entity_id || item?.source_id;
+  let match = url.match(/\/candidates\/(\d+)\/duplicate-review/);
+  if (match) return `candidate-duplicate-review.html?candidate_id=${match[1]}`;
+  match = url.match(/\/pipeline\/applications\/(\d+)/);
+  if (match) return `pipeline-board.html?application_id=${match[1]}`;
+  match = url.match(/\/candidates\/(\d+)/);
+  if (match) return `candidate-detail.html?candidate_id=${match[1]}`;
+  match = url.match(/\/requisitions\/(\d+)/);
+  if (match) return `requisition-detail.html?requisition_id=${match[1]}`;
+  match = url.match(/\/daily-updates\/(\d+)/);
+  if (match) return `daily-update-detail-panel.html?daily_update_id=${match[1]}`;
+  match = url.match(/\/approvals\/(\d+)/);
+  if (match) return `approval-review-drawer.html?approval_id=${match[1]}`;
+  if (source === "candidate" && id) return `candidate-detail.html?candidate_id=${id}`;
+  if (source === "requisition" && id) return `requisition-detail.html?requisition_id=${id}`;
+  if (source === "pipeline" && id) return `pipeline-board.html?application_id=${id}`;
+  if (source === "daily_update" && id) return `daily-update-detail-panel.html?daily_update_id=${id}`;
+  if (source === "user" && id) return `user-detail.html?user_id=${id}`;
+  return "";
+}
+
+function notificationStory(item) {
+  const unread = String(item?.status || "").toLowerCase() === "unread";
+  const meta = notificationEventMeta(item);
+  const eventLabel = meta?.label || (item?.title && !/^notification$/i.test(item.title) ? item.title : titleFromCode(item?.event_type) || "Update");
+  const headline = String(item?.message || "").trim() || eventLabel;
+  const href = notificationRecordHref(item);
+  const cta = meta?.cta || (href ? "Open record" : "View details");
+  const next = meta?.next || (href ? "Open the related record to continue" : "Read the full event");
+  return {
+    unread,
+    eventLabel,
+    headline,
+    category: meta?.category || notificationCategory(item),
+    icon: meta?.icon || notificationIcon(item),
+    href,
+    cta,
+    next,
+    happened: relativeTime(item?.created_at) || "just now",
+    seenAt: relativeTime(item?.read_at),
+    waiting: unread ? "Waiting for you" : (item?.read_at ? `Seen ${relativeTime(item.read_at)}` : "Seen"),
+    priority: String(item?.priority || "normal").toLowerCase(),
+  };
+}
+
+function notificationAccentClass(item) {
+  const story = notificationStory(item);
+  if (story.unread) return "bg-highlight-soft text-on-surface border-border";
+  return "bg-surface-alt text-text-muted border-border";
 }
 
 function notificationIcon(item) {
-  const module = String(item?.module_name || "").toLowerCase();
+  const meta = notificationEventMeta(item);
+  if (meta?.icon) return meta.icon;
+  const module = `${item?.module_name || ""} ${item?.event_type || ""} ${item?.source_type || ""}`.toLowerCase();
   if (/meeting/.test(module)) return "event";
-  if (/approval/.test(module)) return "gavel";
+  if (/approval|workflow/.test(module)) return "gavel";
   if (/candidate/.test(module)) return "person";
   if (/requisition/.test(module)) return "work";
+  if (/pipeline|stage/.test(module)) return "account_tree";
   return "notifications";
 }
 
 function notificationCategory(item) {
+  const meta = notificationEventMeta(item);
+  if (meta?.category) return meta.category;
   const source = `${item?.module_name || ""} ${item?.event_type || ""} ${item?.source_type || ""}`.toLowerCase();
   if (/approval/.test(source)) return "Approvals";
   if (/pipeline|stage/.test(source)) return "Pipeline";
   if (/requisition/.test(source)) return "Requisition";
   if (/candidate/.test(source)) return "Candidate";
-  if (/daily.update/.test(source)) return "Daily Update";
+  if (/daily.update/.test(source)) return "Daily update";
   if (/meeting/.test(source)) return "Meeting";
-  return "System";
+  if (/user|account/.test(source)) return "Account";
+  return "Hiring";
+}
+
+function notificationFlowHtml(item, compact = false) {
+  const story = notificationStory(item);
+  if (compact) {
+    return `<p class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-text-muted">
+      <span class="font-semibold text-on-surface">${escapeLiveHtml(story.eventLabel)}</span>
+      <span aria-hidden="true">→</span>
+      <span>${escapeLiveHtml(story.waiting)}</span>
+      <span aria-hidden="true">→</span>
+      <span>${escapeLiveHtml(story.cta)}</span>
+    </p>`;
+  }
+  return `<ol class="mt-4 grid gap-3">
+    <li class="grid grid-cols-[18px_minmax(0,1fr)] gap-3">
+      <span class="mt-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">1</span>
+      <div><p class="text-[11px] font-bold uppercase tracking-wider text-text-muted">What happened</p><p class="mt-0.5 font-semibold text-on-surface">${escapeLiveHtml(story.eventLabel)}</p><p class="mt-0.5 text-body-sm text-text-muted">${escapeLiveHtml(story.happened)}</p></div>
+    </li>
+    <li class="grid grid-cols-[18px_minmax(0,1fr)] gap-3">
+      <span class="mt-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full ${story.unread ? "bg-primary text-white" : "bg-surface-alt text-text-muted"} text-[11px] font-bold">${story.unread ? "2" : "✓"}</span>
+      <div><p class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${story.unread ? "Needs you" : "You already saw this"}</p><p class="mt-0.5 text-body-sm text-on-surface">${escapeLiveHtml(story.unread ? "This is still new in your inbox." : story.waiting)}</p></div>
+    </li>
+    <li class="grid grid-cols-[18px_minmax(0,1fr)] gap-3">
+      <span class="mt-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border text-[11px] font-bold text-text-muted">3</span>
+      <div><p class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Next step</p><p class="mt-0.5 text-body-sm text-on-surface">${escapeLiveHtml(story.next)}</p></div>
+    </li>
+  </ol>`;
+}
+
+function cardKebabMenu(itemsHtml) {
+  return `<div class="ro-row-menu-host ro-card-kebab" data-layout="row-actions">
+    <button type="button" class="ro-card-kebab-trigger" data-row-menu-bound="true" aria-haspopup="menu" aria-expanded="false" aria-label="Actions" title="Actions">
+      <span class="material-symbols-outlined">more_vert</span>
+    </button>
+    <div class="ro-row-menu" hidden role="menu">${itemsHtml}</div>
+  </div>`;
+}
+
+function notificationRowMenu(item) {
+  const detailHref = `notification-detail-panel.html?notification_id=${item.id}`;
+  const story = notificationStory(item);
+  return cardKebabMenu(`
+      <button type="button" role="menuitem" data-route="${escapeLiveHtml(detailHref)}">What happened</button>
+      ${story.unread
+        ? `<button type="button" role="menuitem" data-notification-read="true">Got it</button>`
+        : `<button type="button" role="menuitem" disabled>Seen</button>`}`);
+}
+
+function renderNotificationDetailPanel(item) {
+  const surface = document.querySelector("[data-overlay-surface='true']");
+  if (!surface || !item) return false;
+  const story = notificationStory(item);
+  const urgent = story.priority === "high" || story.priority === "critical";
+  surface.innerHTML = `<div class="flex h-full min-h-0 flex-col">
+    <div class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-full ${story.unread ? "bg-primary text-white" : "bg-surface-alt text-primary"}">
+          <span class="material-symbols-outlined">${escapeLiveHtml(story.icon)}</span>
+        </div>
+        <div class="min-w-0">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-text-muted">${escapeLiveHtml(story.category)}</p>
+          <h2 class="truncate font-headline-md font-bold text-on-surface">${escapeLiveHtml(story.eventLabel)}</h2>
+        </div>
+      </div>
+      <button class="rounded-lg p-2 text-text-muted hover:bg-highlight-soft hover:text-on-surface" type="button" data-overlay-close="true" aria-label="Close overlay" title="Close overlay">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+      <p class="text-body-md leading-relaxed text-on-surface">${escapeLiveHtml(story.headline)}</p>
+      ${urgent ? `<p class="rounded-lg border border-warning-text/20 bg-warning-bg px-3 py-2 text-body-sm text-warning-text">This is marked ${escapeLiveHtml(story.priority)} priority.</p>` : ""}
+      ${notificationFlowHtml(item, false)}
+      <dl class="grid grid-cols-2 gap-4 border-t border-border pt-4 text-body-sm">
+        <div><dt class="text-[11px] font-bold uppercase tracking-wider text-text-muted">When</dt><dd class="mt-1 text-on-surface">${escapeLiveHtml(story.happened)}</dd></div>
+        <div><dt class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Inbox</dt><dd class="mt-1 text-on-surface">${story.unread ? "New" : "Seen"}</dd></div>
+      </dl>
+    </div>
+    <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-3" data-notification-id="${item.id}">
+      ${story.unread
+        ? `<button class="h-8 rounded-lg bg-primary px-3 text-[13px] font-semibold text-white hover:bg-primary-hover" type="button" data-notification-read="true">Got it</button>`
+        : `<span class="text-[12px] font-semibold text-text-muted">Seen</span>`}
+    </div>
+  </div>`;
+  return true;
 }
 
 function renderNotificationsCommandCenter(items, meta) {
@@ -456,51 +906,90 @@ function renderNotificationsCommandCenter(items, meta) {
   if (metrics[0]) metrics[0].textContent = String(unreadTotal);
   if (metrics[1]) metrics[1].textContent = String(highCount);
   if (metrics[2]) metrics[2].textContent = String(items.length);
+  const metricLabels = surface.querySelectorAll(".grid-cols-3 .font-label-caps");
+  if (metricLabels[2] && /mention/i.test(metricLabels[2].textContent || "")) metricLabels[2].textContent = "In view";
 
-  const pill = Array.from(surface.querySelectorAll("span")).find((span) => /priority alert/i.test(span.textContent || ""));
-  if (pill) pill.textContent = `${highCount} priority alert${highCount === 1 ? "" : "s"}`;
+  const intro = surface.querySelector("h1 + p");
+  if (intro) intro.textContent = "Each item is a hiring event: what changed, whether it still needs you, and the next step.";
 
-  const liveBadge = Array.from(surface.querySelectorAll("span")).find((span) => /mock state/i.test(span.textContent || ""));
-  if (liveBadge) {
-    liveBadge.textContent = "Live API data";
-    liveBadge.className = liveBadge.className.replace("bg-warning-bg", "bg-success-bg").replace("text-warning-text", "text-success-text");
+  const pill = Array.from(surface.querySelectorAll("span")).find((span) => /priority alert|urgent event/i.test(span.textContent || ""));
+  if (pill) pill.textContent = `${highCount} urgent event${highCount === 1 ? "" : "s"}`;
+
+  const queueHeading = Array.from(surface.querySelectorAll("h2")).find((heading) => /action queue|what happened/i.test(heading.textContent || ""));
+  if (queueHeading) {
+    queueHeading.textContent = "What happened";
+    const subtitle = queueHeading.nextElementSibling;
+    if (subtitle) subtitle.textContent = "Newest events first. Stay here to see what happened; hover a row for actions.";
   }
-
-  const queueHeading = Array.from(surface.querySelectorAll("h2")).find((heading) => /action queue/i.test(heading.textContent || ""));
   const list = queueHeading?.closest("section")?.querySelector(".divide-y");
   if (!list) return false;
 
   list.innerHTML = items.length
     ? items.map((item) => {
-        const unread = String(item.status || "").toLowerCase() === "unread";
-        const accent = notificationAccentClass(item);
-        return `<article class="group relative grid gap-3 p-4 transition-colors hover:bg-highlight-soft md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center${unread ? " border-l-4 border-error bg-danger-bg/20" : ""}" data-notification-id="${item.id}" data-notification-status="${escapeLiveHtml(item.status || "read")}">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl ${unread ? "bg-error-container text-error" : "bg-surface-alt text-primary"}">
-            <span class="material-symbols-outlined">${notificationIcon(item)}</span>
+        const story = notificationStory(item);
+        const urgent = story.priority === "high" || story.priority === "critical";
+        return `<article class="notification-event group relative grid gap-3 p-4 transition-colors hover:bg-highlight-soft md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start${story.unread ? " border-l-4 border-primary bg-highlight-soft/40" : ""}" data-notification-id="${item.id}" data-notification-status="${escapeLiveHtml(item.status || "read")}" data-filter-category="${escapeLiveHtml(story.category)}" data-filter-priority="${escapeLiveHtml(story.priority || "")}">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl ${story.unread ? "bg-primary text-white" : "bg-surface-alt text-primary"}">
+            <span class="material-symbols-outlined">${escapeLiveHtml(story.icon)}</span>
           </div>
           <div class="min-w-0">
             <div class="mb-1 flex flex-wrap items-center gap-2">
-              <span class="rounded border px-1.5 py-0.5 font-label-caps text-label-caps uppercase tracking-wider ${unread ? "border-danger-text/20 bg-white text-danger-text" : "border-border bg-surface-alt text-secondary"}">${escapeLiveHtml(notificationCategory(item))}</span>
-              <span class="font-data-tabular text-[11px] text-text-muted">${escapeLiveHtml(relativeTime(item.created_at))}</span>
-              ${unread ? '<span data-notification-unread-indicator class="h-2 w-2 rounded-full bg-error"></span>' : ""}
+              <span class="rounded border border-border bg-surface px-1.5 py-0.5 font-label-caps text-label-caps uppercase tracking-wider text-secondary">${escapeLiveHtml(story.category)}</span>
+              <span class="font-data-tabular text-[11px] text-text-muted">${escapeLiveHtml(story.happened)}</span>
+              ${story.unread ? '<span data-notification-unread-indicator class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New</span>' : ""}
+              ${urgent ? `<span class="rounded-full bg-warning-bg px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning-text">${escapeLiveHtml(story.priority)}</span>` : ""}
             </div>
-            <h3 class="font-headline-sm text-headline-sm text-on-surface">${escapeLiveHtml(item.title || "Notification")}</h3>
-            <p class="mt-1 font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(item.message || "")}</p>
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">${escapeLiveHtml(story.eventLabel)}</h3>
+            <p class="mt-1 font-body-sm text-body-sm text-on-surface">${escapeLiveHtml(story.headline)}</p>
+            ${notificationFlowHtml(item, true)}
           </div>
-          <div class="flex flex-wrap items-center gap-2 md:justify-end">
-            <span class="inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold ${accent}" data-notification-status-badge>${escapeLiveHtml(item.status || "read")}</span>
-            ${unread ? `<button class="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-surface px-2.5 text-secondary hover:bg-highlight-soft" title="Mark as Read" type="button" data-notification-read="true" aria-label="Mark as read"><span class="material-symbols-outlined text-[20px]">done</span></button>` : ""}
+          <div class="flex items-start justify-end">
+            ${notificationRowMenu(item)}
           </div>
         </article>`;
       }).join("")
-    : `<div class="p-6 text-center text-body-sm text-text-muted">No ${escapeLiveHtml(notificationFilterLabel())} notifications. Try the "All" filter.</div>`;
+    : `<div class="p-6 text-center text-body-sm text-text-muted">No ${escapeLiveHtml(notificationFilterLabel())} events. Try the "All" filter to see what already happened.</div>`;
+
+  const nextItem = items.find((item) => String(item.status).toLowerCase() === "unread") || items[0];
+  const nextStory = nextItem ? notificationStory(nextItem) : null;
+  const aside = queueHeading?.closest(".grid")?.querySelector("aside");
+  if (aside) {
+    aside.innerHTML = `<section class="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+        <h2 class="font-headline-sm text-headline-sm text-on-surface">Next up</h2>
+        ${nextStory ? `<p class="mt-3 font-body-sm font-semibold text-on-surface">${escapeLiveHtml(nextStory.eventLabel)}</p>
+        <p class="mt-1 font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(nextStory.headline)}</p>
+        <p class="mt-3 text-[12px] text-text-muted">${escapeLiveHtml(nextStory.waiting)} → ${escapeLiveHtml(nextStory.cta)}</p>` : `<p class="mt-3 font-body-sm text-body-sm text-text-muted">Nothing is waiting. New hiring events will land here.</p>`}
+      </section>
+      <section class="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+        <h2 class="font-headline-sm text-headline-sm text-on-surface">Suggested next step</h2>
+        <p class="mt-3 font-body-sm text-body-sm text-on-surface">${escapeLiveHtml(nextStory ? nextStory.next : "You are caught up.")}</p>
+      </section>
+      <section class="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+        <h2 class="font-headline-sm text-headline-sm text-on-surface">Inbox</h2>
+        <dl class="mt-3 grid gap-2 font-body-sm text-body-sm">
+          <div class="flex justify-between gap-3"><dt class="text-text-muted">New</dt><dd class="font-semibold text-on-surface">${unreadTotal}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-text-muted">Urgent</dt><dd class="font-semibold text-on-surface">${highCount}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-text-muted">Showing</dt><dd class="font-semibold text-on-surface">${items.length}</dd></div>
+        </dl>
+      </section>`;
+  }
+
+  if (typeof applyCollectionPagination === "function") {
+    delete list.dataset.pageSize;
+    list.dataset.page = "1";
+    applyCollectionPagination(list);
+  }
+  if (typeof wireHoverKebabMenus === "function") wireHoverKebabMenus(list);
+  if (typeof wireNotificationListInteractions === "function") wireNotificationListInteractions(list);
+  if (typeof hydrateLiveFilters === "function") hydrateLiveFilters(surface);
+  surface.querySelectorAll("button").forEach((button) => {
+    if (/load older notifications/i.test(button.textContent || "")) {
+      button.closest(".flex.justify-center")?.setAttribute("hidden", "hidden");
+    }
+  });
   return true;
 }
 
-
-/* ═══════════════════════════════════════════════════════════════
-   BUSINESS TITLE HELPERS
-   ═══════════════════════════════════════════════════════════════ */
 
 function businessTitleLevel(item) {
   const title = String(item.title || "").toLowerCase();
@@ -549,7 +1038,7 @@ function renderDeliveryWorkRow(item, index, pipelineByEntity) {
   const requisition = pipeline.requisition_title || item.description || item.entity_type || "Recruiting work";
   const route = item.route_href || (pipeline.application_id ? `candidate-screening.html?application_id=${pipeline.application_id}` : "requisition-detail.html");
   const action = workflowEndpointForLabel(item.primary_action_label);
-  return `<div class="grid min-h-[44px] grid-cols-12 items-center gap-4 border-b border-border px-inset-card py-2 transition-colors hover:bg-highlight-soft" data-live-delivery-row="true" data-action-item-id="${item.id}">
+  return `<div class="group grid min-h-[44px] grid-cols-12 items-center gap-4 border-b border-border px-inset-card py-2 transition-colors hover:bg-highlight-soft" data-live-delivery-row="true" data-action-item-id="${item.id}">
     <div class="col-span-1 flex items-center gap-2">
       <span class="h-1.5 w-1.5 rounded-full ${status.dot}"></span>
       <span class="font-data-tabular text-data-tabular font-semibold text-on-surface">${index + 1}</span>
@@ -562,9 +1051,10 @@ function renderDeliveryWorkRow(item, index, pipelineByEntity) {
     <div class="col-span-2">
       <span class="inline-flex rounded px-2 py-0.5 text-label-caps font-bold ${status.badge}">${escapeLiveHtml(status.label)}</span>
     </div>
-    <div class="col-span-3 flex justify-end gap-2">
-      <button class="inline-flex min-h-8 items-center rounded-lg border border-border bg-surface px-2.5 text-[12px] font-semibold text-secondary transition-colors hover:bg-highlight-soft hover:text-primary" type="button" data-route="${escapeLiveHtml(route)}">Open</button>
-      <button class="inline-flex min-h-8 items-center rounded-lg bg-primary px-2.5 text-[12px] font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-60" type="button" data-live-workflow-action="${action}" data-action-item-id="${item.id}">${escapeLiveHtml(item.primary_action_label || "Do Now")}</button>
+    <div class="col-span-3 flex justify-end">
+      ${cardKebabMenu(`
+        <button type="button" role="menuitem" data-route="${escapeLiveHtml(route)}">Open</button>
+        <button type="button" role="menuitem" data-live-workflow-action="${action}" data-action-item-id="${item.id}">${escapeLiveHtml(item.primary_action_label || "Do Now")}</button>`)}
     </div>
   </div>`;
 }function renderAvailableUserRow(user, requisitionId) {
@@ -629,7 +1119,8 @@ function renderPipelineHistoryItems(host, items) {
 }
 
 function dailyUpdateStatusMeta(item) {
-  const status = String(item?.review_status || item?.status || "").toLowerCase();
+  const status = String(item?.submission_status || item?.review_status || item?.status || "").toLowerCase();
+  if (/draft/.test(status)) return { label: "Draft", badge: "bg-surface-dim text-text-muted border-border" };
   if (/acknowledged|approved|reviewed/.test(status)) return { label: "Reviewed", badge: "bg-success-bg text-success-text border-[#C5DBC8]" };
   if (/pending|submitted/.test(status)) return { label: "Pending Review", badge: "bg-warning-bg text-warning-text border-[#E8D1B5]" };
   if (/feedback|rejected/.test(status)) return { label: "Feedback", badge: "bg-danger-bg text-danger-text border-[#E6C6C1]" };
@@ -650,6 +1141,110 @@ function dailyUpdateStatusMeta(item) {
     tbody.innerHTML = items.length
       ? items.map((item) => renderDailyUpdateTableRow(item)).join("")
       : `<tr><td class="px-4 py-6 text-text-muted" colspan="4">No daily updates returned by the API.</td></tr>`;
+    const table = tbody.closest("table");
+    if (table && typeof applyClientPagination === "function") {
+      delete table.dataset.pageSize;
+      table.dataset.page = "1";
+      applyClientPagination(table);
+    }
+  }
+}
+
+function formatOfferMoney(amount, currency) {
+  if (amount === null || amount === undefined || amount === "") return "—";
+  const value = Number(amount);
+  if (Number.isNaN(value)) return String(amount);
+  const code = String(currency || "USD").toUpperCase();
+  try {
+    return `${new Intl.NumberFormat("en-US", { style: "currency", currency: code, maximumFractionDigits: 0 }).format(value)}/yr`;
+  } catch {
+    return `${code} ${Math.round(value).toLocaleString("en-US")}/yr`;
+  }
+}
+
+function formatOfferDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function offerStatusMeta(status) {
+  const key = String(status || "").toLowerCase();
+  if (key === "accepted" || key === "joined") return { label: "ACCEPTED", badge: "bg-success-bg text-success-text border-primary-fixed-dim" };
+  if (key === "sent") return { label: "SENT", badge: "bg-info-bg text-info-text border-outline-variant" };
+  if (key === "pending-approval" || key === "pending_approval" || key === "pending") return { label: "PENDING APPROVAL", badge: "bg-warning-bg text-warning-text border-highlight-soft" };
+  if (key === "declined" || key === "rejected") return { label: "DECLINED", badge: "bg-danger-bg text-danger-text border-tertiary-fixed-dim" };
+  if (key === "approved") return { label: "APPROVED", badge: "bg-success-bg text-success-text border-primary-fixed-dim" };
+  return { label: "DRAFT", badge: "bg-surface-alt text-text-muted border-border" };
+}
+
+function renderOffers(items = [], meta = {}) {
+  const list = Array.isArray(items) ? items : [];
+  fillExistingTable(list, (row, item) => {
+    const cells = row.querySelectorAll("td");
+    setStackedCell(cells[0], item.candidate_name || "—", item.candidate_email || "");
+    const avatar = cells[0]?.querySelector(".rounded-full, .w-8.h-8");
+    if (avatar) avatar.textContent = personInitials(item.candidate_name);
+    setStackedCell(cells[1], item.requisition_title || "—", item.requisition_code || (item.requisition_id ? `REQ-${item.requisition_id}` : ""));
+    const bonus = item.signing_bonus ? `+ ${formatOfferMoney(item.signing_bonus, item.offer_currency).replace("/yr", "")}` : "";
+    setStackedCell(cells[2], formatOfferMoney(item.offered_ctc, item.offer_currency), bonus);
+    const status = offerStatusMeta(item.offer_status);
+    const statusNode = cells[3]?.querySelector("span") || cells[3];
+    if (statusNode) {
+      statusNode.className = `inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${status.badge}`;
+      statusNode.textContent = status.label;
+    }
+    const approval = String(item.approval_status || item.offer_status || "").toLowerCase();
+    const approvalIcon = cells[4]?.querySelector(".material-symbols-outlined") || cells[4];
+    if (approvalIcon) {
+      if (/approved|accepted|joined|sent/.test(approval) && !/pending/.test(approval)) {
+        approvalIcon.textContent = "check_circle";
+        approvalIcon.className = "material-symbols-outlined text-success-text text-[20px]";
+        approvalIcon.style.fontVariationSettings = "'FILL' 1";
+      } else if (/pending/.test(approval)) {
+        approvalIcon.textContent = "pending";
+        approvalIcon.className = "material-symbols-outlined text-warning-text text-[20px]";
+      } else {
+        approvalIcon.textContent = "—";
+        approvalIcon.className = "text-text-muted";
+      }
+    }
+    setCellValue(cells[5], item.offer_sent_at ? formatOfferDate(item.offer_sent_at) : "—");
+    setCellValue(cells[6], item.expected_joining_date ? formatOfferDate(item.expected_joining_date) : (item.offer_sent_at && /accepted|joined/.test(String(item.offer_status || "").toLowerCase()) ? formatOfferDate(item.updated_at) : "—"));
+    row.dataset.recordId = item.id || item.application_id || "";
+    const offerParams = new URLSearchParams();
+    if (item.id) offerParams.set("offer_id", item.id);
+    if (item.candidate_id) offerParams.set("candidate_id", item.candidate_id);
+    if (item.requisition_id) offerParams.set("requisition_id", item.requisition_id);
+    row.dataset.route = `offer-create-dialog.html?${offerParams.toString()}`;
+    row.classList.add("cursor-pointer");
+  });
+
+  const counts = {
+    draft: 0,
+    pending: 0,
+    sent: 0,
+    accepted: 0,
+    declined: 0,
+  };
+  list.forEach((item) => {
+    const key = String(item.offer_status || "").toLowerCase();
+    if (key === "accepted" || key === "joined") counts.accepted += 1;
+    else if (key === "sent") counts.sent += 1;
+    else if (key === "pending-approval" || key === "pending_approval" || key === "pending") counts.pending += 1;
+    else if (key === "declined" || key === "rejected") counts.declined += 1;
+    else counts.draft += 1;
+  });
+  const metricValues = document.querySelectorAll(".workspace-surface .grid .font-headline-lg, [data-layout='metric-strip'] .font-headline-lg, [data-layout='metric-card'] .font-headline-lg");
+  const metricOrder = [counts.draft, counts.pending, counts.sent, counts.accepted, counts.declined];
+  metricValues.forEach((node, index) => {
+    if (metricOrder[index] !== undefined) node.textContent = String(metricOrder[index]);
+  });
+  const footerText = document.querySelector(".workspace-surface .border-t span");
+  if (footerText) {
+    const total = meta.total || list.length;
+    footerText.textContent = `${list.length} of ${total}`;
   }
 }
 
@@ -757,11 +1352,19 @@ function renderTimeToFillBars(panelTitle, rows) {
       </div>`).join("");
 }
 
-function renderTimeToFillTrend(records) {
+function renderTimeToFillTrend(report) {
   const panel = findPanelByHeading("Time to Fill Trend");
-  if (!panel) return;
-  const host = panel.querySelector(".space-y-3") || panel;
-  if (!host || !records || !records.length) return; // trend placeholder stays when no monthly data
+  const host = panel?.querySelector(".chart-placeholder") || panel?.querySelector(".p-4:last-child");
+  if (!host) return;
+  host.classList.remove("chart-placeholder");
+  const summary = report?.summary || report || {};
+  const filled = summary.filled_count || 0;
+  host.innerHTML = `<div class="ro-balance-note">
+    <p class="m-0 text-[28px] font-semibold tracking-tight text-on-surface">${summary.avg_days != null ? summary.avg_days : "—"}<span class="ml-1 text-[13px] font-medium text-text-muted">days average</span></p>
+    <p class="ro-chart-insight">${filled
+      ? `${filled} filled role${filled === 1 ? "" : "s"}. Fastest ${summary.fastest_days ?? "—"}d · slowest ${summary.slowest_days ?? "—"}d. ${summary.within_sla_percent ?? "—"}% landed inside SLA.`
+      : "Not enough closed requisitions yet — department bars above will fill as roles close."}</p>
+  </div>`;
 }/* ═══════════════════════════════════════════════════════════════
    SOURCE EFFECTIVENESS
    ═══════════════════════════════════════════════════════════════ */
@@ -788,10 +1391,11 @@ function renderSourceEffectivenessTable(rows) {
       <td class="px-4 py-3 text-data-tabular text-on-surface">${row.candidates}</td>
       <td class="px-4 py-3 text-data-tabular text-success">${row.hired}</td>
       <td class="px-4 py-3"><span class="px-2 py-0.5 rounded ${badgeClass} text-label-caps font-semibold">${conversion == null ? "—" : `${conversion}%`}</span></td>
+      <td class="px-4 py-3 text-data-tabular text-on-surface">${row.cost_per_hire != null ? `$${Number(row.cost_per_hire).toLocaleString()}` : "—"}</td>
       <td class="px-4 py-3">${sourceQualityMeta(row)}</td>
     </tr>`;
       }).join("")
-    : `<tr><td class="px-4 py-6 text-text-muted" colspan="5">No candidate source data available yet.</td></tr>`;
+            : `<tr><td class="px-4 py-6 text-text-muted" colspan="6">No candidate source data available yet.</td></tr>`;
 }
 
 function slaRowStatus(row) {
@@ -928,6 +1532,55 @@ function followUpTimingMeta(item) {
   </div>`;
 }
 
+function startOfWeekMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function renderMeetings(items = [], meta = {}) {
+  const list = Array.isArray(items) ? items : [];
+  const host = document.querySelector("[data-meetings-list]");
+  if (host) {
+    host.innerHTML = list.length
+      ? list.map((item) => {
+          const when = item.scheduled_at ? formatWhen(item.scheduled_at) : "Unscheduled";
+          return `<div class="flex items-center gap-4 p-4 hover:bg-highlight-soft transition-colors" data-live-meeting-row="true" data-meeting-id="${item.id || ""}">
+            <div class="w-1 h-12 rounded-full bg-primary-container shrink-0"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <h4 class="font-body-md font-semibold text-on-surface truncate">${escapeLiveHtml(item.title || "Meeting")}</h4>
+                <span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-alt text-[10px] font-semibold shrink-0">${escapeLiveHtml(titleFromCode(item.meeting_type || "meeting"))}</span>
+              </div>
+              <p class="font-body-sm text-text-muted">${escapeLiveHtml(when)}</p>
+              <p class="font-body-sm text-text-muted mt-0.5">${escapeLiveHtml(item.client_name || item.location_name || item.notes || "")}</p>
+            </div>
+          </div>`;
+        }).join("")
+      : `<div class="p-6 text-center text-text-muted">No meetings returned by the API.</div>`;
+  }
+  const cal = document.querySelector("[data-meetings-calendar]");
+  if (cal) {
+    cal.textContent = list.length ? `${list.length} live meeting${list.length === 1 ? "" : "s"} this workspace.` : "No meetings scheduled.";
+  }
+  const start = startOfWeekMonday(new Date());
+  const heading = document.querySelector(".workspace-surface h3.font-headline-md");
+  if (heading) {
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    heading.textContent = `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+  }
+  document.querySelectorAll(".workspace-surface .grid-cols-7.border-b .font-headline-md").forEach((node, index) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + index);
+    node.textContent = String(d.getDate());
+  });
+  const countChip = Array.from(document.querySelectorAll(".workspace-surface .font-label-caps")).find((el) => /LIVE|MEETING/i.test(el.textContent || ""));
+  if (countChip) countChip.textContent = `${list.length} LIVE`;
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    INTERVIEW RENDERERS
@@ -942,6 +1595,7 @@ function interviewStatusBadge(status) {
 }
 
 function renderInterviewCard(item, index) {
+  const feedbackOpen = /pending/i.test(String(item.feedback_status || item.status || ""));
   return `<div class="flex items-center gap-4 p-4 ${index === 0 ? "" : "border-t border-border"} transition-colors hover:bg-highlight-soft" data-live-interview-row="true" data-interview-id="${item.id}">
     <div class="min-w-0 flex-1">
       <div class="mb-1 flex items-center gap-2">
@@ -951,9 +1605,12 @@ function renderInterviewCard(item, index) {
       <p class="font-body-sm text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
       <p class="mt-0.5 text-[11px] text-text-muted">${escapeLiveHtml(item.round_type || item.interview_type || "Interview")} · ${escapeLiveHtml(formatWhen(item.scheduled_at))}</p>
     </div>
-    <button class="rounded p-1 text-text-muted transition-colors hover:bg-surface-variant hover:text-primary" type="button" data-route="interview-detail.html?interview_id=${item.id}" aria-label="View interview details">
-      <span class="material-symbols-outlined text-[20px]">open_in_new</span>
-    </button>
+    <div class="flex shrink-0 items-center gap-1">
+      ${feedbackOpen ? `<button class="rounded px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-highlight-soft" type="button" data-route="interview-feedback-dialog.html?interview_id=${item.id}" aria-label="Submit feedback for ${escapeLiveHtml(item.candidate_name || "candidate")}">Feedback</button>` : ""}
+      <button class="rounded p-1 text-text-muted transition-colors hover:bg-surface-variant hover:text-primary" type="button" data-route="interview-detail.html?interview_id=${item.id}" aria-label="View interview details">
+        <span class="material-symbols-outlined text-[20px]">open_in_new</span>
+      </button>
+    </div>
   </div>`;
 }
 
@@ -1104,6 +1761,84 @@ function renderPipelineAnalyticsBottlenecks(stages, interviews, offers) {
 /* ═══════════════════════════════════════════════════════════════
    ANALYTICS HELPERS
    ═══════════════════════════════════════════════════════════════ */
+
+function renderAnalyticsVisuals(pipelineItems, candidates, offers) {
+  const stages = pipelineStageBuckets(pipelineItems, offers);
+  const hires = (offers || []).filter((item) => item.application_status === "joined" || normalizeOfferStatus(item.offer_status) === "accepted").length;
+  const hireHost = paintChartPlaceholder("Hiring Trend", "");
+  if (hireHost) {
+    hireHost.innerHTML = `<div class="ro-balance-note">
+      <p class="m-0 text-[28px] font-semibold tracking-tight text-on-surface">${pipelineItems.length} <span class="text-[13px] font-medium text-text-muted">in pipeline</span></p>
+      <p class="ro-chart-insight">${hires} hired · ${(offers || []).length} offers. Stage mix is in the funnel below.</p>
+    </div>`;
+  }
+  const sourceCounts = {};
+  (candidates || []).forEach((candidate) => {
+    const source = candidate.source || candidate.source_type || candidate.channel || "Unspecified";
+    sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+  });
+  const sourceRows = Object.entries(sourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([label, value]) => ({ label, value }));
+  const sourceHost = paintChartPlaceholder("Source Effectiveness", "");
+  if (sourceHost) {
+    renderRankedMetricList(sourceHost, sourceRows, {
+      insight: sourceRows[0] ? `${sourceRows[0].label} is currently the busiest channel.` : "",
+      empty: "Source mix will appear once candidates have a channel.",
+    });
+  }
+  const funnelPanel = findPanelByHeading("Pipeline Funnel");
+  const funnelHost = funnelPanel?.querySelector(".space-y-3");
+  if (funnelHost && stages.length) {
+    const max = Math.max(...stages.map((stage) => stage.count), 1);
+    funnelHost.innerHTML = stages.map((stage) => {
+      const pct = Math.round((stage.count / max) * 100);
+      return `<div class="flex items-center gap-4">
+        <span class="text-body-sm text-on-surface w-24">${escapeLiveHtml(stage.label)}</span>
+        <div class="flex-1 bg-outline-variant rounded-full h-6 overflow-hidden">
+          <div class="bg-primary h-full rounded-full" style="width:${Math.max(8, pct)}%"></div>
+        </div>
+        <span class="text-data-tabular font-semibold text-on-surface w-16 text-right">${stage.count}</span>
+      </div>`;
+    }).join("");
+  }
+}
+
+function renderSourceRecommendations(rows) {
+  const panel = findPanelByHeading("Recommendations");
+  const host = panel?.querySelector(".space-y-3") || panel?.querySelector(".p-4");
+  if (!host || !rows?.length) return;
+  const ranked = [...rows].sort((a, b) => (b.conversion_rate || 0) - (a.conversion_rate || 0));
+  const best = ranked[0];
+  const weakest = ranked[ranked.length - 1];
+  const notes = [
+    best ? { icon: "trending_up", title: `Protect ${best.source}`, detail: `${best.conversion_rate ?? "—"}% conversion from ${best.candidates} candidates.` } : null,
+    weakest && weakest !== best ? { icon: "tune", title: `Review ${weakest.source}`, detail: `${weakest.hired || 0} hires from ${weakest.candidates} candidates.` } : null,
+  ].filter(Boolean);
+  host.innerHTML = notes.map((note) => `<div class="flex items-start gap-3 p-2 rounded-lg">
+    <span class="material-symbols-outlined text-[18px] text-primary mt-0.5">${note.icon}</span>
+    <div class="min-w-0">
+      <p class="text-body-sm text-on-surface font-medium m-0">${escapeLiveHtml(note.title)}</p>
+      <p class="text-body-sm text-text-muted m-0">${escapeLiveHtml(note.detail)}</p>
+    </div>
+  </div>`).join("");
+}
+
+function renderSourceLeaderboard(rows) {
+  const panel = findPanelByHeading("Top Performing Sources");
+  const host = panel?.querySelector(".space-y-3") || panel?.querySelector(".p-4");
+  if (!host) return;
+  const ranked = [...(rows || [])]
+    .sort((a, b) => (b.conversion_rate || 0) - (a.conversion_rate || 0) || (b.candidates || 0) - (a.candidates || 0))
+    .slice(0, 5)
+    .map((row) => ({ label: row.source, value: row.conversion_rate || 0 }));
+  renderRankedMetricList(host, ranked, {
+    format: (value) => `${value}%`,
+    insight: ranked[0] ? `${ranked[0].label} currently converts best.` : "",
+    empty: "Source ranking will appear once candidates have a channel.",
+  });
+}
 
 function renderAnalyticsTeam(users, requisitions, candidates, offers) {
   const panel = findPanelByHeading("Team Performance");

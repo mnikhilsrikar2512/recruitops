@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 4174);
 const API_PORT = process.env.API_PORT || 8000;
 const ROOT = __dirname;
 const MIME = {
@@ -44,6 +44,15 @@ http.createServer((req, res) => {
     res.writeHead(404); res.end('Not found'); return;
   }
   const ext = path.extname(filePath);
-  res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+  const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+  const isAsset = ext === '.css' || ext === '.js';
+  const cacheAssets = process.env.NODE_ENV === 'production';
+  if (ext === '.html' || (isAsset && !cacheAssets)) {
+    headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
+    headers['Pragma'] = 'no-cache';
+  } else if (isAsset) {
+    headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+  }
+  res.writeHead(200, headers);
   fs.createReadStream(filePath).pipe(res);
 }).listen(PORT, () => console.log(`Frontend: http://localhost:${PORT} (API proxied to :${API_PORT})`));

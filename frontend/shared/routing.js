@@ -4,15 +4,14 @@
 
 function getActionLabel(element) {
   if (!element) return "";
-  const text = (element.textContent || "").replace(/\\s+/g, " ").trim().toLowerCase();
-  const iconText = Array.from(element.querySelectorAll(".material-symbols-outlined"))
-    .map((node) => (node.textContent || "").replace(/\\s+/g, " ").trim().toLowerCase())
-    .filter(Boolean)
-    .join(" ");
+  const iconNodes = Array.from(element.querySelectorAll(".material-symbols-outlined"));
+  let text = (element.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+  iconNodes.forEach((node) => {
+    const icon = (node.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (icon) text = text.replace(icon, " ");
+  });
+  text = text.replace(/\s+/g, " ").trim();
   const semanticLabel = (element.getAttribute("aria-label") || element.getAttribute("title") || "").trim().toLowerCase();
-  if (!text || text === iconText) {
-    return semanticLabel || text;
-  }
   return text || semanticLabel;
 }
 
@@ -22,11 +21,18 @@ function normalizeInternalRoute(rawHref) {
   try {
     const url = new URL(rawHref, window.location.href);
     const filename = url.pathname.split("/").pop() || "";
-    return /\\.html$/i.test(filename) ? filename : "";
+    return /\.html$/i.test(filename) ? filename : "";
   } catch (error) {
     const filename = String(rawHref).split(/[?#]/)[0].split("/").pop() || "";
-    return /\\.html$/i.test(filename) ? filename : "";
+    return /\.html$/i.test(filename) ? filename : "";
   }
+}
+
+
+function isRootIndexPath(pathname) {
+  const path = String(pathname || "");
+  if (path.includes("/pages/")) return false;
+  return path === "/" || path.endsWith("/") || /\/index\.html$/i.test(path);
 }
 
 
@@ -43,8 +49,8 @@ function buildRouteHref(rawHref) {
   const routeFile = normalizeInternalRoute(rawHref);
   if (!routeFile) return rawHref;
   const target = new URL(rawHref, window.location.href);
-  const currentPath = window.location.pathname;
-  const currentPageIsRootIndex = currentPath.endsWith("/frontend/") || currentPath.endsWith("/frontend/index.html");
+  const currentPageIsRootIndex = isRootIndexPath(window.location.pathname);
+  const targetIsRootIndex = routeFile.toLowerCase() === "index.html";
   if (OVERLAY_ROUTE_FILES.has(routeFile)) {
     const currentFile = getCurrentRouteFile();
     const currentKind = document.body?.dataset.routeKind || "";
@@ -52,13 +58,119 @@ function buildRouteHref(rawHref) {
       target.searchParams.set("returnTo", currentFile);
     }
   }
-  const routePath = currentPageIsRootIndex ? `pages/${routeFile}` : routeFile;
+  const routePath = targetIsRootIndex
+    ? (currentPageIsRootIndex ? "index.html" : "../index.html")
+    : (currentPageIsRootIndex ? `pages/${routeFile}` : routeFile);
   return `${routePath}${target.search}${target.hash}`;
 }
 
 
 function navigateToRoute(rawHref) {
+  const routeFile = normalizeInternalRoute(rawHref);
+  const currentKind = document.body?.dataset.routeKind || "";
+  const alreadyOverlayPage = document.body?.dataset.overlayPage === "true" || currentKind === "overlay";
+  if (routeFile && typeof OVERLAY_ROUTE_FILES !== "undefined" && OVERLAY_ROUTE_FILES.has(routeFile) && !alreadyOverlayPage) {
+    openInPageOverlay(rawHref);
+    return;
+  }
   window.location.href = buildRouteHref(rawHref);
+}
+
+
+function inPageOverlayRoot() {
+  return document.getElementById("ro-inpage-overlay");
+}
+
+
+function closeInPageOverlay(opts = {}) {
+  const root = inPageOverlayRoot();
+  if (!root) return false;
+  const restoreSelector = root.dataset.restoreFocus;
+  root.remove();
+  document.body.classList.remove("is-inpage-overlay");
+  if (opts.refresh && window.RecruitOpsLive?.reloadCurrentPage) {
+    Promise.resolve(window.RecruitOpsLive.reloadCurrentPage()).catch(() => {});
+  }
+  if (!opts.silent && restoreSelector) {
+    const restore = document.querySelector(restoreSelector);
+    if (restore instanceof HTMLElement) restore.focus();
+  }
+  return true;
+}
+
+
+async function openInPageOverlay(rawHref) {
+  const routeFile = normalizeInternalRoute(rawHref);
+  if (!routeFile) {
+    window.location.href = buildRouteHref(rawHref);
+    return;
+  }
+  const target = new URL(rawHref, window.location.href);
+  const overlayRoute = routeFile.replace(/\.html$/i, "");
+  const fetchHref = buildRouteHref(rawHref);
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) {
+    if (!active.id) active.dataset.overlayReturnFocus = "true";
+  }
+
+  closeInPageOverlay({ silent: true });
+
+  const root = document.createElement("div");
+  root.id = "ro-inpage-overlay";
+  root.dataset.overlayRoute = overlayRoute;
+  root.dataset.overlaySearch = target.search.replace(/^\?/, "");
+  if (active instanceof HTMLElement && active.id) root.dataset.restoreFocus = `#${CSS.escape(active.id)}`;
+  else if (active instanceof HTMLElement) root.dataset.restoreFocus = "[data-overlay-return-focus='true']";
+  root.innerHTML = `<div class="overlay-backdrop" data-overlay-close="true"></div><div class="overlay-host dialog" aria-busy="true"></div>`;
+  document.body.appendChild(root);
+  document.body.classList.add("is-inpage-overlay");
+
+  try {
+    const response = await fetch(fetchHref, { credentials: "same-origin", headers: { Accept: "text/html" } });
+    if (!response.ok) throw new Error(`Overlay ${response.status}`);
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const sourceHost = doc.querySelector(".overlay-host");
+    const sourceSurface = sourceHost?.querySelector("[data-overlay-surface='true']") || doc.querySelector("[data-overlay-surface='true']");
+    const liveHost = root.querySelector(".overlay-host");
+    if (sourceHost) {
+      liveHost.className = sourceHost.className;
+      liveHost.innerHTML = sourceHost.innerHTML;
+    } else if (sourceSurface) {
+      liveHost.innerHTML = "";
+      liveHost.appendChild(document.importNode(sourceSurface, true));
+    } else {
+      throw new Error("Overlay markup missing");
+    }
+    liveHost.removeAttribute("aria-busy");
+
+    if (typeof setupOverlayInteractionPolish === "function") setupOverlayInteractionPolish(root);
+    if (typeof upgradeContextualRoutes === "function") upgradeContextualRoutes(root);
+
+    root.querySelectorAll("form").forEach((form) => {
+      form.setAttribute("novalidate", "novalidate");
+      if (typeof setupFormProgress === "function") setupFormProgress(form);
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (typeof validateForm === "function" && !validateForm(form)) return;
+        if (window.RecruitOpsLive?.handleFormSubmit?.(form)) return;
+        showToast("Looks good", "All required fields are complete.");
+      });
+    });
+
+    if (window.RecruitOpsLive?.bootOverlay) {
+      await window.RecruitOpsLive.bootOverlay(overlayRoute);
+    }
+
+    const focusTarget = root.querySelector("[data-overlay-surface] input:not([type='hidden']), [data-overlay-surface] select, [data-overlay-surface] textarea, [data-overlay-surface] button");
+    window.requestAnimationFrame(() => {
+      if (focusTarget instanceof HTMLElement) focusTarget.focus();
+    });
+  } catch (error) {
+    root.remove();
+    document.body.classList.remove("is-inpage-overlay");
+    window.location.href = fetchHref;
+  }
 }
 
 
@@ -78,7 +190,20 @@ function syncOverlayReturnLinks(closeHref) {
 }
 
 
+function shouldGuessRoute(element) {
+  if (!element) return false;
+  if (element.dataset.route || element.dataset.toast || element.dataset.chromeBound === "true") return false;
+  if (element.getAttribute("aria-haspopup") === "menu") return false;
+  if (element.closest("form, [data-layout='pagination-controls'], .ro-row-menu, .ro-row-menu-host, table")) return false;
+  const icon = element.querySelector(".material-symbols-outlined")?.textContent?.trim().toLowerCase() || "";
+  if (icon === "more_vert") return false;
+  const label = getActionLabel(element);
+  if (/export|refresh|reload|filter|save view|download/.test(label)) return false;
+  return true;
+}
+
 function resolveContextualRoute(button) {
+  if (!shouldGuessRoute(button)) return null;
   const routeId = document.body?.dataset.routeId || "";
   const label = getActionLabel(button);
   const icon = button.querySelector(".material-symbols-outlined")?.textContent?.trim().toLowerCase() || "";
@@ -114,7 +239,6 @@ function resolveContextualRoute(button) {
   if (routeId === "candidate-profiles") {
     if (/upload resume|bulk import/.test(label)) return "resume-upload-and-review.html";
     if (/manual entry/.test(label)) return "candidate-review-drawer.html";
-    if (icon === "more_vert" || /more actions/.test(label)) return "candidate-review-drawer.html";
   }
 
   if (routeId === "application-detail-drawer") {
@@ -133,6 +257,7 @@ function resolveContextualRoute(button) {
   if (routeId === "client-directory") {
     if (/view detail/.test(label)) return "client-detail.html";
     if (/new requisition/.test(label)) return "requisition-intake.html";
+    if (/add client|new client/.test(label)) return "contact-form-dialog.html";
   }
 
   if (routeId === "location-management") {
@@ -141,7 +266,7 @@ function resolveContextualRoute(button) {
   }
 
   if (routeId === "role-management") {
-    if (/\\b\\d+\\s+users?\\b/.test(label)) return "user-management.html";
+    if (/\b\d+\s+users?\b/.test(label)) return "user-management.html";
   }
 
   if (routeId === "user-management") {
@@ -175,7 +300,7 @@ function resolveContextualRoute(button) {
   }
 
   if (routeId === "daily-update-detail-panel") {
-    if (/req-\\d+|staff engineer/.test(label)) return "requisition-detail.html";
+    if (/req-\d+|staff engineer/.test(label)) return "requisition-detail.html";
   }
 
   if (routeId === "notification-detail-panel") {
@@ -185,8 +310,19 @@ function resolveContextualRoute(button) {
   if (routeId === "requisition-detail") {
     if (/reassign/.test(label)) return "reassign-owner-dialog.html";
     if (/open pipeline/.test(label)) return "pipeline-board.html";
-    if (/edit requisition/.test(label)) return "requisition-intake.html";
+    if (/edit requisition/.test(label)) {
+      const requisitionId = new URLSearchParams(window.location.search).get("requisition_id");
+      return requisitionId ? `requisition-intake-edit.html?requisition_id=${requisitionId}` : "requisition-intake-edit.html";
+    }
     if (/alex rodriguez|emily chen/.test(label)) return "candidate-review-drawer.html";
+  }
+
+  if (routeId === "follow-ups") {
+    if (/add follow-up|new follow-up/.test(label)) return "follow-up-form-dialog.html";
+  }
+
+  if (routeId === "meetings") {
+    if (/schedule meeting|add meeting|new meeting/.test(label)) return "meeting-form-dialog.html";
   }
 
   if (routeId === "reassign-owner-dialog") {
@@ -335,8 +471,7 @@ function setupRoutePrefetcher() {
   // Inject prefetch links after idle
   const injectPrefetches = () => {
     // Determine if we're on a root index page (needs pages/ prefix)
-    const currentPath = window.location.pathname;
-    const isRootIndex = currentPath.endsWith("/frontend/") || currentPath.endsWith("/frontend/index.html");
+    const isRootIndex = isRootIndexPath(window.location.pathname);
     const prefix = isRootIndex ? "pages/" : "";
 
     unique.forEach((item, index) => {

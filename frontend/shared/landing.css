@@ -9,28 +9,36 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 
 /* ── Nav ── */
 .landing-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  position: fixed !important; top: 0; left: 0; right: 0; z-index: 50;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(16px);
   border-bottom: 1px solid #E7E7E4; transition: box-shadow 0.3s;
+  max-width: 100%;
+  overflow: clip;
 }
 .landing-nav.scrolled { box-shadow: 0 4px 20px rgba(36,72,60,0.06); }
 .landing-nav-inner {
   max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px;
   display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; min-width: 0; width: 100%;
 }
+.landing-nav-inner > div { min-width: 0; }
 .landing-nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 700; font-size: 18px; color: #1e293b; }
+.ro-logo { display: inline-block; width: 24px; height: 24px; flex-shrink: 0; vertical-align: middle; }
+.ro-logo .ro-logo-ring { transform-origin: center; }
+.ro-logo--spin .ro-logo-ring { animation: ro-logo-spin 0.9s linear infinite; }
+@keyframes ro-logo-spin { to { transform: rotate(360deg); } }
 .landing-nav-links { display: flex; align-items: center; gap: 24px; }
 .landing-nav-links a { font-size: 13px; font-weight: 500; color: #4B5257; text-decoration: none; transition: color 0.2s; }
 .landing-nav-links a:hover, .landing-nav-links a.active { color: #1e293b; }
-.landing-nav-actions { display: flex; align-items: center; gap: 12px; }
-.btn-nav { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; text-decoration: none; transition: all 0.2s; }
+.landing-nav-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.btn-nav { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
 .btn-nav-ghost { color: #1e293b; background: none; }
 .btn-nav-ghost:hover { background: #F1F2F0; }
 .btn-nav-primary { background: #1e293b; color: #fff; }
 .btn-nav-primary:hover { background: #0f172a; }
 
 /* ── Mobile menu ── */
-.nav-burger { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid #E7E7E4; border-radius: 8px; background: #fff; color: #1e293b; cursor: pointer; }
+.nav-burger { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid #E7E7E4; border-radius: 8px; background: #fff; color: #1e293b; cursor: pointer; flex-shrink: 0; }
 .mobile-menu {
   list-style: none;
   /* Slide-down: grid-template-rows 0fr→1fr animates to the content's real
@@ -71,8 +79,10 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 .mobile-menu a:hover, .mobile-menu a.active { color: #1e293b; background: #F1F2F0; }
 .mobile-menu .mobile-menu-cta { margin-top: 8px; background: #1e293b; color: #fff !important; text-align: center; }
 .mobile-menu .mobile-menu-cta:hover { background: #0f172a; }
-@media (max-width: 768px) {
+@media (max-width: 1023px), (orientation: landscape) and (max-height: 540px) {
   .nav-burger { display: inline-flex; }
+  .landing-nav-links { display: none; }
+  .landing-nav-actions .btn-nav-ghost { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mobile-menu, .mobile-menu.open { transition: none; }
@@ -98,7 +108,7 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 .landing-footer a:not(.btn-primary):not(.btn-secondary):hover, .landing-footer button:not(.btn-primary):not(.btn-secondary):hover { text-decoration: none !important; border: none !important; background: transparent !important; box-shadow: none !important; outline: none !important; }
 .landing-footer-brand a.landing-nav-brand { background: transparent !important; border: none !important; box-shadow: none !important; }
 .landing-footer-brand a.landing-nav-brand:hover { background: transparent !important; box-shadow: none !important; }
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: landscape) and (max-height: 540px) {
   .landing-nav-links { display: none; }
   .landing-footer-main { flex-direction: column; gap: 32px; }
   .landing-footer-brand { max-width: none; }
@@ -109,8 +119,16 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
    clip (not hidden): keeps document from panning on transient reveal-card
    transforms without creating a scroll container, so position:sticky
    (product-tour stepper) keeps working. */
+html, body {
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  height: auto;
+  max-width: 100%;
+  overscroll-behavior: auto;
+  overscroll-behavior-x: none;
+}
 @media (max-width: 480px) {
-  html, body { overflow-x: clip; }
+  html, body { overflow-x: hidden; overflow-y: auto !important; }
   .landing-nav-inner { padding: 0 16px; }
   .landing-nav-brand { font-size: 16px; }
   .landing-nav-actions { gap: 8px; }
@@ -124,22 +142,22 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 .btn-secondary:hover { background: #FAFBF8; transform: translateY(-1px); }
 
 /* ── Hero ── */
-.landing-hero { position: relative; overflow: hidden; }
-.landing-hero-bg { position: absolute; inset: 0; background: linear-gradient(180deg, #F6F7F4 0%, #E9F2EB 50%, #F6F7F4 100%); }
+.landing-hero { position: relative; overflow: hidden; min-height: min(70vh, 680px); min-height: min(70dvh, 680px); }
+.landing-hero-bg { position: absolute; inset: 0; }
 
 /* ── Hero layered background: dot grid + mesh glow + conic sweep ── */
 .hero-grid {
-  position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(circle, rgba(36,72,60,0.13) 1px, transparent 1px);
-  background-size: 26px 26px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%);
+  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: radial-gradient(circle, rgba(30,41,59,0.2) 1.2px, transparent 1.35px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 82% 72% at 50% 36%, black 18%, transparent 82%);
+  -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 36%, black 18%, transparent 82%);
 }
 .hero-grid::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(115deg, transparent 30%, rgba(58,122,95,0.08) 45%, rgba(255,255,255,0) 55%, transparent 70%);
+  background: linear-gradient(115deg, transparent 28%, rgba(30,41,59,0.1) 46%, rgba(255,255,255,0.28) 54%, transparent 72%);
   background-size: 220% 220%;
-  animation: heroSweep 9s ease-in-out infinite;
+  animation: heroSweep 11s ease-in-out infinite;
 }
 @keyframes heroSweep { 0%, 100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
 
@@ -201,9 +219,9 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Section band backgrounds ── */
 .band-grid {
   background-image:
-    linear-gradient(rgba(36,72,60,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(36,72,60,0.05) 1px, transparent 1px);
-  background-size: 44px 44px;
+    linear-gradient(rgba(30,41,59,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30,41,59,0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 .band-fade-edges {
   mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
@@ -274,7 +292,7 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Scroll Reveal ── */
 .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1); }
 .reveal.visible { opacity: 1; transform: translateY(0); }
-.reveal-scale { opacity: 0; transform: scale(0.92); transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1); }
+.reveal-scale { opacity: 0; transform: scale(0.98); transform-origin: top center; transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1); }
 .reveal-scale.visible { opacity: 1; transform: scale(1); }
 .stagger > * { transition-delay: calc(var(--i, 0) * 0.1s); }
 
@@ -291,9 +309,7 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 
 /* ── Gradient Text ── */
 .gradient-text {
-  background: linear-gradient(135deg, #1e293b 0%, #3a7a5f 50%, #1e293b 100%);
-  background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text; animation: gradientShift 4s ease infinite;
+  color: #1e293b;
 }
 @keyframes gradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 
@@ -304,6 +320,7 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Scroll entrance variants (feature / role cards). Declared AFTER
    .card-hover so the entrance transition wins the cascade — otherwise
    card-hover's 0.3s transform-only transition would replace it. ── */
+.stagger { overflow-x: clip; }
 .reveal-left,
 .reveal-right,
 .reveal-pop {
@@ -312,7 +329,6 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
     opacity 0.8s cubic-bezier(0.22,1,0.36,1),
     transform 0.8s cubic-bezier(0.22,1,0.36,1);
   transition-delay: calc(var(--i, 0) * 0.12s);
-  will-change: opacity, transform;
 }
 .reveal-left { transform: translateX(-56px); }
 .reveal-right { transform: translateX(56px); }
@@ -322,7 +338,48 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 .reveal-pop.visible { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
 
 /* ── Floating Orbs ── */
-.orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15; pointer-events: none; }
+.orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.42; pointer-events: none; z-index: 1; }
+
+.product-preview-body {
+  height: auto;
+  min-height: 200px;
+  min-width: 0;
+}
+.product-preview-sidebar { flex-shrink: 0; }
+.tilt-wrap,
+.tilt-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .product-preview-body { height: min(400px, 56dvh); }
+}
+
+@media (max-width: 900px) {
+  .product-preview-sidebar { display: none; }
+  .float-chip { display: none; }
+}
+
+@media (max-width: 640px) {
+  .product-preview-body { height: auto; }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+  .landing-hero {
+    min-height: 0 !important;
+    padding-top: 80px !important;
+    padding-bottom: 16px !important;
+  }
+  .landing-nav-inner { height: 56px; }
+  .product-preview-body { height: min(280px, 62dvh); }
+}
+
+/* Compact phones and any short landscape: never let the page pan sideways */
+@media (max-width: 1023px), (orientation: landscape) and (max-height: 540px) {
+  html, body { overflow-x: hidden; overflow-y: auto !important; max-width: 100%; }
+}
 
 /* ── Pulse ── */
 @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }

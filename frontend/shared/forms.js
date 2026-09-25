@@ -92,7 +92,7 @@ function isFieldComplete(field) {
   if (field.tagName === "SELECT" && /select/i.test(field.options[field.selectedIndex]?.text || "")) {
     return false;
   }
-  if (field.type === "email" && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)) {
+  if (field.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
     return false;
   }
   if (field.type === "number") {
@@ -107,6 +107,8 @@ function isFieldComplete(field) {
 
 function setupFormProgress(form) {
   if (form.id === "login-form") return;
+  if (form.dataset.skipProgress === "true") return;
+  if (form.id === "profile-details-form" || form.id === "profile-password-form") return;
   const fields = getProgressFields(form);
   if (fields.length < 2) return;
 

@@ -26,6 +26,8 @@ const OVERLAY_ROUTE_FILES = new Set([
   "offer-create-dialog.html",
   "meeting-form-dialog.html",
   "follow-up-form-dialog.html",
+  "dashboard-actions-overlay.html",
+  "onboarding-add-custom-stage-overlay.html",
 ]);
 
 function dismissToast(toast) {

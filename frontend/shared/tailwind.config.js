@@ -93,11 +93,11 @@ tailwind.config = {
       fontSize: {
         "headline-sm": ["13px", { lineHeight: "18px", fontWeight: "600" }],
         "headline-md": ["16px", { lineHeight: "22px", fontWeight: "600" }],
-        "data-tabular": ["12px", { lineHeight: "16px", fontWeight: "500" }],
-        "label-caps": ["10px", { lineHeight: "14px", letterSpacing: "0.05em", fontWeight: "700" }],
-        "body-md": ["12px", { lineHeight: "17px", fontWeight: "400" }],
-        "headline-lg": ["22px", { lineHeight: "28px", letterSpacing: "0", fontWeight: "700" }],
-        "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }]
+        "data-tabular": ["13px", { lineHeight: "18px", fontWeight: "500" }],
+        "label-caps": ["11px", { lineHeight: "15px", letterSpacing: "0.04em", fontWeight: "600" }],
+        "body-md": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+        "headline-lg": ["20px", { lineHeight: "26px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }]
       }
     }
   }
