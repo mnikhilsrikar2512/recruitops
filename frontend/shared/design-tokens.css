@@ -1,0 +1,24 @@
+/* RecruitOps Slate Navy — source of truth for color, type, radius, motion */
+:root {
+  --ro-bg: #f7f7f5;
+  --ro-surface: #ffffff;
+  --ro-surface-muted: #fafaf9;
+  --ro-border: #e7e7e4;
+  --ro-text: #1a1d20;
+  --ro-muted: #6e7476;
+  --ro-primary: #1e293b;
+  --ro-primary-hover: #0f172a;
+  --ro-success: #217a46;
+  --ro-warning: #8a6a1f;
+  --ro-danger: #a63d33;
+  --ro-radius-control: 6px;
+  --ro-radius-card: 8px;
+  --ro-radius-sheet: 12px;
+  --ro-radius-pill: 999px;
+  --ro-space-filter: 8px;
+  --ro-row: 44px;
+  --ro-sidebar: 248px;
+  --ro-motion: 160ms;
+  --ro-font: "Inter", "Manrope", sans-serif;
+  --ro-focus: 2px solid #1e293b;
+}

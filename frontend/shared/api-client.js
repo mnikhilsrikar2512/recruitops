@@ -21,7 +21,7 @@ const PUBLIC_ROUTES = new Set([
   "password-setup", "product-tour", "use-cases", "onboarding-welcome",
   "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup",
   "onboarding-pipeline-stage-builder", "onboarding-add-custom-stage-overlay",
-  "onboarding-hiring-teams", "onboarding-integrations",
+  "onboarding-hiring-teams", "onboarding-integrations", "onboarding-success-launch",
 ]);
 
 
@@ -30,8 +30,15 @@ const PUBLIC_ROUTES = new Set([
    ═══════════════════════════════════════════════════════════════ */
 
 function routeId() {
+  const overlay = document.getElementById("ro-inpage-overlay");
+  if (overlay?.dataset.overlayRoute) return overlay.dataset.overlayRoute;
   const file = (window.location.pathname.split("/").pop() || "index.html").replace(/\.html.*/, "").replace(/\?.*/, "");
   return file || "index";
+}
+
+function pathRouteId() {
+  const file = (window.location.pathname.split("/").pop() || "index.html").replace(/\.html.*/, "").replace(/\?.*/, "");
+  return document.body?.dataset.routeId || file || "index";
 }
 
 function readSession() {
@@ -52,34 +59,104 @@ function writeSession(session) {
 
 function pageHref(name) {
   return name.endsWith(".html") ? name : name + ".html";
-}async function apiRequest(path, options = {}) {
+}
+
+let cachedApiRoot = null;
+
+function apiRootCandidates() {
+  const roots = [];
+  const explicit = typeof window !== "undefined" ? window.RECRUITOPS_API_ORIGIN : "";
+  if (explicit) roots.push(String(explicit).replace(/\/$/, "") + API_BASE);
+  if (typeof window !== "undefined" && window.location?.protocol && window.location.protocol !== "file:") {
+    roots.push(`${window.location.origin}${API_BASE}`);
+  }
+  roots.push("http://127.0.0.1:8000" + API_BASE);
+  roots.push("http://localhost:8000" + API_BASE);
+  return [...new Set(roots)];
+}
+
+function apiUrl(path, root) {
+  if (path.startsWith("http")) return path;
+  return `${root}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+let connectionBannerShown = false;
+
+function showConnectionBanner() {
+  if (connectionBannerShown || document.querySelector(".ro-connection-banner")) return;
+  connectionBannerShown = true;
+  const banner = document.createElement("div");
+  banner.className = "ro-error-banner ro-connection-banner";
+  banner.setAttribute("role", "alert");
+  banner.innerHTML = "<strong>Can’t reach the server.</strong> Data on this page may be missing. Start the backend and refresh.";
+  const canvas = document.querySelector(".app-canvas") || document.querySelector("main") || document.body;
+  canvas.prepend(banner);
+}
+
+async function apiRequest(path, options = {}) {
   const session = RecruitOpsLive.session || readSession();
   const headers = { "Content-Type": "application/json", ...options.headers };
   if (session?.token) headers["Authorization"] = `Bearer ${session.token}`;
-  const origin = window.location.origin && window.location.protocol !== "file:" ? window.location.origin : "http://localhost:8000";
-  const url = path.startsWith("http") ? path : `${origin}${API_BASE}${path}`;
-  const response = await fetch(url, { ...options, headers });
-  if (response.status === 401) {
-    writeSession(null);
-    window.location.href = pageHref("login.html");
-    throw new Error("Session expired");
+  const roots = cachedApiRoot ? [cachedApiRoot] : apiRootCandidates();
+  let lastError = null;
+  let unreachable = true;
+  for (const root of roots) {
+    try {
+      const response = await fetch(apiUrl(path, root), { ...options, headers });
+      if (response.status === 503) {
+        lastError = new Error("API error 503: backend unreachable");
+        continue;
+      }
+      unreachable = false;
+      if (response.status === 404 && !cachedApiRoot && roots.length > 1) {
+        lastError = new Error("API error 404");
+        continue;
+      }
+      cachedApiRoot = root;
+      if (response.status === 401) {
+        writeSession(null);
+        window.location.href = pageHref("login.html");
+        throw new Error("Session expired");
+      }
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(`API error ${response.status}: ${body.slice(0, 200)}`);
+      }
+      if (response.status === 204) return {};
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      if (cachedApiRoot || /Session expired/i.test(error?.message || "")) throw error;
+    }
   }
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`API error ${response.status}: ${body.slice(0, 200)}`);
-  }
-  if (response.status === 204) return {};
-  return response.json();
+  if (unreachable) showConnectionBanner();
+  throw lastError || new Error("Unable to reach the API. Start FastAPI on port 8000.");
+}
+
+function formatListCount(visible, total) {
+  const v = Number(visible) || 0;
+  const t = Number(total) || 0;
+  if (!t) return "0 of 0";
+  return `${v} of ${t}`;
 }
 
 function showLiveError(error) {
   const message = error?.message || String(error);
   console.error("[RecruitOps]", message);
-  const toast = document.createElement("div");
-  toast.className = "fixed bottom-4 right-4 z-[9999] max-w-sm rounded-lg border border-danger-text/30 bg-danger-bg px-4 py-3 shadow-lg";
-  toast.innerHTML = `<p class="font-body-sm font-semibold text-danger-text">Error</p><p class="font-body-sm text-danger-text">${escapeLiveHtml(message)}</p>`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 5000);
+  document.querySelectorAll(".ro-error-banner").forEach((el) => el.remove());
+  const banner = document.createElement("div");
+  banner.className = "ro-error-banner";
+  banner.setAttribute("role", "alert");
+  banner.innerHTML = `<strong>Couldn’t complete that request.</strong> ${escapeLiveHtml(message)}`;
+  const surface = document.querySelector(".workspace-surface");
+  const title = surface?.querySelector(":scope > [data-layout='page-titlebar'], :scope > [data-layout='workspace-header'], :scope h1, :scope h2");
+  if (title) {
+    const host = title.closest("[data-layout='page-titlebar'], [data-layout='workspace-header']") || title;
+    host.insertAdjacentElement("afterend", banner);
+  } else {
+    (surface || document.querySelector(".app-canvas") || document.querySelector("main") || document.body).prepend(banner);
+  }
+  setTimeout(() => banner.remove(), 8000);
 }
 
 function showLiveSuccess(title, text = "") {
@@ -115,7 +192,7 @@ function userPermissions() {
 function hasPermission(permissionCode) {
   if (isAdmin()) return true;
   const perms = userPermissions();
-  if (!perms.length) return true; /* If no permissions loaded, allow (fail-open for UX) */
+  if (!perms.length) return false;
   return perms.includes(permissionCode);
 }
 
@@ -171,7 +248,7 @@ async function fillSelect(selectId, items, labelFn, valueFn, selectedValue) {
 }
 
 async function hydrateSelects() {
-  /* Select hydration for remaining overlay form pages lives with their loaders. */
+  if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
 }
 
 
@@ -187,7 +264,14 @@ function decorateShell() {
     node.textContent = userName;
   });
   document.querySelectorAll(".sidebar-user-role, [data-user-role]").forEach((node) => {
-    node.textContent = session.role || "Recruiter";
+    node.textContent = session.role_name || session.role || "Recruiter";
+  });
+  const initials = typeof personInitials === "function" ? personInitials(userName) : String(userName).slice(0, 2).toUpperCase();
+  document.querySelectorAll('.app-topbar button[aria-label="Open my work"], .app-topbar button[aria-label="Open profile"]').forEach((button) => {
+    button.dataset.route = "my-profile.html";
+    button.setAttribute("aria-label", "Open profile");
+    button.setAttribute("title", "Open profile");
+    button.textContent = initials;
   });
   addConnectionIndicator();
   enforceSidebarRBAC();
@@ -285,8 +369,7 @@ function addConnectionIndicator() {
   indicator.className = "flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium";
   indicator.innerHTML = '<span class="h-2 w-2 rounded-full bg-text-muted animate-pulse"></span><span>Connecting</span>';
   topbar.appendChild(indicator);
-  const healthOrigin = window.location.origin && window.location.protocol !== "file:" ? window.location.origin : "http://localhost:8000";
-  fetch(`${healthOrigin}${API_BASE}/health`).then(() => {
+  apiRequest("/health").then(() => {
     indicator.innerHTML = '<span class="h-2 w-2 rounded-full bg-success-text"></span><span class="text-success-text">Live</span>';
   }).catch(() => {
     indicator.innerHTML = '<span class="h-2 w-2 rounded-full bg-danger-text"></span><span class="text-danger-text">Offline</span>';
@@ -315,7 +398,11 @@ async function handleLogin(form) {
   }
 
   // Show loading state
-  if (overlay) overlay.classList.remove("hidden");
+  if (overlay) {
+    overlay.classList.remove("hidden");
+    overlay.hidden = false;
+    overlay.setAttribute("aria-hidden", "false");
+  }
   if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">sync</span><span>Authenticating...</span>'; }
   if (alertBanner) alertBanner.className = "hidden w-full p-3 rounded flex items-start gap-3 border";
 
@@ -352,10 +439,14 @@ async function handleLogin(form) {
     if (!onboardingComplete && isFirstLogin) {
       window.location.href = pageHref("onboarding-welcome.html");
     } else {
-      window.location.href = pageHref("daily-review.html");
+      window.location.href = pageHref("role-dashboard.html");
     }
   } catch (error) {
-    if (overlay) overlay.classList.add("hidden");
+    if (overlay) {
+      overlay.classList.add("hidden");
+      overlay.hidden = true;
+      overlay.setAttribute("aria-hidden", "true");
+    }
     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<span>Sign In</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span>'; }
     const message = error?.message || String(error);
     const isInvalid = /401|invalid|unauthorized/i.test(message);
@@ -393,13 +484,23 @@ async function handleForgot(form) {
       showAlertState({ bgClass: "bg-warning-bg", textClass: "text-warning-text", borderClass: "border-[#dbc1a3]", icon: "warning", title: "Request failed", message: "Could not send reset link. Please try again." });
     } else { showLiveError(error); }
   }
-}function handleFormSubmit(form) {
+}
+
+function afterOverlaySave(fallbackHref) {
+  window.setTimeout(() => {
+    if (typeof closeInPageOverlay === "function" && closeInPageOverlay({ refresh: true })) return;
+    window.location.href = pageHref(fallbackHref);
+  }, 400);
+}
+
+function handleFormSubmit(form) {
   const route = routeId();
   const submitMap = {
     "contact-form-dialog": submitContact,
     "requisition-intake": submitRequisition,
     "requisition-intake-edit": submitRequisition,
     "daily-updates-submission": submitDailyUpdate,
+    "daily-updates-workspace": () => submitDailyUpdate({ stayOnPage: true, status: "submitted" }),
     "meeting-form-dialog": submitMeetingForm,
     "offer-create-dialog": submitOfferCreate,
     "link-to-requisition-dialog": submitLinkToRequisition,
@@ -417,6 +518,7 @@ async function handleForgot(form) {
       "requisition-intake": "requisition.create",
       "requisition-intake-edit": "requisition.update",
       "daily-updates-submission": "daily_update.create_main",
+      "daily-updates-workspace": "daily_update.create_main",
       "meeting-form-dialog": "meeting.create",
       "offer-create-dialog": "offer.create",
       "link-to-requisition-dialog": "candidate.link_requisition",
@@ -471,6 +573,7 @@ async function submitContact() {
   try {
     await apiRequest(`/clients/${clientId}/contacts`, { method: "POST", body: JSON.stringify(payload) });
     showLiveSuccess("Contact saved", payload.contact_name);
+    afterOverlaySave("client-detail.html");
   } catch (error) { showLiveError(error); }
 }
 
@@ -574,7 +677,7 @@ async function loadWorkflowActions() {
   const countEl = document.querySelector("[data-role-queue-count]");
   if (countEl) {
     const total = payload.meta?.total ?? items.length;
-    countEl.textContent = total > 0 ? `View all ${total} items in queue` : "No items in queue";
+    countEl.textContent = total > 0 ? `View all ${total} items in queue` : "Queue is clear";
   }
 }
 
@@ -585,12 +688,19 @@ async function loadDashboardActionsOverlay() {
 
 async function loadNotificationDetailPanel() {
   const notificationId = queryInt("notification_id");
-  if (notificationId) {
-    try {
-      await apiRequest(`/notifications/${notificationId}/read`, { method: "PATCH", body: JSON.stringify({ status: "read" }) });
-      refreshNotificationBadge();
-    } catch {}
+  let item = notificationItemsCache.find((entry) => Number(entry.id) === Number(notificationId));
+  if (!item && notificationId) {
+    const payload = await apiRequest("/notifications/?page_size=50").catch(() => ({ items: [] }));
+    item = (payload.items || []).find((entry) => Number(entry.id) === Number(notificationId));
   }
+  if (!item) {
+    const surface = document.querySelector("[data-overlay-surface='true']");
+    if (surface) {
+      surface.innerHTML = `<div class="p-6"><h2 class="font-headline-md font-bold text-on-surface">Event not found</h2><p class="mt-2 text-body-sm text-text-muted">This hiring event is no longer in your inbox.</p></div>`;
+    }
+    return;
+  }
+  if (typeof renderNotificationDetailPanel === "function") renderNotificationDetailPanel(item);
 }
 
 async function loadContactFormDialog() {
@@ -627,6 +737,10 @@ async function submitRequisitionStatus(button) {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
     setFirstText("[data-current-stage]", application.current_stage);
+    const subtitle = document.querySelector("[data-overlay-surface] p.font-body-sm");
+    if (subtitle && application.candidate_name) {
+      subtitle.textContent = `${application.candidate_name}${application.requisition_title ? " • " + application.requisition_title : ""}`;
+    }
   } catch (error) { showLiveError(error); }
 }
 
@@ -641,7 +755,7 @@ async function submitStageMove() {
       body: JSON.stringify({ to_stage: toStage, notes }),
     });
     showLiveSuccess("Stage updated", toStage);
-    setTimeout(() => { window.location.href = pageHref("pipeline-board.html"); }, 1000);
+    afterOverlaySave("pipeline-board.html");
   } catch (error) { showLiveError(error); }
 }
 
@@ -672,7 +786,7 @@ async function submitCandidate() {
       result = await apiRequest("/candidates/", { method: "POST", body: JSON.stringify(payload) });
     }
     showLiveSuccess(id ? "Candidate updated" : "Candidate created", result.full_name);
-    setTimeout(() => { window.location.href = pageHref("candidate-profiles.html"); }, 1000);
+    afterOverlaySave("candidate-profiles.html");
   } catch (error) { showLiveError(error); }
 }
 
@@ -986,6 +1100,32 @@ async function openRoleDialog(roleId, refresh) {
   });
 }
 
+async function duplicateRole(roleId) {
+  const role = await apiRequest(`/roles/${roleId}`).catch(() => null);
+  if (!role) {
+    showToast("Could not duplicate role", "The role could not be loaded.");
+    return;
+  }
+  const baseName = String(role.role_name || role.name || "Role").replace(/\s+copy$/i, "").trim();
+  const name = `${baseName} copy`;
+  const code = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").substring(0, 50) || `role_${roleId}_copy`;
+  try {
+    await apiRequest("/roles/", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        code,
+        description: role.description || null,
+        status: role.status || "active",
+      }),
+    });
+    showToast("Role duplicated", name);
+    if (typeof loadRoles === "function") loadRoles();
+  } catch (error) {
+    showToast("Could not duplicate role", error?.message || "Try a different name.");
+  }
+}
+
 async function openClientDialog(clientId, refresh) {
   const isEdit = !!clientId;
   let client = null;
@@ -1169,6 +1309,12 @@ async function loadUsers() {
     paintPlainCell(cells[4], item.primary_location_name || item.location_name);
     paintPlainCell(cells[5], item.reporting_manager_name || item.manager_name || "—");
     paintStatusChip(cells[6], item.status);
+    row.dataset.filterStatus = String(item.status || "active").toLowerCase();
+    row.dataset.filterRole = item.primary_role_name || item.role || item.role_name || "";
+    row.dataset.filterLocation = item.primary_location_name || item.location_name || "";
+    row.dataset.filterOwner = item.reporting_manager_name || item.manager_name || "";
+    row.dataset.route = `user-detail.html?user_id=${item.id}`;
+    row.classList.add("cursor-pointer");
   });
   wireEntityTableActions({
     addPermission: "user.create",
@@ -1188,6 +1334,134 @@ async function loadUserDetail() {
   setFirstText("[data-user-location]", user.location_name || "—");
 }
 
+function paintProfile(user, role, location) {
+  const name = user?.full_name || RecruitOpsLive.session?.user_name || "—";
+  const email = user?.email || RecruitOpsLive.session?.email || "—";
+  const roleName = role?.name || user?.primary_role_name || RecruitOpsLive.session?.role_name || "—";
+  const locationName = location?.location_name || user?.primary_location_name || RecruitOpsLive.session?.location_name || "—";
+  const initials = typeof personInitials === "function" ? personInitials(name) : "";
+  setFirstText("[data-profile-name]", name);
+  setFirstText("[data-profile-email]", email);
+  setFirstText("[data-profile-role]", roleName);
+  setFirstText("[data-profile-location]", locationName);
+  setFirstText("[data-profile-status]", titleFromCode(user?.status || "active"));
+  setFirstText("[data-profile-code]", user?.employee_code || "—");
+  setFirstText("[data-profile-title]", user?.business_title || roleName);
+  setFirstText("[data-profile-initials]", initials);
+  const nameInput = document.getElementById("profile-full-name");
+  const phoneInput = document.getElementById("profile-phone");
+  const emailInput = document.getElementById("profile-email");
+  if (nameInput) nameInput.value = user?.full_name || "";
+  if (phoneInput) phoneInput.value = user?.phone || "";
+  if (emailInput) emailInput.value = email;
+}
+
+async function loadMyProfile() {
+  const detailsForm = document.getElementById("profile-details-form");
+  const passwordForm = document.getElementById("profile-password-form");
+  const detailsSave = detailsForm?.querySelector("button[type='submit']");
+  const passwordSave = passwordForm?.querySelector("button[type='submit']");
+
+  let profileLoaded = false;
+  let baselinePhone = "";
+
+  try {
+    const me = await apiRequest("/auth/me");
+    if (!me?.user) throw new Error("Profile unavailable");
+    paintProfile(me.user, me.primary_role, me.primary_location);
+    baselinePhone = String(me.user.phone || "");
+    profileLoaded = true;
+  } catch (error) {
+    paintProfile({}, null, null);
+    if (detailsSave) detailsSave.disabled = true;
+    if (passwordSave) passwordSave.disabled = true;
+    if (typeof showToast === "function") {
+      showToast("Could not load profile", error.message || "Refresh and try again.");
+    }
+  }
+
+  if (detailsForm && detailsForm.dataset.wired !== "true") {
+    detailsForm.dataset.wired = "true";
+    detailsForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!profileLoaded) {
+        if (typeof showToast === "function") {
+          showToast("Could not save profile", "Profile has not loaded yet. Refresh and try again.");
+        }
+        return;
+      }
+      const fullName = String(document.getElementById("profile-full-name")?.value || "").trim();
+      if (!fullName) {
+        if (typeof showToast === "function") showToast("Name required", "Enter your full name.");
+        return;
+      }
+      // Only send phone when the user actually changed it. Omitting the key keeps
+      // the server phone untouched (avoids wiping when the form was empty).
+      const currentPhone = String(document.getElementById("profile-phone")?.value || "").trim();
+      const body = { full_name: fullName };
+      if (currentPhone !== baselinePhone) {
+        body.phone = currentPhone || null;
+      }
+      const saveButton = detailsForm.querySelector("button[type='submit']");
+      if (saveButton) saveButton.disabled = true;
+      try {
+        const updated = await apiRequest("/auth/profile", {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+        baselinePhone = String(updated.user?.phone || "");
+        const session = RecruitOpsLive.session || readSession() || {};
+        session.user_name = updated.user?.full_name || fullName || session.user_name;
+        writeSession(session);
+        RecruitOpsLive.session = session;
+        paintProfile(updated.user, updated.primary_role, updated.primary_location);
+        decorateShell();
+        if (typeof showToast === "function") showToast("Profile saved", "Your details are up to date.");
+      } catch (error) {
+        if (typeof showToast === "function") showToast("Could not save profile", error.message || "Try again.");
+      } finally {
+        if (saveButton) saveButton.disabled = false;
+      }
+    });
+  }
+
+  if (passwordForm && passwordForm.dataset.wired !== "true") {
+    passwordForm.dataset.wired = "true";
+    passwordForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!profileLoaded) {
+        if (typeof showToast === "function") {
+          showToast("Could not change password", "Profile has not loaded yet. Refresh and try again.");
+        }
+        return;
+      }
+      const currentPassword = document.getElementById("profile-current-password")?.value || "";
+      const newPassword = document.getElementById("profile-new-password")?.value || "";
+      const confirmPassword = document.getElementById("profile-confirm-password")?.value || "";
+      if (newPassword !== confirmPassword) {
+        if (typeof showToast === "function") showToast("Passwords do not match", "Re-enter the new password.");
+        return;
+      }
+      const saveButton = passwordForm.querySelector("button[type='submit']");
+      if (saveButton) saveButton.disabled = true;
+      try {
+        await apiRequest("/auth/password/change", {
+          method: "POST",
+          body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+        });
+        passwordForm.reset();
+        if (typeof showToast === "function") showToast("Password updated", "Use the new password next time you sign in.");
+      } catch (error) {
+        if (typeof showToast === "function") showToast("Could not change password", error.message || "Check your current password.");
+      } finally {
+        if (saveButton) saveButton.disabled = false;
+      }
+    });
+  }
+}
+
 async function loadDeactivateUserDialog() {
   const userId = queryInt("user_id");
   if (userId) {
@@ -1205,6 +1479,8 @@ async function loadRoles() {
     paintPlainCell(cells[2], "—");
     paintPlainCell(cells[3], "Global");
     paintPlainCell(cells[4], item.description || "—");
+    row.dataset.route = `role-permissions-editor.html?role_id=${item.id}`;
+    row.classList.add("cursor-pointer");
   });
   wireEntityTableActions({
     addPermission: "role.create",
@@ -1281,6 +1557,12 @@ async function loadClients() {
     paintPlainCell(cells[3], item.industry);
     paintStatusChip(cells[4], item.status);
     paintPlainCell(cells[5], item.updated_at ? `Updated ${formatWhen(item.updated_at)}` : "—");
+    row.dataset.filterStatus = String(item.status || "active").toLowerCase();
+    row.dataset.filterLocation = item.location_name || "";
+    row.dataset.filterIndustry = item.industry || "";
+    row.dataset.filterOwner = item.client_owner_name || item.owner_name || "";
+    row.dataset.route = `client-detail.html?client_id=${item.id}`;
+    row.classList.add("cursor-pointer");
   });
   wireEntityTableActions({
     addPermission: "client.create",
@@ -1592,18 +1874,82 @@ async function removeRequisitionAssignment(button) {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadCandidates() {
-  const tbody = document.querySelector(".workspace-surface tbody");
-  showSkeletonTable(tbody?.closest("table") || tbody, 6, 5);
+  const table = document.querySelector(".workspace-surface table") || document.querySelector("table");
+  const tbody = table?.querySelector("tbody");
+  if (tbody && typeof showSkeletonTable === "function") showSkeletonTable(tbody, 6, 8);
   const payload = await apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] }));
-  hideSkeleton(tbody?.closest("table") || tbody);
-  fillExistingTable(payload.items || [], (row, item) => {
+  const items = payload.items || [];
+
+  const STATUS_LABEL = { draft: "Active", active: "Active", archived: "Archived", passive: "Passive" };
+  const INTAKE_LABEL = {
+    uploaded: "Incomplete",
+    parsed: "Incomplete",
+    "needs-review": "Missing Docs",
+    "duplicate-review": "Missing Docs",
+    "ready-to-save": "Ready",
+    finalized: "Ready",
+  };
+  const INTAKE_ICON = { Ready: "check_circle", Incomplete: "pending", "Missing Docs": "error" };
+  const DUP_META = {
+    cleared: { label: "Verified Unique", tone: "bg-success-bg text-success-text" },
+    unique: { label: "Verified Unique", tone: "bg-success-bg text-success-text" },
+    "in-review": { label: "Potential Matches", tone: "bg-warning-bg text-warning-text" },
+    potential: { label: "Potential Matches", tone: "bg-warning-bg text-warning-text" },
+    conflict: { label: "Potential Matches", tone: "bg-danger-bg text-danger-text" },
+    "not-started": { label: "Not Checked", tone: "bg-surface-dim text-text-muted" },
+  };
+
+  fillExistingTable(items, (row, item) => {
     const cells = row.querySelectorAll("td");
-    setStackedCell(cells[0], item.full_name, item.email || "");
-    setCellValue(cells[1], item.current_designation || item.source_type || "—");
-    setCellValue(cells[2], item.location_name || "—");
-    const status = cells[3]?.querySelector("span") || cells[3];
-    if (status) status.textContent = item.profile_status || "—";
+    setStackedCell(cells[0], item.full_name || "—", item.email || item.source_type || "");
+    const avatar = cells[0]?.firstElementChild?.querySelector("div");
+    if (avatar) {
+      const initials = (item.full_name || "?").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
+      avatar.textContent = initials;
+    }
+    setStackedCell(cells[1], item.current_designation || "—", item.current_company || "");
+    const owner = item.primary_owner_name || item.sourced_by_name;
+    const ownerWrap = cells[2]?.querySelector("div");
+    if (ownerWrap) {
+      const initials = (owner || "—").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
+      ownerWrap.title = owner || "";
+      const ownerAvatar = ownerWrap.querySelector("div");
+      if (ownerAvatar) ownerAvatar.textContent = initials || "—";
+    }
+    const dup = DUP_META[String(item.duplicate_state || "not-started").toLowerCase()] || DUP_META["not-started"];
+    const dupLabel = cells[3]?.querySelector("span") || cells[3];
+    if (dupLabel) {
+      dupLabel.className = `inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${dup.tone}`;
+      dupLabel.textContent = dup.label;
+    }
+    const intakeLabel = INTAKE_LABEL[String(item.intake_stage || "uploaded").toLowerCase()] || "Incomplete";
+    const readyIcon = cells[4]?.querySelector(".material-symbols-outlined");
+    const readyText = cells[4]?.querySelector("span:not(.material-symbols-outlined):last-of-type") || cells[4]?.querySelector("span:last-child") || cells[4];
+    if (readyIcon) readyIcon.textContent = INTAKE_ICON[intakeLabel] || "pending";
+    if (readyText && readyText !== readyIcon) readyText.textContent = intakeLabel;
+    const linked = cells[5]?.querySelector("span") || cells[5];
+    const hasLink = Boolean(item.linked_requisition_titles?.length);
+    if (linked) linked.textContent = hasLink ? String(item.linked_requisition_titles[0]).slice(0, 18) : "Unlinked";
+    setCellValue(cells[6], item.updated_at ? ageDaysLabel(item.updated_at) + " ago" : "—");
+    const statusLabel = STATUS_LABEL[String(item.profile_status || "draft").toLowerCase()] || "Active";
+    const token = document.createElement("span");
+    token.className = "sr-only";
+    token.textContent = `${statusLabel} ${intakeLabel} ${dup.label} ${hasLink ? "linked" : "unlinked"}`;
+    row.appendChild(token);
+    row.dataset.filterStatus = statusLabel.toLowerCase();
+    row.dataset.filterDuplicate = dup.label.toLowerCase().includes("unique") ? "unique" : dup.label.toLowerCase().includes("potential") ? "potential" : "not-checked";
+    row.dataset.filterReadiness = intakeLabel.toLowerCase().replace(/\s+/g, "-");
+    row.dataset.filterLinkage = hasLink ? "linked" : "unlinked";
+    row.dataset.filterOwner = owner || "";
+    row.dataset.route = `candidate-detail.html?candidate_id=${item.id}`;
+    row.classList.add("cursor-pointer");
   });
+
+  const countChip = document.querySelector("[data-candidate-count]");
+  if (countChip) countChip.textContent = items.length;
+  /* Footer count + pager are owned by the shared engine in tables.js
+     (fillExistingTable → wireLiveTableInteractions → applyClientPagination),
+     which rewrites the summary after this painter returns. */
 }
 
 async function loadCandidateDetail() {
@@ -1960,19 +2306,62 @@ async function loadPortalAccounts() {
 async function loadPipeline() {
   const payload = await apiRequest("/pipeline/board").catch(() => []);
   const items = Array.isArray(payload) ? payload : payload.items || [];
-  const columns = document.querySelectorAll("[data-pipeline-stage]");
+  const board = document.querySelector(".flex.gap-4.min-w-max");
+  if (!board) return;
+  const columns = Array.from(board.children).filter((col) => col.querySelector("h3"));
   columns.forEach((col) => {
-    const stageName = col.querySelector("h3")?.textContent?.trim() || "";
-    const host = col.querySelector(".space-y-2, .flex.flex-col");
+    const title = (col.querySelector("h3")?.textContent || "").trim();
+    col.dataset.pipelineStage = title;
+    const host = col.querySelector(".pipeline-drop-zone, .space-y-3, .flex-1.overflow-y-auto, .flex-1");
     if (!host) return;
-    const stageItems = items.filter((item) => String(item.current_stage || "").toLowerCase() === stageName.toLowerCase());
+    host.classList.remove("flex", "items-center", "justify-center", "flex-row", "flex-wrap");
+    host.classList.add("flex-1", "overflow-y-auto", "hide-scrollbar", "space-y-3", "p-1", "pipeline-drop-zone");
+    host.dataset.pipelineDropZone = title;
+    const stageItems = items.filter((item) => pipelineStageMatchesColumn(item.current_stage, title));
+    const badge = col.querySelector("h3")?.parentElement?.querySelector("span");
+    if (badge) badge.textContent = String(stageItems.length);
     host.innerHTML = stageItems.length
-      ? stageItems.map((item) => `      <div class="rounded-lg border border-border bg-surface p-3 hover:border-primary transition-colors cursor-pointer" data-application-id="${item.application_id}">
-          <p class="font-data-tabular font-semibold text-on-surface">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
-          <p class="mt-1 truncate text-[11px] text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
-        </div>`).join("")
-      : '<div class="p-3 text-center text-text-muted text-[11px]">No items</div>';
+      ? stageItems.map((item) => {
+          const initials = String(item.candidate_name || "?").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
+          const age = item.stage_entered_at || item.updated_at || item.applied_at;
+          return `<div class="pipeline-card bg-surface border border-border rounded-lg p-3 hover:bg-highlight-soft transition-colors cursor-grab" draggable="true" data-application-id="${item.application_id || item.id || ""}" data-filter-owner="${escapeLiveHtml(item.owner_name || item.primary_owner_name || "")}" data-filter-stage="${escapeLiveHtml(item.current_stage || title)}" data-filter-readiness="${escapeLiveHtml(item.readiness || "")}">
+            <div class="flex justify-between items-start mb-2 min-w-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-semibold shrink-0">${escapeLiveHtml(initials)}</div>
+                <div class="min-w-0">
+                  <p class="font-headline-sm text-[14px] text-on-surface">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
+                  <p class="font-body-sm text-[12px] text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
+                </div>
+              </div>
+              <span class="material-symbols-outlined text-text-muted text-[18px] shrink-0">drag_indicator</span>
+            </div>
+            <div class="flex items-center justify-between border-t border-border pt-2 gap-2 min-w-0">
+              <div class="flex items-center gap-1 text-text-muted text-[11px] min-w-0">
+                <span class="material-symbols-outlined text-[14px]">schedule</span>
+                ${age ? escapeLiveHtml(ageDaysLabel(age)) + " in stage" : "In stage"}
+              </div>
+              <button class="px-2 py-1 border border-border rounded text-[11px] font-semibold shrink-0" type="button" data-route="stage-move-dialog.html?application_id=${item.application_id || item.id || ""}">Move stage</button>
+            </div>
+          </div>`;
+        }).join("")
+      : '<div class="pipeline-empty-note">No candidates in this stage</div>';
   });
+  if (typeof setupPipelineBoardInteractions === "function") setupPipelineBoardInteractions();
+  if (typeof setupPipelineDragDrop === "function") setupPipelineDragDrop();
+  if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
+}
+
+function pipelineStageMatchesColumn(stage, columnTitle) {
+  const n = String(stage || "").toLowerCase().replace(/[_-]+/g, " ").trim();
+  const t = String(columnTitle || "").toLowerCase();
+  if (!n || !t) return false;
+  if (n === t || n.includes(t) || t.includes(n)) return true;
+  if (/source/.test(t)) return /source|new|applied/.test(n);
+  if (/screen/.test(t)) return /screen|submit|l1/.test(n);
+  if (/technical|interview/.test(t)) return /tech|l2|interview/.test(n);
+  if (/executive|review/.test(t)) return /exec|client|review/.test(n);
+  if (/offer/.test(t)) return /offer/.test(n);
+  return false;
 }async function loadPipelineApplicationDetail() {
   const applicationId = queryInt("application_id");
   if (!applicationId) return;
@@ -2000,13 +2389,76 @@ async function loadPipelineApplicationHistory() {
    DAILY UPDATES & REVIEW
    ═══════════════════════════════════════════════════════════════ */
 
+function ensureDailyUpdateWorkspaceFields(surface) {
+  if (!surface) return;
+  const reqSelect = surface.querySelector("#req-select, #requisition_id");
+  if (reqSelect && !reqSelect.id) reqSelect.id = "requisition_id";
+  if (reqSelect && reqSelect.id === "req-select") reqSelect.id = "requisition_id";
+  const numbers = Array.from(surface.querySelectorAll('input[type="number"]'));
+  const numberIds = ["profiles-sourced-count", "profiles-screened-count", "profiles-submitted-count", "interviews-scheduled-count"];
+  numbers.forEach((input, index) => {
+    if (!input.id && numberIds[index]) input.id = numberIds[index];
+  });
+  const areas = Array.from(surface.querySelectorAll("textarea"));
+  const areaIds = ["update-summary", "blockers", "next-actions"];
+  areas.forEach((area, index) => {
+    if (!area.id && areaIds[index]) area.id = areaIds[index];
+  });
+  if (!document.getElementById("update-date")) {
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.id = "update-date";
+    hidden.value = new Date().toISOString().split("T")[0];
+    surface.appendChild(hidden);
+  }
+}
+
+function wireDailyUpdateWorkspaceActions(surface) {
+  if (!surface || surface.dataset.dailyWired === "true") return;
+  surface.dataset.dailyWired = "true";
+  const submitBtn = Array.from(surface.querySelectorAll("button")).find((btn) => /submit update/i.test((btn.textContent || "").replace(/\s+/g, " ")));
+  if (submitBtn) {
+    submitBtn.removeAttribute("data-route");
+    submitBtn.dataset.dailySubmit = "true";
+  }
+}
+
 async function loadDailyUpdates() {
-  const payload = await apiRequest("/daily-updates/?page_size=50");
-  const items = payload.items || [];
   const surface = document.querySelector(".workspace-surface");
   if (!surface) return;
-  const list = surface.querySelector(".space-y-4, .rounded-xl.flex.flex-col");
-  if (list) list.innerHTML = items.length ? items.map((item, i) => renderDailyUpdateSubmissionCard(item)).join("") : '<div class="p-4 text-text-muted">No updates.</div>';
+  ensureDailyUpdateWorkspaceFields(surface);
+  wireDailyUpdateWorkspaceActions(surface);
+  const [updatesPayload, requisitionsPayload] = await Promise.all([
+    apiRequest("/daily-updates/?page_size=50").catch(() => ({ items: [], meta: { total: 0 } })),
+    apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
+  ]);
+  const items = updatesPayload.items || [];
+  const submitted = items.filter((item) => String(item.submission_status || "").toLowerCase() === "submitted").length;
+  const pending = items.filter((item) => /draft|submitted/i.test(String(item.submission_status || "submitted")) && !/reviewed/i.test(String(item.submission_status || ""))).length;
+  const metricValues = surface.querySelectorAll(".flex.gap-4 .font-headline-md");
+  if (metricValues[0]) metricValues[0].textContent = String(submitted);
+  if (metricValues[1]) metricValues[1].textContent = String(pending);
+  const queueCount = Array.from(surface.querySelectorAll("span")).find((el) => /total/i.test(el.textContent || ""));
+  if (queueCount) queueCount.textContent = `${items.length} Total`;
+  const list = surface.querySelector(".overflow-y-auto.flex-1") || surface.querySelector(".overflow-y-auto");
+  if (list) {
+    list.innerHTML = items.length
+      ? items.map((item) => renderDailyUpdateSubmissionCard(item)).join("")
+      : '<div class="p-4 text-text-muted font-body-sm">No updates yet.</div>';
+    if (typeof applyCollectionPagination === "function") {
+      delete list.dataset.pageSize;
+      list.dataset.page = "1";
+      applyCollectionPagination(list);
+    }
+  }
+  await fillSelect(
+    "requisition_id",
+    requisitionsPayload.items || [],
+    (r) => `${escapeLiveHtml(r.requisition_code || `REQ-${r.id}`)} — ${escapeLiveHtml(r.title)}`,
+    (r) => r.id,
+  );
+  const draftHint = Array.from(surface.querySelectorAll("span")).find((el) => /draft saved/i.test(el.textContent || ""));
+  if (draftHint) draftHint.textContent = "Ready to submit";
 }
 
 /* Loader for the daily-updates-submission page: populate the requisition select,
@@ -2072,14 +2524,68 @@ async function loadDailyUpdateDetail() {
 }
 
 async function loadDailyReview() {
-  const [company, myWork, pipeline] = await Promise.all([
-    apiRequest("/dashboards/company-summary").catch(() => ({})),
+  const [myWork, pipeline, interviews, offers, actions, notifications, updates] = await Promise.all([
     apiRequest("/dashboards/my-work").catch(() => ({})),
     apiRequest("/pipeline/board").catch(() => []),
+    apiRequest("/interviews/?page_size=50").catch(() => ({ items: [] })),
+    apiRequest("/offers/?page_size=50").catch(() => ({ items: [] })),
+    apiRequest("/workflow-actions/queue?page_size=20").catch(() => ({ items: [] })),
+    apiRequest("/notifications/?page_size=10").catch(() => ({ items: [] })),
+    apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
   ]);
   const pipelineItems = Array.isArray(pipeline) ? pipeline : pipeline.items || [];
-  renderDailyReviewQuickStats(myWork, pipelineItems);
+  const interviewItems = interviews.items || [];
+  const offerItems = offers.items || [];
+  const pendingOffers = offerItems.filter((item) => {
+    const status = String(item.offer_status || item.application_status || "").toLowerCase();
+    return status && !/accepted|rejected|declined|joined|withdrawn/.test(status);
+  });
+  const thisWeekInterviews = interviewItems.filter((item) => {
+    const when = new Date(item.scheduled_at || item.interview_date || item.created_at);
+    if (Number.isNaN(when.getTime())) return false;
+    const start = new Date();
+    start.setDate(start.getDate() - start.getDay());
+    start.setHours(0, 0, 0, 0);
+    return when >= start;
+  });
+  hidePanelByHeading("Candidate Updates");
+  renderDailyReviewQuickStats(myWork, pipelineItems, {
+    interviews: thisWeekInterviews.length,
+    offers: pendingOffers.length,
+  });
   renderDailyReviewPipelineActivity(pipelineItems.slice(0, 5));
+  const actionItems = (actions.items || []).slice(0, 5).map((item) => ({
+    icon: "task_alt",
+    title: item.title || item.entity_type || "Action",
+    href: item.entity_type === "requisition" ? "requisition-list.html" : "approvals-inbox.html",
+    action: item.primary_action_label || "Open",
+  }));
+  if (!actionItems.length && pendingOffers.length) {
+    actionItems.push({ icon: "request_quote", title: `${pendingOffers.length} offers waiting`, href: "offer-management.html", action: "Review" });
+  }
+  renderDailyReviewActions(actionItems);
+  renderDailyReviewCompactList("Today's Schedule", thisWeekInterviews.slice(0, 5).map((item) => ({
+    icon: "calendar_month",
+    title: item.candidate_name || item.title || "Interview",
+    meta: item.interview_type || item.status || "Scheduled",
+  })), "No interviews this week.");
+  const seenTeam = new Set();
+  const teamRows = [];
+  (updates.items || []).forEach((item) => {
+    const name = item.submitted_by_name || item.owner_name || "Teammate";
+    if (seenTeam.has(name)) return;
+    seenTeam.add(name);
+    teamRows.push({ icon: "group", title: name, meta: item.submission_status || "Update" });
+  });
+  renderDailyReviewCompactList("My Team", teamRows, "No team updates yet.");
+  renderDailyReviewCompactList("Recent Notifications", (notifications.items || []).slice(0, 5).map((item) => {
+    const story = typeof notificationStory === "function" ? notificationStory(item) : null;
+    return {
+      icon: story?.icon || "notifications",
+      title: story?.headline || item.message || item.title || "Hiring event",
+      meta: story?.eventLabel || relativeTime(item.created_at),
+    };
+  }), "Inbox is clear.");
 }
 
 
@@ -2159,168 +2665,227 @@ async function loadRoleDashboard() {
   /* ── Daily update pressure ── */
   const updates = dailyUpdates.items || [];
   const submitted = updates.filter(u => u.submission_status === "submitted").length;
-  const totalUsers = 11; // known user count
-  const pressurePct = totalUsers > 0 ? Math.round((submitted / totalUsers) * 100) : 0;
+  const pending = role.pending_daily_updates || updates.filter(u => u.submission_status !== "submitted").length;
+  const denom = submitted + pending || 1;
+  const pressurePct = Math.round((submitted / denom) * 100);
   const pressureEl = document.querySelector("[data-role-pressure-value]");
   if (pressureEl) pressureEl.textContent = `${pressurePct}%`;
   const hintEl = document.querySelector("[data-role-pressure-hint]");
-  if (hintEl) hintEl.textContent = `${submitted} of ${totalUsers} users submitted this period.`;
+  if (hintEl) hintEl.textContent = `${submitted} submitted · ${pending} still open.`;
 }
 
 async function loadDashboards() {
-  const [company, myWork, pipeline] = await Promise.all([
+  const [company, pipeline, ttf, sla, requisitions, placements, users, candidates] = await Promise.all([
     apiRequest("/dashboards/company-summary").catch(() => ({})),
-    apiRequest("/dashboards/my-work").catch(() => ({})),
     apiRequest("/pipeline/board").catch(() => []),
+    apiRequest("/reports/time-to-fill").catch(() => null),
+    apiRequest("/reports/datasets/sla").catch(() => null),
+    apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/reports/placements").catch(() => ({ rows: [] })),
+    apiRequest("/users/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] })),
   ]);
   const pipelineItems = Array.isArray(pipeline) ? pipeline : pipeline.items || [];
-  fillDashboardMetrics([
-    { label: "Open Reqs", value: company.total_open_requisitions || 0, hint: "Active mandates" },
-    { label: "Active Pipeline", value: pipelineItems.length, hint: "Candidates in pipeline" },
-    { label: "My Updates", value: myWork?.submitted_updates || 0, hint: "Submitted this week" },
-    { label: "Pending Actions", value: myWork?.pending_actions || 0, hint: "Need attention" },
-  ]);
+  const reqItems = requisitions.items || [];
+  const summary = ttf?.summary || {};
+  const slaRows = sla?.rows || [];
+  const breached = slaRows.filter((row) => row.current_days > row.sla_target_days);
+  const slaPct = slaRows.length ? Math.round(((slaRows.length - breached.length) / slaRows.length) * 100) : null;
 
-  /* Pipeline by Stage chart */
+  hidePanelByHeading("Pipeline Trend (7 Days)");
+  hidePanelByHeading("Stage Distribution");
+  hidePanelByHeading("Quick Stats");
+  hidePanelByHeading("Workload Distribution (Capacity)");
+  Array.from(document.querySelectorAll(".workspace-surface span")).some((node) => {
+    if (!/^Global Filters$/i.test(readableText(node))) return false;
+    const bar = node.closest(".mb-6, .bg-surface");
+    if (bar) {
+      bar.hidden = true;
+      bar.setAttribute("data-ro-hidden-panel", "true");
+    }
+    return true;
+  });
+  const now = new Date();
+  const quarter = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`;
+  Array.from(document.querySelectorAll(".workspace-surface button")).forEach((button) => {
+    if (/Q3 2023/.test(button.textContent || "")) {
+      button.innerHTML = `<span class="material-symbols-outlined text-[16px]">calendar_today</span> ${quarter}`;
+    }
+  });
+
+  paintLabeledKpi("Total Active Reqs", company.total_open_requisitions || 0, `${company.total_locations || 0} locations`);
+  paintLabeledKpi("Avg Time to Fill", summary.avg_days != null ? summary.avg_days : "—", summary.filled_count ? `${summary.filled_count} filled roles` : "No fills yet");
+  paintLabeledKpi("Overall SLA Compliance", slaPct != null ? `${slaPct}%` : "—", slaRows.length ? `${slaRows.length - breached.length} of ${slaRows.length} on track` : "No SLA sample yet");
+  paintLabeledKpi("Total Placements (YTD)", company.total_joined_applications || 0, `${company.total_active_applications || 0} active applications`);
+
   const stageContainer = document.querySelector("[data-live-stage-chart]");
-  if (stageContainer && pipelineItems.length) {
+  if (stageContainer) {
     const stageCounts = {};
     pipelineItems.forEach((item) => {
       const stage = item.current_stage || "Unknown";
       stageCounts[stage] = (stageCounts[stage] || 0) + 1;
     });
     const sorted = Object.entries(stageCounts).sort((a, b) => b[1] - a[1]);
-    const maxCount = Math.max(...sorted.map((s) => s[1]), 1);
-    stageContainer.innerHTML = sorted.map(([stage, count]) => {
-      const pct = Math.round((count / maxCount) * 100);
-      const label = stage.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-      return `<div class="flex items-center gap-3">
-        <span class="w-36 truncate text-[12px] text-on-surface">${escapeLiveHtml(label)}</span>
-        <div class="flex-1 h-6 bg-surface-alt rounded overflow-hidden relative">
-          <div class="h-full bg-primary/20 rounded" style="width:${pct}%"></div>
-          <div class="h-full bg-primary/60 rounded" style="width:${pct}%"></div>
-        </div>
-        <span class="w-8 text-right text-[12px] font-semibold text-on-surface">${count}</span>
-      </div>`;
-    }).join("");
-
-    /* Stage distribution donut chart */
-    const donutContainer = document.querySelector("[data-live-stage-donut]");
-    if (donutContainer && typeof renderDonutChart !== "undefined") {
-      renderDonutChart(donutContainer, sorted.map(([stage, count]) => ({
-        label: stage.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        value: count
-      })), { size: 140 });
+    if (!sorted.length) {
+      stageContainer.innerHTML = '<p class="text-body-sm text-text-muted text-center py-6">No pipeline volume yet.</p>';
+    } else {
+      const maxCount = Math.max(...sorted.map((row) => row[1]), 1);
+      stageContainer.innerHTML = sorted.map(([stage, count]) => {
+        const pct = Math.max(8, Math.round((count / maxCount) * 100));
+        const label = stage.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        return `<div class="flex items-center gap-3 min-w-0">
+          <span class="w-[168px] shrink-0 text-[12px] leading-snug text-on-surface" title="${escapeLiveHtml(label)}">${escapeLiveHtml(label)}</span>
+          <div class="flex-1 h-2.5 rounded bg-[#f1f2f0] overflow-hidden">
+            <div class="h-full rounded" style="width:${pct}%;background:#1e293b;opacity:0.78"></div>
+          </div>
+          <span class="w-8 shrink-0 text-right text-[12px] font-semibold tabular-nums text-on-surface">${count}</span>
+        </div>`;
+      }).join("");
     }
-
-    /* Update pipeline count in quick stats */
-    const countEl = document.querySelector("[data-live-pipeline-count]");
-    if (countEl) countEl.textContent = pipelineItems.length;
   }
 
-  /* Pipeline trend line chart (simulated last 7 days) */
-  const trendContainer = document.querySelector("[data-live-pipeline-trend]");
-  if (trendContainer && typeof renderLineChart !== "undefined") {
-    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const trendData = days.map((day, i) => ({
-      label: day,
-      value: Math.max(1, pipelineItems.length - Math.floor(Math.random() * 3))
-    }));
-    renderLineChart(trendContainer, trendData, { color: "#1E293B", label: "pipeline-trend" });
-  }
-
-  /* Dynamic funnel from company-summary */
   const funnelApplied = document.querySelector("[data-live-funnel-applied]");
-  const funnelScreening = document.querySelector("[data-live-funnel-screening]");
-  const funnelInterview = document.querySelector("[data-live-funnel-interview]");
-  const funnelOffer = document.querySelector("[data-live-funnel-offer]");
-  const funnelJoined = document.querySelector("[data-live-funnel-joined]");
   if (funnelApplied) {
-    const total = company.total_submitted_profiles || company.total_active_applications || pipelineItems.length || 1;
-    const submitted = company.total_submitted_profiles || 0;
+    const submitted = company.total_submitted_profiles || company.total_active_candidates || 0;
     const active = company.total_active_applications || 0;
     const joined = company.total_joined_applications || 0;
+    const interview = Math.max(active, 0);
     const offer = Math.max(active - joined, 0);
-    funnelApplied.textContent = submitted || active;
-    if (funnelScreening) funnelScreening.textContent = active;
-    if (funnelInterview) funnelInterview.textContent = Math.max(active - joined, 0);
-    if (funnelOffer) funnelOffer.textContent = offer;
-    if (funnelJoined) funnelJoined.textContent = joined;
-    /* Update percentage labels next to the bars */
+    const values = [submitted || active || pipelineItems.length, active || pipelineItems.length, interview, offer, joined];
+    const maxVal = Math.max(...values, 1);
+    const nodes = [
+      document.querySelector("[data-live-funnel-applied]"),
+      document.querySelector("[data-live-funnel-screening]"),
+      document.querySelector("[data-live-funnel-interview]"),
+      document.querySelector("[data-live-funnel-offer]"),
+      document.querySelector("[data-live-funnel-joined]"),
+    ];
+    nodes.forEach((node, index) => {
+      if (!node) return;
+      node.textContent = values[index];
+      const bar = node.parentElement;
+      if (!bar) return;
+      const pct = Math.max(14, Math.round((values[index] / maxVal) * 100));
+      bar.className = bar.className.replace(/w-\[[^\]]+\]/g, "").trim();
+      bar.style.width = `${pct}%`;
+    });
     const pcts = document.querySelectorAll("[data-live-funnel-pct]");
-    if (pcts.length >= 5 && total > 0) {
-      pcts[0].textContent = "100%";
-      pcts[1].textContent = Math.round(((submitted || active) / total) * 100) + "%";
-      pcts[2].textContent = Math.round((active / total) * 100) + "%";
-      pcts[3].textContent = Math.round((offer / total) * 100) + "%";
-      pcts[4].textContent = Math.round((joined / total) * 100) + "%";
-    }
+    pcts.forEach((node, index) => {
+      node.textContent = `${Math.round((values[index] / maxVal) * 100)}%`;
+    });
   }
 
-  /* Revenue by Client chart */
+  renderCompanySlaRisks(reqItems);
+  renderCompanyLocations(company.locations || []);
+  renderCompanyClientDemand(reqItems);
+
   const revenueContainer = document.querySelector("[data-live-revenue-chart]");
-  if (revenueContainer && typeof renderBarChart !== "undefined") {
-    try {
-      const placements = await apiRequest("/reports/placements").catch(() => ({ rows: [] }));
-      const clientRevenue = {};
-      (placements.rows || []).forEach((row) => {
-        const client = row.client || "Unknown";
-        clientRevenue[client] = (clientRevenue[client] || 0) + (row.revenue || 0);
-      });
-      const revenueData = Object.entries(clientRevenue)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([client, revenue]) => ({
-          label: client.length > 12 ? client.slice(0, 12) + "..." : client,
-          value: Math.round(revenue)
-        }));
-      if (revenueData.length) {
-        renderBarChart(revenueContainer, revenueData, { color: "#1E293B", label: "revenue" });
-      } else {
-        revenueContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">No placement revenue this month</div>';
-      }
-    } catch (e) {
-      revenueContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">Revenue data unavailable</div>';
-    }
+  if (revenueContainer) {
+    const clientRevenue = {};
+    (placements.rows || []).forEach((row) => {
+      const client = row.client || "Unknown";
+      clientRevenue[client] = (clientRevenue[client] || 0) + (row.revenue || 0);
+    });
+    const revenueData = Object.entries(clientRevenue)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, value]) => ({ label, value: Math.round(value) }));
+    renderRankedMetricList(revenueContainer, revenueData, {
+      format: (value) => value ? `$${Number(value).toLocaleString()}` : "—",
+      insight: revenueData[0] ? `${revenueData[0].label} currently leads placement revenue.` : "",
+      empty: "No placement revenue this period.",
+    });
   }
 
-  /* Recruiter Performance chart */
   const recruiterContainer = document.querySelector("[data-live-recruiter-chart]");
-  if (recruiterContainer && typeof renderBarChart !== "undefined") {
-    try {
-      const [users, reqs, cands] = await Promise.all([
-        apiRequest("/users/?page_size=100").catch(() => ({ items: [] })),
-        apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
-        apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] })),
-      ]);
-      const userMap = {};
-      (users.items || []).forEach((u) => { userMap[u.id] = u.full_name || u.email; });
-      const reqCounts = {};
-      (reqs.items || []).forEach((r) => {
-        const owner = userMap[r.owner_user_id] || "Unassigned";
-        reqCounts[owner] = (reqCounts[owner] || 0) + 1;
-      });
-      const candCounts = {};
-      (cands.items || []).forEach((c) => {
-        const owner = userMap[c.owner_user_id] || userMap[c.sourced_by_user_id] || "Unassigned";
-        candCounts[owner] = (candCounts[owner] || 0) + 1;
-      });
-      const allNames = [...new Set([...Object.keys(reqCounts), ...Object.keys(candCounts)])];
-      const recruiterData = allNames
-        .map((name) => ({
-          label: name.length > 10 ? name.slice(0, 10) + "..." : name,
-          value: (reqCounts[name] || 0) + (candCounts[name] || 0)
-        }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6);
-      if (recruiterData.length) {
-        renderBarChart(recruiterContainer, recruiterData, { color: "#4B5257", label: "recruiter" });
-      } else {
-        recruiterContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">No recruiter activity yet</div>';
-      }
-    } catch (e) {
-      recruiterContainer.innerHTML = '<div class="text-sm text-text-muted text-center py-4">Recruiter data unavailable</div>';
-    }
+  if (recruiterContainer) {
+    const userMap = {};
+    (users.items || []).forEach((user) => { userMap[user.id] = user.full_name || user.email; });
+    const counts = {};
+    reqItems.forEach((row) => {
+      const owner = userMap[row.owner_user_id] || "Unassigned";
+      counts[owner] = (counts[owner] || 0) + 1;
+    });
+    (candidates.items || []).forEach((row) => {
+      const owner = userMap[row.owner_user_id] || userMap[row.sourced_by_user_id] || "Unassigned";
+      counts[owner] = (counts[owner] || 0) + 1;
+    });
+    const recruiterData = Object.entries(counts)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+    renderRankedMetricList(recruiterContainer, recruiterData, {
+      insight: recruiterData[0] ? `${recruiterData[0].label} owns the most live work.` : "",
+      empty: "No recruiter activity yet.",
+    });
+  }
+}
+
+async function loadMyWorkDashboard() {
+  const [myWork, requisitions, pipeline, interviews, updates] = await Promise.all([
+    apiRequest("/dashboards/my-work").catch(() => ({})),
+    apiRequest("/requisitions/?page_size=50").catch(() => ({ items: [] })),
+    apiRequest("/pipeline/board").catch(() => []),
+    apiRequest("/interviews/?page_size=50").catch(() => ({ items: [] })),
+    apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
+  ]);
+  const pipelineItems = Array.isArray(pipeline) ? pipeline : pipeline.items || [];
+  const reqItems = (requisitions.items || []).filter((row) => String(row.status || "open") === "open").slice(0, 6);
+  const tbody = document.querySelector(".workspace-surface tbody");
+  if (tbody) {
+    tbody.innerHTML = reqItems.length
+      ? reqItems.map((row) => {
+          const created = new Date(row.created_at).getTime();
+          const days = Number.isNaN(created) ? "—" : Math.floor((Date.now() - created) / 86400000);
+          const priority = days > 30 ? "High" : days > 14 ? "Med" : "Low";
+          return `<tr class="border-b border-border h-table-row hover:bg-highlight-soft">
+            <td class="px-4 text-primary">REQ-${row.id}</td>
+            <td class="px-4">${escapeLiveHtml(row.title || "Requisition")}</td>
+            <td class="px-4"><span class="px-2 py-0.5 rounded-sm bg-success-bg text-success-text text-[11px] font-bold">${escapeLiveHtml(String(row.status || "open").toUpperCase())}</span></td>
+            <td class="px-4">${days}</td>
+            <td class="px-4">${priority}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td class="px-4 py-6 text-text-muted" colspan="5">No open requisitions on your desk yet.</td></tr>`;
+  }
+  const actionHost = findPanelByHeading("Action Required")?.querySelector(".flex.gap-4");
+  if (actionHost) {
+    actionHost.innerHTML = `
+      <div class="flex-1 bg-danger-bg border border-border rounded p-3">
+        <div class="font-headline-sm text-on-surface mb-1">${pipelineItems.length} in pipeline</div>
+        <div class="font-body-sm text-text-muted">${myWork.owned_requisitions ?? reqItems.length} open requisitions.</div>
+      </div>
+      <div class="flex-1 bg-warning-bg border border-border rounded p-3">
+        <div class="font-headline-sm text-on-surface mb-1">${myWork.submitted_updates ?? 0} updates in</div>
+        <div class="font-body-sm text-text-muted">${myWork.sourced_candidates ?? 0} sourced candidates.</div>
+      </div>`;
+  }
+  const updatePanel = findPanelByHeading("Daily Update Status");
+  const pendingUpdates = (updates.items || []).filter((item) => item.submission_status !== "submitted").length;
+  const updateCopy = updatePanel?.querySelector(".font-data-tabular");
+  if (updateCopy) updateCopy.textContent = pendingUpdates ? `${pendingUpdates} pending update${pendingUpdates === 1 ? "" : "s"}` : "Caught up";
+  const updateHint = updatePanel?.querySelector(".font-body-sm, .text-body-sm");
+  if (updateHint) updateHint.textContent = pendingUpdates ? "Still waiting on the desk." : "No pending submissions.";
+  updatePanel?.querySelector(".animate-spin")?.classList.remove("animate-spin", "border-t-transparent");
+  const followHost = findPanelByHeading("Today's Follow-ups")?.querySelector("ul");
+  const upcoming = (interviews.items || []).slice(0, 4);
+  if (followHost) {
+    followHost.innerHTML = upcoming.length
+      ? upcoming.map((item) => `<li class="p-3 hover:bg-highlight-soft rounded flex gap-3">
+          <div>
+            <div class="font-data-tabular text-on-surface leading-tight">${escapeLiveHtml(item.candidate_name || item.title || "Interview")}</div>
+            <div class="font-body-sm text-text-muted mt-0.5">${escapeLiveHtml(item.interview_type || item.status || "Scheduled")}</div>
+          </div>
+        </li>`).join("")
+      : `<li class="p-3 text-body-sm text-text-muted">No follow-ups scheduled today.</li>`;
+  }
+  const overview = findPanelByHeading("Candidate Workload Overview")?.querySelector(".grid");
+  if (overview) {
+    const stages = pipelineStageBuckets(pipelineItems, []);
+    overview.innerHTML = stages.slice(0, 4).map((stage) => `<div class="p-4 border border-border rounded bg-background flex flex-col items-center justify-center text-center">
+      <span class="font-headline-lg text-headline-lg text-on-surface mb-1">${stage.count}</span>
+      <span class="font-label-caps text-label-caps text-text-muted">${escapeLiveHtml(stage.label)}</span>
+    </div>`).join("");
   }
 }
 
@@ -2416,13 +2981,15 @@ function timeToFillRecords(requisitions, offers) {
 }
 
 function setMetricCardValue(labelText, valueText, hintHtml = "") {
-  const card = Array.from(document.querySelectorAll(".metric-card")).find((node) =>
-    new RegExp(labelText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(node.textContent || ""),
-  );
+  const needle = String(labelText || "").toLowerCase();
+  const card = Array.from(document.querySelectorAll(".metric-card, .workspace-surface .bg-surface.border")).find((node) => {
+    const label = node.querySelector("h3, .text-label-caps, span.text-label-caps");
+    return label && readableText(label).toLowerCase() === needle;
+  });
   if (!card) return;
-  const headline = card.querySelector("p[class*='headline'], .text-headline-lg");
+  const headline = card.querySelector("p[class*='headline'], .text-headline-lg, .font-headline-lg");
   if (headline) headline.textContent = valueText;
-  const hint = card.querySelector("p.text-body-sm:last-of-type");
+  const hint = card.querySelector("p.text-body-sm:last-of-type, p.font-body-sm:last-of-type");
   if (hint && hintHtml) hint.innerHTML = hintHtml;
 }
 
@@ -2773,16 +3340,18 @@ async function loadTimeToFillReport() {
   const report = await apiRequest("/reports/time-to-fill").catch(() => null);
   if (!report) return;
   const summary = report.summary || {};
+  const emptyHint = `<span class="text-body-sm text-text-muted">No filled roles yet</span>`;
   setMetricCardValue("Avg Time to Fill", summary.avg_days != null ? `${summary.avg_days} days` : "—",
-    summary.filled_count ? `<span class="text-body-sm text-text-muted">across ${summary.filled_count} filled role${summary.filled_count === 1 ? "" : "s"}</span>` : "");
+    summary.filled_count ? `<span class="text-body-sm text-text-muted">across ${summary.filled_count} filled role${summary.filled_count === 1 ? "" : "s"}</span>` : emptyHint);
   setMetricCardValue("Fastest Fill", summary.fastest_days != null ? `${summary.fastest_days} days` : "—",
-    summary.fastest_requisition ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(summary.fastest_requisition)}</span>` : "");
+    summary.fastest_requisition ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(summary.fastest_requisition)}</span>` : emptyHint);
   setMetricCardValue("Slowest Fill", summary.slowest_days != null ? `${summary.slowest_days} days` : "—",
-    summary.slowest_requisition ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(summary.slowest_requisition)}</span>` : "");
+    summary.slowest_requisition ? `<span class="text-body-sm text-text-muted">${escapeLiveHtml(summary.slowest_requisition)}</span>` : emptyHint);
   setMetricCardValue("Within SLA", summary.within_sla_percent != null ? `${summary.within_sla_percent}%` : "—",
-    summary.filled_count ? `<span class="text-body-sm text-text-muted">${summary.within_sla} of ${summary.filled_count} fills</span>` : "");
+    summary.filled_count ? `<span class="text-body-sm text-text-muted">${summary.within_sla} of ${summary.filled_count} fills</span>` : emptyHint);
   renderTimeToFillBars("Time to Fill by Department", (report.by_department || []).map((row) => ({ label: row.label, days: row.avg_days })));
   renderTimeToFillBars("Time to Fill by Seniority", (report.by_seniority || []).map((row) => ({ label: row.label, days: row.avg_days })));
+  renderTimeToFillTrend(report);
 }
 
 async function loadSourceEffectiveness() {
@@ -2791,7 +3360,17 @@ async function loadSourceEffectiveness() {
   setMetricCardValue("Total Sources", String(report.total_sources || 0));
   setMetricCardValue("Best Source", report.best_source || "—",
     report.best_source_conversion != null ? `<span class="text-body-sm text-success">${report.best_source_conversion}% conversion rate</span>` : "");
-  renderSourceEffectivenessTable(report.rows || []);
+  const rows = report.rows || [];
+  const conversions = rows.map((row) => row.conversion_rate).filter((value) => value != null);
+  const avgConversion = conversions.length ? Math.round(conversions.reduce((sum, value) => sum + value, 0) / conversions.length) : null;
+  setMetricCardValue("Avg Cost per Hire", "—",
+    `<span class="text-body-sm text-text-muted">${avgConversion != null ? `${avgConversion}% avg conversion` : "Cost is not tracked yet"}</span>`);
+  const diversity = Math.min(10, (report.total_sources || 0) * 2);
+  setMetricCardValue("Source Diversity Score", report.total_sources ? `${diversity}/10` : "—",
+    `<span class="text-body-sm text-text-muted">${report.total_sources || 0} active channels</span>`);
+  renderSourceEffectivenessTable(rows);
+  renderSourceLeaderboard(rows);
+  renderSourceRecommendations(rows);
 }
 
 async function loadSlaTracker() {
@@ -2867,7 +3446,7 @@ async function markLiveNotificationRead(button) {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadMeetings() {
-  const payload = await apiRequest("/meetings/?page_size=50");
+  const payload = await apiRequest("/meetings/?page_size=50").catch(() => ({ items: [] }));
   renderMeetings(payload.items || [], payload.meta || {});
 }
 
@@ -2890,14 +3469,35 @@ async function loadMeetingFormDialog() {
     ].map(([val, label]) => `<option value="${val}">${label}</option>`).join("");
   }
 }async function loadFollowUps() {
-  const payload = await apiRequest("/meetings/?page_size=50");
-  const items = (payload.items || []).filter((item) => /follow/i.test(String(item.meeting_type || item.outcome_status || "")));
-  const surface = document.querySelector(".workspace-surface");
-  if (!surface) return;
-  const list = surface.querySelector(".rounded-xl.flex.flex-col, [data-follow-up-list]");
-  if (list) list.innerHTML = items.length
-    ? items.map((item, index) => renderFollowUpRow(item, index)).join("")
-    : '<div class="p-6 text-center text-text-muted">No follow-ups returned by the API.</div>';
+  const payload = await apiRequest("/meetings/?page_size=50").catch(() => ({ items: [] }));
+  const all = payload.items || [];
+  const follow = all.filter((item) => /follow/i.test(String(item.meeting_type || item.outcome_status || item.title || "")));
+  const items = follow.length ? follow : all;
+  fillExistingTable(items, (row, item) => {
+    const cells = row.querySelectorAll("td");
+    setStackedCell(cells[0], item.title || "Follow-up", item.notes || item.meeting_type || "");
+    setCellValue(cells[1], item.priority || titleFromCode(item.meeting_type) || "—");
+    setCellValue(cells[2], item.scheduled_at ? formatWhen(item.scheduled_at) : "—");
+    setStackedCell(cells[3], item.contact_name || item.client_name || "—", item.meeting_type || "");
+    if (typeof paintPersonCell === "function") paintPersonCell(cells[4], item.owner_name || item.created_by_name);
+    else setCellValue(cells[4], item.owner_name || item.created_by_name || "—");
+    setCellValue(cells[5], item.outcome_status || item.status || "Open");
+    row.dataset.recordId = item.id || "";
+    row.dataset.filterStatus = String(item.outcome_status || item.status || "open").toLowerCase();
+    row.dataset.filterPriority = String(item.priority || "").toLowerCase();
+    row.dataset.filterOwner = item.owner_name || item.created_by_name || "";
+    row.dataset.filterRelated = item.meeting_type || item.client_name || "";
+    row.dataset.route = `follow-up-form-dialog.html?id=${item.id}`;
+    row.classList.add("cursor-pointer");
+  });
+  const metrics = document.querySelectorAll(".workspace-surface .grid .font-headline-md");
+  if (metrics.length >= 4) {
+    const overdue = items.filter((item) => /overdue/i.test(String(item.outcome_status || ""))).length;
+    metrics[0].textContent = String(overdue);
+    metrics[1].textContent = String(items.length);
+    metrics[2].textContent = String(all.length);
+    metrics[3].textContent = String(items.filter((item) => /complete|done/i.test(String(item.outcome_status || ""))).length);
+  }
 }
 
 async function loadFollowUpFormDialog() {
@@ -2925,13 +3525,156 @@ async function loadInterviewDetail() {
       }
     }
   } catch (error) { showLiveError(error); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INTERVIEW FEEDBACK DIALOG
+   ═══════════════════════════════════════════════════════════════ */
+
+function interviewFeedbackDecision(label) {
+  const normalized = String(label || "").toLowerCase().trim();
+  if (normalized.includes("strong yes")) return "strong-yes";
+  if (normalized.includes("strong no")) return "strong-no";
+  if (normalized === "yes") return "yes";
+  if (normalized === "no") return "no";
+  return normalized.replace(/\s+/g, "-") || null;
+}
+
+function selectInterviewFeedbackDecision(value) {
+  if (!value) return;
+  const grid = document.querySelector("[data-decision-group]");
+  if (!grid) return;
+  grid.querySelectorAll("button").forEach((btn) => {
+    const active = interviewFeedbackDecision(btn.textContent) === value;
+    btn.dataset.selected = String(active);
+    btn.classList.toggle("border-2", active);
+    btn.classList.toggle("border-success-text/30", active);
+    btn.classList.toggle("bg-success-bg", active);
+    btn.classList.toggle("text-success-text", active);
+    btn.classList.toggle("font-semibold", active);
+    btn.classList.toggle("border", !active);
+    btn.classList.toggle("border-border", !active);
+    btn.classList.toggle("bg-surface", !active);
+    btn.classList.toggle("text-on-surface-variant", !active);
+  });
+  grid.dataset.decision = value;
+}
+
+function wireInterviewFeedbackDecisionPicker() {
+  const grid = document.querySelector("[data-decision-group]");
+  if (!grid || grid.dataset.feedbackWired === "true") return;
+  grid.dataset.feedbackWired = "true";
+  grid.querySelectorAll("button").forEach((btn) => {
+    btn.type = "button";
+    btn.addEventListener("click", () => selectInterviewFeedbackDecision(interviewFeedbackDecision(btn.textContent)));
+  });
+  const preselected = grid.querySelector("button.border-2");
+  if (preselected) grid.dataset.decision = interviewFeedbackDecision(preselected.textContent);
+}
+
+function wireInterviewFeedbackRatingBars() {
+  const container = document.querySelector("[data-overlay-surface] .space-y-6");
+  if (!container || container.dataset.ratingsWired === "true") return;
+  container.dataset.ratingsWired = "true";
+  container.querySelectorAll(".flex.gap-1").forEach((barRow) => {
+    const labelRow = barRow.previousElementSibling;
+    const scoreEl = labelRow ? labelRow.querySelector(".font-data-tabular") : null;
+    const nameEl = labelRow ? labelRow.querySelector(".font-body-sm.font-semibold") : null;
+    const bars = barRow.querySelectorAll("button");
+    bars.forEach((bar, index) => {
+      bar.type = "button";
+      bar.addEventListener("click", () => {
+        bars.forEach((b, i) => {
+          const filled = i <= index;
+          b.classList.toggle("bg-primary", filled);
+          b.classList.toggle("bg-outline-variant", !filled);
+        });
+        if (scoreEl) scoreEl.textContent = `${index + 1} / 5`;
+      });
+    });
+    if (nameEl && nameEl.textContent) nameEl.dataset.ratingName = nameEl.textContent.trim();
+  });
+}
+
+async function loadInterviewFeedbackDialog() {
+  wireInterviewFeedbackDecisionPicker();
+  wireInterviewFeedbackRatingBars();
+  const submitBtn = document.getElementById("feedback-submit");
+  if (submitBtn && !submitBtn.dataset.wired) {
+    submitBtn.dataset.wired = "true";
+    submitBtn.addEventListener("click", () => submitInterviewFeedback({ draft: false }));
+  }
+  const draftBtn = document.getElementById("feedback-draft");
+  if (draftBtn && !draftBtn.dataset.wired) {
+    draftBtn.dataset.wired = "true";
+    draftBtn.addEventListener("click", () => submitInterviewFeedback({ draft: true }));
+  }
+  const interviewId = queryInt("interview_id");
+  if (!interviewId) return;
+  const subtitle = document.querySelector("[data-feedback-subtitle]");
+  try {
+    const item = await apiRequest(`/interviews/${interviewId}`);
+    if (item && subtitle) {
+      const label = [item.candidate_name, item.round_name || item.round_type || item.interview_type].filter(Boolean).join(" \u00b7 ");
+      if (label) subtitle.textContent = label;
+    }
+    if (item?.decision) selectInterviewFeedbackDecision(item.decision);
+    const notes = document.getElementById("feedback-detailed-notes");
+    if (item?.feedback_notes && notes && !notes.value) notes.value = item.feedback_notes;
+  } catch (error) {
+    /* Leave the static page as a graceful fallback when the record is unreachable */
+  }
+}
+
+async function submitInterviewFeedback({ draft = false } = {}) {
+  const interviewId = queryInt("interview_id");
+  if (!interviewId) { showLiveError(new Error("Interview id is missing.")); return; }
+  const grid = document.querySelector("[data-decision-group]");
+  const decision = grid?.dataset.decision || null;
+  const surface = document.querySelector("[data-overlay-surface]");
+  const readField = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : "";
+  };
+  const strengths = readField("feedback-strengths");
+  const concerns = readField("feedback-concerns");
+  const detailed = readField("feedback-detailed-notes");
+  const ratingLines = [];
+  (surface ? surface.querySelectorAll(".flex.gap-1") : []).forEach((row) => {
+    const labelRow = row.previousElementSibling;
+    const nameEl = labelRow ? labelRow.querySelector(".font-body-sm.font-semibold") : null;
+    const scoreEl = labelRow ? labelRow.querySelector(".font-data-tabular") : null;
+    if (nameEl && scoreEl) ratingLines.push(`${nameEl.textContent.trim()} ${scoreEl.textContent.trim()}`);
+  });
+  const notesParts = [];
+  if (ratingLines.length) notesParts.push(`Competency ratings: ${ratingLines.join(", ")}.`);
+  if (strengths) notesParts.push(`Strengths: ${strengths}`);
+  if (concerns) notesParts.push(`Concerns: ${concerns}`);
+  if (detailed) notesParts.push(`Notes: ${detailed}`);
+  const feedbackNotes = notesParts.length ? notesParts.join("\n").slice(0, 1000) : null;
+  if (!decision && !feedbackNotes) {
+    showLiveError(new Error("Feedback requires a recommendation or notes."));
+    return;
+  }
+  const payload = draft
+    ? { status: "scheduled", feedback_status: "pending", decision: decision || undefined, feedback_notes: feedbackNotes }
+    : { status: "completed", feedback_status: "received", decision: decision || undefined, feedback_notes: feedbackNotes };
+  try {
+    await apiRequest(`/interviews/${interviewId}/feedback`, { method: "PATCH", body: JSON.stringify(payload) });
+    showLiveSuccess(draft ? "Draft saved" : "Feedback submitted", decision ? titleFromCode(decision) : undefined);
+    afterOverlaySave("interview-detail.html");
+  } catch (error) { showLiveError(error); }
 }/* ═══════════════════════════════════════════════════════════════
    OFFERS
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadOfferManagement() {
-  const payload = await apiRequest("/offers/?page_size=50");
-  renderOffers(payload.items || [], payload.meta || {});
+  try {
+    const payload = await apiRequest("/offers/?page_size=50").catch(() => ({ items: [], meta: { total: 0 } }));
+    renderOffers(payload.items || [], payload.meta || {});
+  } catch (error) {
+    showLiveError(error);
+  }
 }
 
 async function loadOfferCreateDialog() {
@@ -2968,7 +3711,10 @@ function notificationFilterLabel() {
 function notificationsView() {
   const term = notificationSearchText.trim().toLowerCase();
   if (!term) return notificationItemsCache;
-  return notificationItemsCache.filter((item) => `${item.title || ""} ${item.message || ""}`.toLowerCase().includes(term));
+  return notificationItemsCache.filter((item) => {
+    const story = typeof notificationStory === "function" ? notificationStory(item) : {};
+    return `${item.title || ""} ${item.message || ""} ${item.event_type || ""} ${story.eventLabel || ""} ${story.headline || ""}`.toLowerCase().includes(term);
+  });
 }
 
 function ensureNotificationBadge() {
@@ -3004,36 +3750,85 @@ function applyNotificationReadState(row) {
   row.dataset.notificationStatus = "read";
   row.querySelectorAll("[data-notification-unread-indicator]").forEach((dot) => dot.remove());
   const button = row.querySelector("[data-notification-read]");
-  if (button) button.setAttribute("disabled", "disabled");
+  if (button) {
+    if (button.getAttribute("role") === "menuitem") {
+      button.removeAttribute("data-notification-read");
+      button.disabled = true;
+      button.textContent = "Seen";
+    } else {
+      const seen = document.createElement("span");
+      seen.className = "text-[12px] font-semibold text-text-muted";
+      seen.textContent = "Seen";
+      button.replaceWith(seen);
+    }
+  }
   const badge = row.querySelector("[data-notification-status-badge]");
-  if (badge) badge.textContent = "read";
+  if (badge) badge.textContent = "Seen";
+}
+
+async function markNotificationSeen(id) {
+  if (!id) return false;
+  await apiRequest(`/notifications/${id}/read`, { method: "PATCH", body: JSON.stringify({ status: "read" }) });
+  notificationItemsCache = notificationItemsCache.map((item) => (String(item.id) === String(id) ? { ...item, status: "read", read_at: new Date().toISOString() } : item));
+  notificationUnreadTotal = Math.max(0, notificationUnreadTotal - 1);
+  refreshNotificationBadge();
+  return true;
 }
 
 async function markNotificationReadAction(button) {
   if (button.disabled) return;
   button.setAttribute("disabled", "disabled");
   const row = button.closest("[data-notification-id]");
-  const id = intOrNull(row?.dataset.notificationId);
+  const id = intOrNull(row?.dataset.notificationId) || intOrNull(button.dataset.notificationId);
   if (!id) {
     applyNotificationReadState(row);
-    showToast("Notification updated", "This alert is marked as read for this session.");
+    showToast("Got it", "This event will stay in Seen if you need it later.");
     return;
   }
   try {
-    await apiRequest(`/notifications/${id}/read`, { method: "PATCH", body: JSON.stringify({ status: "read" }) });
-    notificationItemsCache = notificationItemsCache.map((item) => (String(item.id) === String(id) ? { ...item, status: "read" } : item));
-    notificationUnreadTotal = Math.max(0, notificationUnreadTotal - 1);
-    refreshNotificationBadge();
+    await markNotificationSeen(id);
     if (routeId() === "notifications-center" && document.querySelector("[data-notifications-command-center]")) {
       renderNotificationsCommandCenter(notificationsView(), { unread_total: notificationUnreadTotal });
     } else {
       applyNotificationReadState(row);
     }
-    showLiveSuccess("Marked as read", "Notification updated.");
+    const overlay = document.getElementById("ro-inpage-overlay");
+    if (overlay?.dataset.overlayRoute === "notification-detail-panel") {
+      const item = notificationItemsCache.find((entry) => Number(entry.id) === Number(id));
+      if (item && typeof renderNotificationDetailPanel === "function") renderNotificationDetailPanel(item);
+    }
+    showLiveSuccess("Got it", "This event is in Seen. Open What happened if you want the details again.");
   } catch (error) {
     button.removeAttribute("disabled");
     showLiveError(error);
   }
+}
+
+async function openNotificationRecord(button) {
+  const row = button.closest("[data-notification-id]");
+  const id = intOrNull(row?.dataset.notificationId) || intOrNull(button.dataset.notificationId);
+  if (!id) return;
+  try {
+    await markNotificationSeen(id);
+  } catch (error) {
+    showLiveError(error);
+    return;
+  }
+  navigateToRoute(`notification-detail-panel.html?notification_id=${id}`);
+}
+
+function wireNotificationListInteractions(list) {
+  if (!list || list.dataset.notificationListWired === "true") return;
+  list.dataset.notificationListWired = "true";
+  list.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest("button, a, .ro-row-menu, .ro-card-kebab")) return;
+    const article = event.target.closest("[data-notification-id]");
+    const id = article?.dataset.notificationId;
+    if (!id) return;
+    event.preventDefault();
+    navigateToRoute(`notification-detail-panel.html?notification_id=${id}`);
+  });
 }
 
 function wireNotificationCenterFilters(surface) {
@@ -3079,19 +3874,30 @@ async function loadNotifications() {
     const surface = document.querySelector("[data-notifications-command-center]");
     if (surface && renderNotificationsCommandCenter(items, { unread_total: notificationUnreadTotal })) {
       wireNotificationCenterFilters(surface);
+      if (typeof hydrateLiveFilters === "function") hydrateLiveFilters(surface);
       return;
     }
   }
   const list = document.querySelector("[data-notification-list], .workspace-surface .rounded-xl.flex.flex-col");
   if (list && items.length) {
-    list.innerHTML = items.map((item) => `<div class="flex items-start gap-4 p-4 border-b border-border bg-surface" data-live-notification-row="true" data-notification-id="${item.id}">
-      <div class="mt-1 text-primary"><span class="material-symbols-outlined">notifications</span></div>
+    list.innerHTML = items.map((item) => {
+      const story = typeof notificationStory === "function" ? notificationStory(item) : { eventLabel: item.title || "Notification", headline: item.message || "", icon: "notifications", unread: String(item.status).toLowerCase() === "unread" };
+      return `<div class="group flex items-start gap-4 p-4 border-b border-border bg-surface" data-live-notification-row="true" data-notification-id="${item.id}">
+      <div class="mt-1 text-primary"><span class="material-symbols-outlined">${escapeLiveHtml(story.icon || "notifications")}</span></div>
       <div class="flex-1 min-w-0">
-        <h4 class="font-headline-sm text-headline-sm text-on-surface truncate">${item.title || "Notification"}</h4>
-        <p class="font-body-sm text-body-sm text-text-muted mt-1">${item.message || ""}</p>
+        <h4 class="font-headline-sm text-headline-sm text-on-surface truncate">${escapeLiveHtml(story.eventLabel)}</h4>
+        <p class="font-body-sm text-body-sm text-on-surface mt-1">${escapeLiveHtml(story.headline)}</p>
       </div>
-      ${String(item.status).toLowerCase() === "unread" ? `<button class="topbar-action" type="button" data-notification-read="true" aria-label="Mark as read" title="Mark as Read"><span class="material-symbols-outlined text-[20px]">done</span></button>` : ""}
-    </div>`).join("");
+      ${typeof notificationRowMenu === "function" ? notificationRowMenu(item) : ""}
+    </div>`;
+    }).join("");
+    if (typeof applyCollectionPagination === "function") {
+      delete list.dataset.pageSize;
+      list.dataset.page = "1";
+      applyCollectionPagination(list);
+    }
+    if (typeof wireHoverKebabMenus === "function") wireHoverKebabMenus(list);
+    wireNotificationListInteractions(list);
     return;
   }
   fillExistingTable(items, (row, item) => {
@@ -3108,10 +3914,10 @@ async function loadNotifications() {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadApprovalsInbox() {
-  const tbody = document.querySelector("[data-layout='table-surface'] tbody");
-  showSkeletonTable(tbody?.closest("table") || tbody, 5, 6);
+  const tbody = document.querySelector(".workspace-surface tbody") || document.querySelector("tbody");
+  if (tbody && typeof showSkeletonTable === "function") showSkeletonTable(tbody, 5, 7);
   const payload = await apiRequest("/approvals/?page_size=50").catch(() => ({ items: [], meta: { total: 0 } }));
-  hideSkeleton(tbody?.closest("table") || tbody);
+  hideSkeleton(tbody);
   const items = payload.items || [];
   const total = payload.meta?.total || items.length;
   const pending = items.filter((i) => i.status === "pending").length;
@@ -3127,12 +3933,12 @@ async function loadApprovalsInbox() {
   if (pendingCount) pendingCount.textContent = pending;
   wireApprovalTabs(items);
   /* Render table filtered to the active tab */
-  const renderTbody = document.querySelector("tbody");
+  const renderTbody = (typeof workspaceTbody === "function" ? workspaceTbody() : null) || document.querySelector(".workspace-surface tbody") || document.querySelector("tbody");
   if (!renderTbody) return;
   const activeTab = document.querySelector('[data-approval-tab].bg-secondary-container')?.dataset.approvalTab || "pending";
   renderApprovalRows(renderTbody, filterApprovalsByTab(items, activeTab));
   const paginationText = document.querySelector(".border-t span");
-  if (paginationText) paginationText.textContent = `Showing 1 to ${(payload.items || []).length} of ${total} entries`;
+  if (paginationText) paginationText.textContent = formatListCount((payload.items || []).length, total);
 }
 
 function filterApprovalsByTab(items, tab) {
@@ -3176,10 +3982,10 @@ function renderApprovalRows(tbody, items) {
     const actionsHtml = item.status === "pending"
       ? `<button class="px-3 py-1.5 border border-primary text-primary rounded text-xs font-semibold hover:bg-primary hover:text-on-primary transition-colors approve-btn" data-approval-id="${item.id}" type="button">Approve</button><button class="px-3 py-1.5 border border-danger-text text-danger-text rounded text-xs font-semibold hover:bg-danger-bg transition-colors reject-btn" data-approval-id="${item.id}" type="button">Reject</button>`
       : statusBadge;
-    return `<tr class="hover:bg-highlight-soft transition-colors bg-surface h-[40px] group" data-approval-id="${item.id}">
+    return `<tr class="hover:bg-highlight-soft transition-colors bg-surface h-[40px] group" data-approval-id="${item.id}" data-filter-type="${escapeLiveHtml(item.approval_type?.replace(/_/g, " ") || "Request")}" data-filter-priority="${escapeLiveHtml(item.priority || "standard")}" data-filter-location="${escapeLiveHtml(locationName)}" data-filter-status="${escapeLiveHtml(item.status || "")}">
       <td class="py-2 px-4 align-middle"><div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${priorityMeta.dot}"></div><span class="${priorityMeta.text} font-medium text-xs">${item.status === "pending" ? slaText : item.status}</span></div></td>
       <td class="py-2 px-4 align-middle text-on-surface font-medium">${escapeLiveHtml(item.approval_type?.replace(/_/g, " ") || "Request")}</td>
-      <td class="py-2 px-4 align-middle text-primary cursor-pointer hover:underline">${escapeLiveHtml(item.title || "—")}</td>
+      <td class="py-2 px-4 align-middle text-on-surface cursor-pointer hover:underline font-medium">${escapeLiveHtml(item.title || "—")}</td>
       <td class="py-2 px-4 align-middle"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full border border-border bg-surface-dim text-text-muted flex items-center justify-center font-headline-sm font-semibold text-[11px]">${initials}</div><span class="text-on-surface">${escapeLiveHtml(item.requester_name || "Unknown")}</span></div></td>
       <td class="py-2 px-4 align-middle text-text-muted text-sm">${escapeLiveHtml(locationName)}</td>
       <td class="py-2 px-4 align-middle text-text-muted text-sm">${created}</td>
@@ -3189,11 +3995,26 @@ function renderApprovalRows(tbody, items) {
   /* Wire approve/reject buttons */
   tbody.querySelectorAll(".approve-btn").forEach((btn) => btn.addEventListener("click", () => decideApproval(btn.dataset.approvalId, "approved")));
   tbody.querySelectorAll(".reject-btn").forEach((btn) => btn.addEventListener("click", () => decideApproval(btn.dataset.approvalId, "rejected")));
+  const table = tbody.closest("table");
+  if (table && typeof applyClientPagination === "function") {
+    delete table.dataset.pageSize;
+    table.dataset.page = "1";
+    applyClientPagination(table);
+  }
+  if (typeof hydrateLiveFilters === "function") hydrateLiveFilters(tbody.closest(".workspace-surface, section") || document);
 }
 
 async function decideApproval(approvalId, decision) {
-  const notes = decision === "rejected" ? prompt("Reason for rejection (optional):") : null;
-  if (decision === "rejected" && notes === null) return;
+  let notes = null;
+  if (decision === "rejected") {
+    notes = await promptNotesDialog({
+      title: "Reject approval",
+      message: "Add a reason for the requester. Optional, but useful in the audit trail.",
+      confirmLabel: "Reject",
+      placeholder: "Reason for rejection",
+    });
+    if (notes === null) return;
+  }
   try {
     await apiRequest(`/approvals/${approvalId}/decide`, {
       method: "PATCH",
@@ -3204,6 +4025,46 @@ async function decideApproval(approvalId, decision) {
   } catch (error) { showLiveError(error); }
 }
 
+function promptNotesDialog({ title, message, confirmLabel = "Confirm", placeholder = "" } = {}) {
+  return new Promise((resolve) => {
+    document.getElementById("ro-notes-dialog")?.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "ro-notes-dialog";
+    overlay.className = "ro-notes-dialog";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="ro-notes-dialog__card">
+        <h2 class="font-headline-md text-[16px] text-on-surface">${escapeLiveHtml(title || "Notes")}</h2>
+        <p class="mt-1 font-body-sm text-[13px] text-text-muted">${escapeLiveHtml(message || "")}</p>
+        <textarea class="custom-input mt-3 w-full min-h-[96px]" placeholder="${escapeLiveHtml(placeholder)}"></textarea>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" data-notes-cancel class="px-3 py-1.5 border border-border rounded text-xs font-semibold">Cancel</button>
+          <button type="button" data-notes-confirm class="px-3 py-1.5 bg-primary text-on-primary rounded text-xs font-semibold">${escapeLiveHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+    const finish = (value) => {
+      overlay.remove();
+      resolve(value);
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+    overlay.querySelector("[data-notes-cancel]").addEventListener("click", () => finish(null));
+    overlay.querySelector("[data-notes-confirm]").addEventListener("click", () => {
+      finish(overlay.querySelector("textarea")?.value || "");
+    });
+    document.addEventListener("keydown", function onKey(event) {
+      if (event.key === "Escape") {
+        document.removeEventListener("keydown", onKey);
+        finish(null);
+      }
+    });
+    document.body.appendChild(overlay);
+    overlay.querySelector("textarea")?.focus();
+  });
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    JOIN TRACKER
@@ -3212,20 +4073,30 @@ async function decideApproval(approvalId, decision) {
 async function loadJoinTracker() {
   const payload = await apiRequest("/offers/?status=accepted&page_size=50").catch(() => ({ items: [] }));
   const items = (payload.items || []).filter((item) => /accepted|joined/i.test(String(item.offer_status || item.application_status || "")));
-  const surface = document.querySelector(".workspace-surface");
-  if (!surface) return;
-  const tbody = surface.querySelector("tbody");
-  if (tbody) {
-    tbody.innerHTML = items.length
-      ? items.map((item, i) => `<tr class="hover:bg-highlight-soft transition-colors">
-          <td class="py-2 px-4 font-medium text-on-surface">${escapeLiveHtml(item.candidate_name || "Candidate")}</td>
-          <td class="py-2 px-4 text-text-muted">${escapeLiveHtml(item.requisition_title || "Position")}</td>
-          <td class="py-2 px-4 text-text-muted">${escapeLiveHtml(item.department || "—")}</td>
-          <td class="py-2 px-4"><span class="inline-flex items-center rounded bg-success-bg px-2 py-0.5 text-[10px] font-semibold text-success-text">Joined</span></td>
-          <td class="py-2 px-4 text-text-muted text-sm">${escapeLiveHtml(formatWhen(item.accepted_at || item.updated_at))}</td>
-        </tr>`).join("")
-      : '<tr><td class="px-4 py-6 text-text-muted" colspan="5">No joined candidates.</td></tr>';
-  }
+  fillExistingTable(items, (row, item) => {
+    const cells = row.querySelectorAll("td");
+    setStackedCell(cells[0], item.candidate_name || "Candidate", item.candidate_email || "");
+    const avatar = cells[0]?.querySelector(".rounded-full, .w-8.h-8");
+    if (avatar && typeof personInitials === "function") avatar.textContent = personInitials(item.candidate_name);
+    setStackedCell(cells[1], item.requisition_title || "Position", item.department || "");
+    const start = item.expected_joining_date || item.accepted_at || item.updated_at;
+    setStackedCell(cells[2], start ? (typeof formatOfferDate === "function" ? formatOfferDate(start) : formatWhen(start)) : "—", "");
+    const joined = /joined/i.test(String(item.application_status || item.offer_status || ""));
+    const pct = joined ? 100 : 60;
+    const bar = cells[3]?.querySelector("[style*='width']");
+    if (bar) bar.style.width = `${pct}%`;
+    const pctLabel = Array.from(cells[3]?.querySelectorAll("span") || []).find((node) => /%/.test(node.textContent || ""));
+    if (pctLabel) pctLabel.textContent = `${pct}%`;
+    setCellValue(cells[4], "—");
+    setCellValue(cells[5], "—");
+    const statusNode = cells[6]?.querySelector("span") || cells[6];
+    if (statusNode) statusNode.textContent = joined ? "Complete" : "Pre-boarding";
+    row.dataset.recordId = item.candidate_id || item.id || "";
+    row.dataset.route = item.candidate_id
+      ? `candidate-detail.html?candidate_id=${item.candidate_id}`
+      : `offer-create-dialog.html?offer_id=${item.id}`;
+    row.classList.add("cursor-pointer");
+  });
 }
 
 
@@ -3291,10 +4162,14 @@ async function loadAnalyticsDashboard() {
   const pipelineItems = Array.isArray(pipeline) ? pipeline : pipeline.items || [];
   const offerItems = offers.items || [];
   const hires = offerItems.filter((item) => item.application_status === "joined" || normalizeOfferStatus(item.offer_status) === "accepted").length;
+  const ttf = await apiRequest("/reports/time-to-fill").catch(() => null);
   fillDashboardMetrics([
     { label: "Total Hires", value: hires, hint: `${company.total_locations || 0} active locations` },
+    { label: "Time to Fill", value: ttf?.summary?.avg_days != null ? `${ttf.summary.avg_days} days` : "—", hint: ttf?.summary?.filled_count ? `${ttf.summary.filled_count} filled roles` : "No fills yet" },
     { label: "Pipeline Velocity", value: `${Math.max(1, Math.round(pipelineItems.length / Math.max(company.total_open_requisitions || 1, 1)))}x`, hint: `${pipelineItems.length} active pipeline items` },
+    { label: "Offer Accept Rate", value: offerItems.length ? `${Math.round((hires / offerItems.length) * 100)}%` : "—", hint: `${offerItems.length} offers` },
   ]);
+  renderAnalyticsVisuals(pipelineItems, candidates.items || [], offerItems);
   renderAnalyticsTeam(users.items || [], requisitions.items || [], candidates.items || [], offerItems);
   renderAnalyticsSavedReports(company, dailyUpdates.items || []);
   renderPortalUsageReport();
@@ -3348,9 +4223,11 @@ async function renderPortalUsageReport() {
   }
 }
 
-async function submitDailyUpdate() {
-  const session = RecruitOpsLive.session || readSession();
-  const summary = document.getElementById("update-summary")?.value || document.querySelector("textarea")?.value || "";
+async function submitDailyUpdate(options = {}) {
+  const stayOnPage = Boolean(options.stayOnPage);
+  const status = options.status || "submitted";
+  ensureDailyUpdateWorkspaceFields(document.querySelector(".workspace-surface"));
+  const summary = document.getElementById("update-summary")?.value || document.querySelector(".workspace-surface textarea")?.value || "";
   const requisitionId = intOrNull(document.getElementById("requisition_id")?.value) || queryInt("requisition_id");
   const profilesSourced = intOrNull(document.getElementById("profiles-sourced-count")?.value);
   const profilesScreened = intOrNull(document.getElementById("profiles-screened-count")?.value);
@@ -3362,7 +4239,6 @@ async function submitDailyUpdate() {
   const updateDate = document.getElementById("update-date")?.value || new Date().toISOString().split("T")[0];
   if (!summary.trim()) { showLiveError(new Error("Summary is required.")); return; }
   if (!requisitionId) { showLiveError(new Error("Please select a requisition.")); return; }
-  /* Try to find a requisition the user is actually linked to */
   let userId = currentUserId();
   const payload = {
     update_date: updateDate,
@@ -3376,16 +4252,22 @@ async function submitDailyUpdate() {
     offers_closed_count: offersClosed,
     blockers,
     next_actions: nextActions,
+    submission_status: status,
   };
   try {
     await apiRequest("/daily-updates/", { method: "POST", body: JSON.stringify(payload) });
-    showLiveSuccess("Daily update submitted");
+    showLiveSuccess(status === "draft" ? "Draft saved" : "Daily update submitted");
+    if (stayOnPage && typeof loadDailyUpdates === "function" && routeId() === "daily-updates-workspace") {
+      await loadDailyUpdates();
+      return;
+    }
     setTimeout(() => { window.location.href = pageHref("daily-updates-review.html"); }, 1000);
   } catch (error) {
-    /* If 403 "must be linked", show helpful message */
     const msg = error?.message || String(error);
     if (/403|linked.*requisition/i.test(msg)) {
       showLiveError(new Error("You are not assigned to this requisition. Contact your admin to assign you first."));
+    } else if (/409|already exists/i.test(msg)) {
+      showLiveError(new Error("An update for this requisition already exists today."));
     } else { showLiveError(error); }
   }
 }
@@ -3418,7 +4300,7 @@ async function submitMeetingForm() {
   try {
     await apiRequest("/meetings/", { method: "POST", body: JSON.stringify(payload) });
     showLiveSuccess("Meeting scheduled", title);
-    setTimeout(() => { window.location.href = pageHref("meetings.html"); }, 1000);
+    afterOverlaySave("meetings.html");
   } catch (error) { showLiveError(error); }
 }
 
@@ -3454,7 +4336,7 @@ async function submitOfferCreate() {
   try {
     await apiRequest("/offers/", { method: "POST", body: JSON.stringify(payload) });
     showLiveSuccess("Offer created");
-    setTimeout(() => { window.location.href = pageHref("offer-management.html"); }, 1000);
+    afterOverlaySave("offer-management.html");
   } catch (error) {
     const msg = error?.message || String(error);
     if (/500|database/i.test(msg)) {
@@ -3479,7 +4361,7 @@ async function submitLinkToRequisition() {
       }),
     });
     showLiveSuccess("Candidate linked to requisition");
-    setTimeout(() => { window.location.href = pageHref("candidate-profiles.html"); }, 1000);
+    afterOverlaySave("candidate-profiles.html");
   } catch (error) {
     const msg = error?.message || String(error);
     if (/duplicate.*check|cleared/i.test(msg)) {
@@ -3632,6 +4514,15 @@ function bindLiveApiInteractions() {
       return;
     }
 
+    // Notification open record
+    const openNotification = target?.closest("[data-notification-open]");
+    if (openNotification) {
+      event.preventDefault();
+      event.stopPropagation();
+      openNotificationRecord(openNotification);
+      return;
+    }
+
     // Notification read
     const readButton = target?.closest("[data-live-notification-read]");
     if (readButton) {
@@ -3726,11 +4617,15 @@ function bindLiveApiInteractions() {
     // Form submissions
     const routeSubmitButton = target?.closest("button");
     const route = routeId();
-    const submitRoutes = new Set(["contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "meeting-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer", "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup", "onboarding-hiring-teams"]);
-    const label = (routeSubmitButton?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-    if (routeSubmitButton && submitRoutes.has(route) && /^(save|create|update|submit|schedule|confirm|continue|next|add|send|save changes|save user|save client|save contact|save role|create requisition|save candidate)/.test(label)) {
+    const submitRoutes = new Set(["contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "daily-updates-workspace", "meeting-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer", "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup", "onboarding-hiring-teams"]);
+    const label = (typeof getActionLabel === "function" ? getActionLabel(routeSubmitButton) : (routeSubmitButton?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase());
+    if (routeSubmitButton && submitRoutes.has(route) && /^(save|create|update|submit|schedule|confirm|continue|next|add|send|save changes|save user|save client|save contact|save role|create requisition|save candidate|update candidate)/.test(label)) {
       event.preventDefault();
       event.stopPropagation();
+      if (route === "daily-updates-workspace") {
+        submitDailyUpdate({ stayOnPage: true, status: /^save draft/.test(label) ? "draft" : "submitted" });
+        return;
+      }
       handleFormSubmit(document.querySelector("form") || routeSubmitButton.closest("form") || document.body);
       return;
     }
@@ -3987,13 +4882,13 @@ async function bootPage() {
     "user-management": loadUsers,
     "user-detail": loadUserDetail,
     "deactivate-user-dialog": loadDeactivateUserDialog,
+    "my-profile": loadMyProfile,
     "role-management": loadRoles,
     "role-permissions-editor": loadRolePermissionsEditor,
     "role-dashboard": async () => { await Promise.all([loadRoleDashboard().catch(() => {}), loadWorkflowActions().catch(() => {})]); },
-    "my-work-dashboard": loadDashboards,
+    "my-work-dashboard": loadMyWorkDashboard,
     "company-dashboard": loadDashboards,
     "location-management": loadLocations,
-    "location-detail": loadLocationDashboard,
     "location-dashboard": loadLocationDashboard,
     "visibility-rules": loadVisibilityRules,
     "business-titles": loadBusinessTitles,
@@ -4015,6 +4910,7 @@ async function bootPage() {
       }
     },
     "interview-detail": loadInterviewDetail,
+    "interview-feedback-dialog": loadInterviewFeedbackDialog,
     "notifications-center": loadNotifications,
     "notification-detail-panel": loadNotificationDetailPanel,
     "approvals-inbox": loadApprovalsInbox,
@@ -4031,7 +4927,6 @@ async function bootPage() {
     "pipeline-analytics": loadPipelineAnalytics,
     "analytics-dashboard": loadAnalyticsDashboard,
     "reports": loadReportsLibrary,
-    "reports-library": loadReportsLibrary,
     "custom-report-builder": loadCustomReportBuilder,
     "report-viewer": loadReportViewer,
     "review-matches-workspace": loadReviewMatchesWorkspace,
@@ -4048,8 +4943,18 @@ async function bootPage() {
         paintPriorityBadge(cells[5], item.priority);
         setCellValue(cells[6], item.status || "—");
         setCellValue(cells[7], ageDaysLabel(item.created_at));
-        const editLink = row.querySelector('[data-route*="requisition-detail"]');
-        if (editLink) editLink.dataset.route = `requisition-detail.html?requisition_id=${item.id}`;
+        row.dataset.filterStatus = String(item.status || "").toLowerCase();
+        row.dataset.filterPriority = String(item.priority || "").toLowerCase();
+        row.dataset.filterClient = item.client_name || "";
+        row.dataset.filterOwner = item.primary_owner_name || "";
+        row.dataset.filterLocation = item.work_mode || item.location_name || "";
+        const detailRoute = `requisition-detail.html?requisition_id=${item.id}`;
+        row.querySelectorAll('[data-route*="requisition-detail"]').forEach((el) => {
+          el.dataset.route = detailRoute;
+          el.setAttribute("aria-label", `Open ${item.title || item.requisition_code || "requisition"}`);
+        });
+        row.dataset.route = detailRoute;
+        row.classList.add("cursor-pointer");
       });
     },
     "application-history": async () => {
@@ -4079,12 +4984,20 @@ async function bootPage() {
     "onboarding-integrations": async () => {},
     "onboarding-success-launch": async () => { await completeOnboarding(); },
   };
+  RecruitOpsLive.pageLoaders = loaders;
+  RecruitOpsLive.reloadCurrentPage = async () => {
+    const id = pathRouteId();
+    if (loaders[id]) await loaders[id]();
+    if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
+  };
+  RecruitOpsLive.bootOverlay = async (overlayRoute) => {
+    if (loaders[overlayRoute]) await loaders[overlayRoute]();
+  };
 
   /* RBAC: Block access to unauthorized pages */
   if (!isAdmin() && !PUBLIC_ROUTES.has(route)) {
     const pagePermMap = {
       "location-management": ["location.read"],
-      "location-detail": ["location.read"],
       "location-dashboard": ["location.read"],
       "user-management": ["user.read"],
       "user-detail": ["user.read"],
@@ -4111,6 +5024,7 @@ async function bootPage() {
       "requisition-intake-edit": ["requisition.update"],
       "interview-scheduler": ["interview.read"],
       "interview-detail": ["interview.read"],
+      "interview-feedback-dialog": ["interview.read"],
       "offer-management": ["offer.read"],
       "offer-create-dialog": ["offer.create"],
       "meetings": ["meeting.read"],
@@ -4129,7 +5043,6 @@ async function bootPage() {
       "user-performance-reports": ["dashboard.view_admin", "dashboard.view_manager"],
       "team-workload": ["dashboard.view_admin", "dashboard.view_manager"],
       "reports": ["report.read"],
-      "reports-library": ["report.read"],
       "custom-report-builder": ["report.read"],
       "report-viewer": ["report.read"],
       "pipeline-analytics": ["pipeline.read.summary"],
@@ -4148,6 +5061,7 @@ async function bootPage() {
   try {
     await hydrateSelects();
     if (loaders[route]) await loaders[route]();
+    if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
   } catch (error) {
     showLiveError(error);
   } finally {
@@ -4166,6 +5080,15 @@ RecruitOpsLive.handleForgot = handleForgot;
 RecruitOpsLive.handleFormSubmit = handleFormSubmit;
 RecruitOpsLive.markNotificationRead = markNotificationReadAction;
 RecruitOpsLive.refreshNotificationBadge = refreshNotificationBadge;
+RecruitOpsLive.bootOverlay = RecruitOpsLive.bootOverlay || (async (overlayRoute) => {
+  const fn = RecruitOpsLive.pageLoaders?.[overlayRoute];
+  if (fn) await fn();
+});
+RecruitOpsLive.reloadCurrentPage = RecruitOpsLive.reloadCurrentPage || (async () => {
+  const fn = RecruitOpsLive.pageLoaders?.[pathRouteId()];
+  if (fn) await fn();
+  if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
+});
 window.RecruitOpsLive = RecruitOpsLive;
 
 

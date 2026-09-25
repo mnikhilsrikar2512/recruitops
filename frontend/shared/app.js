@@ -3,7 +3,7 @@
 const WORKSPACE_INSIGHTS = {
   "user-management": {
     title: "User coverage snapshot",
-    copy: "Use this staged panel to review permission health, invite backlog, and ownership balance before the live admin APIs are connected.",
+    copy: "Review permission health, invite backlog, and ownership balance at a glance.",
     cards: [
       { icon: "mail", label: "Pending invites", value: "3 users", copy: "Two invites are older than 48 hours and should be nudged first." },
       { icon: "shield_person", label: "Permission drift", value: "5 roles", copy: "Five accounts have role-location combinations worth auditing before the next sync." },
@@ -20,59 +20,6 @@ const WORKSPACE_INSIGHTS = {
     ],
   },
 };
-const WORKFLOW_BRIEFS = {
-  "candidate-screening": {
-    badge: "Decision Desk",
-    title: "Move from evidence to decision without losing context.",
-    copy: "Keep the candidate summary, requisition rules, and your evaluation actions aligned before you advance or reject the profile.",
-    bullets: [
-      "Validate the requisition hard requirements before scoring soft-fit criteria.",
-      "Capture the screening outcome while context is still fresh.",
-      "Escalate exceptional cases instead of forcing them through a standard path.",
-    ],
-  },
-  "resume-upload-and-review": {
-    badge: "Intake Flow",
-    title: "Turn uploads into clean candidate records with less back-and-forth.",
-    copy: "Work from the queue, verify the extracted identity details, then hand off to duplicate review before the record enters the main pipeline.",
-    bullets: [
-      "Start with files marked ready for intake to keep throughput predictable.",
-      "Use the review pane to confirm contact details before pipeline entry.",
-      "Route uncertain records into duplicate review instead of guessing.",
-    ],
-  },
-  "daily-updates-workspace": {
-    badge: "Reporting Rhythm",
-    title: "Keep daily updates concise, measurable, and easy to action.",
-    copy: "A good update captures what changed, what is blocked, and what needs attention in the next 24 hours.",
-    bullets: [
-      "Use the counts to anchor the summary in measurable progress.",
-      "Flag high-priority blockers so reviewers know where to intervene first.",
-      "Open recent updates when you need continuity before posting a new one.",
-    ],
-  },
-  "candidate-duplicate-review": {
-    badge: "Conflict Resolution",
-    title: "Resolve duplicates by protecting record quality, not just clearing the queue.",
-    copy: "Use the confidence reasoning and record history to choose whether this profile should merge into the system of record or remain separate.",
-    bullets: [
-      "Prefer merge when primary identity fields and ownership context line up cleanly.",
-      "Keep both only when the incoming record clearly represents a distinct candidate path.",
-      "Escalate edge cases instead of forcing a decision with low confidence.",
-    ],
-  },
-  "approvals-inbox": {
-    badge: "Decision Queue",
-    title: "Surface the riskiest approval first, then move decisively.",
-    copy: "The queue is most useful when the current focus is explicit: pick an item, confirm the risk, and move straight into review.",
-    bullets: [
-      "Start with overdue or critical items before standard approvals.",
-      "Use request type and related record together to avoid shallow reviews.",
-      "Open the review drawer once the priority and business context are clear.",
-    ],
-  },
-};
-
 const HEADINGLESS_WORKSPACE_ROUTES = new Set([
   "analytics-dashboard",
   "custom-report-builder",
@@ -106,34 +53,6 @@ const SHORTCUT_CATALOG = [
 
 const SHORTCUT_HINT_ID = "shortcut-hint";
 
-const OVERLAY_BRIEFS = {
-  "exception-request-dialog": {
-    title: "Capture the exception clearly before you escalate it.",
-    copy: "A good exception request explains the policy variance, the business impact, and the next approver path without leaving hidden assumptions behind.",
-    pills: ["Policy variance", "Audit trail", "Executive routing"],
-  },
-  "stage-move-dialog": {
-    title: "Make the stage decision explicit before you move the candidate.",
-    copy: "Keep the target stage, rationale, and notes aligned so the next teammate can understand why this transition happened.",
-    pills: ["Pipeline decision", "Hiring-team context", "Candidate lifecycle"],
-  },
-  "reassign-owner-dialog": {
-    title: "Hand ownership over without dropping active work.",
-    copy: "Use reassignment only when the new owner and the audit reason are clear enough to preserve continuity across outreach, approvals, and interviews.",
-    pills: ["Ownership continuity", "Audit reason", "Task carryover"],
-  },
-  "approval-review-drawer": {
-    title: "Review the risk and choose the next action deliberately.",
-    copy: "This drawer should make it obvious whether the request is approvable now, needs more information, or should be rejected with a clear reason.",
-    pills: ["Decision record", "SLA pressure", "Business impact"],
-  },
-  "pipeline-history-drawer": {
-    title: "Use the timeline to explain the candidate path, not just view it.",
-    copy: "The strongest audit trails show who moved the candidate, why the move happened, and which steps were manual versus automated.",
-    pills: ["Audit trail", "Manual vs automation", "Stage continuity"],
-  },
-};
-
 function isEditableElement(target) {
   if (!(target instanceof HTMLElement)) return false;
   return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
@@ -148,7 +67,6 @@ function closeOpenOverlays() {
   if (mobileDialog?.open) {
     closeMobileNav(mobileDialog);
   }
-  showToast("Overlays closed", "Dialogs and drawers were dismissed with the keyboard.");
 }
 
 function attachKeyboardShortcuts() {
@@ -240,7 +158,6 @@ function handleKeyDown(event) {
         ? "candidate-review-drawer.html"
         : "candidate-review-drawer.html";
     navigateToRoute(candidateRoute);
-    showToast("New candidate opened", "The candidate entry drawer is ready.");
     return;
   }
 
@@ -266,7 +183,7 @@ function handleKeyDown(event) {
   if (event.key === "/" && !event.ctrlKey && !event.metaKey) {
     event.preventDefault();
     const searchInput = document.querySelector(".topbar-search input, #topbar-search");
-    if (searchInput) { searchInput.focus(); showToast("Search focused", "Type to search within RecruitOps."); }
+    if (searchInput) { searchInput.focus(); }
     return;
   }
 
@@ -306,6 +223,10 @@ function toggleShortcutHelp() {
 }
 
 function attachShortcutHint() {
+  /* App workspaces only — marketing, auth, and overlay pages don't need it */
+  if (!document.querySelector(".app-shell")) return;
+  const kind = document.body?.dataset.routeKind || "";
+  if (["marketing", "auth", "overlay"].includes(kind)) return;
   if (document.getElementById(SHORTCUT_HINT_ID)) return;
   const hint = document.createElement("div");
   hint.id = SHORTCUT_HINT_ID;
@@ -322,6 +243,15 @@ function attachShortcutHint() {
     </div>
   `;
   document.body.appendChild(hint);
+}
+
+const RO_LOGO_SVG = `<svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg>`;
+
+function upgradeBrandMarks() {
+  document.querySelectorAll(".sidebar-mark").forEach((mark) => {
+    if (mark.querySelector(".ro-logo")) return;
+    mark.innerHTML = RO_LOGO_SVG;
+  });
 }
 
 function setupToggleGroups(scope = document) {
@@ -355,7 +285,7 @@ function setupWorkspaceInsights() {
   if (!config) return;
 
   const trigger = Array.from(document.querySelectorAll("button"))
-    .find((button) => /\\binsights\\b/i.test(getActionLabel(button)));
+    .find((button) => /\binsights\b/i.test(getActionLabel(button)));
   const host = document.querySelector("[data-demo-validate]");
   if (!trigger || !host || host.querySelector("[data-workspace-insight-panel]")) return;
 
@@ -435,11 +365,9 @@ function setupWorkspaceInsights() {
     event.stopPropagation();
     if (panel.hidden) {
       openPanel();
-      showToast("Insights opened", "Contextual workspace signals are now visible in the integrated shell.");
-      return;
+        return;
     }
     closePanel({ restoreFocus: false });
-    showToast("Insights hidden", "The workspace is back to its compact operating view.");
   });
 
   dismiss?.addEventListener("click", () => closePanel());
@@ -485,7 +413,7 @@ function setupRecordLinkPolish() {
     document.querySelectorAll("tbody tr").forEach((row) => {
       const relatedRecordCell = row.querySelectorAll("td")[2];
       if (!relatedRecordCell || relatedRecordCell.querySelector("a, button")) return;
-      const recordText = (relatedRecordCell.textContent || "").replace(/\\s+/g, " ").trim();
+      const recordText = (relatedRecordCell.textContent || "").replace(/\s+/g, " ").trim();
       if (!recordText) return;
       const route = /^REQ-/i.test(recordText)
         ? "requisition-detail.html"
@@ -514,15 +442,15 @@ function setupRecordLinkPolish() {
     ];
 
     document.querySelectorAll('[data-layout="metric-card"]').forEach((card) => {
-      const label = (card.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (card.textContent || "").replace(/\s+/g, " ").trim();
       const config = metricRoutes.find((entry) => entry.match.test(label));
       if (!config) return;
       promoteSurfaceRoute(card, config.route, config.label);
     });
 
     document.querySelectorAll("p").forEach((copy) => {
-      const text = (copy.textContent || "").replace(/\\s+/g, " ").trim();
-      if (!/^REQ-\\d+/i.test(text)) return;
+      const text = (copy.textContent || "").replace(/\s+/g, " ").trim();
+      if (!/^REQ-\d+/i.test(text)) return;
       const requisitionRow = copy.closest("div.flex.justify-between.items-start");
       if (!requisitionRow) return;
       promoteSurfaceRoute(requisitionRow, "requisition-detail.html", `Open ${text}`);
@@ -531,7 +459,7 @@ function setupRecordLinkPolish() {
 
   if (routeId === "client-detail") {
     document.querySelectorAll("td").forEach((cell) => {
-      const label = (cell.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (cell.textContent || "").replace(/\s+/g, " ").trim();
       if (!/^(Senior Frontend Engineer|Product Manager|Backend Developer|DevOps Engineer)$/i.test(label)) return;
       promoteSurfaceRoute(cell, "requisition-detail.html", `Open ${label}`);
     });
@@ -539,7 +467,7 @@ function setupRecordLinkPolish() {
 
   if (routeId === "location-management") {
     document.querySelectorAll("span, div").forEach((node) => {
-      const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (node.textContent || "").replace(/\s+/g, " ").trim();
       if (/^(HQ - San Francisco|London Hub|Austin Tech Center|LOC-001|LOC-042|LOC-088)$/i.test(label)) {
         promoteSurfaceRoute(node, "location-management.html", `Open ${label}`);
       }
@@ -555,22 +483,22 @@ function setupRecordLinkPolish() {
     ];
 
     document.querySelectorAll('[data-layout="metric-card"]').forEach((card) => {
-      const label = (card.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (card.textContent || "").replace(/\s+/g, " ").trim();
       const config = metricRoutes.find((entry) => entry.match.test(label));
       if (!config) return;
       promoteSurfaceRoute(card, config.route, config.label);
     });
 
     document.querySelectorAll("span").forEach((copy) => {
-      const label = (copy.textContent || "").replace(/\\s+/g, " ").trim();
-      if (!/^(Alex Rodriguez|Emily Chen|David R\\.)$/i.test(label)) return;
+      const label = (copy.textContent || "").replace(/\s+/g, " ").trim();
+      if (!/^(Alex Rodriguez|Emily Chen|David R\.)$/i.test(label)) return;
       promoteSurfaceRoute(copy, "candidate-review-drawer.html", `Open ${label}`);
     });
   }
 
   if (routeId === "my-work-dashboard") {
     document.querySelectorAll("td, div, button").forEach((node) => {
-      const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (node.textContent || "").replace(/\s+/g, " ").trim();
       if (/^REQ-(923|924|930|942)$/i.test(label)) {
         promoteSurfaceRoute(node, "requisition-detail.html", `Open ${label}`);
         return;
@@ -591,7 +519,7 @@ function setupRecordLinkPolish() {
 
   if (routeId === "requisition-list") {
     document.querySelectorAll("td, span, button").forEach((node) => {
-      const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (node.textContent || "").replace(/\s+/g, " ").trim();
       if (/^REQ-(9012|9008|9022)$/i.test(label)) {
         promoteSurfaceRoute(node, "requisition-detail.html", `Open ${label}`);
         return;
@@ -605,7 +533,7 @@ function setupRecordLinkPolish() {
 
   if (routeId === "notifications-center") {
     document.querySelectorAll("h4, span, div").forEach((node) => {
-      const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (node.textContent || "").replace(/\s+/g, " ").trim();
       if (/^(Total Unread|High Priority|Mentioned)$/i.test(label)) {
         promoteSurfaceRoute(node.closest("div.bg-surface, div.bg-danger-bg") || node, "notification-detail-panel.html", `Open ${label}`);
         return;
@@ -618,12 +546,12 @@ function setupRecordLinkPolish() {
 
   if (routeId === "daily-updates-workspace") {
     document.querySelectorAll("h4, span, div").forEach((node) => {
-      const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (node.textContent || "").replace(/\s+/g, " ").trim();
       if (/^(Updates Submitted|Pending Review)$/i.test(label)) {
         promoteSurfaceRoute(node.closest("div.bg-surface") || node, "daily-update-detail-panel.html", `Open ${label}`);
         return;
       }
-      if (/^(UX Designer \\(REQ-9102\\)|Backend Lead \\(REQ-8771\\)|Marketing Director \\(REQ-9011\\)|DevOps Engineer \\(REQ-8920\\))$/i.test(label)) {
+      if (/^(UX Designer \(REQ-9102\)|Backend Lead \(REQ-8771\)|Marketing Director \(REQ-9011\)|DevOps Engineer \(REQ-8920\))$/i.test(label)) {
         promoteSurfaceRoute(node, "daily-update-detail-panel.html", `Open ${label}`);
       }
     });
@@ -631,14 +559,14 @@ function setupRecordLinkPolish() {
 
   if (routeId === "pipeline-board") {
     document.querySelectorAll("p, button, div").forEach((node) => {
-      const label = (node.textContent || "").replace(/\\s+/g, " ").trim();
+      const label = (node.textContent || "").replace(/\s+/g, " ").trim();
       if (/^(Alex Mercer|Sarah Chen|David Jones|Omar Farooq|Elena Rostova|Kunal Patel)$/i.test(label)) {
         promoteSurfaceRoute(node, "candidate-review-drawer.html", `Open ${label}`);
       }
     });
 
     document.querySelectorAll('div[class*="w-[300px]"]').forEach((column) => {
-      const stageName = (column.querySelector("h3")?.textContent || "").replace(/\\s+/g, " ").trim();
+      const stageName = (column.querySelector("h3")?.textContent || "").replace(/\s+/g, " ").trim();
       if (!stageName) return;
       const addButton = column.querySelector(":scope > div button");
       if (!addButton) return;
@@ -647,23 +575,7 @@ function setupRecordLinkPolish() {
   }
 }
 
-function setupContextualActionToasts(scope = document) {
-  const actionMatchers = [
-    { pattern: /export/i, title: "Export prepared", body: "This export action is staged cleanly and ready for backend delivery." },
-    { pattern: /insights/i, title: "Insights panel", body: "This analytics action can now be wired without reworking the page chrome." },
-    { pattern: /manage stages/i, title: "Stage controls", body: "Stage configuration is preserved and ready for workflow settings APIs." },
-    { pattern: /^role$|^location$|^owner$|^stage$|^readiness$|stale status/i, title: "Filter staged", body: "This filter control is now behaving like a live entry point for future API-backed filtering." },
-  ];
-
-  scope.querySelectorAll("button").forEach((button) => {
-    if (button.dataset.toast || button.dataset.route || button.closest("form")) return;
-    const label = (button.textContent || button.getAttribute("aria-label") || "").trim();
-    const match = actionMatchers.find((entry) => entry.pattern.test(label));
-    if (!match) return;
-    button.dataset.toastTitle = match.title;
-    button.dataset.toast = match.body;
-  });
-}
+function setupContextualActionToasts() {}
 
 function setupWorkflowActionPolish() {
   const routeId = document.body?.dataset.routeId || "";
@@ -672,26 +584,12 @@ function setupWorkflowActionPolish() {
     document.querySelectorAll("button").forEach((button) => {
       const label = getActionLabel(button);
       if (/save draft/.test(label)) {
-        button.dataset.toastTitle = "Evaluation draft saved";
-        button.dataset.toast = "Your screening notes are staged locally and ready for workflow persistence once APIs are connected.";
+        button.dataset.toastTitle = "Draft saved";
+        button.dataset.toast = "Your screening notes are saved.";
       }
       if (/submit evaluation/.test(label)) {
-        button.dataset.toastTitle = "Evaluation staged";
-        button.dataset.toast = "This screening decision is ready to move into reviewer and stage-transition workflows.";
-      }
-    });
-  }
-
-  if (routeId === "daily-updates-workspace") {
-    document.querySelectorAll("button").forEach((button) => {
-      const label = getActionLabel(button);
-      if (/save draft/.test(label)) {
-        button.dataset.toastTitle = "Draft saved";
-        button.dataset.toast = "Your update draft is staged cleanly and ready for persistence once the reporting APIs are wired.";
-      }
-      if (/submit update/.test(label)) {
-        button.dataset.toastTitle = "Update staged";
-        button.dataset.toast = "This daily update is ready to enter the reviewer queue and downstream reporting workflows.";
+        button.dataset.toastTitle = "Evaluation submitted";
+        button.dataset.toast = "Your decision has been recorded.";
       }
     });
   }
@@ -700,50 +598,8 @@ function setupWorkflowActionPolish() {
     document.querySelectorAll("button").forEach((button) => {
       const label = getActionLabel(button);
       if (/skip for now/.test(label)) {
-        button.dataset.toastTitle = "Review deferred";
-        button.dataset.toast = "This duplicate case is intentionally deferred and can be re-queued without losing review context.";
-      }
-    });
-  }
-
-  if (routeId === "location-management") {
-    document.querySelectorAll("button").forEach((button) => {
-      const label = getActionLabel(button);
-      if (/archive/.test(label)) {
-        button.dataset.toastTitle = "Archive staged";
-        button.dataset.toast = "This location archive action is preserved with a safe confirmation point before live admin APIs are connected.";
-      }
-    });
-  }
-
-  if (routeId === "user-management") {
-    document.querySelectorAll("button").forEach((button) => {
-      const label = getActionLabel(button);
-      if (/suspend|reset password|resend invite/.test(label)) {
-        button.dataset.toastTitle = "Account action staged";
-        button.dataset.toast = "This user lifecycle action is ready to connect to account management APIs without changing the admin flow.";
-      }
-      if (/more actions/.test(label)) {
-        button.dataset.toastTitle = "Action menu staged";
-        button.dataset.toast = "This user action menu is ready for lifecycle controls like reset password, resend invite, and suspension.";
-      }
-      if (/more filters/.test(label)) {
-        button.dataset.toastTitle = "Advanced filters staged";
-        button.dataset.toast = "These user filters are ready to connect to role, location, and status-based directory queries.";
-      }
-    });
-  }
-
-  if (routeId === "role-management") {
-    document.querySelectorAll("button").forEach((button) => {
-      const label = getActionLabel(button);
-      if (/duplicate/.test(label)) {
-        button.dataset.toastTitle = "Role template staged";
-        button.dataset.toast = "This duplicate action is ready to spin up a new role template without changing the permissions workflow.";
-      }
-      if (/audit log/.test(label)) {
-        button.dataset.toastTitle = "Audit history staged";
-        button.dataset.toast = "This audit entry point is ready for permission history and governance trail APIs.";
+        button.dataset.toastTitle = "Skipped";
+        button.dataset.toast = "This case will stay in the review queue.";
       }
     });
   }
@@ -847,12 +703,12 @@ function setupOverlayContextPolish() {
   if (!surface) return;
 
   const routeId = document.body?.dataset.routeId || "";
-  const routeTitle = (document.body.dataset.routeTitle || "").replace(/\\s+/g, " ").trim();
-  const parentTitle = (document.body.dataset.parentTitle || "").replace(/\\s+/g, " ").trim();
+  const routeTitle = (document.body.dataset.routeTitle || "").replace(/\s+/g, " ").trim();
+  const parentTitle = (document.body.dataset.parentTitle || "").replace(/\s+/g, " ").trim();
   const titleNodes = Array.from(document.querySelectorAll("[data-shell-page-title], [data-shell-focus-title]"));
   const shellFocusCopyNode = document.querySelector("[data-shell-focus-copy]");
-  const normalize = (value) => value.replace(/\\s+/g, " ").trim().toLowerCase();
-  const authoredShellCopy = (shellFocusCopyNode?.textContent || "").replace(/\\s+/g, " ").trim();
+  const normalize = (value) => value.replace(/\s+/g, " ").trim().toLowerCase();
+  const authoredShellCopy = (shellFocusCopyNode?.textContent || "").replace(/\s+/g, " ").trim();
   const preserveShellMountCopy = Boolean(
     authoredShellCopy
       && /stays mounted on/i.test(authoredShellCopy)
@@ -860,17 +716,17 @@ function setupOverlayContextPolish() {
   );
   const headerSection = surface.querySelector("[data-overlay-section='header']");
   const headerNode = headerSection?.querySelector("h1, h2, h3");
-  const headerHeading = (headerNode?.textContent || "").replace(/\\s+/g, " ").trim();
+  const headerHeading = (headerNode?.textContent || "").replace(/\s+/g, " ").trim();
   const headerCopyNode = headerSection?.querySelector("p");
-  const headerCopy = (headerCopyNode?.textContent || "").replace(/\\s+/g, " ").trim();
+  const headerCopy = (headerCopyNode?.textContent || "").replace(/\s+/g, " ").trim();
   const headerMetaCandidates = Array.from(headerSection?.querySelectorAll("span, div") || [])
-    .map((node) => (node.textContent || "").replace(/\\s+/g, " ").trim())
+    .map((node) => (node.textContent || "").replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .filter((text) => normalize(text) !== normalize(routeTitle))
     .filter((text) => normalize(text) !== normalize(parentTitle))
     .filter((text) => normalize(text) !== normalize(headerHeading))
     .filter((text) => text.length <= 96)
-    .filter((text) => !/^close(?:\\s+(?:overlay|dialog|drawer|panel))?$/i.test(text));
+    .filter((text) => !/^close(?:\s+(?:overlay|dialog|drawer|panel))?$/i.test(text));
   const headerMeta = headerMetaCandidates[0] || "";
   const usableHeaderCopy = headerCopy
     && normalize(headerCopy) !== normalize(routeTitle)
@@ -881,7 +737,7 @@ function setupOverlayContextPolish() {
       : headerMeta;
 
   const headingCandidates = [headerHeading, ...Array.from(surface.querySelectorAll("h1, h2, h3"))
-    .map((node) => (node.textContent || "").replace(/\\s+/g, " ").trim())
+    .map((node) => (node.textContent || "").replace(/\s+/g, " ").trim())
   ]
     .filter(Boolean)
     .filter((text) => normalize(text) !== normalize(routeTitle))
@@ -891,8 +747,8 @@ function setupOverlayContextPolish() {
   const primaryHeading = headingCandidates[0];
   if (!primaryHeading) return;
 
-  const actionLikeHeading = /\\b(add|create|edit|move|review|reassign|request|configure|history|detail|notification|contact|location|role|user|client|candidate|pipeline|exception)\\b/i.test(primaryHeading);
-  const genericRouteTitle = /\\b(workspace|detail|panel)\\b/i.test(routeTitle);
+  const actionLikeHeading = /\b(add|create|edit|move|review|reassign|request|configure|history|detail|notification|contact|location|role|user|client|candidate|pipeline|exception)\b/i.test(primaryHeading);
+  const genericRouteTitle = /\b(workspace|detail|panel)\b/i.test(routeTitle);
   const routeContainsHeading = normalize(routeTitle).includes(normalize(primaryHeading));
   const headingContainsRoute = normalize(primaryHeading).includes(normalize(routeTitle));
   const meaningfullyDifferentTitle = !routeContainsHeading && !headingContainsRoute;
@@ -920,11 +776,6 @@ function setupOverlayContextPolish() {
 
 function setupGenericActionAnnotations(scope = document) {
   const routeId = document.body?.dataset.routeId || "";
-  const annotate = (control, title, body) => {
-    if (!control || control.dataset.route || control.dataset.toast || control.dataset.overlayClose || control.dataset.validateScope) return;
-    control.dataset.toastTitle = title;
-    control.dataset.toast = body;
-  };
 
   scope.querySelectorAll("button, a[href='javascript:void(0)']").forEach((control) => {
     if (control.closest("form, [data-layout='pagination-controls'], [data-toggle-group]")) return;
@@ -936,7 +787,7 @@ function setupGenericActionAnnotations(scope = document) {
 
     const label = getActionLabel(control);
     const icon = control.querySelector(".material-symbols-outlined")?.textContent?.trim().toLowerCase() || "";
-    const normalized = (label || icon).replace(/\\s+/g, " ").trim().toLowerCase();
+    const normalized = (label || icon).replace(/\s+/g, " ").trim().toLowerCase();
     const insideOverlay = control.closest("[data-overlay-surface]");
 
     if (routeId === "requisition-intake" && normalized === "cancel") {
@@ -945,78 +796,169 @@ function setupGenericActionAnnotations(scope = document) {
     }
     if (routeId === "requisition-intake" && /create requisition/.test(normalized)) {
       control.dataset.validateScope = "#requisition-form";
-      control.dataset.successTitle = "Form state is valid";
-      control.dataset.successText = "This screen now has a consistent client-side guardrail.";
+      control.dataset.successTitle = "Looks good";
+      control.dataset.successText = "All required fields are complete.";
       return;
     }
 
-    if (!normalized && /\\bh-2\\b|rounded-full/.test(String(control.className || ""))) {
-      annotate(control, "Rating updated", "This scoring control is staged for live evaluation data.");
-      return;
-    }
-    if (icon === "more_vert" || /more actions?/.test(normalized)) {
-      annotate(control, "Action menu staged", "This row action menu is ready for live workflow options.");
-      return;
-    }
-    if (icon === "filter_list" || /^filter$|filters?|more filters/.test(normalized)) {
-      annotate(control, "Filter staged", "This filter control is ready for API-backed table slicing.");
-      return;
-    }
-    if (insideOverlay && /save|submit|confirm|approve|review|move|request|create|add|link/.test(normalized)) {
+    if (insideOverlay && !control.closest("form") && !control.id && /save|submit|confirm|approve|review|move|request|create|add|link/.test(normalized)) {
       control.dataset.overlayAction = "validate";
-      return;
-    }
-    if (/info|help/.test(normalized)) {
-      annotate(control, "Help context staged", "This contextual helper is ready for inline guidance content.");
-      return;
-    }
-    if (/active only/.test(normalized) || /^(all|owner changes|contributor changes|strong yes|yes|no|strong no)$/.test(normalized)) {
-      annotate(control, "Selection updated", `${label || "This option"} is now staged as the active choice.`);
-      return;
-    }
-    if (/^(client|location|owner|role|status|priority|region|type)\\b/.test(normalized)) {
-      annotate(control, "Filter staged", `${label || "This filter"} is ready for live filtering.`);
-      return;
-    }
-    if (/retry|select all|view \\d+ more|add note|manage|cancel|invite|continue|save|submit|confirm|create|add|send|schedule|update|link|move|request|approve|review|draft/.test(normalized)) {
-      annotate(control, "Interaction staged", `${label || "This action"} is ready for backend workflow wiring.`);
     }
   });
 }
 
-function injectWorkflowBrief() {
+function setupWorkspaceChrome(scope = document) {
   const routeId = document.body?.dataset.routeId || "";
-  const config = WORKFLOW_BRIEFS[routeId];
-  const host = document.querySelector("[data-demo-validate]");
-  if (!config || !host || host.querySelector(".workflow-brief")) return;
 
-  const brief = document.createElement("section");
-  brief.className = "workflow-brief";
-  brief.innerHTML = `
-    <div class="workflow-brief-header">
-      <div>
-        <div class="workflow-brief-title">${escapeHtml(config.title)}</div>
-        <p class="workflow-brief-copy">${escapeHtml(config.copy)}</p>
-      </div>
-      <div class="workflow-brief-badge">
-        <span class="material-symbols-outlined text-[16px]">insights</span>
-        ${escapeHtml(config.badge)}
-      </div>
-    </div>
-    <ul class="workflow-brief-list">
-      ${config.bullets
-        .map(
-          (item) => `
-            <li>
-              <span class="material-symbols-outlined">arrow_forward</span>
-              <span>${escapeHtml(item)}</span>
-            </li>
-          `,
-        )
-        .join("")}
-    </ul>
-  `;
-  placeAfterLeadHeading(host, brief);
+  scope.querySelectorAll("button").forEach((button) => {
+    if (button.dataset.chromeBound === "true") return;
+    if (button.dataset.route || button.dataset.toast) return;
+    if (button.closest("form, table, [data-layout='pagination-controls'], [role='menu'], .ro-row-menu")) return;
+    if (button.getAttribute("aria-haspopup") === "menu") return;
+    const label = getActionLabel(button);
+    const icon = button.querySelector(".material-symbols-outlined")?.textContent?.trim().toLowerCase() || "";
+    const isExport = /export/.test(label) || (icon === "download" && /export|list/.test(label));
+    const isRefresh = /^(refresh|reload)/.test(label.replace(icon, "").trim()) || (icon === "refresh" && /refresh|reload/.test(label));
+    const isFilter = /^(filter|filters)$/.test(label.replace(/filter_list/g, "").trim());
+    const isSaveView = /save view/.test(label);
+    if (!isExport && !isRefresh && !isFilter && !isSaveView) return;
+    button.dataset.chromeBound = "true";
+    if (!button.getAttribute("type")) button.setAttribute("type", "button");
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (isExport) {
+        exportWorkspaceAsCsv();
+        return;
+      }
+      if (isRefresh) {
+        showToast("Refreshing", "Reloading this view.");
+        window.location.reload();
+        return;
+      }
+      if (isFilter) {
+        if (routeId === "role-dashboard") {
+          const rows = Array.from(document.querySelectorAll("[data-live-workflow-row]"));
+          if (!rows.length) {
+            button.hidden = true;
+            showToast("Queue is clear", "There is nothing to filter.");
+            return;
+          }
+          const modes = ["all", "high", "overdue"];
+          const next = modes[(modes.indexOf(button.dataset.filterMode || "all") + 1) % modes.length];
+          button.dataset.filterMode = next;
+          rows.forEach((row) => {
+            const text = (row.textContent || "").toLowerCase();
+            row.hidden = next === "high"
+              ? !/high|urgent|critical/.test(text)
+              : next === "overdue"
+                ? !/overdue|past due/.test(text)
+                : false;
+          });
+          showToast("Queue filtered", next === "all" ? "Showing all signals." : `Showing ${next} items.`);
+          return;
+        }
+        const surface = document.querySelector("[data-layout='table-surface']") || document.querySelector(".workspace-surface");
+        const toolbar = document.querySelector("[data-layout='filter-toolbar']")
+          || (typeof findFilterToolbar === "function" ? findFilterToolbar(surface) : null);
+        const firstControl = toolbar?.querySelector("select, input[type='text'], input:not([type])");
+        if (firstControl) {
+          firstControl.focus();
+          showToast("Filters", "Use the fields above the list to narrow results.");
+          return;
+        }
+        const dateChip = button.parentElement?.querySelector(".rounded-lg, span");
+        const periods = ["Last 7 days", "Last 30 days", "Last 90 days"];
+        const chipText = (dateChip?.textContent || "").replace(/\s+/g, " ").trim();
+        const currentMatch = chipText.match(/Last \d+ days/i);
+        const current = currentMatch ? currentMatch[0] : "";
+        const currentIndex = periods.findIndex((period) => period.toLowerCase() === current.toLowerCase());
+        const nextPeriod = periods[(currentIndex + 1) % periods.length];
+        if (dateChip && current) {
+          const labelNode = Array.from(dateChip.querySelectorAll("span")).find((span) => /last \d+ days/i.test(span.textContent || ""));
+          if (labelNode) labelNode.textContent = nextPeriod;
+          else dateChip.innerHTML = dateChip.innerHTML.replace(/Last \d+ days/i, nextPeriod);
+          showToast("Range updated", nextPeriod);
+          return;
+        }
+        showToast("No extra filters", "This view is already using its default range.");
+        return;
+      }
+      if (isSaveView) {
+        const key = `recruitops:saved-view:${routeId || "page"}`;
+        try {
+          localStorage.setItem(key, JSON.stringify({ url: window.location.href, savedAt: new Date().toISOString() }));
+          showToast("View saved", "This layout is remembered in this browser.");
+        } catch (error) {
+          showToast("Could not save view", "Browser storage is unavailable.");
+        }
+      }
+    });
+  });
+
+  scope.querySelectorAll("label").forEach((label) => {
+    if (!/compare locations/i.test(label.textContent || "")) return;
+    const checkbox = label.querySelector("input[type='checkbox']");
+    if (!checkbox || checkbox.dataset.chromeBound === "true") return;
+    checkbox.dataset.chromeBound = "true";
+    checkbox.addEventListener("change", () => {
+      document.querySelector(".workspace-surface")?.classList.toggle("is-comparing-locations", checkbox.checked);
+      showToast(checkbox.checked ? "Comparing locations" : "Single view", checkbox.checked
+        ? "Location series are shown together."
+        : "Location comparison is off.");
+    });
+  });
+
+  const viewToggle = Array.from(scope.querySelectorAll("button")).filter((button) => /^(calendar|list)$/.test(getActionLabel(button).replace(/calendar_view_week|view_list/g, "").trim()));
+  if (viewToggle.length >= 2) {
+    viewToggle.forEach((button) => {
+      if (button.dataset.viewToggleBound === "true") return;
+      button.dataset.viewToggleBound = "true";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const mode = /calendar/.test(getActionLabel(button)) ? "calendar" : "list";
+        viewToggle.forEach((item) => {
+          const active = item === button;
+          item.classList.toggle("bg-primary-container", active);
+          item.classList.toggle("text-on-primary", active);
+          item.classList.toggle("text-on-surface-variant", !active);
+        });
+        const surface = document.querySelector(".workspace-surface");
+        surface?.setAttribute("data-view-mode", mode);
+        showToast(mode === "calendar" ? "Calendar view" : "List view", "The schedule layout updated.");
+      });
+    });
+  }
+
+  scope.querySelectorAll("button").forEach((button) => {
+    const icon = button.querySelector(".material-symbols-outlined")?.textContent?.trim().toLowerCase() || "";
+    if (icon !== "more_vert" || button.dataset.rowMenuBound === "true" || button.closest("table")) return;
+    if (button.dataset.standaloneMenuBound === "true") return;
+    if (button.closest(".ro-row-menu-host")?.querySelector(":scope > .ro-row-menu, .ro-row-menu")) return;
+    button.dataset.standaloneMenuBound = "true";
+    button.setAttribute("type", "button");
+    button.setAttribute("aria-haspopup", "menu");
+    const host = button.parentElement;
+    if (!host) return;
+    host.classList.add("relative", "ro-row-menu-host");
+    const menu = document.createElement("div");
+    menu.className = "ro-row-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "menu");
+    const fallback = routeId === "meetings" ? "meeting-form-dialog.html" : routeId === "follow-ups" ? "follow-up-form-dialog.html" : "";
+    menu.innerHTML = `<button type="button" role="menuitem" data-route="${fallback}">Open</button>`;
+    host.appendChild(menu);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const willOpen = menu.hidden;
+      closeRowActionMenus(host);
+      menu.hidden = !willOpen;
+      host.classList.toggle("ro-row-menu-open", willOpen);
+    });
+  });
+  if (typeof wireHoverKebabMenus === "function") wireHoverKebabMenus(scope);
 }
 
 function setupHoverMenus(scope = document) {
@@ -1150,7 +1092,7 @@ function markNotificationRead(button) {
   if (!item) return;
   item.classList.add("notification-read");
   button.setAttribute("disabled", "disabled");
-  showToast("Notification updated", "This alert is now marked as read in the frontend workflow.");
+  showToast("Got it", "This event is in Seen. Open What happened if you want the details again.");
 }
 
 document.addEventListener("click", (event) => {
@@ -1174,7 +1116,7 @@ function setupResumeUploadWorkspace() {
       const fileLabel = item.querySelector(".font-data-tabular")?.textContent?.trim() || "Selected resume";
       const statusLabel = item.querySelector(".font-label-caps")?.textContent?.trim() || "READY FOR REVIEW";
       if (headerTitle) {
-        headerTitle.textContent = fileLabel.replace(/\\.[^.]+$/, "").slice(0, 22) || fileLabel;
+        headerTitle.textContent = fileLabel.replace(/\.[^.]+$/, "").slice(0, 22) || fileLabel;
       }
       if (confidenceText) {
         confidenceText.textContent = `Current queue selection: ${statusLabel.toLowerCase()}. Review extracted details before moving forward.`;
@@ -1218,12 +1160,12 @@ function setupMyWorkWorkspace() {
       item.classList.toggle("is-task-complete", checkbox.checked);
       item.setAttribute("aria-checked", checkbox.checked ? "true" : "false");
       if (notify) {
-        const label = (labelNode?.textContent || "Follow-up").replace(/\\s+/g, " ").trim();
+        const label = (labelNode?.textContent || "Follow-up").replace(/\s+/g, " ").trim();
         showToast(
           checkbox.checked ? "Follow-up completed" : "Follow-up reopened",
           checkbox.checked
-            ? `${label} is marked done for this workspace session.`
-            : `${label} is back in your active follow-up list.`,
+            ? `${label} is done.`
+            : `${label} is back on your list.`,
         );
       }
     };
@@ -1248,7 +1190,7 @@ function setupRecoveryUtilities() {
       /copy request id/i.test(button.getAttribute("aria-label") || ""),
     );
     const requestId = Array.from(document.querySelectorAll("span"))
-      .find((node) => /REQ-\\d{8}/.test(node.textContent || ""))
+      .find((node) => /REQ-\d{8}/.test(node.textContent || ""))
       ?.textContent?.trim();
 
     if (copyButton && requestId) {
@@ -1280,12 +1222,8 @@ function setupRecoveryUtilities() {
     document.querySelectorAll("a[href='javascript:void(0)']").forEach((link) => {
       const label = getActionLabel(link);
       if (/internal documentation/.test(label)) {
-        link.dataset.toastTitle = "Documentation handoff";
-        link.dataset.toast = "This knowledge entry point is ready to connect to internal runbooks or a searchable help center.";
       }
       if (/system health status/.test(label)) {
-        link.dataset.toastTitle = "Health status";
-        link.dataset.toast = "This status surface is staged for live operational telemetry, incident messaging, and escalation updates.";
       }
     });
   }
@@ -1294,12 +1232,8 @@ function setupRecoveryUtilities() {
     document.querySelectorAll("a[href='javascript:void(0)']").forEach((link) => {
       const label = getActionLabel(link);
       if (/documentation registry/.test(label)) {
-        link.dataset.toastTitle = "Documentation registry";
-        link.dataset.toast = "This recovery link is ready for internal docs, release notes, and route ownership guidance.";
       }
       if (/platform status dashboard/.test(label)) {
-        link.dataset.toastTitle = "Platform status";
-        link.dataset.toast = "This recovery link is staged for live incident status, maintenance notices, and service health telemetry.";
       }
     });
   }
@@ -1307,60 +1241,17 @@ function setupRecoveryUtilities() {
 
 function setupApprovalsWorkspace() {
   if (document.body?.dataset.routeId !== "approvals-inbox") return;
-  const table = document.querySelector("table");
   const rows = Array.from(document.querySelectorAll("tbody tr")).filter(
     (row) => !row.classList.contains("table-empty-state-row") && !row.querySelector(".ro-empty"),
   );
-  if (!table || rows.length === 0 || document.querySelector("[data-approval-summary]")) return;
-
-  const summary = document.createElement("section");
-  summary.className = "decision-summary";
-  summary.setAttribute("data-approval-summary", "true");
-  summary.innerHTML = `
-    <div class="decision-summary-header">
-      <div>
-        <div class="decision-summary-title">Current review focus</div>
-        <p class="decision-summary-copy" data-approval-summary-copy>Pick an approval row to keep the decision context visible before you open the drawer.</p>
-      </div>
-      <div class="decision-summary-actions">
-        <button type="button" data-route="approval-review-drawer.html">Open review drawer</button>
-      </div>
-    </div>
-    <div class="decision-summary-meta" data-approval-summary-meta></div>
-  `;
-
-  table.parentElement.parentElement.insertBefore(summary, table.parentElement);
-  const copyNode = summary.querySelector("[data-approval-summary-copy]");
-  const metaNode = summary.querySelector("[data-approval-summary-meta]");
-
-  const activateRow = (row) => {
-    rows.forEach((item) => item.classList.remove("is-active-record"));
-    row.classList.add("is-active-record");
-    const cells = row.querySelectorAll("td");
-    const sla = cells[0]?.textContent?.replace(/\\s+/g, " ").trim() || "Standard";
-    const requestType = cells[1]?.textContent?.replace(/\\s+/g, " ").trim() || "Approval";
-    const relatedRecord = cells[2]?.textContent?.replace(/\\s+/g, " ").trim() || "Record unavailable";
-    const requester = cells[3]?.textContent?.replace(/\\s+/g, " ").trim() || "Requester unavailable";
-    if (copyNode) {
-      copyNode.textContent = `${requestType} is active. Review ${relatedRecord} and ${requester} together before you decide.`;
-    }
-    if (metaNode) {
-      metaNode.innerHTML = `
-        <span class="decision-summary-pill"><span class="material-symbols-outlined text-[14px]">priority_high</span>${sla}</span>
-        <span class="decision-summary-pill"><span class="material-symbols-outlined text-[14px]">fact_check</span>${requestType}</span>
-        <span class="decision-summary-pill"><span class="material-symbols-outlined text-[14px]">link</span>${relatedRecord}</span>
-      `;
-    }
-  };
-
+  if (!rows.length) return;
   rows.forEach((row) => {
     row.addEventListener("click", (event) => {
       if (event.target.closest("button, a, select, input")) return;
-      activateRow(row);
+      rows.forEach((item) => item.classList.remove("is-active-record"));
+      row.classList.add("is-active-record");
     });
   });
-
-  activateRow(rows[0]);
 }
 
 function setupDuplicateResolutionWorkspace() {
@@ -1410,7 +1301,7 @@ function setupDuplicateResolutionWorkspace() {
 
     confirmButton.disabled = false;
     confirmButton.classList.remove("opacity-60", "cursor-not-allowed");
-    const label = selected.closest("label")?.textContent?.replace(/\\s+/g, " ").trim() || "Resolution selected";
+    const label = selected.closest("label")?.textContent?.replace(/\s+/g, " ").trim() || "Resolution selected";
     confirmButton.dataset.duplicateResolutionLabel = label;
     if (copyNode) {
       copyNode.textContent = `${label} is selected. Confirm when you're comfortable with the duplicate reasoning and downstream impact.`;
@@ -1445,11 +1336,8 @@ function ensureDecisionSummary(host, key, title, copy) {
     </div>
     <div class="decision-summary-meta"></div>
   `;
-  if (host.matches?.("[data-overlay-surface='true']")) {
-    host.prepend(summary);
-  } else {
-    placeAfterLeadHeading(host, summary);
-  }
+  /* Kept detached: the summary object still drives confirm-button state,
+     but the coaching panel itself is no longer rendered inside overlays. */
   return summary;
 }
 
@@ -1473,45 +1361,6 @@ function setActionEnabled(button, enabled) {
   button.disabled = !enabled;
   button.classList.toggle("opacity-60", !enabled);
   button.classList.toggle("cursor-not-allowed", !enabled);
-}
-
-function injectOverlayBrief() {
-  const routeId = document.body?.dataset.routeId || "";
-  const config = OVERLAY_BRIEFS[routeId];
-  const host = document.querySelector("[data-overlay-surface='true']");
-  if (!config || !host || host.querySelector("[data-overlay-brief='true']")) return;
-
-  const brief = document.createElement("section");
-  brief.className = "decision-summary";
-  brief.setAttribute("data-overlay-brief", "true");
-  brief.innerHTML = `
-    <div class="decision-summary-header">
-      <div>
-        <div class="decision-summary-title">${config.title}</div>
-        <p class="decision-summary-copy">${config.copy}</p>
-      </div>
-    </div>
-    <div class="decision-summary-meta">
-      ${config.pills
-        .map(
-          (pill) => `
-            <span class="decision-summary-pill">
-              <span class="material-symbols-outlined text-[14px]">insights</span>
-              ${pill}
-            </span>
-          `,
-        )
-        .join("")}
-    </div>
-  `;
-
-  const contentHost =
-    host.querySelector(".flex-1.overflow-y-auto") ||
-    host.querySelector(".p-gutter.overflow-y-auto") ||
-    host.querySelector(".p-inset-card.flex.flex-col") ||
-    host.querySelector(".p-gutter.flex.flex-col") ||
-    host;
-  contentHost.prepend(brief);
 }
 
 function setupExceptionRequestOverlay() {
@@ -1548,8 +1397,6 @@ function setupExceptionRequestOverlay() {
 
   if (changeButton) {
     changeButton.type = "button";
-    changeButton.dataset.toastTitle = "Approver routing preserved";
-    changeButton.dataset.toast = "The approver picker can be wired here without changing the dialog structure.";
   }
 
   textarea.addEventListener("input", sync);
@@ -1560,7 +1407,6 @@ function setupExceptionRequestOverlay() {
 const DEFAULT_PIPELINE_FLOW = ["Sourced", "Screening", "Technical Interview", "Executive Review", "Offer"];
 
 function setupOverlayWorkflows() {
-  injectOverlayBrief();
   setupExceptionRequestOverlay();
   setupStageMoveOverlay();
   setupReassignOwnerOverlay();
@@ -1665,9 +1511,14 @@ function markIfUnset(node, layout) {
 
 function markFilterToolbar(toolbar) {
   if (!toolbar || toolbar.dataset.layout) return;
-  if (toolbar.querySelector("table, form, textarea")) return;
+  if (toolbar.closest("[data-overlay-surface='true'], .overlay-host")) return;
+  if (toolbar.querySelector("table, form, textarea, h1, h2, h3, p.font-semibold")) return;
+  const hasSearch = toolbar.querySelector("input[placeholder*='Search'], input[placeholder*='Filter'], input[type='search']");
+  const selectCount = toolbar.querySelectorAll("select").length;
+  const hasFilterControl = hasSearch || selectCount >= 2;
+  if (!hasFilterControl) return;
   const controls = toolbar.querySelectorAll("input:not([type='hidden']), select, button, a[href]");
-  if (controls.length < 2 && !toolbar.querySelector("input[placeholder*='Search'], select")) return;
+  if (controls.length < 2 && !hasSearch) return;
   markIf(toolbar, "filter-toolbar");
   const directGroups = Array.from(toolbar.children).filter((child) => child.querySelector?.("input:not([type='hidden']), select, button, a[href]"));
   if (directGroups.length > 1) {
@@ -1706,7 +1557,8 @@ function setupDenseWorkspaceLayouts() {
 
   if (routeId === "pipeline-board") {
     const topSection = surface.querySelector(":scope > div:first-of-type");
-    const toolbarActions = topSection?.querySelector(":scope > div.flex.gap-2");
+    const headerRow = topSection?.querySelector(":scope > div.flex.items-center, :scope > div.flex.justify-between");
+    const toolbarActions = headerRow?.querySelector(":scope > div.flex.gap-2") || topSection?.querySelector(":scope div.flex.gap-2");
     const filterBar = topSection?.querySelector(":scope > div.flex.gap-3");
     const boardScroll = topSection?.nextElementSibling;
     const title = topSection?.querySelector("h2");
@@ -1714,7 +1566,7 @@ function setupDenseWorkspaceLayouts() {
       const subtitle = document.createElement("p");
       subtitle.className = "pipeline-toolbar-subtitle";
       subtitle.textContent = "Track candidates across active stages and keep movement actions close to the board.";
-      title.insertAdjacentElement("afterend", subtitle);
+      (headerRow || title).insertAdjacentElement("afterend", subtitle);
     }
     markIf(topSection, "pipeline-toolbar");
     markIf(toolbarActions, "pipeline-toolbar-actions");
@@ -1951,6 +1803,10 @@ function setupWorkspaceVisualPolish() {
   }
 
   const surface = resolveWorkspaceSurface(host);
+  surface?.querySelectorAll('[role="tablist"], .flex:has(> [role="tab"])').forEach((el) => {
+    el.dataset.toggleGroup = "true";
+  });
+
   const topSections = Array.from(surface?.children || []).filter((el) => el.nodeType === 1);
   const titlebar = topSections.find((el) => {
     if (el.dataset.layout || el.querySelector("table, form, #right-rail")) return false;
@@ -1969,21 +1825,19 @@ function setupWorkspaceVisualPolish() {
   }
 
   surface?.querySelectorAll("div").forEach((candidate) => {
-    if (candidate === titlebar || candidate.closest("[data-overlay-surface='true'], .overlay-host, table, form, [data-layout='page-titlebar']")) return;
+    if (candidate === titlebar || candidate.closest("[data-overlay-surface='true'], .overlay-host, table, form, [data-layout='page-titlebar'], [data-layout='pipeline-toolbar'], [data-layout='pipeline-filter-bar'], [data-layout='pipeline-toolbar-actions']")) return;
+    if (candidate.dataset.layout) return;
     if (candidate.parentElement?.closest("[data-layout='filter-toolbar']")) return;
     if (candidate.querySelector("h1, h2, h3")) return;
     const rect = candidate.getBoundingClientRect();
     if (rect.height <= 0 || rect.height > 180) return;
-    const hasFilterControl = candidate.querySelector("input[placeholder*='Search'], select");
-    const directButtons = Array.from(candidate.children).filter((child) => child.matches?.("button, a") || child.querySelector?.(":scope > button, :scope > a"));
-    if (!hasFilterControl && candidate.parentElement?.querySelector(":scope > div h1, :scope > div h2, :scope > div h3")) return;
-    if (hasFilterControl || directButtons.length >= 2) {
-      markFilterToolbar(candidate);
-    }
+    const hasFilterControl = candidate.querySelector("input[placeholder*='Search'], input[placeholder*='Filter'], input[type='search'], select");
+    if (!hasFilterControl) return;
+    markFilterToolbar(candidate);
   });
 
   const sidebarCta = document.querySelector(".sidebar-cta-link");
-  const normalizeCta = (text) => (text || "").replace(/\\s+/g, " ").trim().toLowerCase().replace(/^[a-z0-9_]+ /, "");
+  const normalizeCta = (text) => (text || "").replace(/\s+/g, " ").trim().toLowerCase().replace(/^[a-z0-9_]+ /, "");
   const sideLabel = normalizeCta(sidebarCta?.textContent);
   if (sideLabel) {
     const surface = resolveWorkspaceSurface(host);
@@ -2012,11 +1866,11 @@ function setupMarketingInteractions() {
     : "";
   const onboardingWelcomeHref = `${routePrefix}onboarding-welcome.html`;
   const routeMap = [
-    { pattern: /step\\s*1|define|strategy|plan/i, href: "product-tour-plan-strategy.html" },
-    { pattern: /step\\s*2|ownership|accountability|assign/i, href: "product-tour-assign-ownership.html" },
-    { pattern: /step\\s*3|candidate movement|move candidates|pipeline/i, href: "product-tour-move-candidates.html" },
-    { pattern: /step\\s*4|exception|governance|resolve/i, href: "product-tour-resolve-exceptions.html" },
-    { pattern: /step\\s*5|report|progress|data/i, href: "product-tour-report-progress.html" },
+    { pattern: /step\s*1|define|strategy|plan/i, href: "product-tour-plan-strategy.html" },
+    { pattern: /step\s*2|ownership|accountability|assign/i, href: "product-tour-assign-ownership.html" },
+    { pattern: /step\s*3|candidate movement|move candidates|pipeline/i, href: "product-tour-move-candidates.html" },
+    { pattern: /step\s*4|exception|governance|resolve/i, href: "product-tour-resolve-exceptions.html" },
+    { pattern: /step\s*5|report|progress|data/i, href: "product-tour-report-progress.html" },
   ];
 
   document.querySelectorAll(".landing-canvas :is(section, header, main, footer, article), .landing-canvas > :is(div, nav)").forEach((node, index) => {
@@ -2029,12 +1883,7 @@ function setupMarketingInteractions() {
     if (/product tour|^product$|tour/i.test(label) && href === "javascript:void(0)") {
       link.setAttribute("href", "product-tour.html");
     }
-    if (/book demo/i.test(label)) {
-      link.setAttribute("href", "javascript:void(0)");
-      link.dataset.toastTitle = "Demo request staged";
-      link.dataset.toast = "This public CTA is ready for CRM or calendar scheduling integration.";
-    }
-    if (/start free trial|get started/i.test(label)) {
+    if (/start free trial|get started|sign up/i.test(label)) {
       link.setAttribute("href", onboardingWelcomeHref);
     }
     const step = routeMap.find((entry) => entry.pattern.test(label));
@@ -2050,17 +1899,14 @@ function setupMarketingInteractions() {
 
   document.querySelectorAll("button:not([data-route])").forEach((button) => {
     const label = getActionLabel(button);
-    if (/start free trial|get started/i.test(label)) {
+    if (/start free trial|get started|sign up/i.test(label)) {
       button.dataset.route = onboardingWelcomeHref;
-    } else if (/book demo/i.test(label)) {
-      button.dataset.toastTitle = "Demo request staged";
-      button.dataset.toast = "This public CTA is ready for CRM or calendar scheduling integration.";
     }
   });
 
   document.querySelectorAll(".landing-canvas :is(article, section, div)").forEach((node) => {
     if (node.querySelector("a, button") || node.closest("a, button")) return;
-    const text = (node.textContent || "").replace(/\\s+/g, " ").trim();
+    const text = (node.textContent || "").replace(/\s+/g, " ").trim();
     const step = routeMap.find((entry) => entry.pattern.test(text));
     const rect = node.getBoundingClientRect();
     if (!step || rect.width < 120 || rect.height < 60 || rect.height > 360) return;
@@ -2126,18 +1972,18 @@ function setupOnboardingInteractions() {
     Array.from(document.querySelectorAll("button")).forEach((button) => {
       const label = getActionLabel(button);
       if (/add location/i.test(label)) {
-        button.addEventListener("click", () => showToast("Location staged", "This location is ready for onboarding setup persistence."));
+        button.addEventListener("click", () => showToast("Location added", "It will be included in your workspace."));
       }
       if (/import locations/i.test(label)) {
-        button.addEventListener("click", () => showToast("Import staged", "Bulk location import is ready for file upload wiring."));
+        button.addEventListener("click", () => showToast("Import started", "Choose a file to import your locations."));
       }
       if (/edit/.test(label)) {
-        button.dataset.toastTitle = "Location edit staged";
-        button.dataset.toast = "The selected onboarding location is ready for edit-mode wiring.";
+        button.dataset.toastTitle = "Location updated";
+        button.dataset.toast = "Your changes have been recorded.";
       }
       if (/delete/.test(label)) {
-        button.dataset.toastTitle = "Location removal staged";
-        button.dataset.toast = "The selected onboarding location can be removed once persistence is connected.";
+        button.dataset.toastTitle = "Location removed";
+        button.dataset.toast = "It is no longer part of your setup.";
       }
     });
   }
@@ -2284,7 +2130,7 @@ function runLoginDemo(form) {
       submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin-slow text-[20px]">sync</span><span>Connecting...</span>';
     }
 
-    showToast("Authentication succeeded", "The frontend lifecycle is ready for real auth wiring.");
+    showToast("Signed in", "Taking you to your dashboard.");
     window.setTimeout(() => {
       window.location.href = "role-dashboard.html";
     }, 900);
@@ -2316,7 +2162,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupLogoutLinks();
   setupMarketingInteractions();
   setupOnboardingInteractions();
-  injectWorkflowBrief();
   setupResumeUploadWorkspace();
   setupDailyUpdatesWorkspace();
   setupMyWorkWorkspace();
@@ -2329,11 +2174,14 @@ document.addEventListener("DOMContentLoaded", () => {
   setupWorkspaceVisualPolish();
   setupToggleGroups(document);
   setupTableControlPolish();
+  if (typeof refreshWorkspacePagers === "function") refreshWorkspacePagers();
   setupAdvancedFilterPanels(document);
   setupSortableTables(document);
   setupRecordLinkPolish();
   setupGenericActionAnnotations(document);
+  setupWorkspaceChrome(document);
   setupSidebarNav();
+  setupVisualPassChrome();
   setupRoutePrefetcher();
   injectDensityToggle();
   applyDensityPreference(readDensityPreference());
@@ -2373,20 +2221,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   attachKeyboardShortcuts();
   attachShortcutHint();
+  upgradeBrandMarks();
 
   document.querySelectorAll("[data-toggle-group]").forEach((group) => {
     group.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button || !group.contains(button)) return;
       toggleActiveWithin(group, button);
-      const label = (button.textContent || "").trim();
-      const lensResult = applyTableLens(group, button);
-      if (label) {
-        const suffix = lensResult
-          ? ` Showing ${lensResult.visibleCount} of ${lensResult.totalCount} records.`
-          : "";
-        showToast("View updated", `${label} is now the active lens for this workspace.${suffix}`);
-      }
+      applyTableLens(group, button);
     });
   });
 
@@ -2408,38 +2250,70 @@ document.addEventListener("DOMContentLoaded", () => {
         runLoginDemo(form);
         return;
       }
+      if (form.id === "profile-details-form" || form.id === "profile-password-form") {
+        return;
+      }
       if (validateForm(form)) {
         if (window.RecruitOpsLive && window.RecruitOpsLive.handleFormSubmit && window.RecruitOpsLive.handleFormSubmit(form)) {
           return;
         }
-        showToast("Form state is valid", "This screen now has a consistent client-side guardrail.");
+        showToast("Looks good", "All required fields are complete.");
       }
     });
   });
 
   document.addEventListener("click", (event) => {
     const dismissTarget = event.target.closest("[data-overlay-close]");
-    if (dismissTarget && closeHref && document.body.dataset.overlayPage === "true") {
+    if (dismissTarget) {
       event.preventDefault();
-      window.location.href = closeHref;
+      if (typeof closeInPageOverlay === "function" && closeInPageOverlay()) return;
+      if (closeHref && document.body.dataset.overlayPage === "true") {
+        window.location.href = closeHref;
+      }
       return;
     }
 
     const button = event.target.closest("button, a");
     if (!button) {
       closeOpenMenus();
+      if (typeof closeRowActionMenus === "function") closeRowActionMenus();
+      /* Rows/cells promoted to routes (role="button" surfaces) lose their
+         listeners when live loaders clone them — handle them here. */
+      if (!event.target.closest("input, select, textarea, label")) {
+        const routedSurface = event.target.closest("[data-route]");
+        if (routedSurface?.dataset.route) {
+          event.preventDefault();
+          navigateToRoute(routedSurface.dataset.route);
+        }
+      }
       return;
     }
-    if (!button.closest(".menu-open")) {
+    if (!button.closest(".menu-open") && !button.closest(".ro-row-menu-host")) {
       closeOpenMenus();
+      if (typeof closeRowActionMenus === "function") closeRowActionMenus();
     }
 
     if (mobileDialog?.open && button.closest("#mobile-nav a[href]")) {
       closeMobileNav(mobileDialog);
     }
 
+    if (button.dataset.editRecord) {
+      event.preventDefault();
+      if (typeof closeRowActionMenus === "function") closeRowActionMenus();
+      if (typeof invokeRowEdit === "function") invokeRowEdit(button.closest("tr"));
+      return;
+    }
+
+    if (button.dataset.rowAction) {
+      event.preventDefault();
+      if (typeof closeRowActionMenus === "function") closeRowActionMenus();
+      if (typeof invokeRowAction === "function") invokeRowAction(button.closest("tr"), button.dataset.rowAction);
+      return;
+    }
+
     if (button.dataset.route) {
       event.preventDefault();
+      if (typeof closeRowActionMenus === "function") closeRowActionMenus();
       navigateToRoute(button.dataset.route);
       return;
     }
@@ -2468,7 +2342,6 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         event.preventDefault();
-        showToast("Reference action captured", "This placeholder action has been preserved safely and is ready for API or workflow wiring.");
         return;
       }
       const internalRoute = normalizeInternalRoute(href);
@@ -2485,10 +2358,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const contextualRoute = resolveContextualRoute(button);
-    if (contextualRoute) {
-      event.preventDefault();
-      navigateToRoute(contextualRoute);
+    // Do not guess routes from labels at click time. Known CTAs are stamped
+    // with data-route on load; everything else must have an explicit handler.
+    if (button.getAttribute("aria-haspopup") === "menu" || button.closest("[data-layout='pagination-controls']")) {
       return;
     }
 
@@ -2497,6 +2369,25 @@ document.addEventListener("DOMContentLoaded", () => {
           showToast(button.dataset.toastTitle || "Saved for later", button.dataset.toast || "");
           return;
         }
+
+    if (button.matches("[data-clear-workspace-filters]")) {
+      event.preventDefault();
+      if (typeof resetWorkspaceFilters === "function") resetWorkspaceFilters(button);
+      return;
+    }
+
+    if (button.dataset.emptyCtaRoute) {
+      event.preventDefault();
+      navigateToRoute(button.dataset.emptyCtaRoute);
+      return;
+    }
+
+    if (button.dataset.emptyCta === "primary") {
+      event.preventDefault();
+      const addButton = document.querySelector("[data-open-client-dialog], [data-open-user-dialog], [data-open-role-dialog]");
+      if (addButton) addButton.click();
+      return;
+    }
 
     if (button.matches("[data-clear-search-preview]")) {
       event.preventDefault();
@@ -2507,7 +2398,6 @@ document.addEventListener("DOMContentLoaded", () => {
         searchInput.value = "";
         searchInput.focus();
       }
-      showToast("Preview cleared", "The table is back to its default state and ready for another search scenario.");
       return;
     }
 
@@ -2516,7 +2406,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const scope = document.querySelector(button.dataset.validateScope);
       if (!scope) return;
       if (validateScope(scope)) {
-        showToast(button.dataset.successTitle || "Looks good", button.dataset.successText || "This UI flow is ready for API wiring.");
+        showToast(button.dataset.successTitle || "Looks good", button.dataset.successText || "All required fields are complete.");
       }
       return;
     }
@@ -2525,55 +2415,39 @@ document.addEventListener("DOMContentLoaded", () => {
     if (insideOverlay) {
       const label = getActionLabel(button);
       if (button.matches("[data-overlay-close]") || /close|cancel|back/.test(label)) {
+        event.preventDefault();
+        if (typeof closeInPageOverlay === "function" && closeInPageOverlay()) return;
         if (closeHref) {
-          event.preventDefault();
           window.location.href = closeHref;
           return;
         }
       }
-      if (/save|submit|confirm|approve|review|move|request|create|add|link/.test(label)) {
-        event.preventDefault();
-        if (validateScope(insideOverlay)) {
-          showToast("Interaction validated", "The surface is ready to be connected to live API actions.");
-        }
-        return;
-      }
-    }
-
-    if (button.closest("[data-demo-validate]") && button.tagName === "BUTTON") {
-      if (button.dataset.notificationRead === "true") {
-        event.preventDefault();
-        markNotificationRead(button);
-        return;
-      }
-      if (button.dataset.duplicateResolutionConfirm === "true") {
-        event.preventDefault();
-        if (button.disabled) {
-          showToast("Choose a resolution first", "Pick how this profile should be handled before confirming the duplicate review.");
-          return;
-        }
-        showToast("Resolution staged", `${button.dataset.duplicateResolutionLabel || "The selected resolution"} is ready for API-backed confirmation.`);
-        return;
-      }
       if (button.closest("form")) {
         return;
       }
-      const label = getActionLabel(button);
-      if (/open record actions|edit record|open details|preview record/.test(label)) {
+      if (button.dataset.overlayAction === "validate") {
         event.preventDefault();
-        showToast("Action menu staged", `${button.closest("tr")?.dataset.rowSummary || "This record"} is ready for detailed workflow actions.`);
-        return;
+        if (!validateScope(insideOverlay)) return;
+        const liveForm = document.querySelector("[data-overlay-surface] form") || document.querySelector("form") || document.body;
+        if (window.RecruitOpsLive?.handleFormSubmit?.(liveForm)) return;
+        showToast("Saved", "Your changes have been recorded.");
       }
-      if (!/save|submit|create|add|authenticate|request|approve|move|continue|review/.test(label)) {
-        return;
-      }
+      return;
+    }
+
+    if (button.dataset.notificationRead === "true") {
       event.preventDefault();
-      const scope = button.closest("[data-demo-validate]");
-      if (validateScope(scope)) {
-            showToast("Form state is valid", "This screen now has a consistent client-side guardrail.");
-          }
-          return;
-        }
+      markNotificationRead(button);
+      return;
+    }
+    if (button.dataset.duplicateResolutionConfirm === "true") {
+      event.preventDefault();
+      if (button.disabled) {
+        showToast("Choose a resolution first", "Pick how this profile should be handled before confirming the duplicate review.");
+        return;
+      }
+      showToast("Resolution recorded", `${button.dataset.duplicateResolutionLabel || "The selected resolution"} will be applied to this profile.`);
+    }
       });
 
       const isEditableTarget = (target) => {
@@ -2586,12 +2460,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const insightTrigger = document.querySelector("[data-workspace-insight-trigger='true']");
         if (
           event.key === "Escape" &&
-          closeHref &&
-          document.body.dataset.overlayPage === "true" &&
           !isEditableTarget(event.target)
         ) {
-          window.location.href = closeHref;
-          return;
+          if (typeof closeInPageOverlay === "function" && closeInPageOverlay()) {
+            event.preventDefault();
+            return;
+          }
+          if (closeHref && document.body.dataset.overlayPage === "true") {
+            window.location.href = closeHref;
+            return;
+          }
         }
         if (event.key === "Escape" && insightPanel && !insightPanel.hidden) {
           event.preventDefault();
@@ -2615,14 +2493,41 @@ document.addEventListener("DOMContentLoaded", () => {
           trapFocusWithin(event, mobileDialog.querySelector(".mobile-nav-panel"));
           return;
         }
-        if (event.key === "Tab" && overlaySurface && document.body.dataset.overlayPage === "true") {
-          trapFocusWithin(event, overlaySurface);
+        const liveOverlaySurface = document.querySelector("#ro-inpage-overlay [data-overlay-surface='true']") || overlaySurface;
+        if (event.key === "Tab" && liveOverlaySurface && (document.body.classList.contains("is-inpage-overlay") || document.body.dataset.overlayPage === "true")) {
+          trapFocusWithin(event, liveOverlaySurface);
         }
       });
 
       const searchInputs = document.querySelectorAll(".topbar-search input, input[placeholder*='Search']");
       searchInputs.forEach((input) => {
         if (!supportsSharedSearchPreview(input)) return;
+        /* Live topbar search: typed terms filter the page's table via the
+           shared filter engine (term override), composing with the page's
+           own toolbar filters. Debounced; clears restore all rows. */
+        if (input.id === "topbar-search" && input.dataset.liveTopbarBound !== "true") {
+          input.dataset.liveTopbarBound = "true";
+          input.addEventListener("input", () => {
+            if (input.dataset.topbarTimerId) {
+              window.clearTimeout(Number(input.dataset.topbarTimerId));
+            }
+            input.dataset.topbarTimerId = String(window.setTimeout(() => {
+              delete input.dataset.topbarTimerId;
+              const table = getLinkedTableSurface(input)?.querySelector("table");
+              if (!table) return;
+              const toolbar = findFilterToolbar(table.closest("[data-layout='table-surface']"));
+              const term = input.value.trim();
+              if (term.length === 1) return;
+              applyToolbarFilters(toolbar, { notify: false, searchTerm: term });
+            }, 220));
+          });
+          input.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            input.value = "";
+            const table = getLinkedTableSurface(input)?.querySelector("table");
+            if (table) applyToolbarFilters(findFilterToolbar(table.closest("[data-layout='table-surface']")), { notify: false, searchTerm: "" });
+          });
+        }
         input.addEventListener("keydown", (event) => {
           if (event.key === "Enter") {
             event.preventDefault();
@@ -2630,15 +2535,14 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!term) {
               const tableSurface = getLinkedTableSurface(input);
               clearTableSearchPreview(tableSurface?.querySelector("table"));
-              showToast("Search is empty", "Add a term to test the routed search state.");
+              showToast("Search is empty", "Type something to search for.");
               return;
             }
             if (term.length < 2) {
-              showToast("Search needs more detail", "Use at least 2 characters so the preview behaves like a realistic API-backed query.");
+              showToast("Keep typing", "Use at least 2 characters to search.");
               return;
             }
-            const preview = setTableSearchPreview(getLinkedTableSurface(input)?.querySelector("table"), term);
-            showToast(preview.title, preview.body);
+            setTableSearchPreview(getLinkedTableSurface(input)?.querySelector("table"), term);
           }
           if (event.key === "Escape") {
             const tableSurface = getLinkedTableSurface(input);
@@ -2664,6 +2568,7 @@ document.addEventListener("DOMContentLoaded", () => {
    ═══════════════════════════════════════════════════════════════ */
 const COMMAND_ITEMS = [
   { label: "Company Performance", hint: "Dashboard", icon: "dashboard", route: "company-dashboard.html" },
+  { label: "My Profile", hint: "Account", icon: "account_circle", route: "my-profile.html" },
   { label: "My Work", hint: "Dashboard", icon: "assignment_ind", route: "my-work-dashboard.html" },
   { label: "Role Dashboard", hint: "Dashboard", icon: "admin_panel_settings", route: "role-dashboard.html" },
   { label: "Requisitions", hint: "Hiring", icon: "work", route: "requisition-list.html" },
@@ -2821,22 +2726,30 @@ function setupCommandPalette() {
    after data renders.
    ═══════════════════════════════════════════════════════════════ */
 function showSkeletonTable(container, rows = 5, cols = 4) {
+  const tbody = container?.tagName === "TBODY"
+    ? container
+    : container?.querySelector?.("tbody") || (container?.closest?.("table")?.querySelector("tbody"));
+  if (tbody) {
+    if (!tbody._roTemplate) {
+      const first = tbody.querySelector("tr[data-row-template], tr:not(.skeleton-row):not([data-generated-empty-state])");
+      if (first) tbody._roTemplate = first.cloneNode(true);
+    }
+    tbody.innerHTML = Array.from({ length: rows }, () => (
+      `<tr class="skeleton-row" aria-hidden="true"><td colspan="${cols}"><div class="ro-skel"><span></span></div></td></tr>`
+    )).join("");
+    return;
+  }
   if (!container) return;
-  const existing = container.querySelector(".skeleton-table");
+  const existing = container.querySelector(":scope > .skeleton-rows");
   if (existing) return;
   const skeletonHtml = `
-    <table class="skeleton-table w-full">
-      <thead>
-        <tr>${Array.from({length: cols}, () => '<th><div class="skeleton skeleton-text-sm"></div></th>').join("")}</tr>
-      </thead>
-      <tbody>
-        ${Array.from({length: rows}, () => `
-          <tr class="skeleton-row">
-            ${Array.from({length: cols}, (_, i) => `<td><div class="skeleton skeleton-${i === 0 ? 'text' : 'text-sm'}" style="width:${60 + Math.random() * 30}%"></div></td>`).join("")}
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>`;
+    <div class="skeleton-rows" aria-hidden="true">
+      ${Array.from({length: rows}, () => `
+        <div class="skeleton-row">
+          ${Array.from({length: cols}, (_, i) => `<div class="skeleton skeleton-${i === 0 ? 'text' : 'text-sm'}" style="width:${60 + Math.random() * 30}%"></div>`).join("")}
+        </div>
+      `).join("")}
+    </div>`;
   container.insertAdjacentHTML("afterbegin", skeletonHtml);
 }
 
@@ -2865,7 +2778,7 @@ function showSkeletonCards(container, count = 3) {
 
 function hideSkeleton(container) {
   if (!container) return;
-  container.querySelectorAll(".skeleton-table, .skeleton-card").forEach(el => el.remove());
+  container.querySelectorAll(":scope > .skeleton-rows, .skeleton-table, .skeleton-card, tr.skeleton-row").forEach((el) => el.remove());
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2873,8 +2786,10 @@ function hideSkeleton(container) {
    Smooth fade when navigating between pages.
    ═══════════════════════════════════════════════════════════════ */
 function initPageTransition() {
-  const main = document.querySelector(".app-main, main, .workspace-surface");
-  if (main) main.classList.add("page-transition-enter");
+  const main = document.querySelector(".app-main") || document.querySelector("main");
+  if (!main) return;
+  main.classList.add("page-transition-enter");
+  main.addEventListener("animationend", () => main.classList.remove("page-transition-enter"), { once: true });
 }
 document.addEventListener("DOMContentLoaded", initPageTransition);
 
@@ -2889,8 +2804,9 @@ function setupPipelineDragDrop() {
   const board = document.querySelector(".flex.gap-4.min-w-max");
   if (!board) return;
 
-  // Make all candidate cards draggable
-  board.querySelectorAll("[cursor-grab], .cursor-grab").forEach((card) => {
+  board.querySelectorAll("[data-application-id], .cursor-grab, [draggable='true']").forEach((card) => {
+    if (card.dataset.dragWired === "true") return;
+    card.dataset.dragWired = "true";
     card.setAttribute("draggable", "true");
     card.addEventListener("dragstart", (e) => {
       card.classList.add("opacity-50", "scale-95");
@@ -2904,9 +2820,10 @@ function setupPipelineDragDrop() {
   });
 
   // Set up drop zones on columns
-  board.querySelectorAll(".flex.flex-col.bg-surface-alt\\/50").forEach((col) => {
+  Array.from(board.children).filter((col) => col.querySelector("h3")).forEach((col) => {
     const stage = col.querySelector("h3")?.textContent.trim();
-    if (!stage) return;
+    if (!stage || col.dataset.dropWired === "true") return;
+    col.dataset.dropWired = "true";
 
     col.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -2927,11 +2844,17 @@ function setupPipelineDragDrop() {
       // Find the card and move it
       const card = board.querySelector(`[data-application-id="${applicationId}"]`);
       if (!card) return;
-      const dropZone = col.querySelector(".space-y-3, .flex-1");
-      if (dropZone) dropZone.appendChild(card);
+      const dropZone = col.querySelector(".pipeline-drop-zone, .space-y-3, .flex-1");
+      if (dropZone) {
+        dropZone.classList.remove("flex", "items-center", "justify-center");
+        dropZone.querySelectorAll(".pipeline-empty-note, .border-dashed").forEach((node) => {
+          if (!node.closest(".cursor-grab, [data-pipeline-candidate-card], [data-application-id]")) node.remove();
+        });
+        dropZone.appendChild(card);
+      }
 
       // Update the stage badge count
-      board.querySelectorAll(".flex.flex-col.bg-surface-alt\\/50").forEach((c) => {
+      Array.from(board.children).filter((c) => c.querySelector("h3")).forEach((c) => {
         const count = c.querySelector(".space-y-3, .flex-1")?.children.length || 0;
         const badge = c.querySelector("span.bg-surface");
         if (badge) badge.textContent = count;
@@ -2961,62 +2884,61 @@ document.addEventListener("DOMContentLoaded", setupPipelineDragDrop);
    Auto-generates breadcrumbs from the sidebar hierarchy.
    Injects into .app-topbar on app pages.
    ═══════════════════════════════════════════════════════════════ */
-function injectBreadcrumbs() {
-  const topbar = document.querySelector(".app-topbar");
-  if (!topbar) return;
-  const existing = topbar.querySelector(".breadcrumb-nav");
-  if (existing) return;
-
+function setupVisualPassChrome() {
+  const kind = document.body?.dataset.routeKind;
   const routeId = document.body?.dataset.routeId || "";
-  const section = document.body?.dataset.routeKind || "";
 
-  // Map route IDs to breadcrumb paths
-  const breadcrumbMap = {
-    "company-dashboard": ["Reports", "Company Performance"],
-    "pipeline-board": ["Hiring", "Pipeline Board"],
-    "requisition-list": ["Hiring", "Requisitions"],
-    "candidate-profiles": ["Hiring", "Candidates"],
-    "client-directory": ["Hiring", "Clients"],
-    "user-management": ["Admin", "Users"],
-    "role-management": ["Admin", "Roles"],
-    "location-management": ["Admin", "Locations"],
-    "approvals-inbox": ["Inbox", "Approvals"],
-    "notifications-center": ["Inbox", "Notifications"],
-    "reports": ["Reports", "All Reports"],
-    "daily-review": ["Work", "Daily Review"],
-  };
-
-  const crumbs = breadcrumbMap[routeId];
-  if (!crumbs) return;
-
-  const nav = document.createElement("nav");
-  nav.className = "breadcrumb-nav flex items-center gap-1.5 text-[11px] text-text-muted mb-1";
-  nav.setAttribute("aria-label", "Breadcrumb");
-
-  crumbs.forEach((crumb, i) => {
-    const span = document.createElement("span");
-    span.textContent = crumb;
-    if (i < crumbs.length - 1) {
-      span.className = "hover:text-on-surface cursor-pointer transition-colors";
-    } else {
-      span.className = "text-on-surface font-medium";
-    }
-    nav.appendChild(span);
-
-    if (i < crumbs.length - 1) {
-      const sep = document.createElement("span");
-      sep.className = "text-text-muted/50";
-      sep.textContent = "›";
-      nav.appendChild(sep);
-    }
+  document.querySelectorAll("[data-password-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.getElementById("password");
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      const icon = btn.querySelector(".material-symbols-outlined");
+      if (icon) icon.textContent = show ? "visibility_off" : "visibility";
+      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
   });
 
-  // Insert before the page title
-  const titleSection = topbar.querySelector(".min-w-0");
-  if (titleSection) {
-    titleSection.insertBefore(nav, titleSection.firstChild);
+  if (kind !== "app" && kind !== "overlay") return;
+
+  document.querySelectorAll("a.sidebar-brand").forEach((link) => {
+    link.setAttribute("href", "role-dashboard.html");
+    link.title = "Go to Role Dashboard";
+  });
+
+  document.querySelectorAll(".workspace-surface .rounded-full").forEach((el) => {
+    const label = (el.textContent || "").trim();
+    if (label.length < 1 || label.length > 3) return;
+    let hash = 0;
+    for (let i = 0; i < label.length; i += 1) hash = (hash * 31 + label.charCodeAt(i)) % 5;
+    const fills = ["#1e293b", "#334155", "#475569", "#0f172a", "#1e3a4c"];
+    el.style.background = fills[hash];
+    el.style.color = "#ffffff";
+    el.style.borderColor = "transparent";
+  });
+
+  document.querySelectorAll(".workspace-surface").forEach((surface) => {
+    surface.querySelectorAll("p, span").forEach((node) => {
+      if (node.dataset.pageSummary === "true") return;
+      const text = (node.textContent || "").trim();
+      const match = text.match(/^Showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)\s+entries$/i);
+      if (match) node.textContent = `${match[2]} of ${match[3]}`;
+    });
+  });
+
+  if (routeId === "role-dashboard") {
+    document.querySelectorAll(".workspace-surface header p, .workspace-surface .font-body-md").forEach((p) => {
+      if (/command center/i.test(p.textContent || "")) p.textContent = "Your queue";
+    });
   }
+
+  document.querySelectorAll("[data-route-id='daily-updates-workspace'] .group .opacity-0, body[data-route-id='daily-updates-workspace'] .opacity-0").forEach((el) => {
+    el.classList.remove("opacity-0", "group-hover:opacity-100");
+  });
 }
+
+function injectBreadcrumbs() {}
 
 document.addEventListener("DOMContentLoaded", injectBreadcrumbs);
 
@@ -3026,8 +2948,16 @@ document.addEventListener("DOMContentLoaded", injectBreadcrumbs);
    Injected into app pages on mobile viewports.
    ═══════════════════════════════════════════════════════════════ */
 function injectBottomNav() {
-  if (document.querySelector(".bottom-nav")) return;
-  if (window.innerWidth > 768) return;
+  const existing = document.querySelector(".bottom-nav");
+  const isApp = document.body?.dataset.routeKind === "app" && document.querySelector(".app-shell");
+  const compactPortrait = window.innerWidth <= 768 && window.innerHeight > 500
+    && window.matchMedia("(orientation: portrait)").matches;
+
+  if (!isApp || !compactPortrait) {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
 
   const routeId = document.body?.dataset.routeId || "";
   const navItems = [
@@ -3054,56 +2984,75 @@ function injectBottomNav() {
 
 document.addEventListener("DOMContentLoaded", injectBottomNav);
 window.addEventListener("resize", () => {
-  if (window.innerWidth <= 768) injectBottomNav();
+  if (window.__roViewportRaf) cancelAnimationFrame(window.__roViewportRaf);
+  window.__roViewportRaf = requestAnimationFrame(syncViewportLayout);
 });
-
-
-/* ═══════════════════════════════════════════════════════════════
-   PULL-TO-REFRESH (Mobile)
-   Pull down on list pages to reload data.
-   ═══════════════════════════════════════════════════════════════ */
-function setupPullToRefresh() {
-  if (window.innerWidth > 768) return;
-  const main = document.querySelector(".app-main, main");
-  if (!main) return;
-
-  let startY = 0;
-  let pulling = false;
-  const indicator = document.createElement("div");
-  indicator.className = "pull-to-refresh-indicator";
-  indicator.innerHTML = '<span class="material-symbols-outlined text-[18px]">refresh</span>';
-  document.body.appendChild(indicator);
-
-  main.addEventListener("touchstart", (e) => {
-    if (window.scrollY === 0) {
-      startY = e.touches[0].clientY;
-      pulling = true;
-    }
-  }, { passive: true });
-
-  main.addEventListener("touchmove", (e) => {
-    if (!pulling) return;
-    const diff = e.touches[0].clientY - startY;
-    if (diff > 0 && diff < 120) {
-      indicator.classList.add("pulling");
-      indicator.style.transform = `translateX(-50%) translateY(${Math.min(diff - 60, 8)}px)`;
-    }
-  }, { passive: true });
-
-  main.addEventListener("touchend", () => {
-    if (!pulling) return;
-    pulling = false;
-    const isRefreshing = indicator.classList.contains("pulling");
-    indicator.classList.remove("pulling");
-    indicator.style.transform = "";
-    if (isRefreshing) {
-      indicator.classList.add("refreshing");
-      location.reload();
-    }
+window.addEventListener("orientationchange", () => {
+  setTimeout(syncViewportLayout, 50);
+  setTimeout(syncViewportLayout, 300);
+});
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => {
+    if (window.__roViewportRaf) cancelAnimationFrame(window.__roViewportRaf);
+    window.__roViewportRaf = requestAnimationFrame(syncViewportLayout);
   });
 }
 
-document.addEventListener("DOMContentLoaded", setupPullToRefresh);
+function syncViewportLayout() {
+  const root = document.documentElement;
+  const height = Math.round(window.visualViewport?.height || window.innerHeight);
+  const width = Math.round(window.visualViewport?.width || window.innerWidth);
+  const landscape = width > height;
+  root.dataset.orientation = landscape ? "landscape" : "portrait";
+  root.style.setProperty("--app-height", `${height}px`);
+  root.style.setProperty("--app-width", `${width}px`);
+  document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right, .reveal-pop").forEach((el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom > 24 && rect.top < height - 24) el.classList.add("visible");
+  });
+  injectBottomNav();
+}
+
+document.addEventListener("DOMContentLoaded", syncViewportLayout);
+if (document.readyState !== "loading") syncViewportLayout();
+
+function setupPagePanLock() {
+  if (document.documentElement.dataset.panLock === "true") return;
+  document.documentElement.dataset.panLock = "true";
+
+  const pin = (el) => {
+    if (el && el.scrollLeft) el.scrollLeft = 0;
+  };
+
+  const pinRoots = () => {
+    pin(document.documentElement);
+    pin(document.body);
+    document.querySelectorAll(".app-canvas, .login-split, .login-right, .login-left, .landing-hero").forEach(pin);
+  };
+
+  document.addEventListener("scroll", (event) => {
+    const target = event.target;
+    if (target === document || target === document.documentElement || target === document.body) {
+      pinRoots();
+      return;
+    }
+    if (!(target instanceof Element)) return;
+    if (
+      target.classList.contains("app-canvas")
+      || target.classList.contains("login-split")
+      || target.classList.contains("login-right")
+      || target.classList.contains("login-left")
+      || target.classList.contains("landing-hero")
+    ) {
+      pin(target);
+    }
+  }, { capture: true, passive: true });
+
+  pinRoots();
+}
+
+document.addEventListener("DOMContentLoaded", setupPagePanLock);
+if (document.readyState !== "loading") setupPagePanLock();
 
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3147,27 +3096,32 @@ function renderLineChart(container, data, options = {}) {
 
 function renderBarChart(container, data, options = {}) {
   if (!container || !data.length) return;
-  const { width = 400, height = 120, color = "#1E293B", label = "" } = options;
+  const { width = 420, height = 168, color = "#1E293B" } = options;
   const max = Math.max(...data.map(d => d.value), 1);
-  const padding = 20;
-  const chartW = width - padding * 2;
-  const chartH = height - padding * 2;
-  const barW = Math.min(chartW / data.length - 4, 40);
+  const padX = 16;
+  const padTop = 22;
+  const padBottom = 44;
+  const chartW = width - padX * 2;
+  const chartH = height - padTop - padBottom;
+  const barW = Math.min(chartW / data.length - 8, 48);
 
   const bars = data.map((d, i) => {
-    const x = padding + (i / data.length) * chartW + (chartW / data.length - barW) / 2;
-    const barH = (d.value / max) * chartH;
-    const y = padding + chartH - barH;
-    return { x, y, w: barW, h: barH, label: d.label, value: d.value };
+    const x = padX + (i / data.length) * chartW + (chartW / data.length - barW) / 2;
+    const barH = Math.max(4, (d.value / max) * chartH);
+    const y = padTop + chartH - barH;
+    return { x, y, w: barW, h: barH, label: String(d.label || ""), value: d.value };
   });
 
   const svg = `
     <svg width="100%" viewBox="0 0 ${width} ${height}" class="w-full">
-      ${bars.map(b => `
-        <rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${color}" rx="3" opacity="0.8"/>
-        <text x="${b.x + b.w / 2}" y="${b.y - 4}" text-anchor="middle" font-size="9" fill="#6E7476">${b.value}</text>
-        <text x="${b.x + b.w / 2}" y="${height - 2}" text-anchor="middle" font-size="9" fill="#6E7476">${b.label}</text>
-      `).join("")}
+      ${bars.map((b) => {
+        const cx = b.x + b.w / 2;
+        const shown = b.label.length > 18 ? `${b.label.slice(0, 16)}…` : b.label;
+        return `
+        <rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${color}" rx="3" opacity="0.82"/>
+        <text x="${cx}" y="${b.y - 6}" text-anchor="middle" font-size="10" fill="#6E7476">${b.value}</text>
+        <text x="${cx}" y="${height - 28}" text-anchor="end" font-size="10" fill="#4B5257" transform="rotate(-32 ${cx} ${height - 28})">${shown.replace(/</g, "")}</text>`;
+      }).join("")}
     </svg>`;
   container.innerHTML = svg;
 }
