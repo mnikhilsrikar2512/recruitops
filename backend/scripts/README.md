@@ -49,10 +49,66 @@ The dump writes two passes (tables first, then foreign keys as
 `scripts/seed_ci.py` populates a fresh database with the minimum the API and
 tests need:
 
-- 33-code permission catalog (`dbo.permissions`)
+- 70-code permission catalog (`dbo.permissions`), including the AI agent codes
+  (see below)
 - `admin` role granted every permission
 - Admin user `ci.admin@recruitops-test.com` / `admin123`
 - Primary branch link (`dbo.branches` + `dbo.user_branch_roles`)
 - Client id 1 in `dbo.client_companies` (requisition creation requires it)
 
-It is idempotent — safe to run repeatedly.
+It is idempotent — safe to run repeatedly. After seeding it runs `verify_seed()`,
+which fails with a non-zero exit if any seeded row a test depends on is missing
+(requisition/candidate pair, portal account, letterhead entity, AI permission
+codes).
+
+## AI agent permissions (`ai.*`)
+
+The agents API (`app/api/v1/agents.py`) is gated by a base permission plus one
+per-agent code (PRD §4.16; agents are declared in `app/agents/registry.py`):
+
+| Code | Gates |
+|------|-------|
+| `ai.use` | Any agent invocation (list catalog, run an agent) |
+| `ai.agent.resume_screener` | Resume Screener runs + decisions |
+| `ai.agent.daily_brief` | Daily Brief runs + decisions |
+| `ai.agent.inbox_triage` | Inbox Triage runs + decisions |
+
+Only the `admin` role bypasses the check (`app/api/deps.py`); every other role
+needs these codes granted through `role.permissions.assign` (Admin → Roles),
+the CI seed, or the backfill migration below.
+
+### Backfilling existing databases (007)
+
+Databases created before the agents feature have no `ai.*` rows. Apply the
+idempotent migration once — it only inserts what is missing:
+
+```bash
+sqlcmd -S localhost -U sa -P "$DB_PASSWORD" -C -d recruitment_system \
+  -i scripts/007_grant_ai_permissions.sql
+```
+
+`scripts/007_grant_ai_permissions.sql`:
+
+1. Inserts the four `ai.*` catalog rows.
+2. Grants them to existing roles **derived from the closest operational
+   permission they already hold** — `ai.use`, `ai.agent.resume_screener`, and
+   `ai.agent.inbox_triage` to every role holding `candidate.read`, and
+   `ai.agent.daily_brief` to every role holding `daily_update.read` — so
+   one-off/test roles with no real permissions are not widened.
+3. Verifies the result (raises on failure) and is safe to re-run.
+
+The `admin` role needs no backfill grant: `scripts/seed_ci.py` grants it every
+permission, and its API check bypass covers databases seeded by other means.
+
+## Migrations
+
+Numbered SQL scripts in the repo-root `scripts/` directory, applied with
+`sqlcmd -i` in order; each is idempotent and verified by its own tail checks:
+
+- `005_create_approvals_table.sql` — approvals table + demo rows
+- `006_create_agent_runs_table.sql` — `agent_runs` table for V1 agents
+- `007_grant_ai_permissions.sql` — `ai.*` permission codes + role backfill
+  (see above)
+
+`backend/db/schema.sql` stays tables-only by design — permission rows are data
+and belong to `seed_ci.py` / migrations.

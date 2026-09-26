@@ -37,6 +37,16 @@ Do not use `python -m http.server` for the UI (no `/api` proxy).
 - Status: `python -m app.scripts.db_status`
 - Do not re-run `python -m app.scripts.bootstrap_db` against a live database unless you intend to recreate schema
 - CI seed: `scripts/seed_ci.py` (see `scripts/run_tests_ci.sh`)
+- Idempotent migrations: repo-root `scripts/00X_*.sql` — run
+  `scripts/007_grant_ai_permissions.sql` once against databases created before
+  the agents feature so non-admin roles can be granted AI agent access (see
+  `scripts/README.md`)
+
+### AI agent permissions
+
+Non-admin roles need `ai.use` plus the per-agent `ai.agent.*` codes (granted via
+Admin → Roles, the CI seed, or migration `007`); details in
+[`scripts/README.md`](scripts/README.md#ai-agent-permissions-ai).
 
 ## Tests
 
