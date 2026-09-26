@@ -22,6 +22,13 @@ ADMIN_PASSWORD = "admin123"
 
 # (code, module, action) — codes mirror the live permission catalog
 PERMISSIONS = [
+    # AI agents (PRD §4.16): base ai.use + one ai.agent.<id> code per registry
+    # agent (app/agents/registry.py). Without these rows only the admin role
+    # (check bypass in app/api/deps.py) can reach the agents API.
+    ("ai.use", "ai", "use"),
+    ("ai.agent.resume_screener", "ai", "agent.resume_screener"),
+    ("ai.agent.daily_brief", "ai", "agent.daily_brief"),
+    ("ai.agent.inbox_triage", "ai", "agent.inbox_triage"),
     ("approval.decide", "approval", "decide"),
     ("approval.read", "approval", "read"),
     ("assignment.read", "assignment", "read"),
@@ -108,6 +115,12 @@ VERIFICATIONS = [
     (
         "primary company entity (letterhead)",
         "SELECT 1 FROM dbo.company_entities WHERE is_primary = 1 AND status = N'active'",
+    ),
+    (
+        "AI agent permission catalog (ai.use + ai.agent.*)",
+        "SELECT 1 FROM dbo.permissions WHERE code = N'ai.use' AND ("
+        "SELECT COUNT(*) FROM dbo.permissions WHERE code IN ("
+        "N'ai.agent.resume_screener', N'ai.agent.daily_brief', N'ai.agent.inbox_triage')) = 3",
     ),
 ]
 
