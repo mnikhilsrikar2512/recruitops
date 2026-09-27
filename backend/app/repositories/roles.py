@@ -8,6 +8,13 @@ from sqlalchemy.engine import RowMapping
 from app.schemas.role import RoleCreate, RoleListFilters, RoleUpdate
 
 
+@dataclass(frozen=True)
+class PermissionRecord:
+    code: str
+    module_name: str
+    action_name: str
+
+
 @dataclass
 class RoleRecord:
     id: int
@@ -179,6 +186,26 @@ def update_role(engine: Engine, role_id: int, payload: RoleUpdate) -> RoleRecord
             },
         ).mappings().first()
     return find_role_by_id(engine, role_id) if row else None
+
+
+def list_permission_catalog(engine: Engine) -> list[PermissionRecord]:
+    query = text(
+        """
+        SELECT code, module_name, action_name
+        FROM dbo.permissions
+        ORDER BY module_name, action_name, code;
+        """
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [
+        PermissionRecord(
+            code=str(row["code"]),
+            module_name=str(row["module_name"]),
+            action_name=str(row["action_name"]),
+        )
+        for row in rows
+    ]
 
 
 def list_all_permission_codes(engine: Engine) -> list[str]:

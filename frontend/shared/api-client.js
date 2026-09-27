@@ -645,16 +645,38 @@ async function submitRequisition() {
 }
 
 async function saveRolePermissions(button) {
-  const roleId = queryInt("role_id");
+  const roleId = rolePermState.roleId || queryInt("role_id");
   if (!roleId) { showLiveError(new Error("No role selected.")); return; }
-  const permissions = {};
-  document.querySelectorAll("[data-perm].on").forEach((toggle) => {
-    permissions[toggle.dataset.perm] = true;
-  });
+  if (rolePermState.readonly) {
+    showLiveError(new Error("The admin role always keeps full access; its permissions cannot be changed."));
+    return;
+  }
+  if (!rolePermState.dirty) {
+    if (typeof showToast === "function") showToast("No changes", "Toggle permissions before saving.");
+    return;
+  }
+  const permissionCodes = Array.from(document.querySelectorAll("[data-perm].on")).map((toggle) => toggle.dataset.perm);
+  if (button) button.disabled = true;
   try {
-    await apiRequest(`/roles/${roleId}/permissions`, { method: "PUT", body: JSON.stringify({ permission_codes: Object.keys(permissions) }) });
-    showLiveSuccess("Permissions saved");
+    const payload = await apiRequest(`/roles/${roleId}/permissions`, {
+      method: "PUT",
+      body: JSON.stringify({ permission_codes: permissionCodes, scope_rules: {} }),
+    });
+    rolePermState.baseline = new Set(payload.permission_codes || permissionCodes);
+    rolePermState.dirty = false;
+    updateRolePermSummary(rolePermState.baseline.size, rolePermState.total);
+    showLiveSuccess("Permissions saved", `${rolePermState.baseline.size} granted to this role.`);
   } catch (error) { showLiveError(error); }
+  finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function resetRolePermissions() {
+  applyRolePermissionGrants(rolePermState.baseline);
+  rolePermState.dirty = false;
+  updateRolePermSummary(rolePermState.baseline.size, rolePermState.total);
+  if (typeof showToast === "function") showToast("Changes discarded", "The matrix reflects the last saved state.");
 }
 
 function setPermissionToggleState(toggle, enabled) {
@@ -1501,16 +1523,211 @@ async function loadVisibilityRules() {
   });
 }
 
-async function loadRolePermissionsEditor() {
-  const roleId = queryInt("role_id");
-  if (!roleId) return;
+/* ═══ Role & Permissions editor — live permission matrix ═══ */
+
+const ROLE_PERM_MODULE_META = {
+  "ai": { label: "AI Agents", icon: "smart_toy" },
+  "approval": { label: "Approvals", icon: "fact_check" },
+  "assignment": { label: "Assignments", icon: "group_add" },
+  "candidate": { label: "Candidates", icon: "group" },
+  "client": { label: "Clients", icon: "apartment" },
+  "dashboard": { label: "Dashboards", icon: "dashboard" },
+  "daily_update": { label: "Daily Updates", icon: "assignment" },
+  "interview": { label: "Interviews", icon: "calendar_month" },
+  "location": { label: "Locations", icon: "location_on" },
+  "meeting": { label: "Meetings", icon: "event" },
+  "notification": { label: "Notifications", icon: "notifications" },
+  "offer": { label: "Offers", icon: "request_quote" },
+  "pipeline": { label: "Pipeline", icon: "account_tree" },
+  "portal": { label: "Portal Accounts", icon: "vpn_key" },
+  "requisition": { label: "Requisitions", icon: "work" },
+  "report": { label: "Reports", icon: "monitoring" },
+  "role": { label: "Roles & Permissions", icon: "shield_person" },
+  "settings": { label: "Settings", icon: "settings" },
+  "user": { label: "Users", icon: "manage_accounts" },
+  "workflow_action": { label: "Workflow Actions", icon: "task_alt" },
+  "workflow_overlay": { label: "Workflow Overlays", icon: "layers" },
+};
+
+const ROLE_PERM_DESCRIPTIONS = {
+  "ai.use": "Invoke any AI agent (base gate)",
+  "ai.agent.resume_screener": "Resume Screener agent runs + decisions",
+  "ai.agent.daily_brief": "Daily Brief agent runs + decisions",
+  "ai.agent.inbox_triage": "Inbox Triage agent runs + decisions",
+};
+
+const rolePermState = { roleId: null, baseline: new Set(), dirty: false, readonly: false, total: 0 };
+
+function rolePermModuleLabel(moduleName) {
+  const meta = ROLE_PERM_MODULE_META[moduleName];
+  if (meta) return meta.label;
+  return moduleName.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function updateRolePermSummary(enabledCount, totalCount) {
+  const enabledEl = document.querySelector("[data-perm-enabled-count]");
+  const disabledEl = document.querySelector("[data-perm-disabled-count]");
+  if (enabledEl) enabledEl.textContent = `${enabledCount} permission${enabledCount === 1 ? "" : "s"} enabled`;
+  if (disabledEl) disabledEl.textContent = `${Math.max(totalCount - enabledCount, 0)} permission${totalCount - enabledCount === 1 ? "" : "s"} disabled`;
+  const saveButton = document.querySelector("[data-live-role-permissions-save]");
+  if (saveButton) {
+    saveButton.classList.toggle("opacity-50", !rolePermState.dirty);
+    saveButton.classList.toggle("pointer-events-none", !rolePermState.dirty);
+  }
+}
+
+function applyRolePermissionGrants(baseline) {
+  document.querySelectorAll("[data-perm]").forEach((toggle) => {
+    setPermissionToggleState(toggle, baseline.has(toggle.dataset.perm));
+  });
+  updateRolePermSummary(baseline.size, rolePermState.total);
+}
+
+function markRolePermDirty() {
+  const current = new Set(Array.from(document.querySelectorAll("[data-perm].on")).map((t) => t.dataset.perm));
+  rolePermState.dirty = current.size !== rolePermState.baseline.size
+    || Array.from(current).some((code) => !rolePermState.baseline.has(code));
+  updateRolePermSummary(current.size, rolePermState.total);
+}
+
+function renderRolePermissionMatrix(catalog) {
+  const tbody = document.querySelector(".matrix-table tbody");
+  if (!tbody) return;
+  const modules = new Map();
+  catalog.forEach((permission) => {
+    if (!modules.has(permission.module_name)) modules.set(permission.module_name, []);
+    modules.get(permission.module_name).push(permission);
+  });
+  const fragment = document.createDocumentFragment();
+  Array.from(modules.keys()).sort().forEach((moduleName) => {
+    const meta = ROLE_PERM_MODULE_META[moduleName] || {};
+    const headerRow = document.createElement("tr");
+    headerRow.className = "perm-section-header bg-surface-alt";
+    headerRow.innerHTML = `
+      <td colspan="2" class="px-4 py-2.5 font-label-caps text-label-caps text-on-surface-variant">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[16px]">${meta.icon || "folder"}</span>
+          ${escapeLiveHtml(rolePermModuleLabel(moduleName))}
+        </div>
+      </td>`;
+    fragment.appendChild(headerRow);
+    (modules.get(moduleName) || []).forEach((permission) => {
+      const row = document.createElement("tr");
+      const description = ROLE_PERM_DESCRIPTIONS[permission.code] || permission.action_name.replace(/[._-]+/g, " ");
+      row.innerHTML = `
+        <td class="px-4 py-3">
+          <p class="font-semibold">${escapeLiveHtml(permission.code)}</p>
+          <p class="text-[11px] text-text-muted">${escapeLiveHtml(description)}</p>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button type="button" class="toggle-track" role="switch" aria-checked="false"
+                  aria-label="Grant ${escapeLiveHtml(permission.code)}" data-perm="${escapeLiveHtml(permission.code)}"></button>
+        </td>`;
+      fragment.appendChild(row);
+    });
+  });
+  tbody.innerHTML = "";
+  tbody.appendChild(fragment);
+}
+
+function renderRolePermTabs(roles, activeRoleId) {
+  /* The shared table enhancer (tables.js) rebuilds this page's filter bar and
+     prunes sibling wrappers, so the tab strip is created here — after load —
+     inside the bar rather than declared in static HTML. */
+  let tabHost = document.querySelector("[data-role-tab-bar]");
+  if (!tabHost) {
+    const filterBar = document.querySelector(".ro-filter-bar, [data-layout='filter-toolbar']");
+    if (!filterBar) return;
+    tabHost = document.createElement("div");
+    tabHost.className = "flex flex-wrap items-center gap-2";
+    tabHost.setAttribute("data-role-tab-bar", "");
+    filterBar.insertBefore(tabHost, filterBar.firstChild);
+  }
+  tabHost.innerHTML = (roles || []).map((role) => `
+    <button type="button" class="role-tab flex items-center gap-2 px-5 py-2.5 rounded-lg font-body-sm font-semibold cursor-pointer ${Number(role.id) === Number(activeRoleId) ? "active" : ""}"
+            data-role-id="${role.id}" title="Edit ${escapeLiveHtml(role.name)} permissions">
+      <span class="material-symbols-outlined text-[18px]">${role.code === "admin" ? "admin_panel_settings" : "shield_person"}</span>
+      ${escapeLiveHtml(role.name)}
+    </button>`).join("");
+}
+
+async function selectRolePermissions(roleId) {
+  const resolved = new URLSearchParams(window.location.search);
+  resolved.set("role_id", String(roleId));
+  window.history.replaceState(null, "", `${window.location.pathname}?${resolved.toString()}`);
+  rolePermState.roleId = roleId;
+  rolePermState.readonly = false;
+  rolePermState.dirty = false;
+  await hydrateRolePermissionsEditor();
+}
+
+async function hydrateRolePermissionsEditor() {
+  const roleId = rolePermState.roleId;
   const role = await apiRequest(`/roles/${roleId}`).catch(() => null);
-  if (role) {
-    setFirstText("[data-role-name]", role.role_name || role.name);
-    const permissions = role.permissions || {};
-    Object.entries(permissions).forEach(([key, enabled]) => {
-      const toggle = document.querySelector(`[data-perm="${key}"]`);
-      if (toggle) setPermissionToggleState(toggle, enabled);
+  const grants = await apiRequest(`/roles/${roleId}/permissions`).catch(() => null);
+  const description = document.getElementById("role-description");
+  if (role && description) {
+    const nameEl = description.querySelector("h3");
+    const copyEl = description.querySelector("p");
+    if (nameEl) nameEl.innerHTML = `<span class="material-symbols-outlined text-[20px] text-primary">info</span> ${escapeLiveHtml(role.name || "Role")}`;
+    if (copyEl) {
+      copyEl.textContent = role.description
+        || `Configure which permissions the ${role.name || "role"} holds. Toggle a permission to grant or revoke it for every user assigned to this role.`;
+    }
+  }
+  rolePermState.baseline = new Set(grants?.permission_codes || []);
+  applyRolePermissionGrants(rolePermState.baseline);
+  if (role?.code === "admin") {
+    rolePermState.readonly = true;
+    document.querySelectorAll("[data-perm]").forEach((toggle) => { toggle.disabled = true; });
+    const saveButton = document.querySelector("[data-live-role-permissions-save]");
+    if (saveButton) saveButton.classList.add("opacity-50", "pointer-events-none");
+    const note = description?.querySelector("[data-admin-note]");
+    if (note) note.classList.remove("hidden");
+  }
+}
+
+async function loadRolePermissionsEditor() {
+  const surface = document.querySelector(".workspace-surface");
+  const catalogPayload = await apiRequest("/permissions/").catch(() => null);
+  const catalog = catalogPayload?.items || [];
+  rolePermState.total = catalog.length;
+  renderRolePermissionMatrix(catalog);
+
+  const rolesPayload = await apiRequest("/roles/?page_size=100").catch(() => ({ items: [] }));
+  const roles = (rolesPayload.items || []).filter((role) => role.status !== "inactive");
+  const requestedId = queryInt("role_id");
+  const activeRole = roles.find((role) => Number(role.id) === Number(requestedId)) || roles[0];
+  if (!activeRole) {
+    if (surface) setFirstText("[data-perm-enabled-count]", "No roles found");
+    return;
+  }
+  renderRolePermTabs(roles, activeRole.id);
+  rolePermState.roleId = activeRole.id;
+  rolePermState.readonly = false;
+  rolePermState.dirty = false;
+  await hydrateRolePermissionsEditor();
+
+  const tabBar = document.querySelector("[data-role-tab-bar]");
+  if (tabBar && !tabBar.dataset.permTabsWired) {
+    tabBar.dataset.permTabsWired = "true";
+    tabBar.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-role-id]");
+      if (!tab || rolePermState.roleId === Number(tab.dataset.roleId)) return;
+      tabBar.querySelectorAll(".role-tab").forEach((el) => el.classList.remove("active"));
+      tab.classList.add("active");
+      selectRolePermissions(Number(tab.dataset.roleId)).catch((error) => showLiveError(error));
+    });
+  }
+  const search = document.querySelector("[data-perm-search]");
+  if (search && !search.dataset.permSearchWired) {
+    search.dataset.permSearchWired = "true";
+    search.addEventListener("input", () => {
+      const needle = search.value.trim().toLowerCase();
+      document.querySelectorAll(".matrix-table tbody tr").forEach((row) => {
+        if (row.classList.contains("perm-section-header")) return;
+        row.style.display = !needle || row.textContent.toLowerCase().includes(needle) ? "" : "none";
+      });
     });
   }
 }
@@ -4546,7 +4763,10 @@ function bindLiveApiInteractions() {
     if (permissionToggle && routeId() === "role-permissions-editor") {
       event.preventDefault();
       event.stopPropagation();
-      setPermissionToggleState(permissionToggle, !permissionToggle.classList.contains("on"));
+      if (!permissionToggle.disabled) {
+        setPermissionToggleState(permissionToggle, !permissionToggle.classList.contains("on"));
+        markRolePermDirty();
+      }
       return;
     }
 
@@ -4556,6 +4776,15 @@ function bindLiveApiInteractions() {
       event.preventDefault();
       event.stopPropagation();
       saveRolePermissions(permissionSaveButton);
+      return;
+    }
+
+    // Permission reset (discard unsaved toggles)
+    const permissionResetButton = target?.closest("[data-live-role-permissions-reset]");
+    if (permissionResetButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      resetRolePermissions();
       return;
     }
 

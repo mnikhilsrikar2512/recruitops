@@ -7,12 +7,14 @@ from app.repositories.roles import (
     find_role_by_code,
     find_role_by_id,
     list_all_permission_codes,
+    list_permission_catalog,
     list_permission_codes_for_role,
     list_roles,
     list_scope_rules_for_role,
     replace_role_permissions,
     update_role,
 )
+from app.schemas.permission_catalog import PermissionCatalogResponse
 from app.schemas.pagination import PaginationMeta
 from app.schemas.role import (
     RoleCreate,
@@ -23,6 +25,19 @@ from app.schemas.role import (
     RoleResponse,
     RoleUpdate,
 )
+
+
+def list_permission_catalog_service(engine: Engine) -> PermissionCatalogResponse:
+    return PermissionCatalogResponse(
+        items=[
+            {
+                "code": item.code,
+                "module_name": item.module_name,
+                "action_name": item.action_name,
+            }
+            for item in list_permission_catalog(engine)
+        ]
+    )
 
 
 def list_roles_service(engine: Engine, filters: RoleListFilters) -> RoleListResponse:
