@@ -435,13 +435,13 @@ function setupRecordLinkPolish() {
 
   if (routeId === "role-dashboard") {
     const metricRoutes = [
-      { match: /overdue reviews/i, route: "approvals-inbox.html", label: "Open Overdue Reviews" },
-      { match: /stale reqs/i, route: "requisition-detail.html", label: "Open Stale Requisitions" },
-      { match: /high priority/i, route: "candidate-screening.html", label: "Open High Priority Roles" },
-      { match: /offers sent/i, route: "approval-review-drawer.html", label: "Open Offers Sent" },
+      { match: /open requisitions/i, route: "requisition-list.html", label: "Open Requisitions" },
+      { match: /active candidates/i, route: "candidate-profiles.html", label: "Active Candidates" },
+      { match: /active applications/i, route: "candidate-screening.html", label: "Active Applications" },
+      { match: /pending updates/i, route: "daily-updates-workspace.html", label: "Pending Updates" },
     ];
 
-    document.querySelectorAll('[data-layout="metric-card"]').forEach((card) => {
+    document.querySelectorAll('[data-layout="metric-card"], [data-role-kpi-strip] > div').forEach((card) => {
       const label = (card.textContent || "").replace(/\s+/g, " ").trim();
       const config = metricRoutes.find((entry) => entry.match.test(label));
       if (!config) return;

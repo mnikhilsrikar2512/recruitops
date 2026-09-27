@@ -1800,9 +1800,14 @@
     .menu-open > .hidden.group-hover\:block {
       display: block !important;
     }
+    /* Focus-revealed controls: any hover-revealed control that can receive
+       focus must become visible when focus lands inside its group (WCAG
+       2.4.7). Applies everywhere, not just .workspace-surface. */
+    .group:focus-within .opacity-0.group-hover\:opacity-100,
     .workspace-surface .group:focus-within .opacity-0.group-hover\:opacity-100,
     [data-overlay-surface="true"] .group:focus-within .opacity-0.group-hover\:opacity-100 {
       opacity: 1 !important;
+      pointer-events: auto !important;
     }
     [data-hover-reveal-controls="true"] {
       pointer-events: none;
