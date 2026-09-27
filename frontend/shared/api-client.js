@@ -3948,14 +3948,27 @@ function ensureNotificationBadge() {
   return badge;
 }
 
+function formatNotificationBadgeCount(count) {
+  /* Real count up to three digits; 999+ beyond that keeps the pill readable. */
+  return count > 999 ? "999+" : String(count);
+}
+
 async function refreshNotificationBadge() {
   const badge = ensureNotificationBadge();
   if (!badge || !LIVE_API_ENABLED) return;
   try {
     const payload = await apiRequest("/notifications/?status=unread&page_size=1");
     const count = payload.meta?.total ?? 0;
-    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.textContent = formatNotificationBadgeCount(count);
     badge.hidden = count === 0;
+    /* Expose the live count to the bell button's accessible name. */
+    const bell = badge.closest("button");
+    if (bell) {
+      bell.setAttribute(
+        "aria-label",
+        count > 0 ? `Review notifications, ${count} unread` : "Review notifications"
+      );
+    }
   } catch {
     badge.hidden = true;
   }

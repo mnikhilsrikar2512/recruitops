@@ -580,9 +580,9 @@ function renderRoleWorkflowQueue(items) {
           </div>
         </div>`;
       }).join("")
-    : `<div class="px-4 py-6 text-center">
-        <span class="material-symbols-outlined text-[22px] text-text-muted">task_alt</span>
-        <p class="mt-1 text-sm text-text-muted">Nothing needs attention right now.</p>
+    : `<div class="px-inset-card py-2.5 flex items-center justify-center gap-2 bg-surface">
+        <span class="material-symbols-outlined text-[18px] text-success-text">task_alt</span>
+        <p class="font-body-sm text-body-sm text-text-muted">Nothing needs attention right now.</p>
       </div>`;
   if (typeof applyCollectionPagination === "function") {
     delete rowsHost.dataset.pageSize;
