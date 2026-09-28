@@ -189,6 +189,173 @@ function userPermissions() {
   return session?.permissions || [];
 }
 
+/* ── Agent workbench state & helpers ─────────────────────────── */
+let agentsCatalogCache = null;
+let agentsRunsCache = [];
+let agentsStatusFilter = "all"; /* all | pending | accepted */
+let agentsRunContext = null; /* { candidate_id, requisition_id?, run?: boolean } deep-link context */
+
+function agentsStatusVisible(run) {
+  if (agentsStatusFilter === "pending") return run.status === "pending";
+  if (agentsStatusFilter === "accepted") return run.status === "accepted";
+  return true;
+}
+
+function renderAgentsRunContextBanner(catalog, replaceExisting = false) {
+  /* Deep-link banner: names the candidate the screener will run against. */
+  const surface = document.querySelector("[data-agents-workbench]");
+  if (!surface || !agentsRunContext?.candidate_id) return;
+  if (replaceExisting) surface.querySelector("[data-agents-run-context]")?.remove();
+  if (surface.querySelector("[data-agents-run-context]")) return;
+  const candidateName = agentsRunContext.candidate_name
+    ? ` for ${agentsRunContext.candidate_name}`
+    : ` (candidate #${agentsRunContext.candidate_id})`;
+  const banner = document.createElement("div");
+  banner.className = "flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-highlight-soft px-4 py-3";
+  banner.dataset.agentsRunContext = "true";
+  banner.innerHTML = `
+    <p class="font-body-sm text-body-sm text-on-surface flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px] text-primary">smart_toy</span>
+      Resume Screener ready${escapeAgentHtml(candidateName)}${agentsRunContext.requisition_id ? ` · requisition #${escapeAgentHtml(agentsRunContext.requisition_id)}` : ""}
+    </p>
+    <button type="button" class="font-label-caps text-label-caps font-semibold text-primary hover:text-primary-hover" data-agents-context-dismiss>Dismiss</button>`;
+  banner.querySelector("[data-agents-context-dismiss]").addEventListener("click", () => {
+    agentsRunContext = null;
+    banner.remove();
+  });
+  const statsHost = surface.querySelector(".rounded-2xl.border.border-border.bg-surface.p-5") || surface;
+  statsHost.insertAdjacentElement("afterend", banner);
+}
+
+function renderAgentsFromCache() {
+  const visible = agentsRunsCache.filter(agentsStatusVisible);
+  if (typeof renderAgentsWorkbench === "function") {
+    renderAgentsWorkbench(agentsCatalogCache, { items: visible });
+  }
+}
+
+async function loadAgentsCatalog() {
+  /* Request the slash form: GET /agents (no slash) 307-redirects to
+     /agents/ and the browser re-issues the redirected request without
+     the Authorization header, so auth is lost mid-flight. */
+  agentsCatalogCache = await apiRequest("/agents/");
+  return agentsCatalogCache;
+}
+
+async function loadAgentsRuns() {
+  const payload = await apiRequest("/agents/runs?page_size=50");
+  agentsRunsCache = payload.items || [];
+  return payload;
+}
+
+async function runAgentAction(button, overrides = {}) {
+  const select = document.querySelector("[data-agents-select]");
+  const agentId = overrides.agentId || select?.value;
+  if (!agentId) {
+    showToast("Pick an agent", "Select an agent to run first.");
+    return;
+  }
+  const spec = agentsCatalogCache?.items?.find((agent) => agent.id === agentId);
+  /* Explicit overrides win; otherwise fall back to deep-link context. */
+  const context = { ...(agentsRunContext || {}), ...overrides };
+  if (agentId === "resume_screener" && !context.candidate_id) {
+    showToast(
+      "Candidate needed",
+      "The Resume Screener runs from a candidate's profile — open one and click Run AI Screener.",
+    );
+    return;
+  }
+  const payload =
+    agentId === "daily_brief"
+      ? { scope: "me", max_items: 20 }
+      : agentId === "resume_screener"
+        ? { candidate_id: context.candidate_id, ...(context.requisition_id ? { requisition_id: context.requisition_id } : {}) }
+        : { max_items: 20 };
+  if (button) {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+  }
+  try {
+    const run = await apiRequest(`/agents/${agentId}/run`, { method: "POST", body: JSON.stringify(payload) });
+    agentsRunsCache.unshift(run);
+    renderAgentsFromCache();
+    agentsRunContext = null; /* one-shot context */
+    document.querySelector("[data-agents-run-context]")?.remove();
+    const summary = run.output_summary || "Nothing is saved until you accept.";
+    showToast("Draft ready", summary);
+  } catch (error) {
+    showLiveError(error);
+  }
+  if (button) {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+}
+
+async function decideAgentRunAction(button) {
+  const runId = intOrNull(button.dataset.agentRunId);
+  const decision = button.dataset.agentDecision;
+  if (!runId || !decision) return;
+  button.disabled = true;
+  try {
+    const updated = await apiRequest(`/agents/runs/${runId}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision }),
+    });
+    const index = agentsRunsCache.findIndex((run) => Number(run.id) === Number(runId));
+    if (index !== -1) agentsRunsCache[index] = updated;
+    const overlay = document.getElementById("ro-inpage-overlay");
+    if (overlay && overlay.dataset.overlayRoute === "agents-workbench-run-detail") {
+      renderAgentRunDetail(updated, agentsCatalogCache?.items || []);
+    } else {
+      applyAgentRunDecisionToDom(runId, updated.status);
+      if (agentsStatusFilter !== "all" && agentsStatusVisible({ status: updated.status }) === false) {
+        renderAgentsFromCache();
+      } else {
+        updateAgentRunCounters(agentsCatalogCache, { items: agentsRunsCache });
+      }
+    }
+    showToast(decision === "accept" ? "Draft accepted" : "Draft rejected", "The decision is recorded in the audit log.");
+  } catch (error) {
+    button.disabled = false;
+    showLiveError(error);
+  }
+}
+
+async function openAgentRunDetail(button) {
+  const runId = intOrNull(button.dataset.agentRunId);
+  if (!runId) return;
+  const run = agentsRunsCache.find((entry) => Number(entry.id) === Number(runId));
+  if (!run) return;
+  renderAgentRunDetail(run, agentsCatalogCache?.items || []);
+}
+
+function closeAgentRunOverlay() {
+  if (typeof closeInPageOverlay === "function") {
+    closeInPageOverlay({ silent: true });
+  }
+}
+
+function wireAgentsWorkbenchFilters() {
+  const bar = document.querySelector("[data-agents-filter-bar]");
+  if (!bar || bar.dataset.agentsWired === "true") return;
+  bar.dataset.agentsWired = "true";
+  bar.querySelectorAll("[data-agents-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.agentsFilter || "all";
+      if (!/^(all|pending|accepted)$/.test(value)) return;
+      agentsStatusFilter = value;
+      bar.querySelectorAll("[data-agents-filter]").forEach((other) => {
+        other.classList.remove("is-active", "bg-secondary-container", "text-on-secondary-container");
+        other.classList.add("border", "border-border", "bg-surface", "text-secondary", "hover:bg-highlight-soft");
+      });
+      button.classList.add("is-active", "bg-secondary-container", "text-on-secondary-container");
+      button.classList.remove("border", "border-border", "bg-surface", "text-secondary", "hover:bg-highlight-soft");
+      renderAgentsFromCache();
+    });
+  });
+}
+
 function hasPermission(permissionCode) {
   if (isAdmin()) return true;
   const perms = userPermissions();
@@ -439,7 +606,7 @@ async function handleLogin(form) {
     if (!onboardingComplete && isFirstLogin) {
       window.location.href = pageHref("onboarding-welcome.html");
     } else {
-      window.location.href = pageHref("role-dashboard.html");
+      window.location.href = pageHref("home.html");
     }
   } catch (error) {
     if (overlay) {
@@ -4176,6 +4343,59 @@ async function undoMarkAllNotificationsSeen() {
   return Number(payload?.reverted ?? 0);
 }
 
+/* ── Notifications center: AI Triage review mode ─────────────── */
+function exitNotificationsTriage() {
+  window.notificationsTriageState = null;
+  document.querySelector("[data-triage-banner]")?.remove();
+  if (routeId() === "notifications-center") loadNotifications();
+}
+
+async function enterNotificationsTriage(button) {
+  if (button?.disabled) return;
+  if (button) {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+  }
+  try {
+    const run = await apiRequest("/agents/inbox_triage/run", {
+      method: "POST",
+      body: JSON.stringify({ status: "unread", max_items: 50 }),
+    });
+    const queue = run.output_draft?.queue || [];
+    window.notificationsTriageState = { runId: run.id, queue, done: new Set() };
+    renderNotificationsTriage();
+    showToast("AI Triage ready", `${queue.length} unread sorted by priority. Nothing changes until you act.`);
+  } catch (error) {
+    showLiveError(error);
+  }
+  if (button) {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+}
+
+async function triageGotItAction(button) {
+  const id = intOrNull(button.dataset.notificationId);
+  const state = window.notificationsTriageState;
+  if (!id || !state) return;
+  button.disabled = true;
+  try {
+    await markNotificationSeen(id);
+    state.done.add(String(id));
+    applyTriageDoneToDom(id);
+    updateTriageProgress();
+  } catch (error) {
+    button.disabled = false;
+    showLiveError(error);
+  }
+}
+
+function triageOpenAction(button) {
+  const id = intOrNull(button.dataset.notificationId);
+  if (!id) return;
+  navigateToRoute(`notification-detail-panel.html?notification_id=${id}`);
+}
+
 async function markAllNotificationsReadAction(button) {
   if (!button || button.disabled) return;
   setMarkAllButtonState(button, "pending");
@@ -5011,6 +5231,76 @@ function bindLiveApiInteractions() {
       return;
     }
 
+    // Agents: open run detail
+    const openRunButton = target?.closest("[data-live-agents-open-run]");
+    if (openRunButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openAgentRunDetail(openRunButton);
+      return;
+    }
+
+    // Notifications center: AI triage review mode
+    const triageToggle = target?.closest("[data-live-notifications-triage]");
+    if (triageToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      enterNotificationsTriage(triageToggle);
+      return;
+    }
+    if (target?.closest("[data-triage-exit]")) {
+      event.preventDefault();
+      event.stopPropagation();
+      exitNotificationsTriage();
+      return;
+    }
+    const triageGotIt = target?.closest("[data-triage-got-it]");
+    if (triageGotIt) {
+      event.preventDefault();
+      event.stopPropagation();
+      triageGotItAction(triageGotIt);
+      return;
+    }
+    const triageOpen = target?.closest("[data-triage-open]");
+    if (triageOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      triageOpenAction(triageOpen);
+      return;
+    }
+
+    // Agents: run the selected agent
+    const runAgentButton = target?.closest("[data-live-agents-open-runner]");
+    if (runAgentButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      runAgentAction(runAgentButton);
+      return;
+    }
+
+    // Agents: Run AI Screener from a candidate page (deep-links to workbench)
+    const screenerButton = target?.closest("[data-live-agents-run-screener]");
+    if (screenerButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const candidateId = screenerButton.dataset.candidateId;
+      if (!candidateId) {
+        showToast("Hold on", "Load the candidate profile first, then run the screener.");
+        return;
+      }
+      navigateToRoute(`agents-workbench.html?candidate_id=${encodeURIComponent(candidateId)}`);
+      return;
+    }
+
+    // Agents: accept/reject a run
+    const decideAgentButton = target?.closest("[data-live-agents-decide]");
+    if (decideAgentButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      decideAgentRunAction(decideAgentButton);
+      return;
+    }
+
     // Permission reset (discard unsaved toggles)
     const permissionResetButton = target?.closest("[data-live-role-permissions-reset]");
     if (permissionResetButton) {
@@ -5437,6 +5727,37 @@ async function bootPage() {
     "support-workspace": async () => {
       // Support page - no API needed, shows static help content
     },
+    "agents-workbench": async () => {
+      const [catalog, runsPayload] = await Promise.all([
+        loadAgentsCatalog(),
+        loadAgentsRuns().catch(() => ({ items: [] })),
+      ]);
+      /* Deep-link support: ?candidate_id=X prefills the Resume Screener
+         context from a candidate page; &autorun=1 fires it immediately. */
+      const linkedCandidateId = queryInt("candidate_id");
+      if (linkedCandidateId) {
+        agentsRunContext = {
+          candidate_id: linkedCandidateId,
+          requisition_id: queryInt("requisition_id") || undefined,
+          run: queryInt("autorun") === 1,
+        };
+        renderAgentsRunContextBanner(catalog);
+        const candidate = await apiRequest(`/candidates/${linkedCandidateId}`).catch(() => null);
+        if (candidate?.full_name) {
+          agentsRunContext.candidate_name = candidate.full_name;
+          renderAgentsRunContextBanner(catalog, true);
+        }
+        const selectEl = document.querySelector("[data-agents-select]");
+        if (selectEl) selectEl.value = "resume_screener";
+      }
+      if (renderAgentsWorkbench(catalog, { items: agentsRunsCache })) {
+        wireAgentsWorkbenchFilters();
+      }
+      if (agentsRunContext?.run && typeof runAgentAction === "function") {
+        const runButton = document.querySelector("[data-live-agents-open-runner]");
+        runAgentAction(runButton, { ...agentsRunContext, agentId: "resume_screener" });
+      }
+    },
     "onboarding-company-profile": async () => { wireOnboardingLocationGuidance(); },
     "onboarding-hiring-teams": async () => {},
     "onboarding-locations": async () => { wireOnboardingLocationGuidance(); },
@@ -5455,62 +5776,11 @@ async function bootPage() {
     if (loaders[overlayRoute]) await loaders[overlayRoute]();
   };
 
-  /* RBAC: Block access to unauthorized pages */
+  /* RBAC: Block access to unauthorized pages. The gate map now lives in
+     navigation.config.js (NAV_PAGE_PERMISSIONS) — this file no longer
+     duplicates it. Deep-link gating behavior is unchanged. */
   if (!isAdmin() && !PUBLIC_ROUTES.has(route)) {
-    const pagePermMap = {
-      "location-management": ["location.read"],
-      "location-dashboard": ["location.read"],
-      "user-management": ["user.read"],
-      "user-detail": ["user.read"],
-      "role-management": ["role.read"],
-      "role-permissions-editor": ["role.permissions.assign"],
-      "role-dashboard": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr"],
-      "business-titles": ["settings.read"],
-      "visibility-rules": ["settings.read"],
-      "work-assignment": ["assignment.read", "requisition.read"],
-      "portal-accounts": ["portal.read"],
-      "approvals-inbox": ["approval.read"],
-      "client-directory": ["client.read"],
-      "client-detail": ["client.read"],
-      "contact-form-dialog": ["client.contact.create"],
-      "candidate-profiles": ["candidate.read"],
-      "candidate-detail": ["candidate.read"],
-      "candidate-review-drawer": ["candidate.create"],
-      "pipeline-board": ["pipeline.read.summary"],
-      "application-detail-drawer": ["pipeline.read.detail"],
-      "stage-move-dialog": ["pipeline.stage.move"],
-      "requisition-list": ["requisition.read"],
-      "requisition-detail": ["requisition.read"],
-      "requisition-intake": ["requisition.create"],
-      "requisition-intake-edit": ["requisition.update"],
-      "interview-scheduler": ["interview.read"],
-      "interview-detail": ["interview.read"],
-      "interview-feedback-dialog": ["interview.read"],
-      "offer-management": ["offer.read"],
-      "offer-create-dialog": ["offer.create"],
-      "meetings": ["meeting.read"],
-      "meeting-form-dialog": ["meeting.create"],
-      "follow-ups": ["meeting.read"],
-      "follow-up-form-dialog": ["meeting.create"],
-      "join-tracker": ["offer.read"],
-      "daily-updates-workspace": ["daily_update.read"],
-      "daily-updates-submission": ["daily_update.create_main", "daily_update.read"],
-      "daily-updates-review": ["daily_update.read"],
-      "daily-update-detail-panel": ["daily_update.read"],
-      "notifications-center": ["notification.read"],
-      "notification-detail-panel": ["notification.read"],
-      "analytics-dashboard": ["dashboard.view_admin", "dashboard.view_hr", "dashboard.view_manager", "dashboard.view_recruiter"],
-      "company-dashboard": ["dashboard.view_admin"],
-      "user-performance-reports": ["dashboard.view_admin", "dashboard.view_manager"],
-      "team-workload": ["dashboard.view_admin", "dashboard.view_manager"],
-      "reports": ["report.read"],
-      "custom-report-builder": ["report.read"],
-      "report-viewer": ["report.read"],
-      "pipeline-analytics": ["pipeline.read.summary"],
-      "time-to-fill-report": ["report.read"],
-      "source-effectiveness": ["report.read"],
-      "sla-tracker": ["report.read"],
-    };
+    const pagePermMap = (window.NAV_CONFIG && window.NAV_CONFIG.pagePermissions) || {};
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {
       hidePageLoader();

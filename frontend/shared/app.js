@@ -2566,28 +2566,21 @@ document.addEventListener("DOMContentLoaded", () => {
    primary pages, and quick actions. One owner: setupCommandPalette
    builds the DOM lazily; toggleCommandPalette opens/closes.
    ═══════════════════════════════════════════════════════════════ */
+/* Command palette entries derive from navigation.config.js (DRY: one
+   source for sidebar, home grid, and palette) plus in-place actions. */
+const NAV_PALETTE_ITEMS = (window.NAV_CONFIG && window.NAV_CONFIG.entries
+  ? window.NAV_CONFIG.entries
+      .filter((entry) => entry.showInSidebar !== false)
+      .map((entry) => ({
+        label: entry.label,
+        hint: (window.NAV_CONFIG.categories.find((c) => c.key === entry.category) || {}).label || "Page",
+        icon: entry.icon,
+        route: entry.file,
+      }))
+  : []);
+
 const COMMAND_ITEMS = [
-  { label: "Company Performance", hint: "Dashboard", icon: "dashboard", route: "company-dashboard.html" },
-  { label: "My Profile", hint: "Account", icon: "account_circle", route: "my-profile.html" },
-  { label: "My Work", hint: "Dashboard", icon: "assignment_ind", route: "my-work-dashboard.html" },
-  { label: "Role Dashboard", hint: "Dashboard", icon: "admin_panel_settings", route: "role-dashboard.html" },
-  { label: "Requisitions", hint: "Hiring", icon: "work", route: "requisition-list.html" },
-  { label: "New Requisition", hint: "Action", icon: "add_circle", route: "requisition-intake.html" },
-  { label: "Pipeline Board", hint: "Hiring", icon: "view_kanban", route: "pipeline-board.html" },
-  { label: "Candidates", hint: "Hiring", icon: "groups", route: "candidate-profiles.html" },
-  { label: "Clients", hint: "Hiring", icon: "business", route: "client-directory.html" },
-  { label: "Interviews", hint: "Hiring", icon: "calendar_month", route: "interview-scheduler.html" },
-  { label: "Offers", hint: "Hiring", icon: "description", route: "offer-management.html" },
-  { label: "Daily Review", hint: "Work", icon: "fact_check", route: "daily-review.html" },
-  { label: "Submit Daily Update", hint: "Action", icon: "upload_file", route: "daily-updates-submission.html" },
-  { label: "Approvals Inbox", hint: "Workflow", icon: "approval", route: "approvals-inbox.html" },
-  { label: "Notifications", hint: "Inbox", icon: "notifications", route: "notifications-center.html" },
-  { label: "Reports", hint: "Reports", icon: "analytics", route: "reports.html" },
-  { label: "Report Viewer", hint: "Reports", icon: "print", route: "report-viewer.html" },
-  { label: "Users", hint: "Admin", icon: "manage_accounts", route: "user-management.html" },
-  { label: "Roles & Permissions", hint: "Admin", icon: "shield", route: "role-management.html" },
-  { label: "Locations", hint: "Admin", icon: "location_on", route: "location-management.html" },
-  { label: "Business Titles", hint: "Admin", icon: "badge", route: "business-titles.html" },
+  ...NAV_PALETTE_ITEMS,
   { label: "Toggle table density", hint: "Action", icon: "density_medium", action: () => {
       setDensityPreference(readDensityPreference() === "compact" ? "comfortable" : "compact");
       showToast("Table density changed", readDensityPreference() === "compact" ? "Rows are compacted to fit more on screen." : "Rows are back to comfortable spacing.");

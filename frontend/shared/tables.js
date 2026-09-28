@@ -382,6 +382,10 @@ function isTopbarSearchInput(input) {
 function isWorkspaceFilterSelect(select) {
   if (!select || select.closest("table, form, [data-entity-dialog], .overlay-host, [data-overlay-surface], .advanced-filter-panel")) return false;
   if (select.classList.contains("custom-select") || select.id === "req-select") return false;
+  /* Agent picker is an action control, not a table filter. */
+  if (select.hasAttribute("data-agents-select")) return false;
+  /* Global nav search lives in the topbar/home header, not a table toolbar. */
+  if (select.hasAttribute("data-global-search")) return false;
   return true;
 }
 
@@ -1932,6 +1936,9 @@ function arrangeFilterToolbar(toolbar) {
 
 function hydrateLiveFilters(scope = document) {
   const root = scope && scope !== document ? scope : document;
+  /* Home is a categorized card grid, not a data table — the filter-toolbar
+     machinery would restructure it and destroy the layout. */
+  if (root === document && document.body?.dataset.routeId === "home") return;
   const surfaces = new Set();
   if (root.querySelectorAll) {
     root.querySelectorAll(".workspace-surface, [data-layout='table-surface'], section.shell-card").forEach((node) => surfaces.add(node));
