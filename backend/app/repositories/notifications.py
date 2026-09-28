@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, bindparam, text
 
 from app.schemas.notification import NotificationCreate, NotificationListFilters
 
@@ -148,3 +148,49 @@ def mark_notification_as_read(engine: Engine, notification_id: int) -> Notificat
     if updated is None:
         raise RuntimeError("Updated notification could not be reloaded")
     return updated
+
+
+def mark_all_notifications_as_read(engine: Engine, user_id: int) -> list[int]:
+    """Mark every unread notification owned by the user as read.
+
+    Returns the ids of the rows this batch touched so the client can offer
+    an exact undo of the whole batch (not just the page it had cached).
+    """
+    query = text(
+        """
+        UPDATE dbo.notifications
+        SET
+          status = N'read',
+          read_at = COALESCE(read_at, SYSUTCDATETIME()),
+          updated_at = SYSUTCDATETIME()
+        OUTPUT INSERTED.id
+        WHERE user_id = :user_id AND status = N'unread';
+        """
+    )
+    with engine.begin() as connection:
+        rows = connection.execute(query, {"user_id": user_id}).scalars().all()
+        return [int(value) for value in rows]
+
+
+def undo_mark_all_notifications_as_read(engine: Engine, user_id: int, notification_ids: list[int]) -> int:
+    """Revert a mark-all-read batch: set the given notifications back to unread.
+
+    Scoped to the owning user and to rows that are currently 'read', so the
+    undo can never resurrect older reads or touch another user's rows.
+    Returns the affected row count.
+    """
+    if not notification_ids:
+        return 0
+    query = text(
+        """
+        UPDATE dbo.notifications
+        SET
+          status = N'unread',
+          read_at = NULL,
+          updated_at = SYSUTCDATETIME()
+        WHERE user_id = :user_id AND status = N'read' AND id IN :notification_ids;
+        """
+    ).bindparams(bindparam("notification_ids", expanding=True))
+    with engine.begin() as connection:
+        result = connection.execute(query, {"user_id": user_id, "notification_ids": list(notification_ids)})
+        return int(result.rowcount or 0)

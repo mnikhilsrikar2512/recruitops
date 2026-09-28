@@ -5,7 +5,12 @@ from fastapi import HTTPException
 
 from app.schemas.notification import NotificationListFilters
 from app.services.auth import AuthContext
-from app.services.notifications import list_notifications_service, mark_notification_read_service
+from app.services.notifications import (
+    list_notifications_service,
+    mark_all_notifications_read_service,
+    mark_notification_read_service,
+    undo_mark_all_notifications_read_service,
+)
 
 
 def _auth_context(user_id: int, location_id: int | None = 4, role_code: str = "recruiter") -> AuthContext:
@@ -74,3 +79,46 @@ def test_mark_notification_read_succeeds_for_owner(monkeypatch) -> None:
 
     assert response.id == 99
     assert response.status == "read"
+
+
+def test_mark_all_read_scopes_to_current_user(monkeypatch) -> None:
+    captured = {}
+
+    def _mark_all(engine, user_id):
+        captured["user_id"] = user_id
+        return [3, 5, 8, 13, 21]
+
+    monkeypatch.setattr("app.services.notifications.mark_all_notifications_as_read", _mark_all)
+
+    response = mark_all_notifications_read_service(object(), _auth_context(22))
+
+    assert captured["user_id"] == 22
+    assert response == {"updated": 5, "notification_ids": [3, 5, 8, 13, 21]}
+
+
+def test_undo_mark_all_read_scopes_to_current_user(monkeypatch) -> None:
+    captured = {}
+
+    def _undo(engine, user_id, notification_ids):
+        captured["user_id"] = user_id
+        captured["notification_ids"] = list(notification_ids)
+        return 4
+
+    monkeypatch.setattr("app.services.notifications.undo_mark_all_notifications_as_read", _undo)
+
+    response = undo_mark_all_notifications_read_service(object(), _auth_context(22), [3, 5, 8, 13])
+
+    assert captured["user_id"] == 22
+    assert captured["notification_ids"] == [3, 5, 8, 13]
+    assert response == {"reverted": 4}
+
+
+def test_undo_mark_all_read_with_empty_batch_is_noop(monkeypatch) -> None:
+    def _fail(*args, **kwargs):
+        raise AssertionError("repository must not be called for an empty batch")
+
+    monkeypatch.setattr("app.services.notifications.undo_mark_all_notifications_as_read", _fail)
+
+    response = undo_mark_all_notifications_read_service(object(), _auth_context(22), [])
+
+    assert response == {"reverted": 0}

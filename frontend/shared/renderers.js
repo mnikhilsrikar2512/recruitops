@@ -920,6 +920,18 @@ function renderNotificationsCommandCenter(items, meta) {
     queueHeading.textContent = "What happened";
     const subtitle = queueHeading.nextElementSibling;
     if (subtitle) subtitle.textContent = "Newest events first. Stay here to see what happened; hover a row for actions.";
+    const headerRow = queueHeading.closest("div.flex");
+    let slot = headerRow?.querySelector("[data-mark-all-read-slot]");
+    if (headerRow && !slot) {
+      slot = document.createElement("div");
+      slot.dataset.markAllReadSlot = "true";
+      headerRow.appendChild(slot);
+    }
+    if (slot) {
+      slot.innerHTML = unreadTotal > 0
+        ? `<button type="button" data-live-notifications-mark-all-read class="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition-colors shrink-0" aria-label="Mark all ${unreadTotal} unread notifications as read"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">done_all</span><span data-mark-all-label>Mark all read</span></button>`
+        : "";
+    }
   }
   const list = queueHeading?.closest("section")?.querySelector(".divide-y");
   if (!list) return false;

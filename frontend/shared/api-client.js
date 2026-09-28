@@ -3999,10 +3999,105 @@ function applyNotificationReadState(row) {
 async function markNotificationSeen(id) {
   if (!id) return false;
   await apiRequest(`/notifications/${id}/read`, { method: "PATCH", body: JSON.stringify({ status: "read" }) });
-  notificationItemsCache = notificationItemsCache.map((item) => (String(item.id) === String(id) ? { ...item, status: "read", read_at: new Date().toISOString() } : item));
+  notificationItemsCache = notificationItemsCache.map((item) => (String(item.id) === String(id) ? { ...item, status: "read", read_at: item.read_at || new Date().toISOString() } : item));
   notificationUnreadTotal = Math.max(0, notificationUnreadTotal - 1);
   refreshNotificationBadge();
   return true;
+}
+
+const UNDO_WINDOW_MS = 30000;
+const MARK_ALL_BUTTON_LABEL = "Mark all read";
+let pendingMarkAllUndoIds = null;
+
+function setMarkAllButtonState(button, state) {
+  if (!button) return;
+  /* Only the in-flight state locks the button; "failed" must stay
+     clickable so the user can actually retry. */
+  button.disabled = state === "pending";
+  const icon = button.querySelector(".material-symbols-outlined");
+  const label = button.querySelector("[data-mark-all-label]");
+  if (!icon || !label) return;
+  if (state === "pending") {
+    icon.textContent = "progress_activity";
+    icon.classList.add("animate-spin");
+    label.textContent = "Marking…";
+    button.setAttribute("aria-busy", "true");
+  } else if (state === "failed") {
+    icon.textContent = "refresh";
+    icon.classList.remove("animate-spin");
+    label.textContent = "Retry";
+    button.setAttribute("aria-busy", "false");
+  } else {
+    icon.textContent = "done_all";
+    icon.classList.remove("animate-spin");
+    label.textContent = MARK_ALL_BUTTON_LABEL;
+    button.removeAttribute("aria-busy");
+  }
+}
+
+async function markAllNotificationsSeen() {
+  /* The server returns the ids it flipped, so the undo window can restore
+     the whole batch even when only one page (~50 rows) is cached. */
+  const payload = await apiRequest("/notifications/read-all", { method: "POST" });
+  notificationItemsCache = notificationItemsCache.map((item) => ({ ...item, status: "read", read_at: item.read_at || new Date().toISOString() }));
+  notificationUnreadTotal = 0;
+  refreshNotificationBadge();
+  pendingMarkAllUndoIds = Array.isArray(payload?.notification_ids) ? payload.notification_ids.map(Number) : [];
+  return Number(payload?.updated ?? 0);
+}
+
+async function undoMarkAllNotificationsSeen() {
+  const ids = pendingMarkAllUndoIds || [];
+  if (!ids.length) return 0;
+  const payload = await apiRequest("/notifications/read-all/undo", {
+    method: "POST",
+    body: JSON.stringify({ notification_ids: ids }),
+  });
+  const revertedSet = new Set(ids.map(String));
+  notificationItemsCache = notificationItemsCache.map((item) => (revertedSet.has(String(item.id)) ? { ...item, status: "unread", read_at: null } : item));
+  notificationUnreadTotal = ids.length;
+  pendingMarkAllUndoIds = null;
+  refreshNotificationBadge();
+  return Number(payload?.reverted ?? 0);
+}
+
+async function markAllNotificationsReadAction(button) {
+  if (!button || button.disabled) return;
+  setMarkAllButtonState(button, "pending");
+  try {
+    const updated = await markAllNotificationsSeen();
+    if (routeId() === "notifications-center" && document.querySelector("[data-notifications-command-center]")) {
+      renderNotificationsCommandCenter(notificationsView(), { unread_total: notificationUnreadTotal });
+    }
+    if (pendingMarkAllUndoIds && pendingMarkAllUndoIds.length === 0) {
+      /* Server confirmed zero rows changed; nothing to offer undo for. */
+      showToast("All caught up", "Nothing was waiting for you.");
+      setMarkAllButtonState(button, "idle");
+      return;
+    }
+    const undoResult = await showToastWithAction({
+      title: "All caught up",
+      text: updated > 0 ? `${updated} notification${updated === 1 ? "" : "s"} marked as read.` : "Nothing was waiting for you.",
+      actionLabel: "Undo",
+      timeoutMs: UNDO_WINDOW_MS,
+    });
+    if (undoResult.settled) {
+      try {
+        const reverted = await undoMarkAllNotificationsSeen();
+        if (routeId() === "notifications-center" && document.querySelector("[data-notifications-command-center]")) {
+          renderNotificationsCommandCenter(notificationsView(), { unread_total: notificationUnreadTotal });
+        }
+        showToast("Restored", `${reverted} notification${reverted === 1 ? "" : "s"} marked unread again.`);
+      } catch (error) {
+        showLiveError(error);
+      }
+    }
+  } catch (error) {
+    showLiveError(error);
+    setMarkAllButtonState(button, "failed");
+    return;
+  }
+  setMarkAllButtonState(button, "idle");
 }
 
 async function markNotificationReadAction(button) {
@@ -4789,6 +4884,15 @@ function bindLiveApiInteractions() {
       event.preventDefault();
       event.stopPropagation();
       saveRolePermissions(permissionSaveButton);
+      return;
+    }
+
+    // Notifications: mark all as read
+    const markAllReadButton = target?.closest("[data-live-notifications-mark-all-read]");
+    if (markAllReadButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      markAllNotificationsReadAction(markAllReadButton);
       return;
     }
 

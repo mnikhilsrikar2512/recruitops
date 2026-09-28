@@ -60,3 +60,16 @@ class NotificationMarkReadRequest(BaseModel):
 class NotificationListResponse(BaseModel):
     items: list[NotificationResponse]
     meta: PaginationMeta
+
+
+class MarkAllNotificationsReadResponse(BaseModel):
+    updated: int
+    notification_ids: list[int] = Field(default_factory=list)
+
+
+class UndoMarkAllNotificationsReadRequest(BaseModel):
+    notification_ids: list[int] = Field(default_factory=list)
+
+
+class UndoMarkAllNotificationsReadResponse(BaseModel):
+    reverted: int

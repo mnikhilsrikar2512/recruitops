@@ -3,13 +3,21 @@ from sqlalchemy import Engine
 
 from app.api.deps import get_current_auth_context, get_engine, require_permissions
 from app.schemas.notification import (
+    MarkAllNotificationsReadResponse,
     NotificationListFilters,
     NotificationListResponse,
     NotificationMarkReadRequest,
     NotificationResponse,
+    UndoMarkAllNotificationsReadRequest,
+    UndoMarkAllNotificationsReadResponse,
 )
 from app.services.auth import AuthContext
-from app.services.notifications import list_notifications_service, mark_notification_read_service
+from app.services.notifications import (
+    list_notifications_service,
+    mark_all_notifications_read_service,
+    mark_notification_read_service,
+    undo_mark_all_notifications_read_service,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -26,6 +34,29 @@ def list_notifications_endpoint(
 ) -> NotificationListResponse:
     filters = NotificationListFilters(status=status, priority=priority, page=page, page_size=page_size)
     return list_notifications_service(engine, auth_context, filters)
+
+
+@router.post("/read-all", response_model=MarkAllNotificationsReadResponse)
+def mark_all_notifications_read_endpoint(
+    _auth: object = Depends(require_permissions("notification.mark_read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> MarkAllNotificationsReadResponse:
+    """Mark every unread notification for the signed-in user as read."""
+    return MarkAllNotificationsReadResponse(**mark_all_notifications_read_service(engine, auth_context))
+
+
+@router.post("/read-all/undo", response_model=UndoMarkAllNotificationsReadResponse)
+def undo_mark_all_notifications_read_endpoint(
+    payload: UndoMarkAllNotificationsReadRequest,
+    _auth: object = Depends(require_permissions("notification.mark_read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> UndoMarkAllNotificationsReadResponse:
+    """Revert a recent mark-all-read batch back to unread."""
+    return UndoMarkAllNotificationsReadResponse(
+        **undo_mark_all_notifications_read_service(engine, auth_context, payload.notification_ids)
+    )
 
 
 @router.patch("/{notification_id}/read", response_model=NotificationResponse)
