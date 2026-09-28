@@ -3955,7 +3955,7 @@ function formatNotificationBadgeCount(count) {
 
 async function refreshNotificationBadge() {
   const badge = ensureNotificationBadge();
-  if (!badge || !LIVE_API_ENABLED) return;
+  if (!badge || !LIVE_API_ENABLED) return false;
   try {
     const payload = await apiRequest("/notifications/?status=unread&page_size=1");
     const count = payload.meta?.total ?? 0;
@@ -3969,8 +3969,123 @@ async function refreshNotificationBadge() {
         count > 0 ? `Review notifications, ${count} unread` : "Review notifications"
       );
     }
+    return true;
   } catch {
     badge.hidden = true;
+    return false;
+  }
+}
+
+/* ── Adaptive notification-badge polling ──────────────────────
+   A fixed 30s interval used to hit /notifications even when the tab
+   was hidden, the user was away, or the backend was down. The cycle
+   below instead:
+   - polls every 30s while the tab is visible and the user is active;
+   - backs off ×1.5 per skipped tick (hidden tab / idle user) up to 2min;
+   - backs off ×2 per failed request up to 2min, so a downed backend
+     stops being hammered — user activity never resets this backoff;
+   - snaps back to the 30s cadence on real activity or tab return,
+     running the next due poll within ~1s (unless a failure backoff
+     is active — retrying a down API on every click is the exact
+     hammering this prevents);
+   - stops entirely once the session is gone. */
+const BADGE_POLL_BASE_MS = 30 * 1000;
+const BADGE_POLL_MAX_MS = 2 * 60 * 1000;
+const BADGE_POLL_IDLE_MS = 2 * BADGE_POLL_BASE_MS;
+let badgePollTimer = null;
+let badgePollSkipBackoffMs = BADGE_POLL_BASE_MS;
+let badgePollFailureBackoffMs = BADGE_POLL_BASE_MS;
+let badgePollLastActivity = Date.now();
+
+function scheduleBadgePoll(delayMs) {
+  if (badgePollTimer) clearTimeout(badgePollTimer);
+  badgePollTimerDelay = delayMs;
+  badgePollTimerScheduledAt = Date.now();
+  badgePollTimer = setTimeout(runBadgePollCycle, delayMs);
+}
+
+function remainingBadgePollDelay() {
+  if (!badgePollTimer) return Infinity;
+  return Math.max(0, badgePollTimerScheduledAt + badgePollTimerDelay - Date.now());
+}
+
+async function runBadgePollCycle() {
+  badgePollTimer = null;
+  if (!readSession()) return; /* signed out: stop polling */
+  const documentHidden = typeof document !== "undefined" && document.hidden;
+  const idleFor = Date.now() - badgePollLastActivity;
+  if (documentHidden || idleFor >= BADGE_POLL_IDLE_MS) {
+    /* Nobody is watching: skip the request and stretch the interval. */
+    badgePollSkipBackoffMs = Math.min(badgePollSkipBackoffMs * 1.5, BADGE_POLL_MAX_MS);
+    scheduleBadgePoll(Math.max(badgePollSkipBackoffMs, badgePollFailureBackoffMs));
+    return;
+  }
+  const ok = await refreshNotificationBadge();
+  if (ok) {
+    badgePollFailureBackoffMs = BADGE_POLL_BASE_MS;
+    badgePollSkipBackoffMs = BADGE_POLL_BASE_MS;
+    scheduleBadgePoll(BADGE_POLL_BASE_MS);
+  } else {
+    badgePollFailureBackoffMs = Math.min(badgePollFailureBackoffMs * 2, BADGE_POLL_MAX_MS);
+    scheduleBadgePoll(badgePollFailureBackoffMs);
+  }
+}
+
+function nudgeBadgePollSooner() {
+  /* Pull a backoff-delayed poll forward so a returning user sees a
+     fresh count within ~1s. Only when the pending tick is farther out
+     than the base cadence — otherwise steady activity would keep
+     re-nudging and poll more often than every 30s. */
+  if (!badgePollTimer || remainingBadgePollDelay() > BADGE_POLL_BASE_MS) {
+    scheduleBadgePoll(1000);
+  }
+}
+
+function noteBadgeUserActivity() {
+  const now = Date.now();
+  const recentlyHandled = now - badgePollLastActivity < 5000;
+  badgePollLastActivity = now; /* record every event, throttle only the work */
+  if (recentlyHandled) return;
+  badgePollSkipBackoffMs = BADGE_POLL_BASE_MS;
+  /* Never nudge through an active failure backoff: retrying a down
+     API on every click is the hammering this scheduler prevents. */
+  if (badgePollFailureBackoffMs === BADGE_POLL_BASE_MS) nudgeBadgePollSooner();
+}
+
+function startNotificationBadgePolling() {
+  if (badgePollTimer) return; /* already running */
+  if (!readSession()) return; /* nothing to poll for */
+  badgePollLastActivity = Date.now();
+  badgePollSkipBackoffMs = BADGE_POLL_BASE_MS;
+  badgePollFailureBackoffMs = BADGE_POLL_BASE_MS;
+  if (typeof document === "undefined" || !document.hidden) {
+    refreshNotificationBadge();
+  }
+  scheduleBadgePoll(BADGE_POLL_BASE_MS);
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        badgePollLastActivity = Date.now();
+        badgePollSkipBackoffMs = BADGE_POLL_BASE_MS;
+        if (badgePollFailureBackoffMs === BADGE_POLL_BASE_MS) nudgeBadgePollSooner();
+      }
+    });
+  }
+  if (typeof window !== "undefined") {
+    for (const evt of ["pointerdown", "keydown", "wheel"]) {
+      window.addEventListener(evt, noteBadgeUserActivity, { passive: true });
+    }
+  }
+}
+
+/* Hook for session changes that don't navigate away (login/logout flows
+   outside the standard redirects). Safe to call repeatedly. */
+function onSessionChangedBadgePoll() {
+  if (readSession()) {
+    startNotificationBadgePolling();
+  } else if (badgePollTimer) {
+    clearTimeout(badgePollTimer);
+    badgePollTimer = null;
   }
 }
 
@@ -5435,6 +5550,8 @@ RecruitOpsLive.reloadCurrentPage = RecruitOpsLive.reloadCurrentPage || (async ()
   if (fn) await fn();
   if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
 });
+RecruitOpsLive.startNotificationBadgePolling = startNotificationBadgePolling;
+RecruitOpsLive.onSessionChangedBadgePoll = onSessionChangedBadgePoll;
 window.RecruitOpsLive = RecruitOpsLive;
 
 
@@ -5472,8 +5589,7 @@ function startLiveApiClient() {
   });
 
   if (!isLandingPage && (RecruitOpsLive.session || readSession())) {
-    refreshNotificationBadge();
-    setInterval(() => refreshNotificationBadge(), 30000);
+    startNotificationBadgePolling();
   }
 }
 
