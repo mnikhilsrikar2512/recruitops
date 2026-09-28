@@ -447,9 +447,18 @@ function applyToolbarFilters(toolbar, { notify = true, searchTerm: termOverride 
     let visibleCount = 0;
     rows.forEach((row) => {
       const text = normalizeFilterText(row.textContent || "");
+      /* Display IDs like REQ-168 normalize to digit-less text (which would
+         match every row), so digit-bearing terms match raw text/filterCode
+         instead of the normalized form. */
+      const rawText = String(row.textContent || "").toLowerCase();
+      const rawTermLower = rawTerm.trim().toLowerCase();
+      const termHasDigits = /\d/.test(rawTermLower);
       const matchesChoices = activeSelects.every((entry) => rowMatchesFilterChoice(row, entry.choice, entry.key));
       const matchesTab = !tabChoice || isAllFilterChoice(tabChoice) || rowMatchesFilterChoice(row, tabChoice, toolbar?.dataset.filterTabKey || "status");
-      const matchesSearch = searchTerm.length < 2 || text.includes(searchTerm);
+      const matchesSearch = searchTerm.length < 2
+        || (termHasDigits
+          ? (rawText.includes(rawTermLower) || String(row.dataset?.filterCode || "").toLowerCase().includes(rawTermLower))
+          : text.includes(searchTerm));
       const visible = matchesChoices && matchesTab && matchesSearch;
       row.dataset.hiddenByFilter = visible ? "false" : "true";
       if (visible) visibleCount += 1;
@@ -1995,16 +2004,22 @@ function getFilterableCards() {
   return Array.from(document.querySelectorAll("article[data-notification-id], [data-live-notification-row]"));
 }
 
-function applyPipelineFilters({ searchTerm = "", activeSelects = [], tabChoice = "", notify = false } = {}) {
+function applyPipelineFilters({ searchTerm = "", activeSelects = [], tabChoice = "", notify = false, rawTerm = "" } = {}) {
   const cards = getFilterableCards();
   if (!cards.length) return null;
   let visibleCount = 0;
   cards.forEach((card) => {
-    const text = normalizeFilterText(card.textContent || "");
-    const matchesChoices = activeSelects.every((entry) => rowMatchesFilterChoice(card, entry.choice, entry.key));
-    const matchesTab = !tabChoice || isAllFilterChoice(tabChoice) || rowMatchesFilterChoice(card, tabChoice);
-    const matchesSearch = searchTerm.length < 2 || text.includes(searchTerm);
-    const visible = matchesChoices && matchesTab && matchesSearch;
+      const text = normalizeFilterText(card.textContent || "");
+      /* Display IDs like CND-1001 normalize to digit-less text, so
+         digit-bearing terms match the card's raw text instead. */
+      const rawText = String(card.textContent || "").toLowerCase();
+      const rawTermLower = String(rawTerm || "").trim().toLowerCase();
+      const termHasDigits = /\d/.test(rawTermLower);
+      const matchesChoices = activeSelects.every((entry) => rowMatchesFilterChoice(card, entry.choice, entry.key));
+      const matchesTab = !tabChoice || isAllFilterChoice(tabChoice) || rowMatchesFilterChoice(card, tabChoice);
+      const matchesSearch = searchTerm.length < 2
+        || (termHasDigits ? rawText.includes(rawTermLower) : text.includes(searchTerm));
+      const visible = matchesChoices && matchesTab && matchesSearch;
     card.hidden = !visible;
     if (visible) visibleCount += 1;
   });

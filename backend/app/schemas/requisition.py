@@ -152,6 +152,7 @@ class RequisitionResponse(BaseModel):
     id: int
     location_id: int
     requisition_code: str | None
+    branch_code: str | None = None
     client_id: int | None
     client_name: str | None
     primary_contact_id: int | None

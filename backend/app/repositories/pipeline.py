@@ -14,6 +14,9 @@ class PipelineBoardRecord:
     candidate_name: str
     requisition_id: int
     requisition_title: str
+    requisition_code: str | None
+    candidate_code: str | None
+    branch_code: str | None
     location_id: int
     location_name: str | None
     owner_user_id: int
@@ -32,8 +35,11 @@ class PipelineApplicationDetailRecord:
     application_id: int
     candidate_id: int
     candidate_name: str
+    candidate_code: str | None
     requisition_id: int
     requisition_title: str
+    requisition_code: str | None
+    branch_code: str | None
     location_id: int
     location_name: str | None
     owner_user_id: int
@@ -87,8 +93,11 @@ def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[P
           ca.id AS application_id,
           c.id AS candidate_id,
           c.full_name AS candidate_name,
+          c.candidate_code,
           r.id AS requisition_id,
           r.title AS requisition_title,
+          r.requisition_code,
+          l.code AS branch_code,
           r.branch_id AS location_id,
           l.name AS location_name,
           ca.owner_user_id,
@@ -140,8 +149,11 @@ def find_pipeline_application_by_id(engine: Engine, application_id: int) -> Pipe
           ca.id AS application_id,
           c.id AS candidate_id,
           c.full_name AS candidate_name,
+          c.candidate_code,
           r.id AS requisition_id,
           r.title AS requisition_title,
+          r.requisition_code,
+          l.code AS branch_code,
           r.branch_id AS location_id,
           l.name AS location_name,
           ca.owner_user_id,

@@ -59,6 +59,39 @@ function reqCode(item) {
   return item?.requisition_code || (item?.requisition_id ? `REQ-${item.requisition_id}` : item?.id ? `REQ-${item.id}` : "—");
 }
 
+/* ── Badge-Based Visual ID (PRD §2.6) ─────────────────────────────────
+   Bold monospace display ID plus a soft-tinted branch pill. The pill
+   tone is a stable hash of the branch code so HYD always renders the
+   same color on every surface; unknown codes fall back to neutral. */
+const BRANCH_TONES = ["sky", "violet", "amber", "rose", "teal"];
+
+function branchTone(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return "neutral";
+  const base = raw.replace(/[0-9]+$/, "").toUpperCase() || raw.toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < base.length; i += 1) hash = (hash * 31 + base.charCodeAt(i)) % 997;
+  return BRANCH_TONES[hash % BRANCH_TONES.length];
+}
+
+function branchCodeLabel(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return "";
+  return raw.replace(/[0-9]+$/, "").toUpperCase() || raw.toUpperCase();
+}
+
+function entityBadgeHtml(displayId, branchCode) {
+  const id = String(displayId || "").trim();
+  const pill = branchCodeLabel(branchCode);
+  if (!id && !pill) return "";
+  const tone = branchTone(branchCode);
+  return `<span class="entity-badge">${
+    id ? `<span class="entity-badge-id">${escapeLiveHtml(id)}</span>` : ""
+  }${
+    pill ? `<span class="branch-pill" data-branch-tone="${tone}" title="${escapeLiveHtml(String(branchCode).trim())}">${escapeLiveHtml(pill)}</span>` : ""
+  }</span>`;
+}
+
 function personInitials(name) {
   return String(name || "?")
     .split(/\s+/)
@@ -691,6 +724,7 @@ function renderDailyReviewPipelineActivity(items) {
     ? items.map((item) => `<div class="px-inset-card py-3 flex items-center gap-3 hover:bg-highlight-soft transition-colors">
         <div class="w-8 h-8 rounded-full bg-primary text-on-primary font-bold flex items-center justify-center shrink-0 text-[11px]">${escapeLiveHtml(personInitials(item.candidate_name || "C"))}</div>
         <p class="flex-1 min-w-0 truncate font-semibold text-on-surface text-[13px]">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
+        ${typeof entityBadgeHtml === "function" ? entityBadgeHtml(item.candidate_code || item.requisition_code, "") : ""}
         <span class="text-[12px] text-text-muted shrink-0">${escapeLiveHtml(item.current_stage || "Pipeline")}</span>
       </div>`).join("")
     : `<div class="px-inset-card py-5 text-body-sm text-text-muted">No recent pipeline movement.</div>`;
@@ -1205,6 +1239,10 @@ function renderOffers(items = [], meta = {}) {
     const avatar = cells[0]?.querySelector(".rounded-full, .w-8.h-8");
     if (avatar) avatar.textContent = personInitials(item.candidate_name);
     setStackedCell(cells[1], item.requisition_title || "—", item.requisition_code || (item.requisition_id ? `REQ-${item.requisition_id}` : ""));
+    const offerCodeNode = cells[1]?.querySelector(".font-label-caps, .text-xs, .font-body-sm, p.font-body-sm, .text-text-muted");
+    if (offerCodeNode && typeof entityBadgeHtml === "function" && item.requisition_code && !offerCodeNode.querySelector(".entity-badge")) {
+      offerCodeNode.insertAdjacentHTML("afterend", entityBadgeHtml(item.requisition_code, ""));
+    }
     const bonus = item.signing_bonus ? `+ ${formatOfferMoney(item.signing_bonus, item.offer_currency).replace("/yr", "")}` : "";
     setStackedCell(cells[2], formatOfferMoney(item.offered_ctc, item.offer_currency), bonus);
     const status = offerStatusMeta(item.offer_status);

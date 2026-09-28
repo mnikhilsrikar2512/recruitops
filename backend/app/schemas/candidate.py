@@ -213,6 +213,7 @@ class CandidateResponse(BaseModel):
 
     id: int
     candidate_code: str | None
+    branch_code: str | None = None
     full_name: str
     email: str | None
     phone: str | None
@@ -243,6 +244,7 @@ class CandidateResponse(BaseModel):
 class CandidateListItemResponse(BaseModel):
     id: int
     candidate_code: str | None
+    branch_code: str | None = None
     full_name: str
     email: str | None
     phone: str | None

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import RowMapping
 
+from app.repositories.display_ids import ENTITY_CANDIDATE, allocate_display_id
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDocumentCreate,
@@ -19,6 +20,7 @@ from app.schemas.candidate import (
 class CandidateRecord:
     id: int
     candidate_code: str | None
+    branch_code: str | None
     full_name: str
     email: str | None
     phone: str | None
@@ -117,7 +119,8 @@ def _candidate_select_sql() -> str:
     return """
         SELECT
           c.id,
-          CAST(NULL AS NVARCHAR(50)) AS candidate_code,
+          c.candidate_code,
+          cb.code AS branch_code,
           c.full_name,
           c.email,
           c.phone,
@@ -144,6 +147,8 @@ def _candidate_select_sql() -> str:
           c.updated_at,
           COUNT(ca.id) AS applications_count
         FROM dbo.candidates AS c
+        LEFT JOIN dbo.branches AS cb
+          ON cb.id = c.branch_id
         LEFT JOIN dbo.users AS source_owner
           ON source_owner.id = c.created_by_user_id
         LEFT JOIN dbo.users AS primary_owner
@@ -157,6 +162,7 @@ def _map_candidate(row: RowMapping, linked_requisition_titles: list[str] | None 
     return CandidateRecord(
         id=row["id"],
         candidate_code=row["candidate_code"],
+        branch_code=row["branch_code"],
         full_name=row["full_name"],
         email=row["email"],
         phone=row["phone"],
@@ -243,9 +249,13 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
             OR c.full_name LIKE '%' + :search + '%'
             OR c.email LIKE '%' + :search + '%'
             OR c.phone LIKE '%' + :search + '%'
+            OR c.candidate_code LIKE '%' + :search + '%'
+            OR cb.code LIKE '%' + :search + '%'
           )
           GROUP BY
             c.id,
+            c.candidate_code,
+            cb.code,
             c.full_name,
             c.email,
             c.phone,
@@ -301,6 +311,8 @@ def find_candidate_by_id(engine: Engine, candidate_id: int) -> CandidateRecord |
           WHERE c.id = :candidate_id
           GROUP BY
             c.id,
+            c.candidate_code,
+            cb.code,
             c.full_name,
             c.email,
             c.phone,
@@ -412,6 +424,8 @@ def create_candidate(engine: Engine, payload: CandidateCreate) -> CandidateRecor
     query = text(
         """
         INSERT INTO dbo.candidates (
+          branch_id,
+          candidate_code,
           full_name,
           email,
           phone,
@@ -429,6 +443,8 @@ def create_candidate(engine: Engine, payload: CandidateCreate) -> CandidateRecor
         )
         OUTPUT INSERTED.id
         VALUES (
+          (SELECT u.location_id FROM dbo.users AS u WHERE u.id = :branch_owner_user_id),
+          :candidate_code,
           :full_name,
           :email,
           :phone,
@@ -447,9 +463,21 @@ def create_candidate(engine: Engine, payload: CandidateCreate) -> CandidateRecor
         """
     )
     with engine.begin() as connection:
+        creator_user_id = payload.created_by_user_id or payload.primary_owner_user_id
+        creator_branch_id = connection.execute(
+            text("SELECT location_id FROM dbo.users WHERE id = :user_id;"),
+            {"user_id": creator_user_id},
+        ).scalar_one_or_none()
+        candidate_code = (
+            allocate_display_id(connection, ENTITY_CANDIDATE, int(creator_branch_id))
+            if creator_branch_id is not None
+            else None
+        )
         candidate_id = connection.execute(
             query,
             {
+                "branch_owner_user_id": creator_user_id,
+                "candidate_code": candidate_code,
                 "full_name": payload.full_name,
                 "email": payload.email,
                 "phone": payload.phone,

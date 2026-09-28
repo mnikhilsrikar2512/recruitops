@@ -92,6 +92,7 @@ def list_candidates_service(
         CandidateListItemResponse(
             id=item.id,
             candidate_code=item.candidate_code,
+            branch_code=item.branch_code,
             full_name=item.full_name,
             email=item.email,
             phone=item.phone,
@@ -159,6 +160,7 @@ def get_candidate_detail_service(
     response = CandidateResponse(
         id=candidate.id,
         candidate_code=candidate.candidate_code,
+        branch_code=candidate.branch_code,
         full_name=candidate.full_name,
         email=candidate.email,
         phone=candidate.phone,

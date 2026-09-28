@@ -926,6 +926,10 @@ async function submitRequisitionStatus(button) {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
     setFirstText("[data-current-stage]", application.current_stage);
+    const stageDialogName = document.querySelector("[data-candidate-name]");
+    if (stageDialogName?.parentElement && typeof entityBadgeHtml === "function" && (application.candidate_code || application.requisition_code) && !stageDialogName.parentElement.querySelector(":scope > .entity-badge")) {
+      stageDialogName.insertAdjacentHTML("afterend", entityBadgeHtml(application.candidate_code || application.requisition_code, application.branch_code));
+    }
     const subtitle = document.querySelector("[data-overlay-surface] p.font-body-sm");
     if (subtitle && application.candidate_name) {
       subtitle.textContent = `${application.candidate_name}${application.requisition_title ? " • " + application.requisition_title : ""}`;
@@ -2097,6 +2101,10 @@ async function loadRequisitionDetail() {
   setFirstText(".workspace-surface nav span:last-child", requisition.title);
   setFirstText(".workspace-surface h1, .workspace-surface h2", requisition.title);
   setFirstText(".workspace-surface h1 + span, .workspace-surface h2 + span", reqCode(requisition));
+  const reqDetailCodeHost = document.querySelector(".workspace-surface h1 + span, .workspace-surface h2 + span");
+  if (reqDetailCodeHost && typeof entityBadgeHtml === "function" && requisition.requisition_code && !reqDetailCodeHost.querySelector(".entity-badge")) {
+    reqDetailCodeHost.insertAdjacentHTML("afterend", entityBadgeHtml(requisition.requisition_code, requisition.branch_code));
+  }
   fillDashboardMetrics([
     { label: "Openings", value: requisition.openings_count, hint: requisition.employment_type || "Open role" },
     { label: "Priority", value: requisition.priority, hint: requisition.status },
@@ -2286,6 +2294,9 @@ async function loadCandidates() {
   fillExistingTable(items, (row, item) => {
     const cells = row.querySelectorAll("td");
     setStackedCell(cells[0], item.full_name || "—", item.email || item.source_type || "");
+    if (cells[0] && typeof entityBadgeHtml === "function" && item.candidate_code && !cells[0].querySelector(":scope > .entity-badge")) {
+      cells[0].insertAdjacentHTML("beforeend", entityBadgeHtml(item.candidate_code, item.branch_code));
+    }
     const avatar = cells[0]?.firstElementChild?.querySelector("div");
     if (avatar) {
       const initials = (item.full_name || "?").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
@@ -2321,6 +2332,7 @@ async function loadCandidates() {
     token.textContent = `${statusLabel} ${intakeLabel} ${dup.label} ${hasLink ? "linked" : "unlinked"}`;
     row.appendChild(token);
     row.dataset.filterStatus = statusLabel.toLowerCase();
+    row.dataset.filterCode = item.candidate_code || "";
     row.dataset.filterDuplicate = dup.label.toLowerCase().includes("unique") ? "unique" : dup.label.toLowerCase().includes("potential") ? "potential" : "not-checked";
     row.dataset.filterReadiness = intakeLabel.toLowerCase().replace(/\s+/g, "-");
     row.dataset.filterLinkage = hasLink ? "linked" : "unlinked";
@@ -2342,6 +2354,20 @@ async function loadCandidateDetail() {
   setFirstText("[data-candidate-name]", candidate.full_name);
   setFirstText("[data-candidate-email]", candidate.email);
   setFirstText("[data-candidate-phone]", candidate.phone);
+  const candidateNameHost = document.querySelector("[data-candidate-name]");
+  if (candidateNameHost?.parentElement && typeof entityBadgeHtml === "function" && candidate.candidate_code && !candidateNameHost.parentElement.querySelector(":scope > .entity-badge")) {
+    candidateNameHost.insertAdjacentHTML("afterend", entityBadgeHtml(candidate.candidate_code, candidate.branch_code));
+  }
+  /* Surface the agent entry point once the candidate id is known. */
+  const screenerButton = document.querySelector("[data-live-agents-run-screener]");
+  if (screenerButton) {
+    screenerButton.dataset.candidateId = String(candidate.id ?? "");
+    screenerButton.hidden = false;
+    screenerButton.setAttribute(
+      "aria-label",
+      `Run the AI resume screener for ${candidate.full_name || "this candidate"}`,
+    );
+  }
 }
 
 async function loadCandidateReviewDrawer() {
@@ -2715,6 +2741,7 @@ async function loadPipeline() {
                 <div class="min-w-0">
                   <p class="font-headline-sm text-[14px] text-on-surface">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
                   <p class="font-body-sm text-[12px] text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
+                  ${typeof entityBadgeHtml === "function" ? entityBadgeHtml(item.candidate_code || item.requisition_code, item.branch_code) : ""}
                 </div>
               </div>
               <span class="material-symbols-outlined text-text-muted text-[18px] shrink-0">drag_indicator</span>
@@ -2753,6 +2780,10 @@ function pipelineStageMatchesColumn(stage, columnTitle) {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
     setFirstText("[data-current-stage]", application.current_stage);
+    const stageDialogName = document.querySelector("[data-candidate-name]");
+    if (stageDialogName?.parentElement && typeof entityBadgeHtml === "function" && (application.candidate_code || application.requisition_code) && !stageDialogName.parentElement.querySelector(":scope > .entity-badge")) {
+      stageDialogName.insertAdjacentHTML("afterend", entityBadgeHtml(application.candidate_code || application.requisition_code, application.branch_code));
+    }
     setFirstText("[data-requisition-title]", application.requisition_title);
   } catch (error) { showLiveError(error); }
 }
@@ -3223,7 +3254,7 @@ async function loadMyWorkDashboard() {
           const days = Number.isNaN(created) ? "—" : Math.floor((Date.now() - created) / 86400000);
           const priority = days > 30 ? "High" : days > 14 ? "Med" : "Low";
           return `<tr class="border-b border-border h-table-row hover:bg-highlight-soft">
-            <td class="px-4 text-primary">REQ-${row.id}</td>
+            <td class="px-4">${typeof entityBadgeHtml === "function" && row.requisition_code ? entityBadgeHtml(row.requisition_code, row.branch_code) : escapeLiveHtml(row.requisition_code || `REQ-${row.id}`)}</td>
             <td class="px-4">${escapeLiveHtml(row.title || "Requisition")}</td>
             <td class="px-4"><span class="px-2 py-0.5 rounded-sm bg-success-bg text-success-text text-[11px] font-bold">${escapeLiveHtml(String(row.status || "open").toUpperCase())}</span></td>
             <td class="px-4">${days}</td>
@@ -5687,6 +5718,9 @@ async function bootPage() {
         const cells = row.querySelectorAll("td");
         /* Column order: Requisition | Client | Openings | Ownership | Location | Priority | Status | Age */
         setStackedCell(cells[0], item.title || item.requisition_code, item.client_name || "");
+        if (cells[0] && typeof entityBadgeHtml === "function" && item.requisition_code && !cells[0].querySelector(":scope > .entity-badge")) {
+          cells[0].insertAdjacentHTML("beforeend", entityBadgeHtml(item.requisition_code, item.branch_code));
+        }
         paintPersonCell(cells[1], item.client_name);
         setCellValue(cells[2], `${item.openings_count ?? "—"} opening${item.openings_count === 1 ? "" : "s"}`);
         paintPersonCell(cells[3], item.primary_owner_name);
@@ -5697,6 +5731,7 @@ async function bootPage() {
         row.dataset.filterStatus = String(item.status || "").toLowerCase();
         row.dataset.filterPriority = String(item.priority || "").toLowerCase();
         row.dataset.filterClient = item.client_name || "";
+        row.dataset.filterCode = item.requisition_code || "";
         row.dataset.filterOwner = item.primary_owner_name || "";
         row.dataset.filterLocation = item.work_mode || item.location_name || "";
         const detailRoute = `requisition-detail.html?requisition_id=${item.id}`;
