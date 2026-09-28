@@ -122,6 +122,7 @@ def list_agent_runs(
             r.updated_at
           FROM dbo.agent_runs AS r
           WHERE (:agent_id IS NULL OR r.agent_id = :agent_id)
+          AND r.actor_user_id = :actor_user_id
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered_runs
@@ -134,6 +135,7 @@ def list_agent_runs(
             query,
             {
                 "agent_id": agent_id,
+                "actor_user_id": actor_user_id,
                 "offset": (page - 1) * page_size,
                 "page_size": page_size,
             },

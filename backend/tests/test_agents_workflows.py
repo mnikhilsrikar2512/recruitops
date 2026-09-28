@@ -150,6 +150,69 @@ class TestMockInboxTriage:
         assert queue[0]["what"] == "Urgent"
         assert "next" in queue[0]
 
+    def test_queue_is_deterministic_for_equal_priorities(self) -> None:
+        provider = llm.MockLLMProvider()
+        context = {
+            "notifications": [
+                {"id": 7, "priority": "high", "title": "A", "message": "m", "module_name": "x", "entity_type": "t"},
+                {"id": 9, "priority": "high", "title": "B", "message": "m", "module_name": "x", "entity_type": "t"},
+                {"id": 8, "priority": "high", "title": "C", "message": "m", "module_name": "x", "entity_type": "t"},
+            ],
+        }
+        result = provider.generate("inbox_triage", context, AGENT_DEFINITIONS[2])
+        queue = result["output_draft"]["queue"]
+        # Equal priorities: newest first, deterministically.
+        assert [item["id"] for item in queue] == [9, 8, 7]
+
+    def test_queue_survives_malformed_rows(self) -> None:
+        provider = llm.MockLLMProvider()
+        context = {"notifications": [{}, {"id": 4, "priority": None, "title": None, "message": None}]}
+        result = provider.generate("inbox_triage", context, AGENT_DEFINITIONS[2])
+        queue = result["output_draft"]["queue"]
+        assert len(queue) == 2
+        assert queue[0]["what"] == "(untitled notification)"
+        assert queue[0]["priority"] == "normal"
+
+
+class TestMatchScorePrecision:
+    def test_score_capped_at_one_even_with_good_to_have_matches(self) -> None:
+        provider = llm.MockLLMProvider()
+        context = {
+            "candidate": {"full_name": "E", "current_designation": "React Frontend Engineer"},
+            "requisition": {
+                "title": "Frontend",
+                "must_have_skills": ["react"],
+                "good_to_have_skills": ["frontend", "typescript"],
+            },
+        }
+        result = provider.generate("resume_screener", context, AGENT_DEFINITIONS[0])
+        # 1/1 must-have plus 1 matched good-to-have: raw ratio would be 2.0.
+        assert result["output_draft"]["match_score"] == 1.0
+
+    def test_duplicate_and_blank_skills_do_not_inflate_matches(self) -> None:
+        provider = llm.MockLLMProvider()
+        context = {
+            "candidate": {"full_name": "E", "current_designation": "React React React React React React React React React React React React React React React React React Engineer"},
+            "requisition": {"title": "R", "must_have_skills": ["react", "react", "", None]},
+        }
+        result = provider.generate("resume_screener", context, AGENT_DEFINITIONS[0])
+        draft = result["output_draft"]
+        assert draft["extracted_skills"].count("react") == 1
+        assert draft["match_score"] == 1.0
+
+    def test_whole_word_match_avoids_substring_false_positives(self) -> None:
+        provider = llm.MockLLMProvider()
+        context = {
+            "candidate": {"full_name": "E", "current_designation": "Senior JavaScript Engineer"},
+            "requisition": {"title": "R", "must_have_skills": ["java"]},
+        }
+        result = provider.generate("resume_screener", context, AGENT_DEFINITIONS[0])
+        draft = result["output_draft"]
+        # "java" must not match inside "javascript"; Java and JavaScript
+        # are different skills and the old substring match inflated scores.
+        assert draft["extracted_skills"] == []
+        assert draft["match_score"] == 0.0
+
 
 # ---------------------------------------------------------------------------
 # Tool adapters (tenant scope)

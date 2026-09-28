@@ -3,6 +3,7 @@ from sqlalchemy import Engine
 
 from app.agents.registry import AGENT_DEFINITIONS, find_agent_by_id
 from app.agents.runner import decide_agent_run, run_agent
+from app.api.deps import PERMISSION_ALIASES
 from app.repositories.agents import find_agent_run_by_id, list_agent_runs
 from app.repositories.auth import list_resolved_permissions
 from app.schemas.agent import (
@@ -27,8 +28,13 @@ def _guard_agent_permission(engine: Engine, auth_context: AuthContext, agent_id:
         return
     if _is_admin(auth_context):
         return
+    # Resolve through PERMISSION_ALIASES exactly like require_permissions
+    # does at the API layer, so both guards always reach the same verdict
+    # (a legacy alias granted via role seed must not pass one guard and
+    # fail the other).
     resolved = set(list_resolved_permissions(engine, auth_context.user.id))
-    if spec.required_permission not in resolved:
+    aliases = PERMISSION_ALIASES.get(spec.required_permission, (spec.required_permission,))
+    if not any(alias in resolved for alias in aliases):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Missing required permission: {spec.required_permission}",
