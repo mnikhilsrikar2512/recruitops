@@ -1552,3 +1552,14 @@ table [data-layout="row-actions"] .ro-card-kebab-trigger {
   background: var(--surface-dim, rgba(23, 32, 28, 0.05));
   color: var(--text-muted, #5B6663);
 }
+
+/* ── Currency prefix inputs (offer dialog) ────────────────────────────
+   The overlay-input normalization above forces `padding: 6px 10px
+   !important`, which flattened pl-7/pl-9 and let digits collide with the
+   absolutely-positioned currency symbol. Inputs wired to a currency
+   symbol get their measured padding from --currency-pad instead, and the
+   selector mirrors (and exceeds) the normalizer's specificity so the
+   override wins the cascade. */
+.overlay-host [data-overlay-surface="true"] input[data-currency-input="true"]:not([type="checkbox"]):not([type="radio"]) {
+  padding-left: var(--currency-pad, 32px) !important;
+}

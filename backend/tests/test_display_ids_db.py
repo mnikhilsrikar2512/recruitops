@@ -119,6 +119,53 @@ class TestPerBranchAllocation:
         assert min_next >= 101
 
 
+class TestConcurrentAllocation:
+    """High-concurrency rule: parallel creators must never receive the same ID.
+
+    Spawns real concurrent transactions against the live database — the same
+    contention shape as multiple recruiters hitting POST /candidates at once.
+    """
+
+    def test_parallel_allocations_never_collide(self, engine) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        branch_id = _branch_id(engine, "HYD01")
+        entity = ENTITY_CANDIDATE
+        workers = 8
+        attempts_per_worker = 5
+        before = _next_value(engine, entity, branch_id)
+        results: list[str] = []
+        errors: list[Exception] = []
+
+        def allocate_batch(worker_index: int) -> list[str]:
+            allocated: list[str] = []
+            for _ in range(attempts_per_worker):
+                with engine.connect() as connection:
+                    transaction = connection.begin()
+                    try:
+                        allocated.append(allocate_display_id(connection, entity, branch_id))
+                        transaction.commit()
+                    except Exception:  # noqa: BLE001 - recorded and asserted below
+                        transaction.rollback()
+                        raise
+            return allocated
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(allocate_batch, i) for i in range(workers)]
+            for future in futures:
+                try:
+                    results.extend(future.result())
+                except Exception as exc:  # noqa: BLE001 - surfaced below
+                    errors.append(exc)
+
+        assert not errors, f"concurrent allocation raised: {errors!r}"
+        assert len(results) == workers * attempts_per_worker
+        assert len(set(results)) == len(results), "duplicate display IDs under concurrency"
+        # Every allocation is strictly sequential with no gaps or repeats.
+        values = sorted(int(code.split("-")[1]) for code in results)
+        assert values == list(range(before, before + len(values)))
+
+
 class TestWriteOnceImmutability:
     def test_reassigning_an_assigned_code_throws(self, engine) -> None:
         with engine.connect() as connection:

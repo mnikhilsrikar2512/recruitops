@@ -4092,6 +4092,35 @@ async function loadOfferManagement() {
   }
 }
 
+/* Currency selector → prefix symbol sync (offer dialog + any form with
+   select[data-currency-select] and [data-currency-symbol] spans). Updates
+   the rendered symbol and derives each input's padding-left from the
+   measured symbol width so wider glyphs (₹, ¥, C$) never overlap digits,
+   at any font size or screen resolution. */
+const CURRENCY_SYMBOLS = { USD: "$", EUR: "€", GBP: "£", CAD: "C$", INR: "₹", JPY: "¥", AUD: "A$" };
+
+function syncCurrencySymbols() {
+  document.querySelectorAll("select[data-currency-select]").forEach((select) => {
+    if (!select.dataset.currencyWired) {
+      select.addEventListener("change", syncCurrencySymbols);
+      select.dataset.currencyWired = "true";
+    }
+    const scope = select.closest("form") || select.closest("[data-overlay-surface]") || document;
+    const symbol = CURRENCY_SYMBOLS[select.value] ?? "";
+    scope.querySelectorAll("[data-currency-symbol]").forEach((span) => {
+      const input = document.getElementById(span.dataset.currencySymbol);
+      if (!input) return;
+      span.textContent = symbol;
+      const symbolWidth = Math.ceil(span.getBoundingClientRect().width);
+      /* Symbol sits at left-3 (12px); leave an 8px gutter before digits.
+         Routed through a CSS variable because overlay-input normalization
+         uses !important and would flatten a plain inline padding-left. */
+      input.dataset.currencyInput = "true";
+      input.style.setProperty("--currency-pad", `${symbolWidth + 20}px`);
+    });
+  });
+}
+
 async function loadOfferCreateDialog() {
   /* The offer form uses position/department selects — populate from backend */
   const candidates = await apiRequest("/candidates/?page_size=50").catch(() => ({ items: [] }));
@@ -4107,6 +4136,7 @@ async function loadOfferCreateDialog() {
     const el = document.getElementById("requisition_id");
     if (el) el.value = requisitionId;
   }
+  syncCurrencySymbols();
 }
 
 

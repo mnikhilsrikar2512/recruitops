@@ -81,10 +81,14 @@ def allocate_display_id(connection: Connection, entity: str, branch_id: int) -> 
     if branch_id is None:
         raise ValueError(f"A branch is required to allocate a {entity} display ID")
     _seed_sequence_row(connection, entity, branch_id)
+    # Single-statement atomic increment: the row lock taken by the UPDATE
+    # (with explicit UPDLOCK/ROWLOCK hints as documentation of intent)
+    # serializes concurrent creators; each commits its own value inside the
+    # caller's transaction, so no two requests can observe the same value.
     allocated = connection.execute(
         text(
             """
-            UPDATE dbo.display_id_sequences
+            UPDATE dbo.display_id_sequences WITH (UPDLOCK, ROWLOCK)
             SET next_value += 1
             OUTPUT deleted.next_value AS allocated_value
             WHERE entity = :entity
