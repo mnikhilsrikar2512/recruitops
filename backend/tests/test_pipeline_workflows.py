@@ -13,6 +13,16 @@ def _auth_context(user_id: int, location_id: int, role_code: str = "recruiter") 
     return AuthContext(session_id=1, session_token_hash="token", user=user)
 
 
+@pytest.fixture(autouse=True)
+def _stub_branch_settings(monkeypatch):
+    """Stage-move tests pass a bare engine object; default the branch-config
+    lookup (offer toggle) to enabled so tests exercise stage rules only."""
+    monkeypatch.setattr(
+        "app.services.pipeline.find_branch_by_id",
+        lambda *args, **kwargs: SimpleNamespace(id=1, code="HYD01", offers_enabled=True),
+    )
+
+
 def _application(
     *,
     current_stage: str = "submitted",
@@ -223,3 +233,67 @@ def test_move_pipeline_stage_succeeds_with_valid_transition(monkeypatch) -> None
 
     assert response.from_stage == "submitted"
     assert response.to_stage == "client-round"
+
+
+def test_move_to_offer_stage_rejected_when_branch_disables_offers(monkeypatch) -> None:
+    """Offer-phase streamlining: sourcing-only branches reject moves into offer."""
+    monkeypatch.setattr(
+        "app.services.pipeline.get_pipeline_application_detail_service",
+        lambda *args, **kwargs: _application(current_stage="executive-review"),
+    )
+    monkeypatch.setattr("app.services.pipeline.application_has_pipeline_template", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "app.services.pipeline.find_pipeline_template_stage_for_application",
+        lambda engine, application_id, stage_code: _stage(stage_code, 2),
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.find_branch_by_id",
+        lambda *args, **kwargs: SimpleNamespace(id=1, code="HYD01", offers_enabled=False),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        move_pipeline_stage_service(
+            object(),
+            201,
+            PipelineStageMove(to_stage="offer"),
+            _auth_context(91, 4),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "hand off" in exc_info.value.detail
+
+
+def test_move_to_joining_stage_allowed_when_branch_disables_offers(monkeypatch) -> None:
+    """Joins/rejections stay reachable on offer-disabled branches (no tracked offer)."""
+    updated = _application(current_stage="joined", application_status="active")
+    updated.stage_updated_at = "2026-08-19T01:00:00Z"
+
+    monkeypatch.setattr(
+        "app.services.pipeline.get_pipeline_application_detail_service",
+        lambda *args, **kwargs: _application(current_stage="executive-review"),
+    )
+    monkeypatch.setattr("app.services.pipeline.application_has_pipeline_template", lambda *args, **kwargs: True)
+
+    def _find_stage(engine, application_id, stage_code):
+        if stage_code == "executive-review":
+            return _stage("executive-review", 2)
+        if stage_code == "joined":
+            return _stage("joined", 5, stage_type="joining")
+        return None
+
+    monkeypatch.setattr("app.services.pipeline.find_pipeline_template_stage_for_application", _find_stage)
+    monkeypatch.setattr("app.services.pipeline.move_pipeline_stage", lambda *args, **kwargs: ("executive-review", updated))
+    monkeypatch.setattr(
+        "app.services.pipeline.find_branch_by_id",
+        lambda *args, **kwargs: SimpleNamespace(id=1, code="HYD01", offers_enabled=False),
+    )
+    monkeypatch.setattr("app.services.pipeline.create_notification_service", lambda *args, **kwargs: None)
+
+    response = move_pipeline_stage_service(
+        object(),
+        201,
+        PipelineStageMove(to_stage="joined", joining_date=__import__("datetime").date(2026, 10, 1)),
+        _auth_context(91, 4),
+    )
+
+    assert response.to_stage == "joined"

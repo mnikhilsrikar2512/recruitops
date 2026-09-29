@@ -26,11 +26,17 @@ function navHasPermission(codes, entry) {
 function navEntriesFor(codes, { sidebar = true, home = true } = {}) {
   const config = window.NAV_CONFIG;
   const seen = new Set();
+  /* Per-branch feature flags: branches with offer tracking disabled
+     (sourcing-only tenants) never see offer surfaces in nav, home, or
+     search — the deep-link gate below still protects the pages. */
+  const offersOn = typeof branchOffersEnabled === "function" ? branchOffersEnabled() : true;
+  const offerPageIds = new Set(["offer-management", "offer-create-dialog", "join-tracker"]);
   return config.entries.filter((entry) => {
     if (sidebar && entry.showInSidebar === false) return false;
     if (home && entry.showInHome === false) return false;
     if (seen.has(entry.id)) return false;
     seen.add(entry.id);
+    if (!offersOn && offerPageIds.has(entry.id)) return false;
     return navHasPermission(codes, entry);
   });
 }

@@ -1404,7 +1404,12 @@ function setupExceptionRequestOverlay() {
   sync();
 }
 
-const DEFAULT_PIPELINE_FLOW = ["Sourced", "Screening", "Technical Interview", "Executive Review", "Offer"];
+/* The Offer stage exists only on branches with offer tracking enabled
+   (branches.offers_enabled) — sourcing-only tenants get a streamlined
+   flow that ends at client hand-off. */
+const DEFAULT_PIPELINE_FLOW = (typeof branchOffersEnabled === "function" && !branchOffersEnabled())
+  ? ["Sourced", "Screening", "Technical Interview", "Executive Review"]
+  : ["Sourced", "Screening", "Technical Interview", "Executive Review", "Offer"];
 
 function setupOverlayWorkflows() {
   setupExceptionRequestOverlay();

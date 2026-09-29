@@ -584,6 +584,7 @@ async function handleLogin(form) {
       role_name: data.primary_role?.name || data.role || "Recruiter",
       location_id: data.primary_location?.id || data.location_id,
       location_name: data.primary_location?.name || data.primary_location?.location_name || "",
+      offers_enabled: data.primary_location?.offers_enabled ?? true,
     });
     RecruitOpsLive.session = readSession();
     /* Fetch the user's effective permissions for RBAC enforcement.
@@ -922,6 +923,11 @@ async function submitRequisitionStatus(button) {
 }async function loadStageMoveDialog() {
   const applicationId = queryInt("application_id");
   if (!applicationId) return;
+  /* Sourcing-only branches: drop the Offer option from stage targets —
+     the backend rejects the move anyway, so hiding it prevents dead ends. */
+  if (typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
+    document.querySelectorAll("[data-stage-offer-option]").forEach((option) => option.remove());
+  }
   try {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
@@ -939,9 +945,16 @@ async function submitRequisitionStatus(button) {
 
 async function submitStageMove() {
   const applicationId = queryInt("application_id");
-  const toStage = document.getElementById("to_stage")?.value || firstValueOf(["to_stage"], [/to stage/i, /stage/i]);
+  const toStage = document.getElementById("to_stage")?.value || firstValueOf(["to_stage"], [/to stage/i, /stage/i])
+    || document.querySelector("[data-stage-target-select]")?.value || "";
   const notes = document.getElementById("stage_notes")?.value || firstValueOf(["notes"], [/notes/i]) || null;
   if (!applicationId || !toStage) { showLiveError(new Error("Application ID and target stage are required.")); return; }
+  /* Mirror of the backend 409: branches with offer tracking off can't
+     transition into an offer stage (sourcing-only flow). */
+  if (typeof branchOffersEnabled === "function" && !branchOffersEnabled() && /offer/i.test(toStage)) {
+    showLiveError(new Error("Offer stage is not tracked for this branch; hand off the candidate to the client instead"));
+    return;
+  }
   try {
     await apiRequest(`/pipeline/applications/${applicationId}/stage`, {
       method: "PATCH",
@@ -2730,6 +2743,12 @@ async function loadPipeline() {
     host.classList.remove("flex", "items-center", "justify-center", "flex-row", "flex-wrap");
     host.classList.add("flex-1", "overflow-y-auto", "hide-scrollbar", "space-y-3", "p-1", "pipeline-drop-zone");
     host.dataset.pipelineDropZone = title;
+    /* Sourcing-only tenants (branch offer toggle off): the offer column is
+       out of scope, so it collapses entirely instead of showing an empty lane. */
+    if (/offer/i.test(title) && !/join|reject/i.test(title) && typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
+      col.hidden = true;
+      return;
+    }
     const stageItems = items.filter((item) => pipelineStageMatchesColumn(item.current_stage, title));
     const badge = col.querySelector("h3")?.parentElement?.querySelector("span");
     if (badge) badge.textContent = String(stageItems.length);
@@ -2969,7 +2988,7 @@ async function loadDailyReview() {
   hidePanelByHeading("Candidate Updates");
   renderDailyReviewQuickStats(myWork, pipelineItems, {
     interviews: thisWeekInterviews.length,
-    offers: pendingOffers.length,
+    offers: branchOffersEnabled() ? pendingOffers.length : 0,
   });
   renderDailyReviewPipelineActivity(pipelineItems.slice(0, 5));
   const actionItems = (actions.items || []).slice(0, 5).map((item) => ({
@@ -2978,7 +2997,7 @@ async function loadDailyReview() {
     href: item.entity_type === "requisition" ? "requisition-list.html" : "approvals-inbox.html",
     action: item.primary_action_label || "Open",
   }));
-  if (!actionItems.length && pendingOffers.length) {
+  if (!actionItems.length && pendingOffers.length && branchOffersEnabled()) {
     actionItems.push({ icon: "request_quote", title: `${pendingOffers.length} offers waiting`, href: "offer-management.html", action: "Review" });
   }
   renderDailyReviewActions(actionItems);
@@ -4101,6 +4120,14 @@ async function loadOfferManagement() {
    measured symbol width so wider glyphs (₹, ¥, C$) never overlap digits,
    at any font size or screen resolution. */
 const CURRENCY_SYMBOLS = { USD: "$", EUR: "€", GBP: "£", CAD: "C$", INR: "₹", JPY: "¥", AUD: "A$" };
+
+/* Per-branch offer tracking flag (branches.offers_enabled, migration 009).
+   Persisted at login as session.offers_enabled; unknown/unset = enabled so
+   the default flow never changes. Offer surfaces hide when disabled. */
+function branchOffersEnabled() {
+  const session = (typeof readSession === "function" && readSession()) || {};
+  return session.offers_enabled !== false;
+}
 
 function syncCurrencySymbols() {
   document.querySelectorAll("select[data-currency-select]").forEach((select) => {
@@ -5855,6 +5882,17 @@ async function bootPage() {
       showAccessDenied("access this page");
       return;
     }
+  }
+
+  /* Per-branch offer streamlining: on branches with offer tracking off,
+     offer pages deep-linked directly get a clear denial instead of a
+     half-functional screen. The toggle is branch configuration (managed
+     in Locations), not a permission, so admins are gated like everyone. */
+  if (["offer-management", "offer-create-dialog", "join-tracker"].includes(route)
+    && typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
+    hidePageLoader();
+    showAccessDenied("track offers — offer tracking is disabled for this branch and offers are handed off to the client directly");
+    return;
   }
 
   try {

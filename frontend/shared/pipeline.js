@@ -623,12 +623,19 @@ function setupStageMoveOverlay() {
     const desiredValue = targetStage.value;
     if (stageNames.length) {
       targetStage.innerHTML = "";
-      stageNames.filter((stage) => stage !== activeCandidate?.stage).concat("Rejected").forEach((stage) => {
-        const option = document.createElement("option");
-        option.value = slugifyPipelineValue(stage);
-        option.textContent = stage;
-        targetStage.appendChild(option);
-      });
+      /* Branches with offer tracking off never offer the Offer stage as a
+         transition target — the backend rejects it, so don't show it. */
+      const offersOn = typeof branchOffersEnabled === "function" ? branchOffersEnabled() : true;
+      stageNames
+        .filter((stage) => stage !== activeCandidate?.stage)
+        .filter((stage) => offersOn || !/offer/i.test(stage))
+        .concat("Rejected")
+        .forEach((stage) => {
+          const option = document.createElement("option");
+          option.value = slugifyPipelineValue(stage);
+          option.textContent = stage;
+          targetStage.appendChild(option);
+        });
       if (Array.from(targetStage.options).some((option) => option.value === desiredValue)) {
         targetStage.value = desiredValue;
       }

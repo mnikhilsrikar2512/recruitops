@@ -40,6 +40,7 @@ class AuthLocationSummary(BaseModel):
     id: int | None
     location_code: str | None
     location_name: str | None
+    offers_enabled: bool | None = None
 
 
 class AuthSessionSummary(BaseModel):

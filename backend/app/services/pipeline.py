@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from app.repositories.display_ids import find_branch_by_id
 from app.repositories.pipeline import (
     application_has_pipeline_template,
     find_pipeline_application_by_id,
@@ -148,6 +149,22 @@ def move_pipeline_stage_service(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Rejection is not allowed from the current stage",
         )
+
+    # Offer-phase streamlining: branches with offer tracking disabled treat
+    # the offer stage as out of scope — candidates are handed off to the
+    # client instead. Joins/starts remain reachable (they close the loop
+    # without a tracked offer), as does rejection.
+    if not is_target_rejection and not is_target_joining:
+        branch = find_branch_by_id(engine, application.location_id)
+        if branch is not None and branch.offers_enabled is False and (
+            (payload.to_stage or "").strip().lower() in {"offer", "offers"}
+            or "offer" in str(payload.to_stage or "").strip().lower()
+            or (target_stage_definition is not None and "offer" in str(target_stage_definition.stage_code or "").strip().lower())
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Offer stage is not tracked for this branch; hand off the candidate to the client instead",
+            )
 
     if is_target_joining and payload.joining_date is None:
         raise HTTPException(
