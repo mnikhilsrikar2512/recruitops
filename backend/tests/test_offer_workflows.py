@@ -114,6 +114,10 @@ def test_create_offer_succeeds_and_routes_approval(monkeypatch) -> None:
     captured = {}
     monkeypatch.setattr("app.services.offers.find_pipeline_application_by_id", lambda *args, **kwargs: _application())
     monkeypatch.setattr("app.services.offers.find_user_by_id", lambda *args, **kwargs: make_user_record(user_id=601))
+    monkeypatch.setattr(
+        "app.services.offers.find_branch_by_id",
+        lambda *args, **kwargs: SimpleNamespace(id=1, code="HYD01", offers_enabled=True),
+    )
 
     def fake_create(_engine, payload, *, location_id, actor_user_id):
         captured["location_id"] = location_id
@@ -130,6 +134,42 @@ def test_create_offer_succeeds_and_routes_approval(monkeypatch) -> None:
 
     assert response.offer_status == "pending-approval"
     assert captured == {"location_id": 1, "actor_user_id": 7, "assigned_to_user_id": 601}
+
+
+def test_create_offer_rejected_when_branch_disables_offers(monkeypatch) -> None:
+    """Per-tenant offer toggle: branches with offers_enabled=False reject new offers."""
+    monkeypatch.setattr("app.services.offers.find_pipeline_application_by_id", lambda *args, **kwargs: _application())
+    monkeypatch.setattr(
+        "app.services.offers.find_branch_by_id",
+        lambda *args, **kwargs: SimpleNamespace(id=1, code="HYD01", offers_enabled=False),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        create_offer_service(
+            object(),
+            OfferCreate(candidate_application_id=501, requested_by_user_id=7),
+        )
+    assert exc_info.value.status_code == 409
+
+
+def test_create_offer_allows_branch_without_toggle_record(monkeypatch) -> None:
+    """NULL/unset toggle or missing branch must not block the default flow."""
+    captured = {}
+
+    def fake_create(_engine, payload, *, location_id, actor_user_id):
+        captured["location_id"] = location_id
+        return _offer()
+
+    monkeypatch.setattr("app.services.offers.find_pipeline_application_by_id", lambda *args, **kwargs: _application())
+    monkeypatch.setattr("app.services.offers.find_branch_by_id", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.services.offers.create_offer", fake_create)
+
+    response = create_offer_service(
+        object(),
+        OfferCreate(candidate_application_id=501, requested_by_user_id=7),
+    )
+    assert response.offer_status == "pending-approval"
+    assert captured["location_id"] == 1
 
 
 def test_update_offer_decision_accepts_and_sets_joining(monkeypatch) -> None:

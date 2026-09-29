@@ -8,7 +8,9 @@ caller's transaction against the same connection that inserts the entity row.
 
 from __future__ import annotations
 
-from sqlalchemy import Connection, text
+from dataclasses import dataclass
+
+from sqlalchemy import Connection, Engine, text
 
 ENTITY_REQUISITION = "REQ"
 ENTITY_CANDIDATE = "CND"
@@ -68,6 +70,38 @@ def _seed_sequence_row(connection: Connection, entity: str, branch_id: int) -> N
             """
         ),
         {"entity": entity, "branch_id": branch_id, "start_value": start_value},
+    )
+
+
+@dataclass
+class BranchOfferSettingsRecord:
+    id: int
+    code: str
+    offers_enabled: bool | None
+
+
+def find_branch_by_id(engine: Engine, branch_id: int) -> BranchOfferSettingsRecord | None:
+    """Load branch configuration flags (offer toggle) for gating decisions."""
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                """
+                SELECT TOP 1
+                  id,
+                  code,
+                  offers_enabled
+                FROM dbo.branches
+                WHERE id = :branch_id;
+                """
+            ),
+            {"branch_id": branch_id},
+        ).mappings().first()
+    if row is None:
+        return None
+    return BranchOfferSettingsRecord(
+        id=int(row["id"]),
+        code=str(row["code"]),
+        offers_enabled=(None if row["offers_enabled"] is None else bool(row["offers_enabled"])),
     )
 
 

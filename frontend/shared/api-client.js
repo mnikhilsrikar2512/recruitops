@@ -1445,6 +1445,8 @@ async function openLocationDialog(existing) {
     + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Name</span><input id="loc-name" type="text" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. Hyderabad Branch" value="' + escapeHtml(nameVal) + '" /></label>'
     + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Code</span><input id="loc-code" type="text" required ' + (isEdit ? 'readonly class="mt-1 w-full rounded-lg border border-border bg-surface-variant px-3 py-2 text-text-muted text-sm"' : 'class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. HYD01"') + ' value="' + escapeHtml(codeVal) + '" /></label>'
     + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Address</span><input id="loc-address" type="text" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. 123 Main St" value="' + escapeHtml(addrVal) + '" /></label>'
+    + '<label class="flex items-center gap-2 mb-3 cursor-pointer"><input id="loc-offers-enabled" type="checkbox" class="w-4 h-4 rounded border-border text-primary focus:ring-primary" ' + ((isEdit ? locationData.offers_enabled !== false : true) ? 'checked' : '') + ' /><span class="text-body-sm text-on-surface">Offer tracking enabled</span></label>'
+    + '<p class="text-[11px] text-text-muted mb-3 -mt-2">When off, offer creation is blocked for this branch and offers are handed off to the client outside the system. Existing offers stay visible.</p>'
     + '<div id="location-error" class="text-body-sm text-red-600 mb-3 hidden"></div>'
     + '<div class="flex justify-end gap-2 mt-4">'
     + '<button type="button" id="location-cancel" class="px-4 py-2 rounded-lg border border-border text-on-surface text-sm font-medium hover:bg-surface-variant">Cancel</button>'
@@ -1475,13 +1477,14 @@ async function openLocationDialog(existing) {
         const newAddr = document.getElementById('loc-address').value.trim();
         if (newName) payload.location_name = newName;
         if (newAddr !== undefined) payload.address = newAddr || null;
+        payload.offers_enabled = document.getElementById('loc-offers-enabled').checked;
         await apiRequest('/locations/' + existing.id, { method: 'PATCH', body: JSON.stringify(payload) });
       } else {
         const name = document.getElementById('loc-name').value.trim();
         const code = document.getElementById('loc-code').value.trim();
         if (!name || !code) throw new Error('Name and code are required');
         const addr = document.getElementById('loc-address').value.trim();
-        await apiRequest('/locations/', { method: 'POST', body: JSON.stringify({ location_name: name, location_code: code, address: addr || null, status: 'active' }) });
+        await apiRequest('/locations/', { method: 'POST', body: JSON.stringify({ location_name: name, location_code: code, address: addr || null, status: 'active', offers_enabled: document.getElementById('loc-offers-enabled').checked }) });
       }
       close();
       showToast(isEdit ? 'Location updated' : 'Location created', 'Changes saved successfully.');
