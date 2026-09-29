@@ -57,6 +57,9 @@ def _can_access_candidate(candidate: CandidateResponse, auth_context: AuthContex
 
     actor_id = auth_context.user.id
     actor_location_id = auth_context.user.location_id
+    # Global-record ownership (creator/sourcer/primary owner) grants visibility
+    # of the candidate IDENTITY only — application summaries are filtered to
+    # the viewer's tenant below, so grants never cross tenant lines.
     direct_user_ids = {
         candidate.created_by_user_id,
         candidate.sourced_by_user_id,
@@ -72,6 +75,42 @@ def _can_access_candidate(candidate: CandidateResponse, auth_context: AuthContex
             return True
 
     return False
+
+
+def _tenant_scoped_candidate_response(
+    candidate: CandidateResponse, auth_context: AuthContext
+) -> CandidateResponse:
+    """Filter application summaries to the viewer's tenant.
+
+    Candidates are global identity records, but pipeline state, requisition
+    links, and owner details per application are tenant-owned. A user whose
+    only tie is a global-record grant (e.g. they sourced the candidate for
+    tenant A) must not see tenant B's application summaries.
+    """
+    if auth_context.user.role_code == "admin":
+        return candidate
+    actor_id = auth_context.user.id
+    actor_location_id = auth_context.user.location_id
+    global_record_grant_only = actor_id in {
+        candidate.created_by_user_id,
+        candidate.sourced_by_user_id,
+        candidate.primary_owner_user_id,
+    } and not any(
+        application.location_id == actor_location_id
+        or actor_id in {application.owner_user_id, application.submitted_by_user_id}
+        for application in candidate.applications
+    )
+    if global_record_grant_only:
+        return candidate.model_copy(update={"applications": []})
+    scoped = [
+        application
+        for application in candidate.applications
+        if application.location_id == actor_location_id
+        or actor_id in {application.owner_user_id, application.submitted_by_user_id}
+    ]
+    if len(scoped) != len(candidate.applications):
+        return candidate.model_copy(update={"applications": scoped})
+    return candidate
 
 
 def _assert_candidate_access(candidate: CandidateResponse, auth_context: AuthContext) -> None:
@@ -189,6 +228,7 @@ def get_candidate_detail_service(
     )
     if auth_context:
         _assert_candidate_access(response, auth_context)
+        response = _tenant_scoped_candidate_response(response, auth_context)
     return response
 
 

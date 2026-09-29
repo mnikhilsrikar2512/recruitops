@@ -100,15 +100,27 @@ class TestPerBranchAllocation:
         assert _next_value(engine, ENTITY_REQUISITION, branch_id) == before
 
     def test_all_branches_have_sequence_rows(self, engine) -> None:
+        """Every branch must be seedable — the allocator seeds missing rows
+        lazily, so assert post-allocation state rather than pre-seeded rows
+        (fixture branches created by other test modules may not have run the
+        allocator yet)."""
         with engine.connect() as connection:
             branch_ids = connection.execute(text("SELECT id FROM dbo.branches")).scalars().all()
-            seeded = connection.execute(
-                text(
-                    "SELECT branch_id FROM dbo.display_id_sequences WHERE entity = :entity"
-                ),
-                {"entity": ENTITY_CANDIDATE},
-            ).scalars().all()
-        assert set(branch_ids) <= set(seeded), "every branch needs a sequence row before allocation"
+        for branch_id in branch_ids:
+            with engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    allocate_display_id(connection, ENTITY_REQUISITION, int(branch_id))
+                    seeded = connection.execute(
+                        text(
+                            "SELECT COUNT(*) FROM dbo.display_id_sequences "
+                            "WHERE entity = :entity AND branch_id = :branch_id AND tenant_scope = N'DEFAULT'"
+                        ),
+                        {"entity": ENTITY_REQUISITION, "branch_id": int(branch_id)},
+                    ).scalar_one()
+                finally:
+                    transaction.rollback()
+            assert seeded == 1, f"branch {branch_id} sequence row missing after allocation"
 
     def test_new_branch_sequence_starts_at_configured_start(self, engine) -> None:
         with engine.connect() as connection:

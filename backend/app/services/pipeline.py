@@ -33,14 +33,19 @@ def _can_access_pipeline_application(
 
     actor_id = auth_context.user.id
     actor_location_id = auth_context.user.location_id
+    # Tenant (location) scope first: the application belongs to exactly one
+    # requisition/branch, so users outside that tenant only get in via a
+    # contribution role ON THIS application (never via a contribution made
+    # for a different tenant, e.g. the global candidate's original source).
     if application.location_id == actor_location_id:
         return True
-    if actor_id in {
-        application.owner_user_id,
-        application.submitted_by_user_id,
-        application.sourced_by_user_id,
-    }:
+    if actor_id in {application.owner_user_id, application.submitted_by_user_id}:
         return True
+    # NOTE: sourced_by_user_id is intentionally NOT a grant here — it is
+    # projected from the GLOBAL candidate record (c.created_by_user_id) onto
+    # every application, so treating it as access would let the original
+    # source recruiter read other tenants' applications, notes, and offer
+    # terms for a candidate they once sourced. Tenant isolation wins.
     return False
 
 
