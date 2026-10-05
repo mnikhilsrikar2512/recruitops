@@ -21,8 +21,8 @@ import urllib.error
 import urllib.request
 
 ADMIN = ("ci.admin@recruitops-test.com", "admin123")
-TENANT_A = ("manager@northwind-staging.test", "recruiter@northwind-staging.test")
-TENANT_B = ("manager@contoso-staging.test", "recruiter@contoso-staging.test")
+TENANT_A = ("manager@northwind-staging.example.com", "recruiter@northwind-staging.example.com")
+TENANT_B = ("manager@contoso-staging.example.com", "recruiter@contoso-staging.example.com")
 
 results: list[tuple[str, bool, str]] = []
 
@@ -105,6 +105,11 @@ def main() -> int:
     throwaway.token = old_token
     status, _, _ = throwaway.call("GET", "/auth/me")
     check("1.4 token replay after logout → 401", status == 401, str(status))
+    if not all(api.token for api in (admin, rec_a, mgr_a, rec_b)):
+        print("\nPersona logins failed — is the database seeded (backend/scripts/seed_staging.py) "
+              "and is --base pointing at the stack that uses it? Stopping early.")
+        print(f"\n{sum(r[1] for r in results)}/{len(results)} smoke checks passed")
+        return 1
     status, perms, _ = rec_a.call("GET", "/permissions/me")
     check("1.5 /permissions/me returns grants", status == 200 and perms.get("permissions"), str(status))
 
@@ -147,7 +152,7 @@ def main() -> int:
         "target_closure_date": "2026-12-31", "job_description": "Live smoke test requisition."})
     check("4.1 create requisition", status == 201, f"{status} {req}")
     status, cand, _ = rec_a.call("POST", "/candidates/", {
-        "full_name": f"Smoke Candidate {stamp}", "email": f"smoke.{stamp}@northwind-staging.test",
+        "full_name": f"Smoke Candidate {stamp}", "email": f"smoke.{stamp}@northwind-staging.example.com",
         "source_type": "Referral", "primary_owner_user_id": rec_id, "save_mode": "final"})
     check("4.1 create candidate", status == 201, f"{status} {cand}")
     rec_a.call("GET", f"/candidates/{cand.get('id')}/duplicate-check")

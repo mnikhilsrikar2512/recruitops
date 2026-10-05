@@ -142,6 +142,61 @@ def verify_seed(engine) -> None:
     )
 
 
+def seed_display_ids(engine, location_id: int) -> None:
+    """Display-ID fixtures (scripts/008_display_ids.sql) on a fresh database.
+
+    tests/test_display_ids_db.py expects an HYD01 branch with sequence rows and
+    at least one coded requisition and candidate. A dev database gets these
+    from 008's backfill; a fresh one has nothing to backfill, so give the
+    seeded rows codes through the real allocator. Skipped when 008 has not
+    been applied.
+    """
+    from app.repositories.display_ids import (  # noqa: PLC0415
+        ENTITY_CANDIDATE,
+        ENTITY_REQUISITION,
+        _seed_sequence_row,
+        allocate_display_id,
+    )
+
+    with engine.begin() as connection:
+        if connection.execute(text("SELECT OBJECT_ID(N'dbo.display_id_sequences')")).scalar() is None:
+            print("display-ID tables absent (008 not applied) — skipping display-ID fixtures")
+            return
+        hyd_id = connection.execute(
+            text(
+                """
+                SET NOCOUNT ON;
+                IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HYD01')
+                    INSERT INTO dbo.branches (name, code, location, status)
+                    VALUES (N'Hyderabad', N'HYD01', N'Hyderabad', N'active');
+                SELECT id FROM dbo.branches WHERE code = N'HYD01';
+                """
+            )
+        ).scalar_one()
+        for branch_id in (location_id, hyd_id):
+            for entity in (ENTITY_REQUISITION, ENTITY_CANDIDATE):
+                _seed_sequence_row(connection, entity, int(branch_id))
+
+        requisition_id = connection.execute(
+            text("SELECT TOP 1 id FROM dbo.requisitions WHERE title = N'CI Test Requisition' AND requisition_code IS NULL")
+        ).scalar()
+        if requisition_id:
+            code = allocate_display_id(connection, ENTITY_REQUISITION, int(location_id))
+            connection.execute(
+                text("UPDATE dbo.requisitions SET requisition_code = :code WHERE id = :id"),
+                {"code": code, "id": requisition_id},
+            )
+        candidate_id = connection.execute(
+            text("SELECT TOP 1 id FROM dbo.candidates WHERE full_name = N'CI Test Candidate' AND candidate_code IS NULL")
+        ).scalar()
+        if candidate_id:
+            code = allocate_display_id(connection, ENTITY_CANDIDATE, int(location_id))
+            connection.execute(
+                text("UPDATE dbo.candidates SET candidate_code = :code, branch_id = COALESCE(branch_id, :branch) WHERE id = :id"),
+                {"code": code, "branch": location_id, "id": candidate_id},
+            )
+
+
 def main() -> None:
     engine = create_db_engine()
     with engine.begin() as connection:
@@ -368,6 +423,7 @@ def main() -> None:
             ),
         )
 
+    seed_display_ids(engine, location_id)
     verify_seed(engine)
     print("CI seed complete: permissions, admin role/user (ci.admin@recruitops-test.com / admin123), Head Office location, requisition/candidate pair, portal account")
 

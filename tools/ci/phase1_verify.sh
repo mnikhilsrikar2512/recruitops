@@ -8,15 +8,17 @@
 #    (your dev database is never touched)
 # 3. seeds the CI baseline and runs the backend test suite against it
 # 4. seeds the two staging tenants
-# 5. starts the API (:8000) and UI (:4174) on that database
+# 5. starts the API (:8010) and UI (:4184) on that database
 # 6. runs the live API smoke test and the browser sweep (admin + tenant-A recruiter)
-# Logs: /tmp/recruitops-phase1/*.log   Summary at the end.
+# Logs: <repo>/.phase1-logs/*.log (gitignored)   Summary at the end.
+# Uses its own ports (API 8010, UI 4184) so an already-running dev backend on
+# :8000 (e.g. the launchd com.recruitops.backend job) is not hit by mistake.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STAGING_DB="${STAGING_DB:-recruitops_staging}"
 STAGING_PASSWORD="${STAGING_PASSWORD:-Staging#2026-Recruit}"
-LOGS=/tmp/recruitops-phase1
+LOGS="$ROOT/.phase1-logs"   # inside the repo (gitignored) so the logs can be shared
 mkdir -p "$LOGS"
 cd "$ROOT/backend"
 PY=.venv/bin/python
@@ -45,7 +47,7 @@ export DB_NAME="$STAGING_DB"
 
 echo "→ 3/6 baseline seed + backend tests"
 $PY scripts/seed_ci.py >"$LOGS/seed_ci.log" 2>&1 || record FAIL "seed_ci (see $LOGS/seed_ci.log)"
-if $PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tee "$LOGS/pytest.log" | tail -5; [ "${PIPESTATUS[0]}" = "0" ]; then
+if $PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tee "$LOGS/pytest.log" | grep -E "^(FAILED|ERROR)| passed| failed"; [ "${PIPESTATUS[0]}" = "0" ]; then
   record PASS "backend tests ($(tail -1 "$LOGS/pytest.log"))"
 else
   record FAIL "backend tests ($(tail -1 "$LOGS/pytest.log")) — see $LOGS/pytest.log"
@@ -58,28 +60,41 @@ else
   record FAIL "staging seed (see $LOGS/seed_staging.log)"
 fi
 
-echo "→ 5/6 starting API :8000 and UI :4174"
-$PY -m uvicorn app.main:app --host 127.0.0.1 --port 8000 >"$LOGS/api.log" 2>&1 &
+API_PORT_V="${API_PORT_V:-8010}"
+WEB_PORT_V="${WEB_PORT_V:-4184}"
+BASE="http://127.0.0.1:$WEB_PORT_V"
+echo "→ 5/6 starting API :$API_PORT_V and UI :$WEB_PORT_V on $STAGING_DB"
+for port in "$API_PORT_V" "$WEB_PORT_V"; do
+  if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+    record FAIL "port $port already in use — stop that process or set API_PORT_V/WEB_PORT_V"
+    printf '\n%s\n' "${SUMMARY[@]}"; exit 1
+  fi
+done
+$PY -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT_V" >"$LOGS/api.log" 2>&1 &
 API_PID=$!
-(cd "$ROOT/frontend" && API_PORT=8000 PORT=4174 exec node server.js) >"$LOGS/web.log" 2>&1 &
+(cd "$ROOT/frontend" && API_PORT="$API_PORT_V" PORT="$WEB_PORT_V" exec node server.js) >"$LOGS/web.log" 2>&1 &
 WEB_PID=$!
 trap 'kill $API_PID $WEB_PID 2>/dev/null' EXIT
-for _ in $(seq 1 40); do curl -sf http://127.0.0.1:4174/api/v1/health >/dev/null && break; sleep 0.5; done
-curl -sf http://127.0.0.1:4174/api/v1/health >/dev/null && record PASS "stack up" || record FAIL "stack did not start (see $LOGS/api.log, $LOGS/web.log)"
+for _ in $(seq 1 40); do curl -sf "$BASE/api/v1/health" >/dev/null && break; sleep 0.5; done
+if curl -sf "$BASE/api/v1/health" >/dev/null && kill -0 "$API_PID" 2>/dev/null; then
+  record PASS "stack up ($BASE → API :$API_PORT_V, DB $STAGING_DB)"
+else
+  record FAIL "stack did not start (see $LOGS/api.log, $LOGS/web.log)"
+fi
 
 echo "→ 6/6 live smoke + browser sweep"
 cd "$ROOT"
-backend/.venv/bin/python tools/ci/live_smoke.py --base http://127.0.0.1:4174 --password "$STAGING_PASSWORD" \
+backend/.venv/bin/python tools/ci/live_smoke.py --base "$BASE" --password "$STAGING_PASSWORD" \
   2>&1 | tee "$LOGS/live_smoke.log" | grep -E "FAIL|checks passed"
 [ "${PIPESTATUS[0]}" = "0" ] && record PASS "live smoke ($(tail -1 "$LOGS/live_smoke.log"))" \
   || record FAIL "live smoke ($(tail -1 "$LOGS/live_smoke.log")) — see $LOGS/live_smoke.log"
-backend/.venv/bin/python frontend/tests/page_sweep.py --base http://127.0.0.1:4174 --live \
+backend/.venv/bin/python frontend/tests/page_sweep.py --base "$BASE" --live \
   --email ci.admin@recruitops-test.com --password admin123 --persona admin \
   >"$LOGS/sweep_admin.log" 2>&1 \
   && record PASS "browser sweep admin ($(tail -1 "$LOGS/sweep_admin.log"))" \
   || record FAIL "browser sweep admin ($(tail -1 "$LOGS/sweep_admin.log")) — see $LOGS/sweep_admin.log"
-backend/.venv/bin/python frontend/tests/page_sweep.py --base http://127.0.0.1:4174 --live \
-  --email recruiter@northwind-staging.test --password "$STAGING_PASSWORD" --persona recruiter \
+backend/.venv/bin/python frontend/tests/page_sweep.py --base "$BASE" --live \
+  --email recruiter@northwind-staging.example.com --password "$STAGING_PASSWORD" --persona recruiter \
   >"$LOGS/sweep_recruiter.log" 2>&1 \
   && record PASS "browser sweep recruiter ($(tail -1 "$LOGS/sweep_recruiter.log"))" \
   || record FAIL "browser sweep recruiter ($(tail -1 "$LOGS/sweep_recruiter.log")) — see $LOGS/sweep_recruiter.log"

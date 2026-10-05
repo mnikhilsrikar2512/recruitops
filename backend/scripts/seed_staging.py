@@ -56,14 +56,14 @@ MANAGER_CODES = RECRUITER_CODES + [
 TENANTS = [
     {
         "key": "A", "branch": "Northwind Staffing — Bengaluru", "code": "STGA", "city": "Bengaluru",
-        "domain": "northwind-staging.test",
+        "domain": "northwind-staging.example.com",
         "clients": [("Acumen Fintech", "Financial Services"), ("Helios Health", "Healthcare")],
         "requisitions": ["Senior Backend Engineer", "Clinical Data Analyst"],
         "candidates": ["Ananya Rao", "Karthik Menon", "Divya Pillai"],
     },
     {
         "key": "B", "branch": "Contoso Talent — Hyderabad", "code": "STGB", "city": "Hyderabad",
-        "domain": "contoso-staging.test",
+        "domain": "contoso-staging.example.com",
         "clients": [("Orbit Logistics", "Logistics"), ("Lumen Retail", "Retail")],
         "requisitions": ["Supply Chain Planner", "Store Operations Lead"],
         "candidates": ["Farhan Qureshi", "Sneha Reddy", "Vivek Sharma"],
@@ -96,6 +96,7 @@ def ensure_branch(engine, tenant: dict) -> int:
         return int(connection.execute(
             text(
                 """
+                SET NOCOUNT ON;
                 IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = :code)
                     INSERT INTO dbo.branches (name, code, location, status, offers_enabled)
                     VALUES (:name, :code, :city, N'active', 1);
@@ -124,7 +125,7 @@ def create_role(admin: Api, tenant: dict, label: str, codes: list[str]) -> int:
 def create_user(client: TestClient, admin: Api, name: str, email: str, branch_id: int, role_id: int,
                 title: str, manager_id: int | None = None) -> int:
     payload = {
-        "full_name": name, "email": email, "employee_code": email.split("@")[0].upper()[:40],
+        "full_name": name, "email": email, "employee_code": f"{email.split('@')[0].upper()}-{email.split('@')[1].split('.')[0].upper()}"[:50],
         "primary_location_id": branch_id, "primary_role_id": role_id, "business_title": title,
     }
     if manager_id:

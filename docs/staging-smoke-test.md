@@ -21,9 +21,9 @@ recorded as FAIL with the phase number — it is not waived).
 | Persona | Account | Tenant |
 |---|---|---|
 | **TA** Admin (control plane) | `ci.admin@recruitops-test.com` | all (today's global admin) |
-| **MA** Manager, tenant A | `manager@northwind-staging.test` | Northwind Staffing — Bengaluru |
-| **RA** Recruiter, tenant A | `recruiter@northwind-staging.test` | Northwind Staffing — Bengaluru |
-| **MB / RB** tenant B | `manager@` / `recruiter@contoso-staging.test` | Contoso Talent — Hyderabad |
+| **MA** Manager, tenant A | `manager@northwind-staging.example.com` | Northwind Staffing — Bengaluru |
+| **RA** Recruiter, tenant A | `recruiter@northwind-staging.example.com` | Northwind Staffing — Bengaluru |
+| **MB / RB** tenant B | `manager@` / `recruiter@contoso-staging.example.com` | Contoso Talent — Hyderabad |
 
 Until Phase 2 adds a `tenants` table, a tenant is a branch with everything scoped to it.
 
