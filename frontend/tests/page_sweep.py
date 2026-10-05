@@ -48,7 +48,12 @@ IGNORED_CONSOLE = (
 )
 
 
+LIVE = {"enabled": False, "session": None}
+
+
 def mock(base: str, path: str):
+    if LIVE["enabled"]:  # real backend: no mock log; contract checks don't apply
+        return {"calls": [], "violations": []}
     with urllib.request.urlopen(base + path) as response:
         return json.loads(response.read() or b"{}")
 
@@ -75,19 +80,39 @@ def main() -> int:
     ap.add_argument("--persona", default="admin")
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--report", default="")
+    ap.add_argument("--live", action="store_true", help="real backend: sign in through login.html first")
+    ap.add_argument("--email", default="ci.admin@recruitops-test.com")
+    ap.add_argument("--password", default="admin123")
     opts = ap.parse_args()
 
     names = sorted(p.stem for p in PAGES.glob("*.html"))
     if opts.only:
         names = [n for n in names if n in opts.only]
+    LIVE["enabled"] = opts.live
     mock(opts.base, f"/__mock/reset?persona={opts.persona}")
 
     results: dict[str, dict] = {}
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
+        if opts.live:
+            # Real sign-in through the UI; reuse the resulting session for every page.
+            login_ctx = browser.new_context()
+            login_page = login_ctx.new_page()
+            login_page.goto(f"{opts.base}/pages/login.html", wait_until="networkidle")
+            login_page.fill("#email", opts.email)
+            login_page.fill("#password", opts.password)
+            login_page.click("#submit-btn")
+            login_page.wait_for_url("**/home.html", timeout=15000)
+            LIVE["session"] = login_page.evaluate("localStorage.getItem('recruitops-session')")
+            login_ctx.close()
         for name in names:
             context = browser.new_context()
-            if name not in PUBLIC:
+            if name not in PUBLIC and LIVE["session"]:
+                context.add_init_script(
+                    f"try {{ localStorage.setItem('recruitops-session', {json.dumps(LIVE['session'])});"
+                    " localStorage.setItem('recruitops-onboarding-complete', 'true'); } catch (e) {}"
+                )
+            elif name not in PUBLIC:
                 context.add_init_script(
                     f"try {{ localStorage.setItem('recruitops-session', {json.dumps(json.dumps(session_for(opts.persona)))});"
                     " localStorage.setItem('recruitops-onboarding-complete', 'true'); } catch (e) {}"
@@ -99,6 +124,7 @@ def main() -> int:
                     return route.fulfill(status=200, content_type="application/javascript", body=TAILWIND_STUB)
                 return route.fulfill(status=200, body="")
 
+            # Third-party assets (Tailwind CDN, fonts) are stubbed in both modes.
             context.route("**/*", lambda route: route.continue_() if route.request.url.startswith(opts.base) else route_external(route))
             page = context.new_page()
             errors: list[str] = []

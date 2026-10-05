@@ -89,13 +89,47 @@ merged into it (see §2). Nothing in the backend needed to change for the pages 
 UI flows passing: login (bad + good credentials), create client, create requisition,
 approve, pipeline stage move, mark notification read, logout.
 
-## 4. Not done in Phase 1 (and why)
+## 4. Completion of 1.7 and 1.8
 
-| Item | Why it is open |
+| Item | Delivered |
 |---|---|
-| 1.7 fresh dual-tenant staging seed | Real tenants arrive in Phase 2 (2.1); seeding two branch-derived "tenants" now would be thrown away. `seed_ci.py` + the isolation tests' fixtures cover CI today. |
-| 1.8 re-baseline the smoke test against live data | Needs a staging environment (inputs I-2, I-3). The sweep/flows above are the automated half. |
-| Backend pytest in this session | The sandbox has no PyPI access; CI runs it. The only backend changes are config/CORS, the AI flag dependency and new tests. |
-| Real-DB browser run | The contract mock proves the UI ↔ API contract; a run against the seeded SQL Server belongs to the 1.8 smoke test. |
+| 1.7 fresh dual-tenant seed | `backend/scripts/seed_staging.py` — on top of `seed_ci.py`, builds two isolated tenants (Northwind Staffing — Bengaluru, Contoso Talent — Hyderabad), each with a Manager and Recruiter role + user, 2 clients, 2 requisitions, 3 candidates at 3 stages and a pending approval, all through the real API. Idempotent; verifies every persona can sign in. A tenant is a branch until Phase 2.1 adds `tenants`. |
+| 1.8 re-baselined smoke test | `docs/staging-smoke-test.md` (v2, replaces assessment §3 with the §6.3 corrections and no waivers) + `tools/ci/live_smoke.py` (27 automated API checks: auth, token replay, isolation A↔B, RBAC 403s, happy path, 422 envelope, CORS, pagination) + `page_sweep.py --live` (signs in through `login.html`, then sweeps every page against the real backend). |
+
+## 5. The one remaining step: run it on a machine with the stack
+
+Everything above was built and exercised against the contract mock in a sandbox
+that cannot install the backend's Python packages or reach SQL Server, so the
+following has **not yet been run against the real backend**. On your Mac:
+
+```bash
+# 0. enable CI (this session could not write under .github/)
+mkdir -p .github/workflows && git mv tools/ci/github-workflow-ci.yml .github/workflows/ci.yml
+
+# 1. backend tests (throwaway SQL Server in Docker; or SKIP_DOCKER=1 for your local DB)
+cd backend && .venv/bin/pip install -r requirements-dev.txt
+DB_PORT=1434 ./scripts/run_tests_ci.sh
+
+# 2. fresh staging DB + seed (D-12: never your dev DB)
+#    create an empty DB, apply db/schema.sql + ../scripts/00X_*.sql, then:
+DB_NAME=recruitops_staging .venv/bin/python scripts/seed_staging.py
+
+# 3. run the stack against it and smoke-test
+cd .. && DB_NAME=recruitops_staging ./start.sh        # second terminal for the rest
+python3 tools/ci/live_smoke.py --base http://127.0.0.1:4174
+pip install playwright && python3 -m playwright install chromium
+python3 frontend/tests/page_sweep.py --base http://127.0.0.1:4174 --live
+python3 frontend/tests/page_sweep.py --base http://127.0.0.1:4174 --live \
+  --email recruiter@northwind-staging.test --password 'Staging#2026-Recruit' --persona recruiter
+```
+
+Phase 1 is closed when steps 1–3 pass (every `auto` row in the smoke test) and CI is
+green and required on `main`.
+
+## 6. Deferred out of Phase 1 (by design)
+
+| Item | Why |
+|---|---|
 | Tailwind via CDN (`cdn.tailwindcss.com`) | Not for production use; compile the CSS at build time in Phase 6 (6.1). |
-| Admin bypass (`role_code == "admin"`) | Deliberately left: removing it needs the D-03 seed migration in the same change (Phase 2.5 + 2.6, risk register row 1). |
+| Admin bypass (`role_code == "admin"`) | Removing it needs the D-03 seed migration in the same change (Phase 2.5 + 2.6, risk register row 1). |
+| Smoke rows marked "FAIL until Phase N" | Owned by Phases 2–6; tracked in `staging-smoke-test.md`, not waived. |
