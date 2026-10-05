@@ -1,8 +1,8 @@
 """Create a FRESH staging database next to your dev DB (decision D-12).
 
 Drops and recreates the target database, applies backend/db/schema.sql and the
-idempotent migrations in ../scripts/ (005, 006, 008, 009 — 007 is a backfill
-for databases created before the agents feature; seed_ci.py covers it).
+migrations newer than the schema dump (008, 009). 005/006 are already in
+schema.sql and 007 is a backfill that seed_ci.py covers.
 
 Uses the DB_HOST / DB_USER / DB_PASSWORD from backend/.env; only the database
 name differs. Refuses to touch the dev database named in .env.
@@ -22,8 +22,10 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND))
 
-MIGRATIONS = ["005_create_approvals_table.sql", "006_create_agent_runs_table.sql",
-              "008_display_ids.sql", "009_branch_offer_toggle.sql"]
+# 005/006 tables are already in db/schema.sql (005 also inserts demo approvals
+# that need existing locations); 007 is covered by seed_ci.py. Only the
+# migrations newer than the schema dump are applied.
+MIGRATIONS = ["008_display_ids.sql", "009_branch_offer_toggle.sql"]
 
 
 def dev_db_name() -> str:
