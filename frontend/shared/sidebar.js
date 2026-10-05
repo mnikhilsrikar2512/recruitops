@@ -366,17 +366,3 @@ function closeMobileNav(mobileDialog) {
 }
 
 
-function setupLogoutLinks() {
-  document.querySelectorAll("[data-logout-link]").forEach((link) => {
-    link.addEventListener("click", () => {
-      try {
-        window.sessionStorage.clear();
-        window.localStorage.removeItem("recruitops-selected-pipeline-candidate");
-      } catch {
-      }
-      showToast("Logged out", "Returning to the sign-in screen.");
-    });
-  });
-}
-
-

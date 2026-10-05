@@ -64,8 +64,15 @@ const ADMIN_SIDEBAR_BASE = new Set([
 const ADMIN_EXECUTION_GRANT_CODES = ["client.read", "requisition.read", "candidate.read", "daily_update.read"];
 
 function navShapeEntriesForSidebar(entries, codes) {
+  /* Session first — the previous version referenced `session` before its
+     declaration (TDZ ReferenceError) and left the real body below an
+     unreachable `return`, so the admin pass never ran. */
   const session = (typeof readSession === "function" && readSession()) || {};
-  if (session.role_code !== "admin") return entries;
+  if (session.role_code !== "admin") {
+    /* Non-admins: navEntriesFor() already applied default-deny against the
+       resolved permission codes — nothing more to shape here. */
+    return entries;
+  }
   const allowed = new Set(ADMIN_SIDEBAR_BASE);
   if (ADMIN_EXECUTION_GRANT_CODES.some((code) => codes.has(code))) {
     allowed.add("my-work-dashboard"); /* PRD §3.1: My Work only with an execution grant */
@@ -278,18 +285,17 @@ async function loadHomeMetrics() {
     const host = document.querySelector(`[data-metric-id="${id}"] [data-metric-value]`);
     if (host) host.textContent = value;
   };
-  const api = typeof apiRequest === "function" ? apiRequest : null;
-  if (!api) return;
   const guard = (promise, fallback) => promise.catch(() => fallback);
 
-  const requisitions = await guard(api("/requisitions/?page_size=1"), null);
+  const requisitions = await guard(apiRequest("/requisitions/?status=open&page_size=1"), null);
   setValue("open-requisitions", requisitions?.meta?.total ?? "—");
-  const notifications = await guard(api("/notifications/?status=unread&page_size=1"), null);
+  const notifications = await guard(apiRequest("/notifications/?status=unread&page_size=1"), null);
   setValue("unread-notifications", notifications?.meta?.total ?? "—");
-  const approvals = await guard(api("/approvals/?page_size=1"), null);
+  const approvals = await guard(apiRequest("/approvals/?status=pending&page_size=1"), null);
   setValue("pending-approvals", approvals?.meta?.total ?? "—");
-  const updates = await guard(api("/daily-updates/?page_size=1"), null);
-  setValue("overdue-updates", updates?.meta?.total ?? "—");
+  /* "Overdue daily updates" is left at "—": the API has no overdue filter
+     (the PRD's cutoff-based overdue flag is not implemented backend-side),
+     and an unfiltered total would be a false number. */
 }
 
 /* ── Boot ─────────────────────────────────────────────────────── */

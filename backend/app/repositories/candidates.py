@@ -65,6 +65,29 @@ class CandidateApplicationSummaryRecord:
 
 
 @dataclass
+class CandidateFootprintEntryRecord:
+    """Admin-only cross-tenant footprint entry: WHERE a candidate is in play.
+
+    Deliberately exposes placement context (client, branch, stage, status)
+    and NOTHING tenant-private — no notes, no offer terms, no owner
+    identities. This is an oversight view, not a data export.
+    """
+
+    application_id: int
+    requisition_id: int
+    requisition_code: str | None
+    requisition_title: str | None
+    client_id: int | None
+    client_name: str | None
+    branch_id: int
+    branch_code: str | None
+    current_stage: str
+    application_status: str
+    stage_updated_at: object
+    applied_at: object
+
+
+@dataclass
 class CandidateDocumentRecord:
     id: int
     candidate_id: int
@@ -342,6 +365,61 @@ def find_candidate_by_id(engine: Engine, candidate_id: int) -> CandidateRecord |
         return None
     linked_titles = _load_linked_requisition_titles(engine, [candidate_id])
     return _map_candidate(row, linked_titles.get(candidate_id, []))
+
+
+def get_candidate_footprint(engine: Engine, candidate_id: int) -> list[CandidateFootprintEntryRecord]:
+    """Cross-tenant footprint for one candidate (admin oversight only).
+
+    One row per application across ALL tenants: which client company the
+    candidate is in play with, on which branch, and the coarse pipeline
+    position. Tenant-private fields (notes, offer terms, owner identities)
+    are intentionally not selected.
+    """
+    query = text(
+        """
+        SELECT
+          ca.id AS application_id,
+          ca.requisition_id,
+          r.requisition_code,
+          r.title AS requisition_title,
+          r.client_company_id AS client_id,
+          cc.name AS client_name,
+          r.branch_id AS branch_id,
+          b.code AS branch_code,
+          ca.current_stage,
+          ca.application_status,
+          ca.stage_updated_at,
+          ca.applied_at
+        FROM dbo.candidate_applications AS ca
+        INNER JOIN dbo.requisitions AS r
+          ON r.id = ca.requisition_id
+        LEFT JOIN dbo.client_companies AS cc
+          ON cc.id = r.client_company_id
+        LEFT JOIN dbo.branches AS b
+          ON b.id = r.branch_id
+        WHERE ca.candidate_id = :candidate_id
+        ORDER BY ca.applied_at DESC, ca.id DESC;
+        """
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(query, {"candidate_id": candidate_id}).mappings().all()
+    return [
+        CandidateFootprintEntryRecord(
+            application_id=int(row["application_id"]),
+            requisition_id=int(row["requisition_id"]),
+            requisition_code=row["requisition_code"],
+            requisition_title=row["requisition_title"],
+            client_id=(int(row["client_id"]) if row["client_id"] is not None else None),
+            client_name=row["client_name"],
+            branch_id=int(row["branch_id"]) if row["branch_id"] is not None else 0,
+            branch_code=row["branch_code"],
+            current_stage=row["current_stage"],
+            application_status=row["application_status"],
+            stage_updated_at=row["stage_updated_at"],
+            applied_at=row["applied_at"],
+        )
+        for row in rows
+    ]
 
 
 def list_candidate_applications(engine: Engine, candidate_id: int) -> list[CandidateApplicationSummaryRecord]:

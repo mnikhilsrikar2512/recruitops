@@ -208,6 +208,34 @@ class CandidateDuplicateReviewCaseResponse(BaseModel):
     updated_at: datetime
 
 
+class CandidateFootprintEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    application_id: int
+    requisition_id: int
+    requisition_code: str | None = None
+    requisition_title: str | None = None
+    client_id: int | None = None
+    client_name: str | None = None
+    branch_id: int
+    branch_code: str | None = None
+    current_stage: str
+    application_status: str
+    stage_updated_at: datetime
+    applied_at: datetime
+
+
+class CandidateFootprintResponse(BaseModel):
+    """Admin-only cross-tenant oversight payload. Contains placement context
+    only — never notes, offer terms, or owner identities."""
+
+    candidate_id: int
+    candidate_code: str | None = None
+    full_name: str
+    clients_count: int
+    entries: list[CandidateFootprintEntry] = Field(default_factory=list)
+
+
 class CandidateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

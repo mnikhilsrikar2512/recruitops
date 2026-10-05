@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 from sqlalchemy import Engine
 
-from app.api.deps import get_engine, require_any_permission, require_permissions
+from app.api.deps import get_current_auth_context, get_engine, require_any_permission, require_permissions
 from app.schemas.candidate import (
     CandidateCreate,
+    CandidateFootprintResponse,
     CandidateDocumentCreate,
     CandidateDocumentResponse,
     CandidateDuplicateCheckResponse,
@@ -25,6 +26,7 @@ from app.services.candidates import (
     finalize_candidate_service,
     get_candidate_detail_service,
     get_candidate_duplicate_check_service,
+    get_candidate_footprint_service,
     list_candidates_service,
     reassign_candidate_owner_service,
     update_candidate_service,
@@ -77,6 +79,21 @@ def get_candidate_detail_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
     return get_candidate_detail_service(engine, candidate_id, auth_context)
+
+
+@router.get("/{candidate_id}/footprint", response_model=CandidateFootprintResponse)
+def get_candidate_footprint_endpoint(
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    candidate_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> CandidateFootprintResponse:
+    """Admin-only: cross-tenant client footprint for one shared candidate.
+
+    Gated on the admin role inside the service (this oversight view crosses
+    tenant lines by design, so it must not be grantable via permissions);
+    requires a valid session for the audit trail either way.
+    """
+    return get_candidate_footprint_service(engine, candidate_id, auth_context)
 
 
 @router.patch("/{candidate_id}", response_model=CandidateResponse)

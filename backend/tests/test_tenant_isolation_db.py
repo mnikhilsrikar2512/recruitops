@@ -555,6 +555,59 @@ class TestCrossTenantOfferIsolation:
             assert leak_probe not in body, f"tenant B notes leaked via {path}"
 
 
+class TestAdminFootprintOversight:
+    """Admin-only cross-tenant footprint: admins see which clients a shared
+    candidate is in play with; recruiters do not, and the payload never
+    carries tenant-private fields (notes, offer terms, owner identities)."""
+
+    def test_admin_gets_full_footprint(self, client, isolation, admin_headers):
+        response = client.get(
+            f"/api/v1/candidates/{isolation.candidate_id}/footprint",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["candidate_id"] == isolation.candidate_id
+        assert payload["clients_count"] >= 2, "shared candidate spans >= 2 clients"
+        client_ids = {entry["client_id"] for entry in payload["entries"]}
+        assert {isolation.client_a, isolation.client_b} <= client_ids
+
+    def test_footprint_payload_has_no_tenant_private_fields(self, client, isolation, admin_headers):
+        response = client.get(
+            f"/api/v1/candidates/{isolation.candidate_id}/footprint",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200, response.text
+        body = response.text
+        for forbidden in (
+            f"PRIVATE NOTE tenant A {isolation.suffix}",
+            f"PRIVATE NOTE tenant B {isolation.suffix}",
+            "client_feedback_notes",
+            "offered_ctc",
+            "offer_currency",
+            "owner_user_id",
+            "owner_name",
+        ):
+            assert forbidden not in body, f"footprint leaked tenant-private field: {forbidden}"
+
+    @pytest.mark.parametrize("label", ["A", "B"])
+    def test_recruiters_denied_footprint(self, client, isolation, label):
+        response = client.get(
+            f"/api/v1/candidates/{isolation.candidate_id}/footprint",
+            headers=isolation.user_headers[label],
+        )
+        assert response.status_code == 403, response.text
+        assert "administrator oversight" in response.json()["detail"]
+
+    def test_footprint_requires_authentication(self, client, isolation):
+        response = client.get(f"/api/v1/candidates/{isolation.candidate_id}/footprint")
+        assert response.status_code in {401, 403}
+
+    def test_footprint_404_for_unknown_candidate(self, client, admin_headers):
+        response = client.get("/api/v1/candidates/99999999/footprint", headers=admin_headers)
+        assert response.status_code == 404
+
+
 class TestTenantDataDoesNotLeakViaLists:
     """List endpoints must not leak other tenants' rows or aggregate values."""
 

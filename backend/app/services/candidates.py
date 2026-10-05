@@ -10,6 +10,7 @@ from app.repositories.candidates import (
     finalize_candidate_into_requisition,
     find_candidate_by_id,
     find_duplicate_matches,
+    get_candidate_footprint,
     list_candidate_applications,
     list_candidates,
     social_profiles_for_candidate,
@@ -20,6 +21,8 @@ from app.repositories.audit import insert_audit_log
 from app.repositories.requisitions import find_requisition_by_id
 from app.repositories.users import find_user_by_id
 from app.schemas.candidate import (
+    CandidateFootprintEntry,
+    CandidateFootprintResponse,
     CandidateCreate,
     CandidateDocumentCreate,
     CandidateDocumentResponse,
@@ -117,6 +120,34 @@ def _assert_candidate_access(candidate: CandidateResponse, auth_context: AuthCon
     if _can_access_candidate(candidate, auth_context):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Candidate access is not allowed")
+
+
+def get_candidate_footprint_service(
+    engine: Engine,
+    candidate_id: int,
+    auth_context: AuthContext | None = None,
+) -> CandidateFootprintResponse:
+    """Admin-only cross-tenant oversight: which clients a shared candidate is
+    in play with. Recruiters must use tenant-scoped surfaces instead — the
+    footprint's value is precisely that it crosses tenant lines, so it is
+    gated on the admin ROLE (not a permission that can be granted) and never
+    carries tenant-private fields."""
+    if auth_context is None or auth_context.user.role_code != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Candidate footprint is restricted to administrator oversight",
+        )
+    candidate = find_candidate_by_id(engine, candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
+    entries = get_candidate_footprint(engine, candidate_id)
+    return CandidateFootprintResponse(
+        candidate_id=candidate.id,
+        candidate_code=candidate.candidate_code,
+        full_name=candidate.full_name,
+        entries=[CandidateFootprintEntry.model_validate(entry) for entry in entries],
+        clients_count=len({entry.client_id for entry in entries if entry.client_id is not None}),
+    )
 
 
 def list_candidates_service(
