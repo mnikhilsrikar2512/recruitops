@@ -3,6 +3,7 @@ from sqlalchemy import Engine
 
 from app.api.deps import PERMISSION_ALIASES, get_current_auth_context, get_engine, require_permissions
 from app.agents.registry import find_agent_by_id
+from app.core.config import settings
 from app.repositories.auth import list_resolved_permissions
 from app.schemas.agent import (
     AgentCatalogResponse,
@@ -19,7 +20,13 @@ from app.services.agents import (
 )
 from app.services.auth import AuthContext
 
-router = APIRouter(dependencies=[Depends(get_current_auth_context)])
+def _require_ai_enabled() -> None:
+    """Feature flag (decision D-10): agents are dark in staging/production."""
+    if not settings.ai_agents_available:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+
+router = APIRouter(dependencies=[Depends(_require_ai_enabled), Depends(get_current_auth_context)])
 
 
 def _has_agent_resolved_permission(resolved_permissions: set[str], code: str) -> bool:

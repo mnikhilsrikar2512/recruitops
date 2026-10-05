@@ -4,7 +4,7 @@ const path = require('path');
 
 const PORT = Number(process.env.PORT || 4174);
 const API_PORT = process.env.API_PORT || 8000;
-const ROOT = __dirname;
+const ROOT = path.resolve(__dirname);
 const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
@@ -32,19 +32,32 @@ http.createServer((req, res) => {
     proxyApi(req, res);
     return;
   }
-  let filePath = path.join(ROOT, req.url === '/' ? 'index.html' : req.url.split('?')[0]);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch {
+    res.writeHead(400); res.end('Bad request'); return;
+  }
+  // Resolve inside ROOT only — "/../backend/.env" must never be served.
+  const inRoot = (candidate) => candidate === ROOT || candidate.startsWith(ROOT + path.sep);
+  let filePath = path.resolve(ROOT, '.' + (urlPath === '/' ? '/index.html' : urlPath));
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    filePath = path.join(ROOT, 'pages', req.url.split('?')[0].replace(/^\//, ''));
+    filePath = path.resolve(ROOT, 'pages', '.' + urlPath);
   }
   if (!fs.existsSync(filePath)) {
     // Try appending .html
     filePath = filePath.endsWith('.html') ? filePath : filePath + '.html';
   }
-  if (!fs.existsSync(filePath)) {
+  if (!inRoot(filePath) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     res.writeHead(404); res.end('Not found'); return;
   }
   const ext = path.extname(filePath);
-  const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+  const headers = {
+    'Content-Type': MIME[ext] || 'application/octet-stream',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+    'X-Frame-Options': 'SAMEORIGIN',
+  };
   const isAsset = ext === '.css' || ext === '.js';
   const cacheAssets = process.env.NODE_ENV === 'production';
   if (ext === '.html' || (isAsset && !cacheAssets)) {

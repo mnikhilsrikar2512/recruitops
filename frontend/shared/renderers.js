@@ -1320,6 +1320,15 @@ function buildWorkloadMembers(users, requisitions, candidates) {
   });
 }
 
+/* Utilization band for the team workload bars: >85% is overloaded,
+   <40% has spare capacity. */
+function workloadStatus(utilization) {
+  const value = Number(utilization) || 0;
+  if (value > 85) return { label: "Overloaded", barClass: "bg-error", textClass: "text-danger-text" };
+  if (value >= 40) return { label: "Balanced", barClass: "bg-primary", textClass: "text-on-surface" };
+  return { label: "Capacity", barClass: "bg-success-text", textClass: "text-success-text" };
+}
+
 function renderTeamWorkloadRows(members) {
   return members.map((member) => {
     const status = workloadStatus(member.utilization);
@@ -1670,6 +1679,35 @@ function renderInterviewCard(item, index) {
   </div>`;
 }
 
+
+/* Summary card for interview-detail.html, painted from GET /interviews/{id}
+   (InterviewResponse in backend/app/schemas/interview.py). */
+function renderInterviewDetail(item) {
+  const field = (label, value) => `<div>
+      <p class="font-label-caps text-label-caps text-text-muted">${escapeLiveHtml(label)}</p>
+      <p class="font-body-sm text-body-sm text-on-surface mt-0.5">${escapeLiveHtml(value || "—")}</p>
+    </div>`;
+  const status = item.feedback_status || item.status || "Pending";
+  return `<section class="bg-surface border border-border rounded-lg p-4 mb-4" data-live-interview-detail="true">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div class="min-w-0">
+        <h2 class="font-headline-sm text-headline-sm text-on-surface truncate">${escapeLiveHtml(item.candidate_name || "Candidate")}</h2>
+        <p class="font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
+      </div>
+      <span class="inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${interviewStatusBadge(status)}">${escapeLiveHtml(status)}</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      ${field("Round", [item.round_type, item.round_name].filter(Boolean).join(" · "))}
+      ${field("Scheduled", formatWhen(item.scheduled_at))}
+      ${field("Interviewer", item.interviewer_name)}
+      ${field("Location", item.location_name)}
+      ${field("Decision", item.decision ? titleFromCode(item.decision) : "")}
+      ${field("Scheduled by", item.created_by_name)}
+    </div>
+    ${item.feedback_notes ? `<p class="font-body-sm text-body-sm text-on-surface mt-4 whitespace-pre-line">${escapeLiveHtml(item.feedback_notes)}</p>` : ""}
+    ${/pending/i.test(String(item.feedback_status || "")) ? `<div class="mt-4"><button type="button" class="px-4 py-2 rounded bg-primary-container text-on-primary font-body-sm font-semibold" data-route="interview-feedback-dialog.html?interview_id=${item.id}">Submit feedback</button></div>` : ""}
+  </section>`;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    OFFER RENDERERS

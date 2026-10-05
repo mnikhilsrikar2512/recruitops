@@ -8,10 +8,14 @@ Run and operate the API here. Product requirements: [`../docs/PRODUCT_REQUIREMEN
 cd backend
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime only: requirements.txt
+cp .env.example .env                  # then fill in DB_* (see comments inside)
 ```
 
 Configure environment (MSSQL connection and secrets) via `.env` / settings as used by `app.core.config`.
+`APP_ENV=staging|production` refuses to boot with a wildcard or `http://` `CORS_ORIGINS`,
+an empty `DB_PASSWORD`, or `AI_ENABLED=true` (`validate_settings()`); in those
+environments the agents API answers 404 (AI is off at launch, decision D-10).
 
 ## Run API
 

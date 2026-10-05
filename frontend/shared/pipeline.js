@@ -598,7 +598,7 @@ function setupStageMoveOverlay() {
   const sync = ({ fromRejectToggle = false } = {}) => {
     const selectedBase = candidates.find((candidate) => candidate.id === candidateSelect.value) || activeCandidate;
     const rememberedCandidate = readRememberedPipelineCandidate();
-    const selectedCandidate = rememberedCandidate?.id === selectedBase?.id
+    const selectedCandidate = selectedBase?.id && rememberedCandidate?.id === selectedBase.id
       ? { ...selectedBase, ...rememberedCandidate, badges: selectedBase.badges || rememberedCandidate.badges || [] }
       : selectedBase;
     activeCandidate = selectedCandidate;
@@ -678,6 +678,12 @@ function setupStageMoveOverlay() {
     event.preventDefault();
     event.stopPropagation();
     if (!validateScope(surface)) return;
+    /* Opened for a real application (?application_id=…): persist the move
+       through PATCH /pipeline/applications/{id}/stage (api-client.js). */
+    if (/[?&]application_id=\d+/.test(window.location.search) && window.RecruitOpsLive?.handleFormSubmit) {
+      window.RecruitOpsLive.handleFormSubmit(surface);
+      return;
+    }
     const targetLabel = targetStage.options[targetStage.selectedIndex]?.text?.trim() || "selected stage";
     showToast("Interaction validated", `${activeCandidate?.name || "Candidate"} will move from ${activeCandidate?.stage || "current stage"} to ${targetLabel}.`);
   });

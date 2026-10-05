@@ -70,6 +70,11 @@ Observed script order in `pages/approvals-inbox.html`:
 
 ## Part 1 — Verification questions
 
+> **Correction (2026-10-05, `phase-1-foundation-status.md`):** the grep below ran against an
+> uncommitted working tree in which `api-client.js` had been cut from 5,978 to ~550 lines.
+> The committed client (`0b2aeaa`) defines `apiRequest` and ~70 page loaders; the data layer
+> has been restored. Items 5 and 6 are re-evaluated in the Phase 1 status doc.
+
 ### Q1. Does the frontend load data through another mechanism, or is `apiRequest` really missing?
 
 **`apiRequest` is genuinely missing.** No other file, module, or inline script fetches business data — the only two `fetch()` calls in the data path are the RB-1 gate's `/auth/me` + `/permissions/me`.

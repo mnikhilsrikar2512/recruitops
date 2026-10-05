@@ -382,6 +382,9 @@ function isTopbarSearchInput(input) {
 function isWorkspaceFilterSelect(select) {
   if (!select || select.closest("table, form, [data-entity-dialog], .overlay-host, [data-overlay-surface], .advanced-filter-panel")) return false;
   if (select.classList.contains("custom-select") || select.id === "req-select") return false;
+  /* Action/selector controls (report type, agent picker) drive a page
+     action, not a table filter — opt out with data-no-filter. */
+  if (select.hasAttribute("data-no-filter") || select.id === "report-type") return false;
   /* Agent picker is an action control, not a table filter. */
   if (select.hasAttribute("data-agents-select")) return false;
   /* Global nav search lives in the topbar/home header, not a table toolbar. */

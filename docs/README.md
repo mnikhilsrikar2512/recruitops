@@ -22,3 +22,8 @@ Decision records:
 - [production-readiness-assessment.md](./production-readiness-assessment.md) — Go/No-Go
   baseline. **Note:** its items 5/6 and the "17 `isAdmin()` sites" evidence are superseded by
   `readiness-qa-and-decisions.md` (Part 1).
+- [recruitops-production-readiness-execution-plan.md](./recruitops-production-readiness-execution-plan.md) —
+  phased path from NO-GO to launch.
+- [phase-1-foundation-status.md](./phase-1-foundation-status.md) — Phase 1 results. **Corrects**
+  the "`apiRequest` is defined nowhere" finding (Q1 / plan §1): the committed client had the full
+  data layer; an uncommitted rewrite had deleted it. It has been restored and CI gates added.
