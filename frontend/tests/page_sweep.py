@@ -46,6 +46,12 @@ IGNORED_CONSOLE = (
     "Failed to load resource",  # stubbed fonts/images
     "favicon",
 )
+# Chrome aborts the cross-document @view-transition (global.css) when a page
+# redirects while still loading (e.g. access-denied → login). The browser
+# raises it as an uncaught DOMException; it is navigation noise, not app code.
+IGNORED_PAGEERRORS = (
+    "Transition was aborted because of invalid state",
+)
 
 
 LIVE = {"enabled": False, "session": None}
@@ -128,7 +134,8 @@ def main() -> int:
             context.route("**/*", lambda route: route.continue_() if route.request.url.startswith(opts.base) else route_external(route))
             page = context.new_page()
             errors: list[str] = []
-            page.on("pageerror", lambda exc, errors=errors: errors.append(f"uncaught: {exc}"))
+            page.on("pageerror", lambda exc, errors=errors: errors.append(f"uncaught: {exc}")
+                    if not any(s in str(exc) for s in IGNORED_PAGEERRORS) else None)
             page.on("console", lambda msg, errors=errors: errors.append(f"console.error: {msg.text}")
                     if msg.type == "error" and not any(s in msg.text for s in IGNORED_CONSOLE) else None)
             before = len(mock(opts.base, "/__mock/log")["violations"])
