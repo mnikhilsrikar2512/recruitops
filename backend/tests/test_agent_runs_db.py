@@ -9,7 +9,7 @@ convention in test_permission_catalog.py.
 """
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from app.api.deps import get_engine
 from app.main import create_application
@@ -49,7 +49,13 @@ def _admin_user_id(engine) -> int:
     with engine.connect() as connection:
         return int(
             connection.execute(
-                text("SELECT TOP 1 id FROM dbo.users WHERE email = N'admin@executiveconnection.com'")
+                # Dev databases carry the legacy demo admin; fresh/CI databases
+                # only have the seed_ci admin — accept whichever exists.
+                text(
+                    "SELECT TOP 1 id FROM dbo.users WHERE email IN :emails "
+                    "ORDER BY CASE email WHEN N'admin@executiveconnection.com' THEN 0 ELSE 1 END"
+                ).bindparams(bindparam("emails", expanding=True)),
+                {"emails": list(ADMIN_EMAIL_CANDIDATES)},
             ).scalar_one()
         )
 

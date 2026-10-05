@@ -8,10 +8,10 @@
 #    (your dev database is never touched)
 # 3. seeds the CI baseline and runs the backend test suite against it
 # 4. seeds the two staging tenants
-# 5. starts the API (:8010) and UI (:4184) on that database
+# 5. starts the API and UI on free ports (from 18010 / 14184) on that database
 # 6. runs the live API smoke test and the browser sweep (admin + tenant-A recruiter)
 # Logs: <repo>/.phase1-logs/*.log (gitignored)   Summary at the end.
-# Uses its own ports (API 8010, UI 4184) so an already-running dev backend on
+# Uses its own free ports (never 8000/4174) so an already-running dev backend on
 # :8000 (e.g. the launchd com.recruitops.backend job) is not hit by mistake.
 set -uo pipefail
 
@@ -60,16 +60,22 @@ else
   record FAIL "staging seed (see $LOGS/seed_staging.log)"
 fi
 
-API_PORT_V="${API_PORT_V:-8010}"
-WEB_PORT_V="${WEB_PORT_V:-4184}"
+free_port() {  # first free TCP port at or above $1
+  "$PY" - "$1" <<'PYEOF'
+import socket, sys
+port = int(sys.argv[1])
+while True:
+    with socket.socket() as s:
+        try:
+            s.bind(("127.0.0.1", port)); print(port); break
+        except OSError:
+            port += 1
+PYEOF
+}
+API_PORT_V="${API_PORT_V:-$(free_port 18010)}"
+WEB_PORT_V="${WEB_PORT_V:-$(free_port 14184)}"
 BASE="http://127.0.0.1:$WEB_PORT_V"
 echo "→ 5/6 starting API :$API_PORT_V and UI :$WEB_PORT_V on $STAGING_DB"
-for port in "$API_PORT_V" "$WEB_PORT_V"; do
-  if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
-    record FAIL "port $port already in use — stop that process or set API_PORT_V/WEB_PORT_V"
-    printf '\n%s\n' "${SUMMARY[@]}"; exit 1
-  fi
-done
 $PY -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT_V" >"$LOGS/api.log" 2>&1 &
 API_PID=$!
 (cd "$ROOT/frontend" && API_PORT="$API_PORT_V" PORT="$WEB_PORT_V" exec node server.js) >"$LOGS/web.log" 2>&1 &

@@ -92,8 +92,11 @@ def login(client: TestClient, email: str, password: str) -> Api:
 
 
 def ensure_branch(engine, tenant: dict) -> int:
+    """Create the tenant branch and mirror it into dbo.locations with the SAME
+    id: the codebase treats branch id == location id, and several FKs
+    (approvals, clients, users, …) reference dbo.locations."""
     with engine.begin() as connection:
-        return int(connection.execute(
+        branch_id = int(connection.execute(
             text(
                 """
                 SET NOCOUNT ON;
@@ -105,6 +108,22 @@ def ensure_branch(engine, tenant: dict) -> int:
             ),
             {"code": tenant["code"], "name": tenant["branch"], "city": tenant["city"]},
         ).scalar_one())
+        connection.execute(
+            text(
+                """
+                SET NOCOUNT ON;
+                IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
+                BEGIN
+                    SET IDENTITY_INSERT dbo.locations ON;
+                    INSERT INTO dbo.locations (id, name, code, location, city, status)
+                    VALUES (:id, :name, :code, :city, :city, N'active');
+                    SET IDENTITY_INSERT dbo.locations OFF;
+                END
+                """
+            ),
+            {"id": branch_id, "code": tenant["code"], "name": tenant["branch"], "city": tenant["city"]},
+        )
+        return branch_id
 
 
 def user_exists(engine, email: str) -> bool:
