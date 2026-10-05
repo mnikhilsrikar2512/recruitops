@@ -99,32 +99,23 @@ approve, pipeline stage move, mark notification read, logout.
 ## 5. The one remaining step: run it on a machine with the stack
 
 Everything above was built and exercised against the contract mock in a sandbox
-that cannot install the backend's Python packages or reach SQL Server, so the
-following has **not yet been run against the real backend**. On your Mac:
+that cannot install the backend's Python packages or reach SQL Server. One command
+runs the whole closing check on a developer machine (it creates a fresh
+`recruitops_staging` database next to your dev DB — the dev DB is never touched):
 
 ```bash
-# 0. enable CI (this session could not write under .github/)
-mkdir -p .github/workflows && git mv tools/ci/github-workflow-ci.yml .github/workflows/ci.yml
-
-# 1. backend tests (throwaway SQL Server in Docker; or SKIP_DOCKER=1 for your local DB)
-cd backend && .venv/bin/pip install -r requirements-dev.txt
-DB_PORT=1434 ./scripts/run_tests_ci.sh
-
-# 2. fresh staging DB + seed (D-12: never your dev DB)
-#    create an empty DB, apply db/schema.sql + ../scripts/00X_*.sql, then:
-DB_NAME=recruitops_staging .venv/bin/python scripts/seed_staging.py
-
-# 3. run the stack against it and smoke-test
-cd .. && DB_NAME=recruitops_staging ./start.sh        # second terminal for the rest
-python3 tools/ci/live_smoke.py --base http://127.0.0.1:4174
-pip install playwright && python3 -m playwright install chromium
-python3 frontend/tests/page_sweep.py --base http://127.0.0.1:4174 --live
-python3 frontend/tests/page_sweep.py --base http://127.0.0.1:4174 --live \
-  --email recruiter@northwind-staging.test --password 'Staging#2026-Recruit' --persona recruiter
+bash "<repo>/tools/ci/phase1_verify.sh"
 ```
 
-Phase 1 is closed when steps 1–3 pass (every `auto` row in the smoke test) and CI is
-green and required on `main`.
+It installs deps, creates + migrates the fresh DB (`backend/scripts/create_staging_db.py`),
+runs the backend suite, seeds both tenants, starts the stack, then runs
+`live_smoke.py` and the `--live` browser sweep as admin and as a tenant-A recruiter,
+printing a PASS/FAIL summary (logs in `/tmp/recruitops-phase1/`).
+
+To enable CI, from the repo root:
+`mkdir -p .github/workflows && git mv tools/ci/github-workflow-ci.yml .github/workflows/ci.yml`
+
+Phase 1 is closed when the summary is all PASS and CI is green and required on `main`.
 
 ## 6. Deferred out of Phase 1 (by design)
 
