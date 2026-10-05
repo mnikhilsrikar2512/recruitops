@@ -125,6 +125,13 @@ def main() -> int:
     if b_ids:
         status, payload, _ = rec_a.call("GET", f"/requisitions/{b_ids[0]}")
         check("2.2 A reading B's requisition by id → 403/404", status in (403, 404) and not leaks(payload), str(status))
+    status, clients_a, _ = mgr_a.call("GET", "/clients/?page_size=100")
+    client_names = {c.get("client_name") for c in items(clients_a)}
+    check("2.1 manager A's clients exclude tenant B", status == 200 and not any("(STGB)" in (n or "") for n in client_names), str(client_names))
+    status, approvals_a, _ = mgr_a.call("GET", "/approvals/?page_size=100")
+    check("2.1 manager A's approvals exclude tenant B",
+          status == 200 and not any("Supply Chain Planner" in (a.get("title") or "") for a in items(approvals_a)),
+          str([a.get("title") for a in items(approvals_a)]))
     status, board_a, _ = rec_a.call("GET", "/pipeline/board")
     names_a = {r.get("candidate_name") for r in items(board_a)}
     check("2.2 pipeline board isolated", status == 200 and not ({"Farhan Qureshi", "Sneha Reddy", "Vivek Sharma"} & names_a), str(names_a))

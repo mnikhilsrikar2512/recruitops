@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import (
+    get_current_auth_context,
+    get_engine,
+    pinned_location_id,
+    require_location_scope,
+    require_permissions,
+    require_record_in_location,
+)
 from app.schemas.requisition import (
     RequisitionAssignmentCreate,
     RequisitionAssignmentResponse,
@@ -29,10 +36,17 @@ from app.services.auth import AuthContext
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
+_scope_requisition = require_record_in_location(
+    "requisition_id",
+    lambda engine, requisition_id: get_requisition_detail_service(engine, requisition_id).location_id,
+    "Requisition was not found",
+)
+
 
 @router.get("/", response_model=RequisitionListResponse)
 def list_requisitions_endpoint(
     _auth: object = Depends(require_permissions("requisition.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     _scope: object = Depends(require_location_scope("location_id")),
     location_id: int | None = Query(default=None, ge=1),
     client_id: int | None = Query(default=None, ge=1),
@@ -48,7 +62,7 @@ def list_requisitions_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> RequisitionListResponse:
     filters = RequisitionListFilters(
-        location_id=location_id,
+        location_id=pinned_location_id(auth_context, location_id),
         client_id=client_id,
         primary_owner_user_id=primary_owner_user_id,
         delivery_owner_user_id=delivery_owner_user_id,
@@ -76,6 +90,7 @@ def create_requisition_endpoint(
 @router.get("/{requisition_id}", response_model=RequisitionResponse)
 def get_requisition_detail_endpoint(
     _auth: object = Depends(require_permissions("requisition.read")),
+    _in_scope: object = Depends(_scope_requisition),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
@@ -86,6 +101,7 @@ def get_requisition_detail_endpoint(
 def update_requisition_endpoint(
     payload: RequisitionUpdate,
     _auth: object = Depends(require_permissions("requisition.update")),
+    _in_scope: object = Depends(_scope_requisition),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
@@ -96,6 +112,7 @@ def update_requisition_endpoint(
 def update_requisition_status_endpoint(
     payload: RequisitionStatusUpdate,
     _auth: object = Depends(require_permissions("requisition.status.update")),
+    _in_scope: object = Depends(_scope_requisition),
     auth_context: AuthContext = Depends(get_current_auth_context),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
@@ -106,6 +123,7 @@ def update_requisition_status_endpoint(
 @router.get("/{requisition_id}/assignments", response_model=list[RequisitionAssignmentResponse])
 def list_requisition_assignments_endpoint(
     _auth: object = Depends(require_permissions("assignment.read")),
+    _in_scope: object = Depends(_scope_requisition),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> list[RequisitionAssignmentResponse]:
@@ -116,6 +134,7 @@ def list_requisition_assignments_endpoint(
 def create_requisition_assignment_endpoint(
     payload: RequisitionAssignmentCreate,
     _auth: object = Depends(require_permissions("assignment.create")),
+    _in_scope: object = Depends(_scope_requisition),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionAssignmentResponse:
@@ -135,6 +154,7 @@ def remove_requisition_assignment_endpoint(
 def reassign_requisition_owners_endpoint(
     payload: RequisitionOwnerReassignment,
     _auth: object = Depends(require_permissions("requisition.update")),
+    _in_scope: object = Depends(_scope_requisition),
     auth_context: AuthContext = Depends(get_current_auth_context),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),

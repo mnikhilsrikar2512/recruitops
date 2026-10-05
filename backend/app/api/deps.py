@@ -214,3 +214,44 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
         return auth_context
 
     return scope_dependency
+
+
+# ── Row-level location (tenant) scoping ─────────────────────────────────────
+# Until Phase 2 adds tenant_id, a non-admin's tenant boundary is their primary
+# location. require_location_scope() only rejects an explicit foreign
+# location_id; these helpers close the two remaining gaps found by the live
+# smoke test: list endpoints called WITHOUT location_id, and direct-id routes.
+
+
+def pinned_location_id(auth_context: AuthContext, requested: int | None) -> int | None:
+    """Effective list filter: admins keep what they asked for (None = all
+    locations); everyone else is pinned to their own location."""
+    if auth_context.user.role_code == "admin":
+        return requested
+    return auth_context.user.location_id
+
+
+def require_record_in_location(
+    path_param: str,
+    load_location_id: Callable[[Engine, int], int | None],
+    not_found_detail: str,
+) -> Callable[..., AuthContext]:
+    """Dependency for direct-id routes: a record outside the caller's location
+    answers 404 (not 403) so ids in other tenants cannot be discovered.
+
+    ``load_location_id`` returns the record's location id and raises its own
+    404 when the record does not exist."""
+
+    def dependency(
+        request: Request,
+        auth_context: AuthContext = Depends(get_current_auth_context),
+        engine: Engine = Depends(get_engine),
+    ) -> AuthContext:
+        if auth_context.user.role_code == "admin":
+            return auth_context
+        record_id = int(request.path_params[path_param])
+        if load_location_id(engine, record_id) != auth_context.user.location_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
+        return auth_context
+
+    return dependency

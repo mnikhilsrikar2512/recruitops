@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_permissions
+from app.api.deps import (
+    get_current_auth_context,
+    get_engine,
+    pinned_location_id,
+    require_location_scope,
+    require_permissions,
+    require_record_in_location,
+)
 from app.schemas.approval import (
     ApprovalCreate,
     ApprovalDecision,
@@ -15,13 +22,21 @@ from app.services.approval import (
     get_approval_detail_service,
     list_approvals_service,
 )
+from app.services.auth import AuthContext
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
+
+_scope_approval = require_record_in_location(
+    "approval_id",
+    lambda engine, approval_id: get_approval_detail_service(engine, approval_id).location_id,
+    "Approval was not found",
+)
 
 
 @router.get("/", response_model=ApprovalListResponse)
 def list_approvals_endpoint(
     _auth: object = Depends(require_permissions("approval.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     location_id: int | None = Query(default=None, ge=1),
     approval_type: str | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -33,7 +48,7 @@ def list_approvals_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> ApprovalListResponse:
     filters = ApprovalListFilters(
-        location_id=location_id,
+        location_id=pinned_location_id(auth_context, location_id),
         approval_type=approval_type,
         status=status,
         priority=priority,
@@ -49,6 +64,7 @@ def list_approvals_endpoint(
 def create_approval_endpoint(
     payload: ApprovalCreate,
     _auth: object = Depends(require_permissions("approval.create")),
+    _scope: object = Depends(require_location_scope("location_id")),
     engine: Engine = Depends(get_engine),
 ) -> ApprovalResponse:
     return create_approval_service(engine, payload)
@@ -57,6 +73,7 @@ def create_approval_endpoint(
 @router.get("/{approval_id}", response_model=ApprovalResponse)
 def get_approval_detail_endpoint(
     _auth: object = Depends(require_permissions("approval.read")),
+    _in_scope: object = Depends(_scope_approval),
     approval_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> ApprovalResponse:
@@ -68,6 +85,7 @@ def decide_approval_endpoint(
     approval_id: int = Path(..., ge=1),
     payload: ApprovalDecision = ...,
     _auth: object = Depends(require_permissions("approval.decide")),
+    _in_scope: object = Depends(_scope_approval),
     engine: Engine = Depends(get_engine),
 ) -> ApprovalResponse:
     return decide_approval_service(engine, approval_id, payload)
