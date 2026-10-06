@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from app.repositories.display_ids import find_branch_by_id
+
 from app.core.config import settings
 from app.core.security import (
     generate_session_token,
@@ -106,7 +108,19 @@ def _assert_session_active(session_record: SessionWithUserRecord) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not allowed to access the system")
 
 
-def _current_session_payload(user: LoginUserRecord) -> CurrentSessionResponse:
+def _branch_offers_enabled(engine: Engine, location_id: int | None) -> bool | None:
+    """Resolve the branch offer-tracking flag for the session's primary location.
+
+    None (unknown branch / legacy column) means "no information" — the
+    frontend treats that as enabled so the default flow is unchanged.
+    """
+    if location_id is None:
+        return None
+    branch = find_branch_by_id(engine, location_id)
+    return branch.offers_enabled if branch else None
+
+
+def _current_session_payload(user: LoginUserRecord, engine: Engine | None = None) -> CurrentSessionResponse:
     return CurrentSessionResponse(
         user={
             "id": user.id,
@@ -126,6 +140,7 @@ def _current_session_payload(user: LoginUserRecord) -> CurrentSessionResponse:
             "id": user.location_id,
             "location_code": user.location_code,
             "location_name": user.location_name,
+            "offers_enabled": _branch_offers_enabled(engine, user.location_id) if engine is not None else None,
         },
     )
 
@@ -178,6 +193,7 @@ def login_service(
             "id": user.location_id,
             "location_code": user.location_code,
             "location_name": user.location_name,
+            "offers_enabled": _branch_offers_enabled(engine, user.location_id),
         },
         session={
             "id": session.id,
@@ -206,8 +222,8 @@ def logout_service(engine: Engine, auth_context: AuthContext) -> LogoutResponse:
     return LogoutResponse(message="Logged out successfully")
 
 
-def get_current_session_service(auth_context: AuthContext) -> CurrentSessionResponse:
-    return _current_session_payload(auth_context.user)
+def get_current_session_service(engine: Engine, auth_context: AuthContext) -> CurrentSessionResponse:
+    return _current_session_payload(auth_context.user, engine)
 
 
 def update_own_profile_service(
@@ -245,7 +261,7 @@ def update_own_profile_service(
     refreshed = find_user_for_login(engine, auth_context.user.email)
     if not refreshed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User was not found")
-    return _current_session_payload(refreshed)
+    return _current_session_payload(refreshed, engine)
 
 
 def get_resolved_permissions_service(engine: Engine, auth_context: AuthContext) -> ResolvedPermissionsResponse:

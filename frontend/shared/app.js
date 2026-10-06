@@ -1254,6 +1254,7 @@ function setupApprovalsWorkspace() {
   });
 }
 
+
 function setupDuplicateResolutionWorkspace() {
   if (document.body?.dataset.routeId !== "candidate-duplicate-review") return;
   if (document.querySelector("[data-duplicate-summary]")) return;
@@ -1404,7 +1405,12 @@ function setupExceptionRequestOverlay() {
   sync();
 }
 
-const DEFAULT_PIPELINE_FLOW = ["Sourced", "Screening", "Technical Interview", "Executive Review", "Offer"];
+/* The Offer stage exists only on branches with offer tracking enabled
+   (branches.offers_enabled) — sourcing-only tenants get a streamlined
+   flow that ends at client hand-off. */
+const DEFAULT_PIPELINE_FLOW = (typeof branchOffersEnabled === "function" && !branchOffersEnabled())
+  ? ["Sourced", "Screening", "Technical Interview", "Executive Review"]
+  : ["Sourced", "Screening", "Technical Interview", "Executive Review", "Offer"];
 
 function setupOverlayWorkflows() {
   setupExceptionRequestOverlay();
@@ -2053,88 +2059,10 @@ function setupOnboardingInteractions() {
 }
 
 function runLoginDemo(form) {
-  if (window.RecruitOpsLive && typeof window.RecruitOpsLive.handleLogin === "function") {
-    window.RecruitOpsLive.handleLogin(form);
-    return;
-  }
-  if (!validateForm(form)) {
-    return;
-  }
-
-  const overlay = document.getElementById("loading-overlay");
-  const submitBtn = document.getElementById("submit-btn");
-  const passwordInput = document.getElementById("password");
-  const states = ["invalid", "inactive", "success"];
-  const stateIndex = Number(form.dataset.loginStateIndex || "0");
-  const nextState = states[stateIndex % states.length];
-  form.dataset.loginStateIndex = String(stateIndex + 1);
-  resetAlertBanner(document.getElementById("alert-banner"));
-
-  if (overlay) {
-    overlay.classList.remove("hidden");
-  }
-
-  if (submitBtn) {
-    submitBtn.disabled = true;
-  }
-
-  window.setTimeout(() => {
-    if (overlay) {
-      overlay.classList.add("hidden");
-    }
-
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<span>Authenticate</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span>';
-    }
-
-    if (nextState === "invalid") {
-      showAlertState({
-        bgClass: "bg-danger-bg",
-        textClass: "text-danger-text",
-        borderClass: "border-[#e4b6b0]",
-        icon: "error",
-        title: "Authentication Failed",
-        message: "Invalid corporate email or password. Please try again.",
-      });
-      if (passwordInput) {
-        passwordInput.value = "";
-        passwordInput.focus();
-      }
-      return;
-    }
-
-    if (nextState === "inactive") {
-      showAlertState({
-        bgClass: "bg-warning-bg",
-        textClass: "text-warning-text",
-        borderClass: "border-[#dbc1a3]",
-        icon: "warning",
-        title: "Account Inactive",
-        message: "Your enterprise account is temporarily suspended. Contact IT support to regain access.",
-      });
-      return;
-    }
-
-    showAlertState({
-      bgClass: "bg-success-bg",
-      textClass: "text-success-text",
-      borderClass: "border-[#c5dac9]",
-      icon: "check_circle",
-      title: "Authenticated",
-      message: "Secure workspace verified. Redirecting to the operational dashboard.",
-    });
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin-slow text-[20px]">sync</span><span>Connecting...</span>';
-    }
-
-    showToast("Signed in", "Taking you to your dashboard.");
-    window.setTimeout(() => {
-      window.location.href = "role-dashboard.html";
-    }, 900);
-  }, 900);
+  /* Real sign-in lives in api-client.js (loaded before this file on every
+     page). The demo state machine that used to live here — cycling
+     invalid → inactive → success with canned copy — was unreachable. */
+  window.RecruitOpsLive.handleLogin(form);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2159,7 +2087,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupOverlayInteractionPolish(document);
   setupOverlayContextPolish();
   upgradeContextualRoutes(document);
-  setupLogoutLinks();
   setupMarketingInteractions();
   setupOnboardingInteractions();
   setupResumeUploadWorkspace();
@@ -2262,6 +2189,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  /* The shared anchor router never takes over links another owner has
+     claimed — excluded anchors keep their native behavior and skip every
+     routing branch below:
+       a[data-logout-link] → api-client.js's logout listener owns it; its
+         POST /auth/logout must survive without a navigateToRoute abort
+         (this also makes the router safe regardless of listener order).
+       a[download], a[target] → the browser owns those. */
+  const ANCHOR_ROUTER_EXCLUSIONS = [
+    "a[data-logout-link]",
+    "a[download]",
+    "a[target]",
+  ].join(", ");
+
   document.addEventListener("click", (event) => {
     const dismissTarget = event.target.closest("[data-overlay-close]");
     if (dismissTarget) {
@@ -2295,6 +2235,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (mobileDialog?.open && button.closest("#mobile-nav a[href]")) {
       closeMobileNav(mobileDialog);
+    }
+
+    if (button.matches(ANCHOR_ROUTER_EXCLUSIONS)) {
+      return;
     }
 
     if (button.dataset.editRecord) {
@@ -2566,28 +2510,21 @@ document.addEventListener("DOMContentLoaded", () => {
    primary pages, and quick actions. One owner: setupCommandPalette
    builds the DOM lazily; toggleCommandPalette opens/closes.
    ═══════════════════════════════════════════════════════════════ */
+/* Command palette entries derive from navigation.config.js (DRY: one
+   source for sidebar, home grid, and palette) plus in-place actions. */
+const NAV_PALETTE_ITEMS = (window.NAV_CONFIG && window.NAV_CONFIG.entries
+  ? window.NAV_CONFIG.entries
+      .filter((entry) => entry.showInSidebar !== false)
+      .map((entry) => ({
+        label: entry.label,
+        hint: (window.NAV_CONFIG.categories.find((c) => c.key === entry.category) || {}).label || "Page",
+        icon: entry.icon,
+        route: entry.file,
+      }))
+  : []);
+
 const COMMAND_ITEMS = [
-  { label: "Company Performance", hint: "Dashboard", icon: "dashboard", route: "company-dashboard.html" },
-  { label: "My Profile", hint: "Account", icon: "account_circle", route: "my-profile.html" },
-  { label: "My Work", hint: "Dashboard", icon: "assignment_ind", route: "my-work-dashboard.html" },
-  { label: "Role Dashboard", hint: "Dashboard", icon: "admin_panel_settings", route: "role-dashboard.html" },
-  { label: "Requisitions", hint: "Hiring", icon: "work", route: "requisition-list.html" },
-  { label: "New Requisition", hint: "Action", icon: "add_circle", route: "requisition-intake.html" },
-  { label: "Pipeline Board", hint: "Hiring", icon: "view_kanban", route: "pipeline-board.html" },
-  { label: "Candidates", hint: "Hiring", icon: "groups", route: "candidate-profiles.html" },
-  { label: "Clients", hint: "Hiring", icon: "business", route: "client-directory.html" },
-  { label: "Interviews", hint: "Hiring", icon: "calendar_month", route: "interview-scheduler.html" },
-  { label: "Offers", hint: "Hiring", icon: "description", route: "offer-management.html" },
-  { label: "Daily Review", hint: "Work", icon: "fact_check", route: "daily-review.html" },
-  { label: "Submit Daily Update", hint: "Action", icon: "upload_file", route: "daily-updates-submission.html" },
-  { label: "Approvals Inbox", hint: "Workflow", icon: "approval", route: "approvals-inbox.html" },
-  { label: "Notifications", hint: "Inbox", icon: "notifications", route: "notifications-center.html" },
-  { label: "Reports", hint: "Reports", icon: "analytics", route: "reports.html" },
-  { label: "Report Viewer", hint: "Reports", icon: "print", route: "report-viewer.html" },
-  { label: "Users", hint: "Admin", icon: "manage_accounts", route: "user-management.html" },
-  { label: "Roles & Permissions", hint: "Admin", icon: "shield", route: "role-management.html" },
-  { label: "Locations", hint: "Admin", icon: "location_on", route: "location-management.html" },
-  { label: "Business Titles", hint: "Admin", icon: "badge", route: "business-titles.html" },
+  ...NAV_PALETTE_ITEMS,
   { label: "Toggle table density", hint: "Action", icon: "density_medium", action: () => {
       setDensityPreference(readDensityPreference() === "compact" ? "comfortable" : "compact");
       showToast("Table density changed", readDensityPreference() === "compact" ? "Rows are compacted to fit more on screen." : "Rows are back to comfortable spacing.");

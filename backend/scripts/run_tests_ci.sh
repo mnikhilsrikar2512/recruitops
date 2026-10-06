@@ -99,6 +99,18 @@ if [ "$SKIP_DOCKER" != "1" ]; then
       exit 1
     fi
     echo "✓ $table_count tables present"
+
+    # Migrations newer than the schema dump (005/006 are in schema.sql;
+    # 007 is covered by seed_ci.py). Same list as scripts/create_staging_db.py.
+    for migration in 008_display_ids.sql 009_branch_offer_toggle.sql; do
+      echo "→ applying migration $migration…"
+      if ! run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DB_NAME" -b \
+        -i /dev/stdin < "$BACKEND_DIR/../scripts/$migration" >/tmp/migration_apply.log 2>&1; then
+        echo "✗ migration $migration failed:" >&2
+        head -8 /tmp/migration_apply.log >&2
+        exit 1
+      fi
+    done
   fi
 else
   echo "→ SKIP_DOCKER=1 — using already-running database at localhost:${DB_PORT}"

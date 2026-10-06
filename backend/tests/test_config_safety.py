@@ -1,0 +1,40 @@
+"""Production configuration guardrails (PRD §10, §13 items 7 and 11)."""
+
+from app.core.config import DEV_CORS_ORIGINS, Settings, validate_settings
+
+
+def _settings(**env) -> Settings:
+    return Settings.model_validate(env)
+
+
+def test_development_defaults_are_accepted_and_not_wildcard():
+    config = _settings(APP_ENV="development")
+    assert validate_settings(config) == []
+    assert "*" not in config.cors_origin_list()
+    assert config.cors_origin_list() == [o for o in DEV_CORS_ORIGINS.split(",")]
+
+
+def test_production_rejects_wildcard_cors():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="*", DB_PASSWORD="x")
+    assert any("CORS_ORIGINS" in error for error in validate_settings(config))
+
+
+def test_production_rejects_plain_http_origins():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="http://app.example.com", DB_PASSWORD="x")
+    assert any("https" in error for error in validate_settings(config))
+
+
+def test_production_accepts_exact_https_origins():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    assert validate_settings(config) == []
+
+
+def test_ai_flag_is_off_in_production_and_cannot_be_enabled():
+    off = _settings(APP_ENV="staging", CORS_ORIGINS="https://staging.example.com", DB_PASSWORD="x")
+    assert off.ai_agents_available is False
+    on = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x", AI_ENABLED="true")
+    assert any("AI_ENABLED" in error for error in validate_settings(on))
+
+
+def test_ai_agents_stay_available_in_development():
+    assert _settings(APP_ENV="development").ai_agents_available is True

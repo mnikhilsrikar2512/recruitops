@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.api.router import api_router
-from app.core.config import settings
+from app.core.config import settings, validate_settings
 
 
 def _database_unavailable_response(_request: Request, _exc: OperationalError) -> JSONResponse:
@@ -50,19 +50,23 @@ def _validation_error_response(_request: Request, exc: RequestValidationError) -
 
 
 def create_application() -> FastAPI:
+    config_errors = validate_settings(settings)
+    if config_errors:
+        raise RuntimeError("Refusing to start with unsafe configuration: " + "; ".join(config_errors))
     application = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         docs_url="/docs",
         redoc_url="/redoc",
     )
-    origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    # Exact-match allowlist (no wildcard). The UI is served same-origin via
+    # frontend/server.js's /api proxy, so browsers only need CORS in dev.
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=settings.cors_origin_list(),
         allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Idempotency-Key"],
     )
     application.add_exception_handler(RequestValidationError, _validation_error_response)
     application.add_exception_handler(IntegrityError, _integrity_error_response)

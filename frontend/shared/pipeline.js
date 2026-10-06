@@ -598,7 +598,7 @@ function setupStageMoveOverlay() {
   const sync = ({ fromRejectToggle = false } = {}) => {
     const selectedBase = candidates.find((candidate) => candidate.id === candidateSelect.value) || activeCandidate;
     const rememberedCandidate = readRememberedPipelineCandidate();
-    const selectedCandidate = rememberedCandidate?.id === selectedBase?.id
+    const selectedCandidate = selectedBase?.id && rememberedCandidate?.id === selectedBase.id
       ? { ...selectedBase, ...rememberedCandidate, badges: selectedBase.badges || rememberedCandidate.badges || [] }
       : selectedBase;
     activeCandidate = selectedCandidate;
@@ -623,12 +623,19 @@ function setupStageMoveOverlay() {
     const desiredValue = targetStage.value;
     if (stageNames.length) {
       targetStage.innerHTML = "";
-      stageNames.filter((stage) => stage !== activeCandidate?.stage).concat("Rejected").forEach((stage) => {
-        const option = document.createElement("option");
-        option.value = slugifyPipelineValue(stage);
-        option.textContent = stage;
-        targetStage.appendChild(option);
-      });
+      /* Branches with offer tracking off never offer the Offer stage as a
+         transition target — the backend rejects it, so don't show it. */
+      const offersOn = typeof branchOffersEnabled === "function" ? branchOffersEnabled() : true;
+      stageNames
+        .filter((stage) => stage !== activeCandidate?.stage)
+        .filter((stage) => offersOn || !/offer/i.test(stage))
+        .concat("Rejected")
+        .forEach((stage) => {
+          const option = document.createElement("option");
+          option.value = slugifyPipelineValue(stage);
+          option.textContent = stage;
+          targetStage.appendChild(option);
+        });
       if (Array.from(targetStage.options).some((option) => option.value === desiredValue)) {
         targetStage.value = desiredValue;
       }
@@ -671,6 +678,12 @@ function setupStageMoveOverlay() {
     event.preventDefault();
     event.stopPropagation();
     if (!validateScope(surface)) return;
+    /* Opened for a real application (?application_id=…): persist the move
+       through PATCH /pipeline/applications/{id}/stage (api-client.js). */
+    if (/[?&]application_id=\d+/.test(window.location.search) && window.RecruitOpsLive?.handleFormSubmit) {
+      window.RecruitOpsLive.handleFormSubmit(surface);
+      return;
+    }
     const targetLabel = targetStage.options[targetStage.selectedIndex]?.text?.trim() || "selected stage";
     showToast("Interaction validated", `${activeCandidate?.name || "Candidate"} will move from ${activeCandidate?.stage || "current stage"} to ${targetLabel}.`);
   });

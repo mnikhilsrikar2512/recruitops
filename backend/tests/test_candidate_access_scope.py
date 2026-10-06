@@ -18,6 +18,7 @@ def _candidate_record() -> SimpleNamespace:
     return SimpleNamespace(
         id=11,
         candidate_code="C-11",
+        branch_code="HYD01",
         full_name="Asha Verma",
         email="asha@example.com",
         phone="9999999999",

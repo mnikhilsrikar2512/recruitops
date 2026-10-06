@@ -59,6 +59,39 @@ function reqCode(item) {
   return item?.requisition_code || (item?.requisition_id ? `REQ-${item.requisition_id}` : item?.id ? `REQ-${item.id}` : "—");
 }
 
+/* ── Badge-Based Visual ID (PRD §2.6) ─────────────────────────────────
+   Bold monospace display ID plus a soft-tinted branch pill. The pill
+   tone is a stable hash of the branch code so HYD always renders the
+   same color on every surface; unknown codes fall back to neutral. */
+const BRANCH_TONES = ["sky", "violet", "amber", "rose", "teal"];
+
+function branchTone(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return "neutral";
+  const base = raw.replace(/[0-9]+$/, "").toUpperCase() || raw.toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < base.length; i += 1) hash = (hash * 31 + base.charCodeAt(i)) % 997;
+  return BRANCH_TONES[hash % BRANCH_TONES.length];
+}
+
+function branchCodeLabel(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return "";
+  return raw.replace(/[0-9]+$/, "").toUpperCase() || raw.toUpperCase();
+}
+
+function entityBadgeHtml(displayId, branchCode) {
+  const id = String(displayId || "").trim();
+  const pill = branchCodeLabel(branchCode);
+  if (!id && !pill) return "";
+  const tone = branchTone(branchCode);
+  return `<span class="entity-badge">${
+    id ? `<span class="entity-badge-id">${escapeLiveHtml(id)}</span>` : ""
+  }${
+    pill ? `<span class="branch-pill" data-branch-tone="${tone}" title="${escapeLiveHtml(String(branchCode).trim())}">${escapeLiveHtml(pill)}</span>` : ""
+  }</span>`;
+}
+
 function personInitials(name) {
   return String(name || "?")
     .split(/\s+/)
@@ -691,6 +724,7 @@ function renderDailyReviewPipelineActivity(items) {
     ? items.map((item) => `<div class="px-inset-card py-3 flex items-center gap-3 hover:bg-highlight-soft transition-colors">
         <div class="w-8 h-8 rounded-full bg-primary text-on-primary font-bold flex items-center justify-center shrink-0 text-[11px]">${escapeLiveHtml(personInitials(item.candidate_name || "C"))}</div>
         <p class="flex-1 min-w-0 truncate font-semibold text-on-surface text-[13px]">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
+        ${typeof entityBadgeHtml === "function" ? entityBadgeHtml(item.candidate_code || item.requisition_code, "") : ""}
         <span class="text-[12px] text-text-muted shrink-0">${escapeLiveHtml(item.current_stage || "Pipeline")}</span>
       </div>`).join("")
     : `<div class="px-inset-card py-5 text-body-sm text-text-muted">No recent pipeline movement.</div>`;
@@ -925,12 +959,18 @@ function renderNotificationsCommandCenter(items, meta) {
     if (headerRow && !slot) {
       slot = document.createElement("div");
       slot.dataset.markAllReadSlot = "true";
+      slot.className = "flex items-center gap-2 shrink-0";
       headerRow.appendChild(slot);
     }
     if (slot) {
-      slot.innerHTML = unreadTotal > 0
+      /* AI Triage applies to the unread backlog; show it alongside
+         Mark-all-read whenever there is something unread. */
+      const canTriage = typeof hasPermission === "function" && (isAdmin() || hasPermission("ai.agent.inbox_triage"));
+      slot.innerHTML = `${unreadTotal > 0 && canTriage
+        ? `<button type="button" data-live-notifications-triage class="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-highlight-soft px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-primary hover:bg-primary hover:text-on-primary transition-colors shrink-0" aria-label="Start AI triage review of ${unreadTotal} unread notifications"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">smart_toy</span>AI Triage</button>`
+        : ""}${unreadTotal > 0
         ? `<button type="button" data-live-notifications-mark-all-read class="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition-colors shrink-0" aria-label="Mark all ${unreadTotal} unread notifications as read"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">done_all</span><span data-mark-all-label>Mark all read</span></button>`
-        : "";
+        : ""}`;
     }
   }
   const list = queueHeading?.closest("section")?.querySelector(".divide-y");
@@ -1199,6 +1239,10 @@ function renderOffers(items = [], meta = {}) {
     const avatar = cells[0]?.querySelector(".rounded-full, .w-8.h-8");
     if (avatar) avatar.textContent = personInitials(item.candidate_name);
     setStackedCell(cells[1], item.requisition_title || "—", item.requisition_code || (item.requisition_id ? `REQ-${item.requisition_id}` : ""));
+    const offerCodeNode = cells[1]?.querySelector(".font-label-caps, .text-xs, .font-body-sm, p.font-body-sm, .text-text-muted");
+    if (offerCodeNode && typeof entityBadgeHtml === "function" && item.requisition_code && !offerCodeNode.querySelector(".entity-badge")) {
+      offerCodeNode.insertAdjacentHTML("afterend", entityBadgeHtml(item.requisition_code, ""));
+    }
     const bonus = item.signing_bonus ? `+ ${formatOfferMoney(item.signing_bonus, item.offer_currency).replace("/yr", "")}` : "";
     setStackedCell(cells[2], formatOfferMoney(item.offered_ctc, item.offer_currency), bonus);
     const status = offerStatusMeta(item.offer_status);
@@ -1274,6 +1318,15 @@ function buildWorkloadMembers(users, requisitions, candidates) {
     const utilization = Math.min(100, Math.round(activeReqs * 18 + activeCandidates * 12));
     return { ...user, activeReqs, activeCandidates, utilization };
   });
+}
+
+/* Utilization band for the team workload bars: >85% is overloaded,
+   <40% has spare capacity. */
+function workloadStatus(utilization) {
+  const value = Number(utilization) || 0;
+  if (value > 85) return { label: "Overloaded", barClass: "bg-error", textClass: "text-danger-text" };
+  if (value >= 40) return { label: "Balanced", barClass: "bg-primary", textClass: "text-on-surface" };
+  return { label: "Capacity", barClass: "bg-success-text", textClass: "text-success-text" };
 }
 
 function renderTeamWorkloadRows(members) {
@@ -1626,6 +1679,35 @@ function renderInterviewCard(item, index) {
   </div>`;
 }
 
+
+/* Summary card for interview-detail.html, painted from GET /interviews/{id}
+   (InterviewResponse in backend/app/schemas/interview.py). */
+function renderInterviewDetail(item) {
+  const field = (label, value) => `<div>
+      <p class="font-label-caps text-label-caps text-text-muted">${escapeLiveHtml(label)}</p>
+      <p class="font-body-sm text-body-sm text-on-surface mt-0.5">${escapeLiveHtml(value || "—")}</p>
+    </div>`;
+  const status = item.feedback_status || item.status || "Pending";
+  return `<section class="bg-surface border border-border rounded-lg p-4 mb-4" data-live-interview-detail="true">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div class="min-w-0">
+        <h2 class="font-headline-sm text-headline-sm text-on-surface truncate">${escapeLiveHtml(item.candidate_name || "Candidate")}</h2>
+        <p class="font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
+      </div>
+      <span class="inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${interviewStatusBadge(status)}">${escapeLiveHtml(status)}</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      ${field("Round", [item.round_type, item.round_name].filter(Boolean).join(" · "))}
+      ${field("Scheduled", formatWhen(item.scheduled_at))}
+      ${field("Interviewer", item.interviewer_name)}
+      ${field("Location", item.location_name)}
+      ${field("Decision", item.decision ? titleFromCode(item.decision) : "")}
+      ${field("Scheduled by", item.created_by_name)}
+    </div>
+    ${item.feedback_notes ? `<p class="font-body-sm text-body-sm text-on-surface mt-4 whitespace-pre-line">${escapeLiveHtml(item.feedback_notes)}</p>` : ""}
+    ${/pending/i.test(String(item.feedback_status || "")) ? `<div class="mt-4"><button type="button" class="px-4 py-2 rounded bg-primary-container text-on-primary font-body-sm font-semibold" data-route="interview-feedback-dialog.html?interview_id=${item.id}">Submit feedback</button></div>` : ""}
+  </section>`;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    OFFER RENDERERS
@@ -2034,4 +2116,325 @@ function renderCustomReportPreview(context) {
     </div>
   </div>`;
   root.dataset.liveCustomReportDestination = customReportDestination(selectedMetrics);
+}
+
+function escapeAgentHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function agentMeta(agentId) {
+  return {
+    resume_screener: { icon: "plagiarism", accent: "bg-primary text-white" },
+    daily_brief: { icon: "summarize", accent: "bg-secondary-container text-on-secondary-container" },
+    inbox_triage: { icon: "inbox", accent: "bg-warning-bg text-warning-text" },
+  }[agentId] || { icon: "smart_toy", accent: "bg-surface-alt text-primary" };
+}
+
+const TRIAGE_PRIORITY_CLASSES = {
+  critical: "bg-danger-bg text-danger-text border-danger-text/20",
+  high: "bg-warning-bg text-warning-text border-warning-text/20",
+  normal: "bg-surface-alt text-text-muted border-border",
+  low: "bg-surface-alt text-text-muted border-border",
+};
+TRIAGE_PRIORITY_CLASSES.low = "bg-surface-alt text-text-muted border-border";
+
+function triagePriorityClass(priority) {
+  return TRIAGE_PRIORITY_CLASSES[String(priority || "normal").toLowerCase()] || TRIAGE_PRIORITY_CLASSES.normal;
+}
+
+function renderNotificationsTriage() {
+  /* AI Triage review mode for the notifications center: replaces the
+     queue with the agent's prioritized draft. Informational until the
+     user acts (Got it / Open); draft-only, audited server-side. */
+  const state = window.notificationsTriageState;
+  const surface = document.querySelector("[data-notifications-command-center]");
+  if (!state || !surface) return false;
+  const queue = state.queue || [];
+  const cleared = state.done.size;
+  const listHost = Array.from(surface.querySelectorAll(".divide-y")).find((el) => el.closest("section"));
+  if (!listHost) return false;
+
+  const banner = document.createElement("div");
+  banner.className = "flex flex-wrap items-center justify-between gap-3 border-b border-border bg-highlight-soft px-4 py-3";
+  banner.dataset.triageBanner = "true";
+  banner.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px] text-primary">smart_toy</span>
+      <p class="font-body-sm text-body-sm text-on-surface"><strong>AI Triage</strong> · ${queue.length} unread sorted by priority</p>
+      <span class="rounded-full border border-border bg-surface px-2 py-0.5 font-data-tabular text-[11px] text-text-muted" data-triage-progress>${cleared}/${queue.length} cleared</span>
+    </div>
+    <button type="button" class="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1 font-data-tabular text-[12px] font-semibold text-secondary hover:bg-highlight-soft transition" data-triage-exit aria-label="Exit triage review">
+      <span class="material-symbols-outlined text-[16px]">close</span>Exit triage
+    </button>`;
+  surface.querySelector("[data-triage-banner]")?.remove();
+  listHost.before(banner);
+
+  listHost.innerHTML = queue.length
+    ? queue.map((item, index) => {
+        const id = escapeAgentHtml(item.id);
+        const done = state.done.has(String(item.id));
+        return `<article class="grid gap-3 p-4 transition-colors md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start ${done ? "opacity-50" : "hover:bg-highlight-soft"}" data-triage-row="${id}" data-notification-id="${id}" data-notification-status="${done ? "read" : "unread"}" data-filter-category="${escapeAgentHtml(item.module || "")}" data-filter-priority="${escapeAgentHtml(item.priority || "")}">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface font-data-tabular text-[12px] font-bold text-text-muted">${index + 1}</div>
+          <div class="min-w-0">
+            <div class="mb-1 flex flex-wrap items-center gap-2">
+              <span class="rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${triagePriorityClass(item.priority)}">${escapeAgentHtml(item.priority || "normal")}</span>
+              <span class="rounded border border-border bg-surface px-1.5 py-0.5 font-label-caps text-label-caps uppercase tracking-wider text-secondary">${escapeAgentHtml(item.module || "inbox")}</span>
+              ${done ? '<span class="rounded-full bg-success-bg px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success-text">Cleared</span>' : ""}
+            </div>
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">${escapeAgentHtml(item.what || "(untitled notification)")}</h3>
+            <p class="mt-1 font-body-sm text-body-sm text-on-surface">${escapeAgentHtml(item.why || "")}</p>
+            <p class="mt-1.5 font-body-sm text-[12px] text-text-muted flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">arrow_forward</span>${escapeAgentHtml(item.next || "Review this item")}</p>
+          </div>
+          <div class="flex items-center justify-end gap-2">
+            ${done
+              ? '<span class="font-body-sm text-[12px] font-semibold text-success-text">Seen</span>'
+              : `<button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-success-bg px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-success-text hover:brightness-95 transition" data-triage-got-it data-notification-id="${id}" aria-label="Mark notification ${id} as read"><span class="material-symbols-outlined text-[16px]">check</span>Got it</button>
+                 <button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition" data-triage-open data-notification-id="${id}" aria-label="Open notification ${id}">Open</button>`}
+          </div>
+        </article>`;
+      }).join("")
+    : '<div class="p-6 text-center font-body-sm text-body-sm text-text-muted">Nothing unread to triage. You are all caught up.</div>';
+  return true;
+}
+
+function updateTriageProgress() {
+  const state = window.notificationsTriageState;
+  if (!state) return;
+  const progress = document.querySelector("[data-triage-progress]");
+  if (progress) progress.textContent = `${state.done.size}/${state.queue.length} cleared`;
+  if (state.queue.length > 0 && state.done.size >= state.queue.length) {
+    showToast("Inbox cleared", "Every triaged notification has been handled.");
+  }
+}
+
+function applyTriageDoneToDom(notificationId) {
+  const row = document.querySelector(`[data-triage-row="${CSS.escape(String(notificationId))}"]`);
+  if (!row) return;
+  row.classList.add("opacity-50");
+  row.dataset.notificationStatus = "read";
+  const actions = row.querySelector(".flex.items-center.justify-end.gap-2");
+  if (actions) actions.innerHTML = '<span class="font-body-sm text-[12px] font-semibold text-success-text">Seen</span>';
+  if (!row.querySelector("[data-triage-cleared-badge]")) {
+    const cleared = document.createElement("span");
+    cleared.className = "rounded-full bg-success-bg px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success-text";
+    cleared.dataset.triageClearedBadge = "true";
+    cleared.textContent = "Cleared";
+    row.querySelector(".mb-1")?.appendChild(cleared);
+  }
+}
+
+function agentRunStatusMeta(status) {
+  const s = String(status || "pending").toLowerCase();
+  return {
+    pending: { label: "Pending review", classes: "bg-warning-bg text-warning-text border-warning-text/20" },
+    accepted: { label: "Accepted", classes: "bg-success-bg text-success-text border-success-text/20" },
+    rejected: { label: "Rejected", classes: "bg-surface-alt text-text-muted border-border" },
+    failed: { label: "Failed", classes: "bg-danger-bg text-danger-text border-danger-text/20" },
+  }[s] || { label: s, classes: "bg-surface-alt text-text-muted border-border" };
+}
+
+function agentRelativeTime(iso) {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.floor((Date.now() - then) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function agentDraftHighlights(agentId, draft) {
+  const highlights = [];
+  if (agentId === "resume_screener") {
+    const score = draft?.match_score;
+    if (score != null) highlights.push(`Match ${Math.round(score * 100)}%`);
+    const skills = draft?.extracted_skills || [];
+    if (skills.length) highlights.push(`${skills.length} skill${skills.length === 1 ? "" : "s"}`);
+    const note = (draft?.match_notes || [])[0];
+    if (note) highlights.push(String(note));
+  } else if (agentId === "daily_brief") {
+    const stats = draft?.stats || {};
+    const screened = stats.profiles_screened ?? 0;
+    const focus = (draft?.focus_items || []).length;
+    if (screened) highlights.push(`${screened} screened`);
+    if (focus) highlights.push(`${focus} focus item${focus === 1 ? "" : "s"}`);
+    const blockers = (draft?.blockers || []).filter(Boolean);
+    if (blockers.length) highlights.push(`${blockers.length} blocker${blockers.length === 1 ? "" : "s"}`);
+  } else if (agentId === "inbox_triage") {
+    const queue = draft?.queue || [];
+    if (queue.length) {
+      highlights.push(`${queue.length} notification${queue.length === 1 ? "" : "s"}`);
+      const urgent = queue.filter((entry) => ["high", "critical"].includes(String(entry.priority || "").toLowerCase())).length;
+      if (urgent) highlights.push(`${urgent} urgent`);
+    }
+  }
+  return highlights.slice(0, 3);
+}
+
+function updateAgentRunCounters(catalog, runs) {
+  /* Refresh the header stats/pill after cache-only changes (e.g. a
+     decision) without re-rendering the whole list. */
+  const surface = document.querySelector("[data-agents-workbench]");
+  if (!surface) return;
+  const items = Array.isArray(catalog?.items) ? catalog.items : [];
+  const runItems = Array.isArray(runs?.items) ? runs.items : [];
+  const statTotal = surface.querySelector('[data-agents-stat="total"]');
+  const statPending = surface.querySelector('[data-agents-stat="pending"]');
+  const statAccepted = surface.querySelector('[data-agents-stat="accepted"]');
+  if (statTotal) statTotal.textContent = String(items.length);
+  if (statPending) statPending.textContent = String(runItems.filter((run) => run.status === "pending").length);
+  if (statAccepted) statAccepted.textContent = String(runItems.filter((run) => run.status === "accepted").length);
+  const countPill = surface.querySelector("[data-agents-count-pill]");
+  if (countPill) countPill.textContent = `${items.length} agents · ${runItems.length} runs`;
+}
+
+function renderAgentsWorkbench(catalog, runs) {
+  const surface = document.querySelector("[data-agents-workbench]");
+  if (!surface) return false;
+  const items = Array.isArray(catalog?.items) ? catalog.items : [];
+  const runItems = Array.isArray(runs?.items) ? runs.items : [];
+  const adminUser = typeof isAdmin === "function" && isAdmin();
+  const perms = typeof userPermissions === "function" ? userPermissions() : [];
+  const canRun = (agentId) => adminUser || perms.includes(`ai.agent.${agentId}`);
+
+  updateAgentRunCounters(catalog, runs);
+
+  const catalogHost = surface.querySelector("[data-agents-catalog]");
+  if (catalogHost) {
+    catalogHost.innerHTML = items.length
+      ? items.map((agent) => {
+          const meta = agentMeta(agent.id);
+          const runnable = canRun(agent.id);
+          return `<article class="rounded-xl border border-border bg-surface-alt p-3">
+            <div class="flex items-center gap-2">
+              <div class="flex h-8 w-8 items-center justify-center rounded-lg ${meta.accent}"><span class="material-symbols-outlined text-[16px]">${escapeAgentHtml(meta.icon)}</span></div>
+              <div class="min-w-0 flex-1">
+                <p class="font-data-tabular text-[13px] font-semibold text-on-surface">${escapeAgentHtml(agent.name)}</p>
+                <p class="font-body-sm text-body-sm text-text-muted">${escapeAgentHtml(agent.where_used)}</p>
+              </div>
+            </div>
+            <p class="mt-2 font-body-sm text-body-sm text-on-surface">${escapeAgentHtml(agent.job)}</p>
+            <p class="mt-1.5 text-[11px] font-semibold uppercase tracking-wide ${runnable ? "text-success-text" : "text-text-muted"}">${runnable ? "Ready to run" : "Needs permission"}</p>
+          </article>`;
+        }).join("")
+      : '<div class="p-4 font-body-sm text-body-sm text-text-muted">No agents available.</div>';
+  }
+
+  const select = surface.querySelector("[data-agents-select]");
+  if (select) {
+    const previous = select.value;
+    select.innerHTML = items.length
+      ? items.map((agent) => `<option value="${escapeAgentHtml(agent.id)}"${canRun(agent.id) ? "" : " disabled"}>${escapeAgentHtml(agent.name)}${canRun(agent.id) ? "" : " — permission required"}</option>`).join("")
+      : '<option value="">No agents available</option>';
+    if (previous && Array.from(select.options).some((option) => option.value === previous && !option.disabled)) select.value = previous;
+  }
+
+  const list = surface.querySelector("[data-agents-run-list]");
+  if (list) {
+    list.innerHTML = runItems.length
+      ? runItems.map((run) => renderAgentRunRow(run, items)).join("")
+      : '<div class="p-6 text-center font-body-sm text-body-sm text-text-muted">No runs yet. Pick an agent above and click Run agent.</div>';
+  }
+  return true;
+}
+
+function renderAgentRunRow(run, catalogItems) {
+  const meta = agentMeta(run.agent_id);
+  const statusMeta = agentRunStatusMeta(run.status);
+  const agentName = (catalogItems || []).find((agent) => agent.id === run.agent_id)?.name || run.agent_id;
+  const highlights = agentDraftHighlights(run.agent_id, run.output_draft);
+  const runId = escapeAgentHtml(run.id);
+  const pendingActions = `<button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-success-bg px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-success-text hover:brightness-95 transition" data-live-agents-decide data-agent-run-id="${runId}" data-agent-decision="accept" aria-label="Accept run ${runId}"><span class="material-symbols-outlined text-[16px]">check</span>Accept</button>
+              <button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition" data-live-agents-decide data-agent-run-id="${runId}" data-agent-decision="reject" aria-label="Reject run ${runId}"><span class="material-symbols-outlined text-[16px]">close</span>Reject</button>`;
+  const reviewAction = `<button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition" data-live-agents-open-run data-agent-run-id="${runId}" aria-label="Review run ${runId}">Review</button>`;
+  return `<article class="agent-run-row group relative grid gap-3 p-4 transition-colors hover:bg-highlight-soft md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center" data-agent-run-id="${runId}" data-agent-run-status="${escapeAgentHtml(run.status)}">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl ${meta.accent}"><span class="material-symbols-outlined">${escapeAgentHtml(meta.icon)}</span></div>
+            <div class="min-w-0">
+              <div class="mb-1 flex flex-wrap items-center gap-2">
+                <span class="font-data-tabular text-[13px] font-semibold text-on-surface">${escapeAgentHtml(agentName)}</span>
+                <span class="rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusMeta.classes}" data-agent-run-status-badge>${escapeAgentHtml(statusMeta.label)}</span>
+                <span class="font-data-tabular text-[11px] text-text-muted" data-agent-run-time>${escapeAgentHtml(agentRelativeTime(run.created_at))}</span>
+              </div>
+              <p class="font-body-sm text-body-sm text-on-surface">${escapeAgentHtml(run.output_summary || "")}</p>
+              ${highlights.length ? `<div class="mt-1.5 flex flex-wrap gap-1.5">${highlights.map((h) => `<span class="rounded bg-surface-alt px-1.5 py-0.5 font-data-tabular text-[11px] text-text-muted">${escapeAgentHtml(h)}</span>`).join("")}</div>` : ""}
+            </div>
+            <div class="flex items-center justify-end gap-2" data-agent-run-actions>${run.status === "pending" ? pendingActions : reviewAction}</div>
+            <div class="hidden" data-agent-draft-host>${escapeAgentHtml(JSON.stringify(run.output_draft || {}))}</div>
+          </article>`;
+}
+
+function applyAgentRunDecisionToDom(runId, status) {
+  const row = document.querySelector(`[data-agent-run-id="${CSS.escape(String(runId))}"]`);
+  if (!row) return;
+  const statusMeta = agentRunStatusMeta(status);
+  row.dataset.agentRunStatus = status;
+  const badge = row.querySelector("[data-agent-run-status-badge]");
+  if (badge) {
+    badge.className = `rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusMeta.classes}`;
+    badge.textContent = statusMeta.label;
+  }
+  const actions = row.querySelector("[data-agent-run-actions]");
+  if (actions && status !== "pending") {
+    const safeId = escapeAgentHtml(runId);
+    actions.innerHTML = `<button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition" data-live-agents-open-run data-agent-run-id="${safeId}" aria-label="Review run ${safeId}">Review</button>`;
+  }
+}
+
+function renderAgentRunDetail(run, catalogItems) {
+  let overlay = document.getElementById("ro-inpage-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "ro-inpage-overlay";
+    document.body.appendChild(overlay);
+    document.body.classList.add("is-inpage-overlay");
+  }
+  const meta = agentMeta(run.agent_id);
+  const agentName = (catalogItems || []).find((agent) => agent.id === run.agent_id)?.name || run.agent_id;
+  const statusMeta = agentRunStatusMeta(run.status);
+  const runId = escapeAgentHtml(run.id);
+  const draftJson = JSON.stringify(run.output_draft || {}, null, 2);
+  const inputEntries = Object.entries(run.input_refs || {}).map(([key, value]) => `<div class="flex justify-between gap-3"><dt class="text-text-muted">${escapeAgentHtml(key)}</dt><dd class="font-semibold text-on-surface">${escapeAgentHtml(String(value))}</dd></div>`).join("");
+  overlay.dataset.overlayRoute = "agents-workbench-run-detail";
+  overlay.innerHTML = `
+    <div class="overlay-backdrop" data-overlay-close="true"></div>
+    <div class="overlay-host dialog">
+    <div class="w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label="Agent run detail">
+        <div class="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl ${meta.accent}"><span class="material-symbols-outlined">${escapeAgentHtml(meta.icon)}</span></div>
+            <div>
+              <p class="font-headline-sm text-headline-sm text-on-surface">${escapeAgentHtml(agentName)} · run #${runId}</p>
+              <p class="font-body-sm text-body-sm text-text-muted">${escapeAgentHtml(agentRelativeTime(run.created_at))} · ${escapeAgentHtml(run.output_summary || "")}</p>
+            </div>
+          </div>
+          <button type="button" class="rounded-full border border-border p-2 text-on-surface" data-overlay-close aria-label="Close run detail"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="max-h-[70vh] space-y-4 overflow-auto px-5 py-4">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusMeta.classes}">${escapeAgentHtml(statusMeta.label)}</span>
+            ${run.decided_at ? `<span class="font-data-tabular text-[11px] text-text-muted">Decided ${escapeAgentHtml(agentRelativeTime(run.decided_at))}${run.decision_notes ? ` · “${escapeAgentHtml(run.decision_notes)}”` : ""}</span>` : ""}
+          </div>
+          ${inputEntries ? `<section><h3 class="font-label-caps text-label-caps text-text-muted uppercase tracking-wider">Inputs</h3><dl class="mt-2 grid gap-1.5 font-body-sm text-body-sm">${inputEntries}</dl></section>` : ""}
+          <section>
+            <h3 class="font-label-caps text-label-caps text-text-muted uppercase tracking-wider">Draft output</h3>
+            <pre class="mt-2 overflow-auto rounded-xl border border-border bg-surface-alt p-3 font-data-tabular text-[12px] text-on-surface" data-agent-draft-json>${escapeAgentHtml(draftJson)}</pre>
+          </section>
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-4" data-agent-detail-actions>
+          ${run.status === "pending" ? `<button type="button" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-success-bg px-4 font-data-tabular text-data-tabular font-semibold text-success-text hover:brightness-95 transition" data-live-agents-decide data-agent-run-id="${runId}" data-agent-decision="accept"><span class="material-symbols-outlined text-[18px]">check</span>Accept draft</button>
+          <button type="button" class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 font-data-tabular text-data-tabular font-semibold text-secondary hover:bg-highlight-soft transition" data-live-agents-decide data-agent-run-id="${runId}" data-agent-decision="reject"><span class="material-symbols-outlined text-[18px]">close</span>Reject</button>` : `<p class="font-body-sm text-body-sm text-text-muted">This run has been ${escapeAgentHtml(run.status)}.</p>`}
+        </div>
+      </div>
+    </div>
+    </div>`;
+  if (typeof wireHoverKebabMenus === "function") { /* no-op: keeps call parity with other overlays */ }
 }

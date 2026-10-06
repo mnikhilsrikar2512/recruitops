@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import (
+    get_current_auth_context,
+    get_engine,
+    pinned_location_id,
+    require_location_scope,
+    require_permissions,
+    require_record_in_location,
+)
 from app.schemas.meeting import (
     MeetingCreate,
     MeetingListFilters,
@@ -15,13 +22,21 @@ from app.services.meetings import (
     list_meetings_service,
     update_meeting_service,
 )
+from app.services.auth import AuthContext
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
+
+_scope_meeting = require_record_in_location(
+    "meeting_id",
+    lambda engine, meeting_id: get_meeting_detail_service(engine, meeting_id).location_id,
+    "Meeting was not found",
+)
 
 
 @router.get("/", response_model=MeetingListResponse)
 def list_meetings_endpoint(
     _auth: object = Depends(require_permissions("meeting.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     _scope: object = Depends(require_location_scope("location_id")),
     location_id: int | None = Query(default=None, ge=1),
     client_id: int | None = Query(default=None, ge=1),
@@ -33,7 +48,7 @@ def list_meetings_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> MeetingListResponse:
     filters = MeetingListFilters(
-        location_id=location_id,
+        location_id=pinned_location_id(auth_context, location_id),
         client_id=client_id,
         meeting_owner_user_id=meeting_owner_user_id,
         attendance_status=attendance_status,
@@ -57,6 +72,7 @@ def create_meeting_endpoint(
 @router.get("/{meeting_id}", response_model=MeetingResponse)
 def get_meeting_detail_endpoint(
     _auth: object = Depends(require_permissions("meeting.read")),
+    _in_scope: object = Depends(_scope_meeting),
     meeting_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> MeetingResponse:
@@ -67,6 +83,7 @@ def get_meeting_detail_endpoint(
 def update_meeting_endpoint(
     payload: MeetingUpdate,
     _auth: object = Depends(require_permissions("meeting.update")),
+    _in_scope: object = Depends(_scope_meeting),
     meeting_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> MeetingResponse:

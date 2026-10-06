@@ -15,6 +15,7 @@ class OfferRecord:
     candidate_email: str | None
     requisition_id: int
     requisition_title: str
+    requisition_code: str | None
     location_id: int
     location_name: str | None
     owner_user_id: int
@@ -45,6 +46,7 @@ def _offer_select_sql() -> str:
           c.email AS candidate_email,
           r.id AS requisition_id,
           r.title AS requisition_title,
+          r.requisition_code,
           r.branch_id AS location_id,
           l.name AS location_name,
           ca.owner_user_id,

@@ -17,8 +17,9 @@ class LocationRecord:
     status: str
     location_head_user_id: int | None
     location_head_name: str | None
-    created_at: object
-    updated_at: object
+    offers_enabled: bool | None = None
+    created_at: object = None
+    updated_at: object = None
 
 
 def _map_location(row: RowMapping) -> LocationRecord:
@@ -30,6 +31,7 @@ def _map_location(row: RowMapping) -> LocationRecord:
         status=row["status"],
         location_head_user_id=row["location_head_user_id"],
         location_head_name=row["location_head_name"],
+        offers_enabled=(None if row["offers_enabled"] is None else bool(row["offers_enabled"])),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -47,6 +49,7 @@ def list_locations(engine: Engine, filters: LocationListFilters) -> tuple[list[L
             l.status,
             l.manager_user_id AS location_head_user_id,
             u.full_name AS location_head_name,
+            l.offers_enabled,
             l.created_at,
             l.updated_at
           FROM dbo.branches AS l
@@ -96,6 +99,7 @@ def find_location_by_id(engine: Engine, location_id: int) -> LocationRecord | No
           l.status,
           l.manager_user_id AS location_head_user_id,
           u.full_name AS location_head_name,
+          l.offers_enabled,
           l.created_at,
           l.updated_at
         FROM dbo.branches AS l
@@ -122,6 +126,7 @@ def find_location_by_code(engine: Engine, location_code: str) -> LocationRecord 
           l.status,
           l.manager_user_id AS location_head_user_id,
           u.full_name AS location_head_name,
+          l.offers_enabled,
           l.created_at,
           l.updated_at
         FROM dbo.branches AS l
@@ -161,7 +166,8 @@ def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
           location,
           address,
           status,
-          manager_user_id
+          manager_user_id,
+          offers_enabled
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -170,7 +176,8 @@ def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
           :location_value,
           :address,
           :status,
-          :location_head_user_id
+          :location_head_user_id,
+          CASE WHEN :has_offers_enabled = 1 THEN :offers_enabled ELSE 1 END
         );
         """
     )
@@ -182,9 +189,10 @@ def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
                 "location_name": payload.location_name,
                 "location_code": payload.location_code,
                 "location_value": payload.location_name,
-                "address": payload.address,
-                "status": payload.status,
-                "location_head_user_id": payload.location_head_user_id,
+                "address": payload.address,              "status": payload.status,
+              "location_head_user_id": payload.location_head_user_id,
+              "has_offers_enabled": 1 if "offers_enabled" in payload.model_fields_set else 0,
+              "offers_enabled": payload.offers_enabled,
             },
         )
         location_id = result.scalar_one()
@@ -211,6 +219,10 @@ def update_location(engine: Engine, location_id: int, payload: LocationUpdate) -
             WHEN :has_location_head_user_id = 1 THEN :location_head_user_id
             ELSE manager_user_id
           END,
+          offers_enabled = CASE
+            WHEN :has_offers_enabled = 1 THEN :offers_enabled
+            ELSE offers_enabled
+          END,
           updated_at = SYSUTCDATETIME()
         WHERE id = :location_id;
         """
@@ -227,6 +239,8 @@ def update_location(engine: Engine, location_id: int, payload: LocationUpdate) -
                 "status": payload.status,
                 "has_location_head_user_id": 1 if "location_head_user_id" in payload.model_fields_set else 0,
                 "location_head_user_id": payload.location_head_user_id,
+                "has_offers_enabled": 1 if "offers_enabled" in payload.model_fields_set else 0,
+                "offers_enabled": payload.offers_enabled,
             },
         )
 

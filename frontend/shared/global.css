@@ -1513,6 +1513,41 @@
     .toast-action:hover {
       background: rgba(255, 255, 255, 0.12);
     }
+    /* Global live search dropdown (navigation.js) */
+    .nav-search-dropdown {
+      position: fixed;
+      z-index: 90;
+      max-height: 380px;
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(39, 48, 56, 0.12);
+      background: #ffffff;
+      box-shadow: 0 18px 40px rgba(20, 29, 36, 0.18);
+      padding: 6px;
+    }
+    .nav-search-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      text-decoration: none;
+    }
+    .nav-search-item:hover {
+      background: rgba(39, 48, 56, 0.06);
+    }
+    .nav-search-empty {
+      padding: 12px;
+      color: #6E7476;
+      font-size: 13px;
+    }
+    /* Home feature cards (PRD §6.3) */
+    .nav-feature-card {
+      text-decoration: none;
+    }
+    .nav-feature-card:hover {
+      text-decoration: none;
+    }
     .toast-countdown {
       color: rgba(255, 255, 255, 0.6);
       font-size: 11px;

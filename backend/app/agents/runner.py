@@ -7,8 +7,12 @@ here writes to domain tables — agents are draft-only by default.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
+
+logger = logging.getLogger(__name__)
 
 from app.agents import tools
 from app.agents.llm import get_llm_provider
@@ -38,8 +42,17 @@ def run_agent(
     if spec is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent was not found")
 
-    context, input_refs = _collect_input(spec.id, engine, auth_context, payload)
-    result = get_llm_provider().generate(spec.id, context, spec)
+    try:
+        context, input_refs = _collect_input(spec.id, engine, auth_context, payload)
+        result = get_llm_provider().generate(spec.id, context, spec)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Agent run failed for agent_id=%s", spec.id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Agent run failed while preparing the draft; try again.",
+        ) from None
 
     run = create_agent_run(
         engine,
@@ -90,6 +103,7 @@ def _collect_input(
         candidate["resume"] = tools.read_candidate_resume(
             engine=engine,
             candidate_id=payload.candidate_id,
+            candidate=candidate,
         )
         context["candidate"] = candidate
         if payload.requisition_id:
@@ -102,6 +116,13 @@ def _collect_input(
             )
         if payload.resume_document_id:
             input_refs["resume_document_id"] = payload.resume_document_id
+            context["resume_document"] = tools.read_candidate_document(
+                engine=engine,
+                document_id=payload.resume_document_id,
+                candidate_id=payload.candidate_id,
+                location_id=location_id,
+                is_admin=is_admin,
+            )
         return context, input_refs
 
     if agent_id == "daily_brief":
@@ -112,6 +133,7 @@ def _collect_input(
             scope=payload.scope,
             user_id=ctx.id,
             location_id=location_id,
+            is_admin=is_admin,
             max_items=payload.max_items,
         )
         context["actions"] = tools.read_workflow_queue(

@@ -1,14 +1,18 @@
 """Read-only tool adapters for V1 agents.
 
 Every tool reads through existing repositories and enforces tenant scope:
-non-admin callers may only read records belonging to their location.
+non-admin callers may only read records their location can already see.
 Nothing here writes to domain tables — agents are draft-only.
 """
 from __future__ import annotations
 
 from fastapi import HTTPException, status
 
-from app.repositories.candidates import find_candidate_by_id, list_candidate_applications
+from app.repositories.candidates import (
+    find_candidate_by_id,
+    find_candidate_document_by_id,
+    list_candidate_applications,
+)
 from app.repositories.daily_updates import list_daily_updates
 from app.repositories.notifications import list_notifications
 from app.repositories.requisitions import find_requisition_by_id
@@ -40,9 +44,13 @@ def read_candidate(*, engine, candidate_id: int, location_id: int | None, is_adm
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
 
     applications = list_candidate_applications(engine, candidate_id)
+    # Mirror the candidate service's own access rule: the actor's location
+    # must intersect one of the candidate's application locations. The
+    # previous "location_id in {None} | app_locations" branch let a
+    # NULL-scope actor read anything, which is the opposite of safe.
     if not is_admin and location_id is not None and applications:
         app_locations = {app.location_id for app in applications}
-        if app_locations and location_id not in {None} | app_locations:
+        if app_locations and location_id not in app_locations:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Location scope does not allow this action",
@@ -62,10 +70,22 @@ def read_candidate(*, engine, candidate_id: int, location_id: int | None, is_adm
         "duplicate_state": record.duplicate_state,
         "profile_status": record.profile_status,
         "intake_stage": record.intake_stage,
+        # getattr: record shapes vary between the real repository and test
+        # stubs; resume fields are informational, never access control.
+        "resume_file_name": getattr(record, "resume_file_name", None),
+        "resume_file_path": getattr(record, "resume_file_path", None),
+        "resume_uploaded_at": _iso(getattr(record, "resume_uploaded_at", None)),
     }
 
 
-def read_candidate_resume(*, engine, candidate_id: int) -> dict:
+def read_candidate_resume(*, engine, candidate_id: int, candidate: dict | None = None) -> dict:
+    # Reuse the already-loaded candidate instead of re-querying when given.
+    if candidate is not None:
+        return {
+            "resume_file_name": candidate.get("resume_file_name"),
+            "resume_file_path": candidate.get("resume_file_path"),
+            "resume_uploaded_at": candidate.get("resume_uploaded_at"),
+        }
     record = find_candidate_by_id(engine, candidate_id)
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
@@ -73,6 +93,37 @@ def read_candidate_resume(*, engine, candidate_id: int) -> dict:
         "resume_file_name": record.resume_file_name,
         "resume_file_path": record.resume_file_path,
         "resume_uploaded_at": _iso(record.resume_uploaded_at),
+    }
+
+
+def read_candidate_document(
+    *,
+    engine,
+    document_id: int,
+    candidate_id: int,
+    location_id: int | None,
+    is_admin: bool,
+) -> dict:
+    """Validate that resume_document_id actually belongs to this candidate."""
+    try:
+        document = find_candidate_document_by_id(engine, document_id)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate document was not found",
+        ) from None
+    if document.candidate_id != candidate_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="resume_document_id does not belong to the given candidate",
+        )
+    _guard_location(getattr(document, "location_id", None), location_id, is_admin)
+    return {
+        "id": document.id,
+        "document_type": document.document_type,
+        "file_name": document.file_name,
+        "file_path": document.file_path,
+        "verification_status": document.verification_status,
     }
 
 
@@ -97,11 +148,16 @@ def read_requisition(*, engine, requisition_id: int, location_id: int | None, is
     }
 
 
-def read_daily_updates(*, engine, scope: str, user_id: int, location_id: int | None, max_items: int) -> list[dict]:
+def read_daily_updates(*, engine, scope: str, user_id: int, location_id: int | None, is_admin: bool, max_items: int) -> list[dict]:
+    # Non-admins can only ever see their own updates or their location's;
+    # "location" scope for a non-admin without a location silently narrows
+    # to the user's own updates rather than leaking other branches' data.
     if scope == "me":
         filters = DailyUpdateListFilters(user_id=user_id, page=1, page_size=max_items)
-    else:
+    elif is_admin or location_id is not None:
         filters = DailyUpdateListFilters(location_id=location_id, page=1, page_size=max_items)
+    else:
+        filters = DailyUpdateListFilters(user_id=user_id, page=1, page_size=max_items)
     records, _total = list_daily_updates(engine, filters)
     return [
         {

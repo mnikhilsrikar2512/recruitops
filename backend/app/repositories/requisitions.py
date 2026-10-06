@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import RowMapping
 
+from app.repositories.display_ids import ENTITY_REQUISITION, allocate_display_id
 from app.schemas.requisition import (
     RequisitionAssignmentCreate,
     RequisitionCreate,
@@ -19,6 +20,7 @@ class RequisitionRecord:
     id: int
     location_id: int
     requisition_code: str | None
+    branch_code: str | None
     client_id: int | None
     client_name: str | None
     primary_contact_id: int | None
@@ -68,7 +70,8 @@ def _requisition_select_sql() -> str:
         SELECT
           r.id,
           r.branch_id AS location_id,
-          CAST(NULL AS NVARCHAR(50)) AS requisition_code,
+          r.requisition_code,
+          b.code AS branch_code,
           r.client_company_id AS client_id,
           c.name AS client_name,
           CAST(NULL AS BIGINT) AS primary_contact_id,
@@ -94,6 +97,8 @@ def _requisition_select_sql() -> str:
           r.created_at,
           r.updated_at
         FROM dbo.requisitions AS r
+        LEFT JOIN dbo.branches AS b
+          ON b.id = r.branch_id
         LEFT JOIN dbo.client_companies AS c
           ON c.id = r.client_company_id
         LEFT JOIN dbo.users AS primary_owner
@@ -106,6 +111,7 @@ def _map_requisition(row: RowMapping, must_have_skills: list[str], good_to_have_
         id=row["id"],
         location_id=row["location_id"],
         requisition_code=row["requisition_code"],
+        branch_code=row["branch_code"],
         client_id=row["client_id"],
         client_name=row["client_name"],
         primary_contact_id=row["primary_contact_id"],
@@ -185,6 +191,8 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
             :search IS NULL
             OR r.title LIKE '%' + :search + '%'
             OR c.name LIKE '%' + :search + '%'
+            OR r.requisition_code LIKE '%' + :search + '%'
+            OR b.code LIKE '%' + :search + '%'
           )
         )
         SELECT *, COUNT(*) OVER() AS total_count
@@ -294,6 +302,7 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
         """
         INSERT INTO dbo.requisitions (
           branch_id,
+          requisition_code,
           hiring_type,
           client_company_id,
           title,
@@ -309,6 +318,7 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
         OUTPUT INSERTED.id
         VALUES (
           :location_id,
+          :requisition_code,
           CASE WHEN :client_id IS NULL THEN N'internal' ELSE N'external' END,
           :client_id,
           :title,
@@ -324,10 +334,12 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
         """
     )
     with engine.begin() as connection:
+        requisition_code = allocate_display_id(connection, ENTITY_REQUISITION, payload.location_id)
         requisition_id = connection.execute(
             query,
             {
                 "location_id": payload.location_id,
+                "requisition_code": requisition_code,
                 "client_id": payload.client_id,
                 "primary_contact_id": payload.primary_contact_id,
                 "secondary_contact_id": payload.secondary_contact_id,

@@ -27,7 +27,7 @@ class AgentRunRequest(BaseModel):
     requisition_id: Optional[int] = Field(default=None, ge=1)
     resume_document_id: Optional[int] = Field(default=None, ge=1)
     scope: Literal["me", "team", "location"] = "me"
-    status: Optional[str] = None
+    status: Optional[Literal["unread", "read"]] = "unread"
     max_items: int = Field(default=20, ge=1, le=100)
 
 

@@ -10,6 +10,7 @@ from app.repositories.candidates import (
     finalize_candidate_into_requisition,
     find_candidate_by_id,
     find_duplicate_matches,
+    get_candidate_footprint,
     list_candidate_applications,
     list_candidates,
     social_profiles_for_candidate,
@@ -20,6 +21,8 @@ from app.repositories.audit import insert_audit_log
 from app.repositories.requisitions import find_requisition_by_id
 from app.repositories.users import find_user_by_id
 from app.schemas.candidate import (
+    CandidateFootprintEntry,
+    CandidateFootprintResponse,
     CandidateCreate,
     CandidateDocumentCreate,
     CandidateDocumentResponse,
@@ -57,6 +60,9 @@ def _can_access_candidate(candidate: CandidateResponse, auth_context: AuthContex
 
     actor_id = auth_context.user.id
     actor_location_id = auth_context.user.location_id
+    # Global-record ownership (creator/sourcer/primary owner) grants visibility
+    # of the candidate IDENTITY only — application summaries are filtered to
+    # the viewer's tenant below, so grants never cross tenant lines.
     direct_user_ids = {
         candidate.created_by_user_id,
         candidate.sourced_by_user_id,
@@ -74,10 +80,74 @@ def _can_access_candidate(candidate: CandidateResponse, auth_context: AuthContex
     return False
 
 
+def _tenant_scoped_candidate_response(
+    candidate: CandidateResponse, auth_context: AuthContext
+) -> CandidateResponse:
+    """Filter application summaries to the viewer's tenant.
+
+    Candidates are global identity records, but pipeline state, requisition
+    links, and owner details per application are tenant-owned. A user whose
+    only tie is a global-record grant (e.g. they sourced the candidate for
+    tenant A) must not see tenant B's application summaries.
+    """
+    if auth_context.user.role_code == "admin":
+        return candidate
+    actor_id = auth_context.user.id
+    actor_location_id = auth_context.user.location_id
+    global_record_grant_only = actor_id in {
+        candidate.created_by_user_id,
+        candidate.sourced_by_user_id,
+        candidate.primary_owner_user_id,
+    } and not any(
+        application.location_id == actor_location_id
+        or actor_id in {application.owner_user_id, application.submitted_by_user_id}
+        for application in candidate.applications
+    )
+    if global_record_grant_only:
+        return candidate.model_copy(update={"applications": []})
+    scoped = [
+        application
+        for application in candidate.applications
+        if application.location_id == actor_location_id
+        or actor_id in {application.owner_user_id, application.submitted_by_user_id}
+    ]
+    if len(scoped) != len(candidate.applications):
+        return candidate.model_copy(update={"applications": scoped})
+    return candidate
+
+
 def _assert_candidate_access(candidate: CandidateResponse, auth_context: AuthContext) -> None:
     if _can_access_candidate(candidate, auth_context):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Candidate access is not allowed")
+
+
+def get_candidate_footprint_service(
+    engine: Engine,
+    candidate_id: int,
+    auth_context: AuthContext | None = None,
+) -> CandidateFootprintResponse:
+    """Admin-only cross-tenant oversight: which clients a shared candidate is
+    in play with. Recruiters must use tenant-scoped surfaces instead — the
+    footprint's value is precisely that it crosses tenant lines, so it is
+    gated on the admin ROLE (not a permission that can be granted) and never
+    carries tenant-private fields."""
+    if auth_context is None or auth_context.user.role_code != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Candidate footprint is restricted to administrator oversight",
+        )
+    candidate = find_candidate_by_id(engine, candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
+    entries = get_candidate_footprint(engine, candidate_id)
+    return CandidateFootprintResponse(
+        candidate_id=candidate.id,
+        candidate_code=candidate.candidate_code,
+        full_name=candidate.full_name,
+        entries=[CandidateFootprintEntry.model_validate(entry) for entry in entries],
+        clients_count=len({entry.client_id for entry in entries if entry.client_id is not None}),
+    )
 
 
 def list_candidates_service(
@@ -92,6 +162,7 @@ def list_candidates_service(
         CandidateListItemResponse(
             id=item.id,
             candidate_code=item.candidate_code,
+            branch_code=item.branch_code,
             full_name=item.full_name,
             email=item.email,
             phone=item.phone,
@@ -159,6 +230,7 @@ def get_candidate_detail_service(
     response = CandidateResponse(
         id=candidate.id,
         candidate_code=candidate.candidate_code,
+        branch_code=candidate.branch_code,
         full_name=candidate.full_name,
         email=candidate.email,
         phone=candidate.phone,
@@ -187,6 +259,7 @@ def get_candidate_detail_service(
     )
     if auth_context:
         _assert_candidate_access(response, auth_context)
+        response = _tenant_scoped_candidate_response(response, auth_context)
     return response
 
 

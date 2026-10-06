@@ -4,6 +4,7 @@ from sqlalchemy import Engine
 from app.repositories.offers import create_offer, find_offer_by_application_id, list_offers, update_offer_decision
 from app.repositories.pipeline import find_pipeline_application_by_id
 from app.repositories.users import find_user_by_id
+from app.repositories.display_ids import find_branch_by_id
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters, OfferListResponse, OfferResponse
 from app.schemas.pagination import PaginationMeta
 from app.services.auth import AuthContext
@@ -50,6 +51,12 @@ def create_offer_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
         _assert_pipeline_application_access(application, auth_context)
+    branch = find_branch_by_id(engine, application.location_id)
+    if branch is not None and branch.offers_enabled is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Offer tracking is disabled for this branch; offers are handed off to the client outside the system",
+        )
     if payload.assigned_to_user_id and not find_user_by_id(engine, payload.assigned_to_user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assigned approver was not found")
     actor_user_id = payload.requested_by_user_id

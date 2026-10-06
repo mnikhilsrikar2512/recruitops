@@ -1479,3 +1479,87 @@ table [data-layout="row-actions"] .ro-card-kebab-trigger {
     width: 100% !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BADGE-BASED VISUAL ID (PRD §2.6)
+   Bold monospace display ID + soft-tinted branch pill. Tones are
+   hashed from the branch code, so a branch keeps its color across
+   every surface. Unknown/missing codes fall back to neutral gray.
+   ═══════════════════════════════════════════════════════════════ */
+.entity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.entity-badge-id {
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--on-surface, #17201C);
+  background: var(--surface-dim, rgba(23, 32, 28, 0.05));
+  border: 1px solid var(--border, rgba(23, 32, 28, 0.12));
+  border-radius: 4px;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+
+.branch-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-label, inherit);
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  background: var(--surface-dim, rgba(23, 32, 28, 0.05));
+  color: var(--text-muted, #5B6663);
+}
+
+.branch-pill[data-branch-tone="sky"] {
+  background: color-mix(in srgb, #0284C7 12%, transparent);
+  color: color-mix(in srgb, #0284C7 78%, #17201C);
+}
+
+.branch-pill[data-branch-tone="violet"] {
+  background: color-mix(in srgb, #7C3AED 12%, transparent);
+  color: color-mix(in srgb, #7C3AED 78%, #17201C);
+}
+
+.branch-pill[data-branch-tone="amber"] {
+  background: color-mix(in srgb, #B45309 12%, transparent);
+  color: color-mix(in srgb, #B45309 78%, #17201C);
+}
+
+.branch-pill[data-branch-tone="rose"] {
+  background: color-mix(in srgb, #E11D48 12%, transparent);
+  color: color-mix(in srgb, #E11D48 78%, #17201C);
+}
+
+.branch-pill[data-branch-tone="teal"] {
+  background: color-mix(in srgb, #0D9488 12%, transparent);
+  color: color-mix(in srgb, #0D9488 78%, #17201C);
+}
+
+.branch-pill[data-branch-tone="neutral"] {
+  background: var(--surface-dim, rgba(23, 32, 28, 0.05));
+  color: var(--text-muted, #5B6663);
+}
+
+/* ── Currency prefix inputs (offer dialog) ────────────────────────────
+   The overlay-input normalization above forces `padding: 6px 10px
+   !important`, which flattened pl-7/pl-9 and let digits collide with the
+   absolutely-positioned currency symbol. Inputs wired to a currency
+   symbol get their measured padding from --currency-pad instead, and the
+   selector mirrors (and exceeds) the normalizer's specificity so the
+   override wins the cascade. */
+.overlay-host [data-overlay-surface="true"] input[data-currency-input="true"]:not([type="checkbox"]):not([type="radio"]) {
+  padding-left: var(--currency-pad, 32px) !important;
+}

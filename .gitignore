@@ -29,3 +29,6 @@ node_modules/
 
 # Freebuff workspace
 .freebuff/
+
+# Phase 1 verification logs (tools/ci/phase1_verify.sh)
+.phase1-logs/

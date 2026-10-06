@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_permissions
+from app.api.deps import (
+    get_current_auth_context,
+    get_engine,
+    pinned_location_id,
+    require_permissions,
+    require_record_in_location,
+)
 from app.schemas.user import (
     UserCreate,
     UserDeactivateRequest,
@@ -28,10 +34,17 @@ from app.services.auth import AuthContext
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
+_scope_user = require_record_in_location(
+    "user_id",
+    lambda engine, user_id: get_user_detail_service(engine, user_id).primary_location_id,
+    "User was not found",
+)
+
 
 @router.get("/", response_model=UserListResponse)
 def list_users_endpoint(
     _auth: object = Depends(require_permissions("user.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     location_id: int | None = Query(default=None, ge=1),
     role_id: int | None = Query(default=None, ge=1),
     status: str | None = Query(default=None),
@@ -41,7 +54,7 @@ def list_users_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> UserListResponse:
     filters = UserListFilters(
-        location_id=location_id,
+        location_id=pinned_location_id(auth_context, location_id),
         role_id=role_id,
         status=status,
         search=search,
@@ -63,6 +76,7 @@ def create_user_endpoint(
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user_detail_endpoint(
     _auth: object = Depends(require_permissions("user.read")),
+    _in_scope: object = Depends(_scope_user),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> UserResponse:
@@ -73,6 +87,7 @@ def get_user_detail_endpoint(
 def update_user_endpoint(
     payload: UserUpdate,
     _auth: object = Depends(require_permissions("user.update")),
+    _in_scope: object = Depends(_scope_user),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> UserResponse:
@@ -83,6 +98,7 @@ def update_user_endpoint(
 def reset_user_credentials_endpoint(
     payload: UserResetCredentials,
     _auth: object = Depends(require_permissions("user.credentials.manage")),
+    _in_scope: object = Depends(_scope_user),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> UserResetCredentialsResponse:
@@ -93,6 +109,7 @@ def reset_user_credentials_endpoint(
 def deactivate_user_endpoint(
     payload: UserDeactivateRequest,
     _auth: object = Depends(require_permissions("user.update")),
+    _in_scope: object = Depends(_scope_user),
     auth_context: AuthContext = Depends(get_current_auth_context),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
@@ -104,6 +121,7 @@ def deactivate_user_endpoint(
 def move_user_endpoint(
     payload: UserMoveRequest,
     _auth: object = Depends(require_permissions("user.update")),
+    _in_scope: object = Depends(_scope_user),
     auth_context: AuthContext = Depends(get_current_auth_context),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),

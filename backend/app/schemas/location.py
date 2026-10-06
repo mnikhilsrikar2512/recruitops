@@ -13,6 +13,7 @@ class LocationBase(BaseModel):
     address: str | None = Field(default=None, max_length=500)
     status: LocationStatus = "active"
     location_head_user_id: int | None = Field(default=None, ge=1)
+    offers_enabled: bool | None = None
 
     @field_validator("location_name")
     @classmethod
@@ -42,6 +43,7 @@ class LocationUpdate(BaseModel):
     address: str | None = Field(default=None, max_length=500)
     status: LocationStatus | None = None
     location_head_user_id: int | None = Field(default=None, ge=1)
+    offers_enabled: bool | None = None
 
     @field_validator("location_name")
     @classmethod
@@ -90,6 +92,7 @@ class LocationResponse(BaseModel):
     status: str
     location_head_user_id: int | None
     location_head_name: str | None
+    offers_enabled: bool | None = None
     created_at: datetime
     updated_at: datetime
 

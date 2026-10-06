@@ -2,11 +2,16 @@
  * api-client.js — API layer, session management, page orchestration & async loaders
  *
  * Depends on renderers.js being loaded first for helper functions.
- * Contains: API requests, form submissions, page loaders, shell decoration.
+ * Contains: apiRequest() (the one way pages call the API), session +
+ * permission sync, form submissions, per-route page loaders, shell decoration.
  *
  * Load AFTER renderers.js:
  *   <script src="../shared/renderers.js"></script>
  *   <script src="../shared/api-client.js"></script>
+ *
+ * Guardrails (CI): tools/undef-check.js fails on any identifier defined
+ * nowhere; tools/api-contract-check.py fails on any apiRequest() path the
+ * backend does not declare.
  */
 
 /* ═══════════════════════════════════════════════════════════════
@@ -93,44 +98,192 @@ function showConnectionBanner() {
   canvas.prepend(banner);
 }
 
+/**
+ * Normalized failure for every non-2xx response (and for network failures).
+ * Parsed from the backend's error envelope (backend/app/main.py):
+ *   4xx / 5xx → {"detail": "…"}          422 → {"detail": "…", "errors": [...]}
+ * `message`/`detail` is the human-readable text, `errors` the field list.
+ * Status 0 means the request never reached the API.
+ */
+class ApiError extends Error {
+  constructor(status, detail, errors, body) {
+    super(detail);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+    this.errors = Array.isArray(errors) ? errors : [];
+    this.body = body ?? null;
+  }
+}
+
+function apiErrorFromBody(status, body) {
+  let detail = body && typeof body === "object" ? body.detail : null;
+  const errors = body && Array.isArray(body.errors) ? body.errors : [];
+  /* FastAPI's default 422 shape is a list under `detail`. */
+  if (Array.isArray(detail)) {
+    detail = detail.map((e) => (e && e.msg) || String(e)).join("; ");
+  }
+  let message;
+  if (typeof detail === "string" && detail) message = detail;
+  else if (errors.length) message = String(errors[0]);
+  else message = `Request failed (HTTP ${status})`;
+  return new ApiError(status, message, errors, body);
+}
+
+/* 401 handling is pluggable so Phase 3 (JWT refresh) can swap in
+ * refresh-and-retry without touching any call site. */
+function defaultUnauthorizedHandler() {
+  /* On the login page a 401 means the submitted credentials were rejected,
+     not that a stored session was revoked — stay on the page and show it. */
+  if (/login\.html$/.test(window.location.pathname)) return;
+  writeSession(null);
+  RecruitOpsLive.session = null;
+  window.location.href = pageHref("login.html");
+}
+let unauthorizedHandler = defaultUnauthorizedHandler;
+
+function setUnauthorizedHandler(handler) {
+  unauthorizedHandler = typeof handler === "function" ? handler : defaultUnauthorizedHandler;
+}
+
+/**
+ * The one way pages call the API. Returns parsed JSON ({} for 204).
+ *
+ *   apiRequest("/approvals/?status=pending")
+ *   apiRequest("/pipeline/applications/7/stage", { method: "PATCH", body: { to_stage: "Interview" } })
+ *
+ * - sends the session's Bearer token; plain-object bodies are JSON-encoded
+ * - throws ApiError { status, detail, errors } on any non-2xx
+ * - on 401 runs the pluggable handler (clear session → login) before throwing
+ * - tries same-origin /api/v1 first (Node proxy), then the dev API on :8000
+ * - never widens access on failure: it reads credentials, it never grants any
+ */
 async function apiRequest(path, options = {}) {
   const session = RecruitOpsLive.session || readSession();
-  const headers = { "Content-Type": "application/json", ...options.headers };
+  const headers = { Accept: "application/json", ...options.headers };
   if (session?.token) headers["Authorization"] = `Bearer ${session.token}`;
+  let body = options.body;
+  if (body !== undefined && body !== null && typeof body !== "string"
+      && !(typeof FormData !== "undefined" && body instanceof FormData)
+      && !(typeof Blob !== "undefined" && body instanceof Blob)) {
+    body = JSON.stringify(body);
+  }
+  if (typeof body === "string" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  const init = { ...options, headers, body };
+
   const roots = cachedApiRoot ? [cachedApiRoot] : apiRootCandidates();
   let lastError = null;
   let unreachable = true;
   for (const root of roots) {
+    let response;
     try {
-      const response = await fetch(apiUrl(path, root), { ...options, headers });
-      if (response.status === 503) {
-        lastError = new Error("API error 503: backend unreachable");
-        continue;
-      }
-      unreachable = false;
-      if (response.status === 404 && !cachedApiRoot && roots.length > 1) {
-        lastError = new Error("API error 404");
+      response = await fetch(apiUrl(path, root), init);
+    } catch (networkError) {
+      lastError = new ApiError(0, "Can’t reach the server. Check that the API is running.");
+      if (cachedApiRoot) break;
+      continue;
+    }
+    if (response.status === 503 && !cachedApiRoot) {
+      /* The Node proxy answers 503 when FastAPI is down — try the next root. */
+      lastError = apiErrorFromBody(503, await response.json().catch(() => null));
+      continue;
+    }
+    unreachable = false;
+    if (response.status === 404 && !cachedApiRoot && roots.length > 1) {
+      /* A static server without the /api proxy 404s every call — try the next root. */
+      const text = await response.text().catch(() => "");
+      if (!/^\s*\{/.test(text)) {
+        lastError = new ApiError(404, "API not found at this origin");
         continue;
       }
       cachedApiRoot = root;
-      if (response.status === 401) {
-        writeSession(null);
-        window.location.href = pageHref("login.html");
-        throw new Error("Session expired");
-      }
-      if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new Error(`API error ${response.status}: ${body.slice(0, 200)}`);
-      }
-      if (response.status === 204) return {};
-      return response.json();
-    } catch (error) {
-      lastError = error;
-      if (cachedApiRoot || /Session expired/i.test(error?.message || "")) throw error;
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+      throw apiErrorFromBody(404, parsed);
     }
+    cachedApiRoot = root;
+    if (response.status === 204) return {};
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = apiErrorFromBody(response.status, payload);
+      if (response.status === 401) unauthorizedHandler(error);
+      throw error;
+    }
+    return payload ?? {};
   }
   if (unreachable) showConnectionBanner();
-  throw lastError || new Error("Unable to reach the API. Start FastAPI on port 8000.");
+  throw lastError || new ApiError(0, "Unable to reach the API. Start FastAPI on port 8000.");
+}
+
+/**
+ * Refresh the session's identity + permission codes from the API
+ * (GET /auth/me + GET /permissions/me). Runs on every page boot, when the tab
+ * regains focus, and every 5 minutes, so a role change made by an admin
+ * reaches open tabs without a re-login (RBAC spec §4.1).
+ * Returns the updated session, or null when signed out.
+ */
+const PERMISSION_REFRESH_MS = 5 * 60 * 1000;
+const PERMISSION_FRESH_MS = 60 * 1000; /* page loads within this window reuse the last sync */
+
+async function syncUserPermissions({ force = false } = {}) {
+  const session = RecruitOpsLive.session || readSession();
+  if (!session?.token) return null;
+  if (!force && session.synced_at && Date.now() - session.synced_at < PERMISSION_FRESH_MS) return session;
+  try {
+    const [me, perms] = await Promise.all([
+      apiRequest("/auth/me"),
+      apiRequest("/permissions/me"),
+    ]);
+    const next = { ...(RecruitOpsLive.session || readSession() || {}) };
+    if (me?.user) {
+      next.user_id = me.user.id ?? next.user_id;
+      next.email = me.user.email ?? next.email;
+      next.user_name = me.user.full_name || next.user_name;
+    }
+    if (me?.primary_role) {
+      next.role = me.primary_role.code || next.role;
+      next.role_name = me.primary_role.name || next.role_name;
+    }
+    if (me?.primary_location) {
+      next.location_id = me.primary_location.id ?? next.location_id;
+      next.location_name = me.primary_location.location_name || next.location_name;
+      if (me.primary_location.offers_enabled !== undefined) next.offers_enabled = me.primary_location.offers_enabled;
+    }
+    if (Array.isArray(perms?.permissions)) next.permissions = perms.permissions;
+    if (perms?.role_code) next.role_code = perms.role_code;
+    const changed = JSON.stringify(next.permissions || []) !== JSON.stringify(session.permissions || [])
+      || next.role_code !== session.role_code;
+    next.synced_at = Date.now();
+    writeSession(next);
+    RecruitOpsLive.session = next;
+    if (changed) {
+      try {
+        if (typeof buildSidebarNav === "function") buildSidebarNav();
+        if (typeof buildMobileNav === "function") buildMobileNav();
+      } catch { /* nav re-render is best-effort */ }
+    }
+    if (changed) document.dispatchEvent(new CustomEvent("recruitops:permissions-changed", { detail: next }));
+    return next;
+  } catch (error) {
+    /* 401 already cleared the session via the handler. Network errors keep
+       the last known session (the backend still enforces every route). */
+    return error?.status === 401 ? null : (RecruitOpsLive.session || readSession());
+  }
+}
+
+function startPermissionRefresh() {
+  if (startPermissionRefresh.started) return;
+  startPermissionRefresh.started = true;
+  window.addEventListener("focus", () => { syncUserPermissions(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) syncUserPermissions(); });
+  window.setInterval(() => {
+    if (!document.hidden) syncUserPermissions({ force: true });
+  }, PERMISSION_REFRESH_MS);
+}
+
+/* Kept for login.html's inline hook: one permission sync for this page. */
+async function bootRBACGate() {
+  return syncUserPermissions({ force: true });
 }
 
 function formatListCount(visible, total) {
@@ -168,11 +321,11 @@ function showLiveSuccess(title, text = "") {
 }
 
 function currentUserId() {
-  return intOrNull(RecruitOpsLive.session?.user_id) || 1;
+  return intOrNull((RecruitOpsLive.session || readSession())?.user_id);
 }
 
 function currentLocationId() {
-  return intOrNull(RecruitOpsLive.session?.location_id) || 1;
+  return intOrNull((RecruitOpsLive.session || readSession())?.location_id);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -187,6 +340,173 @@ function isAdmin() {
 function userPermissions() {
   const session = RecruitOpsLive.session || readSession();
   return session?.permissions || [];
+}
+
+/* ── Agent workbench state & helpers ─────────────────────────── */
+let agentsCatalogCache = null;
+let agentsRunsCache = [];
+let agentsStatusFilter = "all"; /* all | pending | accepted */
+let agentsRunContext = null; /* { candidate_id, requisition_id?, run?: boolean } deep-link context */
+
+function agentsStatusVisible(run) {
+  if (agentsStatusFilter === "pending") return run.status === "pending";
+  if (agentsStatusFilter === "accepted") return run.status === "accepted";
+  return true;
+}
+
+function renderAgentsRunContextBanner(catalog, replaceExisting = false) {
+  /* Deep-link banner: names the candidate the screener will run against. */
+  const surface = document.querySelector("[data-agents-workbench]");
+  if (!surface || !agentsRunContext?.candidate_id) return;
+  if (replaceExisting) surface.querySelector("[data-agents-run-context]")?.remove();
+  if (surface.querySelector("[data-agents-run-context]")) return;
+  const candidateName = agentsRunContext.candidate_name
+    ? ` for ${agentsRunContext.candidate_name}`
+    : ` (candidate #${agentsRunContext.candidate_id})`;
+  const banner = document.createElement("div");
+  banner.className = "flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-highlight-soft px-4 py-3";
+  banner.dataset.agentsRunContext = "true";
+  banner.innerHTML = `
+    <p class="font-body-sm text-body-sm text-on-surface flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px] text-primary">smart_toy</span>
+      Resume Screener ready${escapeAgentHtml(candidateName)}${agentsRunContext.requisition_id ? ` · requisition #${escapeAgentHtml(agentsRunContext.requisition_id)}` : ""}
+    </p>
+    <button type="button" class="font-label-caps text-label-caps font-semibold text-primary hover:text-primary-hover" data-agents-context-dismiss>Dismiss</button>`;
+  banner.querySelector("[data-agents-context-dismiss]").addEventListener("click", () => {
+    agentsRunContext = null;
+    banner.remove();
+  });
+  const statsHost = surface.querySelector(".rounded-2xl.border.border-border.bg-surface.p-5") || surface;
+  statsHost.insertAdjacentElement("afterend", banner);
+}
+
+function renderAgentsFromCache() {
+  const visible = agentsRunsCache.filter(agentsStatusVisible);
+  if (typeof renderAgentsWorkbench === "function") {
+    renderAgentsWorkbench(agentsCatalogCache, { items: visible });
+  }
+}
+
+async function loadAgentsCatalog() {
+  /* Request the slash form: GET /agents (no slash) 307-redirects to
+     /agents/ and the browser re-issues the redirected request without
+     the Authorization header, so auth is lost mid-flight. */
+  agentsCatalogCache = await apiRequest("/agents/");
+  return agentsCatalogCache;
+}
+
+async function loadAgentsRuns() {
+  const payload = await apiRequest("/agents/runs?page_size=50");
+  agentsRunsCache = payload.items || [];
+  return payload;
+}
+
+async function runAgentAction(button, overrides = {}) {
+  const select = document.querySelector("[data-agents-select]");
+  const agentId = overrides.agentId || select?.value;
+  if (!agentId) {
+    showToast("Pick an agent", "Select an agent to run first.");
+    return;
+  }
+  const spec = agentsCatalogCache?.items?.find((agent) => agent.id === agentId);
+  /* Explicit overrides win; otherwise fall back to deep-link context. */
+  const context = { ...(agentsRunContext || {}), ...overrides };
+  if (agentId === "resume_screener" && !context.candidate_id) {
+    showToast(
+      "Candidate needed",
+      "The Resume Screener runs from a candidate's profile — open one and click Run AI Screener.",
+    );
+    return;
+  }
+  const payload =
+    agentId === "daily_brief"
+      ? { scope: "me", max_items: 20 }
+      : agentId === "resume_screener"
+        ? { candidate_id: context.candidate_id, ...(context.requisition_id ? { requisition_id: context.requisition_id } : {}) }
+        : { max_items: 20 };
+  if (button) {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+  }
+  try {
+    const run = await apiRequest(`/agents/${agentId}/run`, { method: "POST", body: JSON.stringify(payload) });
+    agentsRunsCache.unshift(run);
+    renderAgentsFromCache();
+    agentsRunContext = null; /* one-shot context */
+    document.querySelector("[data-agents-run-context]")?.remove();
+    const summary = run.output_summary || "Nothing is saved until you accept.";
+    showToast("Draft ready", summary);
+  } catch (error) {
+    showLiveError(error);
+  }
+  if (button) {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+}
+
+async function decideAgentRunAction(button) {
+  const runId = intOrNull(button.dataset.agentRunId);
+  const decision = button.dataset.agentDecision;
+  if (!runId || !decision) return;
+  button.disabled = true;
+  try {
+    const updated = await apiRequest(`/agents/runs/${runId}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision }),
+    });
+    const index = agentsRunsCache.findIndex((run) => Number(run.id) === Number(runId));
+    if (index !== -1) agentsRunsCache[index] = updated;
+    const overlay = document.getElementById("ro-inpage-overlay");
+    if (overlay && overlay.dataset.overlayRoute === "agents-workbench-run-detail") {
+      renderAgentRunDetail(updated, agentsCatalogCache?.items || []);
+    } else {
+      applyAgentRunDecisionToDom(runId, updated.status);
+      if (agentsStatusFilter !== "all" && agentsStatusVisible({ status: updated.status }) === false) {
+        renderAgentsFromCache();
+      } else {
+        updateAgentRunCounters(agentsCatalogCache, { items: agentsRunsCache });
+      }
+    }
+    showToast(decision === "accept" ? "Draft accepted" : "Draft rejected", "The decision is recorded in the audit log.");
+  } catch (error) {
+    button.disabled = false;
+    showLiveError(error);
+  }
+}
+
+async function openAgentRunDetail(button) {
+  const runId = intOrNull(button.dataset.agentRunId);
+  if (!runId) return;
+  const run = agentsRunsCache.find((entry) => Number(entry.id) === Number(runId));
+  if (!run) return;
+  renderAgentRunDetail(run, agentsCatalogCache?.items || []);
+}
+
+function closeAgentRunOverlay() {
+  if (typeof closeInPageOverlay === "function") {
+    closeInPageOverlay({ silent: true });
+  }
+}
+
+function wireAgentsWorkbenchFilters() {
+  const bar = document.querySelector("[data-agents-filter-bar]");
+  if (!bar || bar.dataset.agentsWired === "true") return;
+  bar.dataset.agentsWired = "true";
+  bar.querySelectorAll("[data-agents-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.agentsFilter || "all";
+      if (!/^(all|pending|accepted)$/.test(value)) return;
+      agentsStatusFilter = value;
+      bar.querySelectorAll("[data-agents-filter]").forEach((other) => {
+        other.classList.remove("is-active", "bg-secondary-container", "text-on-secondary-container");
+        other.classList.add("border", "border-border", "bg-surface", "text-secondary", "hover:bg-highlight-soft");
+      });
+      button.classList.add("is-active", "bg-secondary-container", "text-on-secondary-container");
+      button.classList.remove("border", "border-border", "bg-surface", "text-secondary", "hover:bg-highlight-soft");
+      renderAgentsFromCache();
+    });
+  });
 }
 
 function hasPermission(permissionCode) {
@@ -382,6 +702,16 @@ function addConnectionIndicator() {
    ═══════════════════════════════════════════════════════════════ */
 
 async function handleLogin(form) {
+  if (handleLogin.pending) return; /* rapid double-submit */
+  handleLogin.pending = true;
+  try {
+    await handleLoginOnce(form);
+  } finally {
+    handleLogin.pending = false;
+  }
+}
+
+async function handleLoginOnce(form) {
   const emailInput = form?.querySelector('[name="email"]') || document.getElementById("email");
   const passwordInput = form?.querySelector('[name="password"]') || document.getElementById("password");
   const email = emailInput?.value?.trim();
@@ -416,20 +746,14 @@ async function handleLogin(form) {
       role: data.primary_role?.code || data.role || "Recruiter",
       role_name: data.primary_role?.name || data.role || "Recruiter",
       location_id: data.primary_location?.id || data.location_id,
-      location_name: data.primary_location?.name || data.primary_location?.location_name || "",
+      location_name: data.primary_location?.location_name || data.primary_location?.name || "",
+      offers_enabled: data.primary_location?.offers_enabled ?? true,
     });
     RecruitOpsLive.session = readSession();
     /* Fetch the user's effective permissions for RBAC enforcement.
        /permissions/me resolves role + branch-role grants server-side and also
        returns the canonical role_code, so admins are recognized correctly. */
-    try {
-      const permData = await apiRequest("/permissions/me").catch(() => ({}));
-      const session = RecruitOpsLive.session || readSession();
-      session.permissions = permData.permissions || [];
-      if (permData.role_code) session.role_code = permData.role_code;
-      writeSession(session);
-      RecruitOpsLive.session = session;
-    } catch {}
+    await syncUserPermissions({ force: true });
     if (typeof showAlertState === "function") {
       showAlertState({ bgClass: "bg-success-bg", textClass: "text-success-text", borderClass: "border-[#c5dac9]", icon: "check_circle", title: "Authenticated", message: "Redirecting to your workspace..." });
     }
@@ -439,7 +763,7 @@ async function handleLogin(form) {
     if (!onboardingComplete && isFirstLogin) {
       window.location.href = pageHref("onboarding-welcome.html");
     } else {
-      window.location.href = pageHref("role-dashboard.html");
+      window.location.href = pageHref("home.html");
     }
   } catch (error) {
     if (overlay) {
@@ -448,16 +772,26 @@ async function handleLogin(form) {
       overlay.setAttribute("aria-hidden", "true");
     }
     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<span>Sign In</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span>'; }
-    const message = error?.message || String(error);
-    const isInvalid = /401|invalid|unauthorized/i.test(message);
+    const status = error?.status ?? 0;
+    const isInvalid = status === 401;
+    const unreachable = status === 0 || status === 503;
+    const title = isInvalid ? "Authentication Failed"
+      : unreachable ? "Connection Error"
+      : status === 403 ? "Account Unavailable"
+      : status === 422 ? "Check your details"
+      : status === 429 ? "Too many attempts"
+      : "Sign in failed";
+    const message = isInvalid ? "Invalid email or password. Please try again."
+      : unreachable ? "Unable to reach the server. Please check your connection and try again."
+      : (error?.detail || error?.message || "Sign in failed. Please try again.");
     if (typeof showAlertState === "function") {
       showAlertState({
-        bgClass: isInvalid ? "bg-danger-bg" : "bg-warning-bg",
-        textClass: isInvalid ? "text-danger-text" : "text-warning-text",
-        borderClass: isInvalid ? "border-[#e4b6b0]" : "border-[#dbc1a3]",
-        icon: isInvalid ? "error" : "warning",
-        title: isInvalid ? "Authentication Failed" : "Connection Error",
-        message: isInvalid ? "Invalid email or password. Please try again." : "Unable to reach the server. Please check your connection and try again.",
+        bgClass: isInvalid || status >= 400 ? "bg-danger-bg" : "bg-warning-bg",
+        textClass: isInvalid || status >= 400 ? "text-danger-text" : "text-warning-text",
+        borderClass: isInvalid || status >= 400 ? "border-[#e4b6b0]" : "border-[#dbc1a3]",
+        icon: unreachable ? "warning" : "error",
+        title,
+        message,
       });
     } else { showLiveError(error); }
     if (passwordInput) { passwordInput.value = ""; passwordInput.focus(); }
@@ -465,10 +799,16 @@ async function handleLogin(form) {
 }
 
 async function handleLogout() {
+  if (handleLogout.pending) return; /* rapid double-click */
+  handleLogout.pending = true;
   try { await apiRequest("/auth/logout", { method: "POST" }).catch(() => {}); } catch {}
   writeSession(null);
   RecruitOpsLive.session = null;
-  window.location.href = pageHref("login.html");
+  try {
+    window.sessionStorage.removeItem("recruitops-selected-pipeline-candidate");
+    window.localStorage.removeItem("recruitops-selected-pipeline-candidate");
+  } catch { /* storage unavailable */ }
+  window.location.href = "login.html?loggedOut=true";
 }
 
 async function handleForgot(form) {
@@ -597,7 +937,8 @@ async function submitRequisition() {
   const employmentType = document.getElementById("employment-type")?.value || firstValueOf(["employment_type"], [/employment type/i, /type/i]) || null;
   const targetDate = document.getElementById("start-date")?.value || document.getElementById("target_closure_date")?.value || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
   const openings = intOrNull(document.getElementById("openings")?.value) || intOrNull(document.getElementById("openings_count")?.value) || 1;
-  const priority = document.getElementById("priority")?.value || firstValueOf(["priority"], [/priority/i]) || "medium";
+  const rawPriority = document.getElementById("priority")?.value || firstValueOf(["priority"], [/priority/i]) || "medium";
+  const priority = ["low", "medium", "high", "critical"].includes(rawPriority) ? rawPriority : "medium";
   const workMode = readRadioValue("work-mode") || firstValueOf(["work_mode"], [/work mode/i]) || null;
   const locationId = intOrNull(document.getElementById("location_id")?.value) || session?.location_id;
   const skillsRaw = document.getElementById("req-skills")?.value || firstValueOf(["must_have_skills"], [/must have/i, /required skills/i]);
@@ -629,17 +970,23 @@ async function submitRequisition() {
     good_to_have_skills: splitSkillList(niceSkillsRaw),
   };
   if (!title) { showLiveError(new Error("Title is required.")); return; }
+  if (!id && !clientId) { showLiveError(new Error("Select the client this requisition is for.")); return; }
+  if (!id && !locationId) { showLiveError(new Error("Select the requisition's location.")); return; }
   try {
-    if (id) await apiRequest(`/requisitions/${id}`, { method: "PATCH", body: JSON.stringify(updatePayload) });
-    else await apiRequest("/requisitions/", { method: "POST", body: JSON.stringify(createPayload) });
+    const saved = id
+      ? await apiRequest(`/requisitions/${id}`, { method: "PATCH", body: JSON.stringify(updatePayload) })
+      : await apiRequest("/requisitions/", { method: "POST", body: JSON.stringify(createPayload) });
     showLiveSuccess("Requisition saved", title);
-    setTimeout(() => { window.location.href = pageHref("requisition-detail.html"); }, 1000);
+    const savedId = saved?.id || id;
+    setTimeout(() => {
+      window.location.href = savedId ? `requisition-detail.html?requisition_id=${savedId}` : pageHref("requisition-list.html");
+    }, 1000);
   } catch (error) { showLiveError(error); }
 }async function resetUserCredentials(button) {
   const userId = intOrNull(button?.dataset.userId);
   if (!userId) { showLiveError(new Error("No user selected.")); return; }
   try {
-    await apiRequest(`/users/${userId}/reset-credentials`, { method: "POST" });
+    await apiRequest(`/users/${userId}/credentials/reset`, { method: "POST" });
     showLiveSuccess("Credentials reset", "A new invitation email has been sent.");
   } catch (error) { showLiveError(error); }
 }
@@ -732,14 +1079,63 @@ async function loadContactFormDialog() {
   }
 }
 
+/* Swap a prototype free-text input (e.g. "Search client...") for a <select>
+   bound to real records, keeping its classes and label association. */
+function replaceInputWithSelect(inputId, selectId, items, labelFn, valueFn, selectedValue, placeholder) {
+  let select = document.getElementById(selectId);
+  const input = document.getElementById(inputId);
+  if (!select && input) {
+    select = document.createElement("select");
+    select.id = selectId;
+    select.name = selectId;
+    select.required = true;
+    select.className = input.className.replace(/\bpl-9\b/, "pl-3");
+    const label = document.querySelector(`label[for="${inputId}"]`);
+    if (label) label.setAttribute("for", selectId);
+    const wrapper = input.parentElement;
+    wrapper.querySelectorAll(".material-symbols-outlined").forEach((icon) => icon.remove());
+    input.replaceWith(select);
+  }
+  if (!select) return null;
+  select.innerHTML = `<option value="">${escapeLiveHtml(placeholder || "Select...")}</option>` + items.map((item) =>
+    `<option value="${escapeLiveHtml(String(valueFn(item)))}" ${String(valueFn(item)) === String(selectedValue ?? "") ? "selected" : ""}>${escapeLiveHtml(labelFn(item))}</option>`,
+  ).join("");
+  return select;
+}
+
 async function loadRequisitionIntake() {
   const clientId = queryInt("client_id");
+  const session = RecruitOpsLive.session || readSession();
   if (clientId) {
     const client = await apiRequest(`/clients/${clientId}`).catch(() => null);
     if (client) setFirstText("[data-client-name]", client.client_name);
   }
-  const clients = await apiRequest("/clients/?page_size=100").catch(() => ({ items: [] }));
-  await fillSelect("client_id", clients.items || [], (c) => c.client_name, (c) => c.id, clientId);
+  const [clients, locations] = await Promise.all([
+    apiRequest("/clients/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
+  ]);
+  replaceInputWithSelect("client", "client_id", clients.items || [], (c) => c.client_name, (c) => c.id, clientId, "Select client...");
+  replaceInputWithSelect("location", "location_id", locations.items || [], (l) => l.location_name, (l) => l.id, session?.location_id, "Select location...");
+  /* RequisitionPriority is low | medium | high | critical (schemas/requisition.py). */
+  document.querySelectorAll('#priority option[value="standard"]').forEach((option) => { option.value = "medium"; });
+
+  const requisitionId = queryInt("requisition_id");
+  if (requisitionId) {
+    const req = await apiRequest(`/requisitions/${requisitionId}`).catch(() => null);
+    if (req) {
+      const set = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.value = value; };
+      set("job-title", req.title);
+      set("openings", req.openings_count);
+      set("priority", req.priority);
+      set("employment-type", req.employment_type);
+      set("start-date", (req.target_closure_date || "").slice(0, 10));
+      set("job-description", req.job_description);
+      set("req-skills", (req.must_have_skills || []).join(", "));
+      set("client_id", req.client_id);
+      set("location_id", req.location_id);
+      if (req.work_mode) document.querySelectorAll('input[name="work-mode"]').forEach((radio) => { radio.checked = radio.value === req.work_mode; });
+    }
+  }
 }
 
 async function submitRequisitionStatus(button) {
@@ -755,10 +1151,19 @@ async function submitRequisitionStatus(button) {
 }async function loadStageMoveDialog() {
   const applicationId = queryInt("application_id");
   if (!applicationId) return;
+  /* Sourcing-only branches: drop the Offer option from stage targets —
+     the backend rejects the move anyway, so hiding it prevents dead ends. */
+  if (typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
+    document.querySelectorAll("[data-stage-offer-option]").forEach((option) => option.remove());
+  }
   try {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
     setFirstText("[data-current-stage]", application.current_stage);
+    const stageDialogName = document.querySelector("[data-candidate-name]");
+    if (stageDialogName?.parentElement && typeof entityBadgeHtml === "function" && (application.candidate_code || application.requisition_code) && !stageDialogName.parentElement.querySelector(":scope > .entity-badge")) {
+      stageDialogName.insertAdjacentHTML("afterend", entityBadgeHtml(application.candidate_code || application.requisition_code, application.branch_code));
+    }
     const subtitle = document.querySelector("[data-overlay-surface] p.font-body-sm");
     if (subtitle && application.candidate_name) {
       subtitle.textContent = `${application.candidate_name}${application.requisition_title ? " • " + application.requisition_title : ""}`;
@@ -768,13 +1173,27 @@ async function submitRequisitionStatus(button) {
 
 async function submitStageMove() {
   const applicationId = queryInt("application_id");
-  const toStage = document.getElementById("to_stage")?.value || firstValueOf(["to_stage"], [/to stage/i, /stage/i]);
-  const notes = document.getElementById("stage_notes")?.value || firstValueOf(["notes"], [/notes/i]) || null;
+  /* The target <select> carries slug values (pipeline.js); the API expects
+     the stage label, so send the selected option's text. */
+  const targetSelect = document.getElementById("to_stage") || document.querySelector("[data-stage-target-select]");
+  const toStage = (targetSelect?.options?.[targetSelect.selectedIndex]?.text || targetSelect?.value || "").trim()
+    || firstValueOf(["to_stage"], [/to stage/i, /stage/i]) || "";
+  const notesField = document.getElementById("stage_notes") || document.querySelector("[data-overlay-surface] textarea");
+  const notes = (notesField?.value || firstValueOf(["notes"], [/notes/i]) || "").trim() || null;
+  const isRejection = /^rejected$/i.test(toStage);
+  /* The backend recognises rejection by the canonical lowercase code. */
+  const targetStage = isRejection ? "rejected" : toStage;
   if (!applicationId || !toStage) { showLiveError(new Error("Application ID and target stage are required.")); return; }
+  /* Mirror of the backend 409: branches with offer tracking off can't
+     transition into an offer stage (sourcing-only flow). */
+  if (typeof branchOffersEnabled === "function" && !branchOffersEnabled() && /offer/i.test(toStage)) {
+    showLiveError(new Error("Offer stage is not tracked for this branch; hand off the candidate to the client instead"));
+    return;
+  }
   try {
     await apiRequest(`/pipeline/applications/${applicationId}/stage`, {
       method: "PATCH",
-      body: JSON.stringify({ to_stage: toStage, notes }),
+      body: { to_stage: targetStage, notes, rejection_reason: isRejection ? notes : undefined },
     });
     showLiveSuccess("Stage updated", toStage);
     afterOverlaySave("pipeline-board.html");
@@ -1274,6 +1693,8 @@ async function openLocationDialog(existing) {
     + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Name</span><input id="loc-name" type="text" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. Hyderabad Branch" value="' + escapeHtml(nameVal) + '" /></label>'
     + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Code</span><input id="loc-code" type="text" required ' + (isEdit ? 'readonly class="mt-1 w-full rounded-lg border border-border bg-surface-variant px-3 py-2 text-text-muted text-sm"' : 'class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. HYD01"') + ' value="' + escapeHtml(codeVal) + '" /></label>'
     + '<label class="block mb-3"><span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Address</span><input id="loc-address" type="text" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-on-surface text-sm focus:outline-none focus:border-primary" placeholder="e.g. 123 Main St" value="' + escapeHtml(addrVal) + '" /></label>'
+    + '<label class="flex items-center gap-2 mb-3 cursor-pointer"><input id="loc-offers-enabled" type="checkbox" class="w-4 h-4 rounded border-border text-primary focus:ring-primary" ' + ((isEdit ? locationData.offers_enabled !== false : true) ? 'checked' : '') + ' /><span class="text-body-sm text-on-surface">Offer tracking enabled</span></label>'
+    + '<p class="text-[11px] text-text-muted mb-3 -mt-2">When off, offer creation is blocked for this branch and offers are handed off to the client outside the system. Existing offers stay visible.</p>'
     + '<div id="location-error" class="text-body-sm text-red-600 mb-3 hidden"></div>'
     + '<div class="flex justify-end gap-2 mt-4">'
     + '<button type="button" id="location-cancel" class="px-4 py-2 rounded-lg border border-border text-on-surface text-sm font-medium hover:bg-surface-variant">Cancel</button>'
@@ -1304,13 +1725,14 @@ async function openLocationDialog(existing) {
         const newAddr = document.getElementById('loc-address').value.trim();
         if (newName) payload.location_name = newName;
         if (newAddr !== undefined) payload.address = newAddr || null;
+        payload.offers_enabled = document.getElementById('loc-offers-enabled').checked;
         await apiRequest('/locations/' + existing.id, { method: 'PATCH', body: JSON.stringify(payload) });
       } else {
         const name = document.getElementById('loc-name').value.trim();
         const code = document.getElementById('loc-code').value.trim();
         if (!name || !code) throw new Error('Name and code are required');
         const addr = document.getElementById('loc-address').value.trim();
-        await apiRequest('/locations/', { method: 'POST', body: JSON.stringify({ location_name: name, location_code: code, address: addr || null, status: 'active' }) });
+        await apiRequest('/locations/', { method: 'POST', body: JSON.stringify({ location_name: name, location_code: code, address: addr || null, status: 'active', offers_enabled: document.getElementById('loc-offers-enabled').checked }) });
       }
       close();
       showToast(isEdit ? 'Location updated' : 'Location created', 'Changes saved successfully.');
@@ -1930,6 +2352,10 @@ async function loadRequisitionDetail() {
   setFirstText(".workspace-surface nav span:last-child", requisition.title);
   setFirstText(".workspace-surface h1, .workspace-surface h2", requisition.title);
   setFirstText(".workspace-surface h1 + span, .workspace-surface h2 + span", reqCode(requisition));
+  const reqDetailCodeHost = document.querySelector(".workspace-surface h1 + span, .workspace-surface h2 + span");
+  if (reqDetailCodeHost && typeof entityBadgeHtml === "function" && requisition.requisition_code && !reqDetailCodeHost.querySelector(".entity-badge")) {
+    reqDetailCodeHost.insertAdjacentHTML("afterend", entityBadgeHtml(requisition.requisition_code, requisition.branch_code));
+  }
   fillDashboardMetrics([
     { label: "Openings", value: requisition.openings_count, hint: requisition.employment_type || "Open role" },
     { label: "Priority", value: requisition.priority, hint: requisition.status },
@@ -2119,6 +2545,9 @@ async function loadCandidates() {
   fillExistingTable(items, (row, item) => {
     const cells = row.querySelectorAll("td");
     setStackedCell(cells[0], item.full_name || "—", item.email || item.source_type || "");
+    if (cells[0] && typeof entityBadgeHtml === "function" && item.candidate_code && !cells[0].querySelector(":scope > .entity-badge")) {
+      cells[0].insertAdjacentHTML("beforeend", entityBadgeHtml(item.candidate_code, item.branch_code));
+    }
     const avatar = cells[0]?.firstElementChild?.querySelector("div");
     if (avatar) {
       const initials = (item.full_name || "?").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
@@ -2154,6 +2583,7 @@ async function loadCandidates() {
     token.textContent = `${statusLabel} ${intakeLabel} ${dup.label} ${hasLink ? "linked" : "unlinked"}`;
     row.appendChild(token);
     row.dataset.filterStatus = statusLabel.toLowerCase();
+    row.dataset.filterCode = item.candidate_code || "";
     row.dataset.filterDuplicate = dup.label.toLowerCase().includes("unique") ? "unique" : dup.label.toLowerCase().includes("potential") ? "potential" : "not-checked";
     row.dataset.filterReadiness = intakeLabel.toLowerCase().replace(/\s+/g, "-");
     row.dataset.filterLinkage = hasLink ? "linked" : "unlinked";
@@ -2175,6 +2605,20 @@ async function loadCandidateDetail() {
   setFirstText("[data-candidate-name]", candidate.full_name);
   setFirstText("[data-candidate-email]", candidate.email);
   setFirstText("[data-candidate-phone]", candidate.phone);
+  const candidateNameHost = document.querySelector("[data-candidate-name]");
+  if (candidateNameHost?.parentElement && typeof entityBadgeHtml === "function" && candidate.candidate_code && !candidateNameHost.parentElement.querySelector(":scope > .entity-badge")) {
+    candidateNameHost.insertAdjacentHTML("afterend", entityBadgeHtml(candidate.candidate_code, candidate.branch_code));
+  }
+  /* Surface the agent entry point once the candidate id is known. */
+  const screenerButton = document.querySelector("[data-live-agents-run-screener]");
+  if (screenerButton) {
+    screenerButton.dataset.candidateId = String(candidate.id ?? "");
+    screenerButton.hidden = false;
+    screenerButton.setAttribute(
+      "aria-label",
+      `Run the AI resume screener for ${candidate.full_name || "this candidate"}`,
+    );
+  }
 }
 
 async function loadCandidateReviewDrawer() {
@@ -2534,6 +2978,12 @@ async function loadPipeline() {
     host.classList.remove("flex", "items-center", "justify-center", "flex-row", "flex-wrap");
     host.classList.add("flex-1", "overflow-y-auto", "hide-scrollbar", "space-y-3", "p-1", "pipeline-drop-zone");
     host.dataset.pipelineDropZone = title;
+    /* Sourcing-only tenants (branch offer toggle off): the offer column is
+       out of scope, so it collapses entirely instead of showing an empty lane. */
+    if (/offer/i.test(title) && !/join|reject/i.test(title) && typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
+      col.hidden = true;
+      return;
+    }
     const stageItems = items.filter((item) => pipelineStageMatchesColumn(item.current_stage, title));
     const badge = col.querySelector("h3")?.parentElement?.querySelector("span");
     if (badge) badge.textContent = String(stageItems.length);
@@ -2548,6 +2998,7 @@ async function loadPipeline() {
                 <div class="min-w-0">
                   <p class="font-headline-sm text-[14px] text-on-surface">${escapeLiveHtml(item.candidate_name || "Candidate")}</p>
                   <p class="font-body-sm text-[12px] text-text-muted">${escapeLiveHtml(item.requisition_title || "Requisition")}</p>
+                  ${typeof entityBadgeHtml === "function" ? entityBadgeHtml(item.candidate_code || item.requisition_code, item.branch_code) : ""}
                 </div>
               </div>
               <span class="material-symbols-outlined text-text-muted text-[18px] shrink-0">drag_indicator</span>
@@ -2586,6 +3037,10 @@ function pipelineStageMatchesColumn(stage, columnTitle) {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
     setFirstText("[data-current-stage]", application.current_stage);
+    const stageDialogName = document.querySelector("[data-candidate-name]");
+    if (stageDialogName?.parentElement && typeof entityBadgeHtml === "function" && (application.candidate_code || application.requisition_code) && !stageDialogName.parentElement.querySelector(":scope > .entity-badge")) {
+      stageDialogName.insertAdjacentHTML("afterend", entityBadgeHtml(application.candidate_code || application.requisition_code, application.branch_code));
+    }
     setFirstText("[data-requisition-title]", application.requisition_title);
   } catch (error) { showLiveError(error); }
 }
@@ -2768,7 +3223,7 @@ async function loadDailyReview() {
   hidePanelByHeading("Candidate Updates");
   renderDailyReviewQuickStats(myWork, pipelineItems, {
     interviews: thisWeekInterviews.length,
-    offers: pendingOffers.length,
+    offers: branchOffersEnabled() ? pendingOffers.length : 0,
   });
   renderDailyReviewPipelineActivity(pipelineItems.slice(0, 5));
   const actionItems = (actions.items || []).slice(0, 5).map((item) => ({
@@ -2777,7 +3232,7 @@ async function loadDailyReview() {
     href: item.entity_type === "requisition" ? "requisition-list.html" : "approvals-inbox.html",
     action: item.primary_action_label || "Open",
   }));
-  if (!actionItems.length && pendingOffers.length) {
+  if (!actionItems.length && pendingOffers.length && branchOffersEnabled()) {
     actionItems.push({ icon: "request_quote", title: `${pendingOffers.length} offers waiting`, href: "offer-management.html", action: "Review" });
   }
   renderDailyReviewActions(actionItems);
@@ -3056,7 +3511,7 @@ async function loadMyWorkDashboard() {
           const days = Number.isNaN(created) ? "—" : Math.floor((Date.now() - created) / 86400000);
           const priority = days > 30 ? "High" : days > 14 ? "Med" : "Low";
           return `<tr class="border-b border-border h-table-row hover:bg-highlight-soft">
-            <td class="px-4 text-primary">REQ-${row.id}</td>
+            <td class="px-4">${typeof entityBadgeHtml === "function" && row.requisition_code ? entityBadgeHtml(row.requisition_code, row.branch_code) : escapeLiveHtml(row.requisition_code || `REQ-${row.id}`)}</td>
             <td class="px-4">${escapeLiveHtml(row.title || "Requisition")}</td>
             <td class="px-4"><span class="px-2 py-0.5 rounded-sm bg-success-bg text-success-text text-[11px] font-bold">${escapeLiveHtml(String(row.status || "open").toUpperCase())}</span></td>
             <td class="px-4">${days}</td>
@@ -3638,11 +4093,18 @@ async function runWorkflowAction(button) {
 }
 
 async function runDuplicateDecision(button) {
-  const decision = button?.dataset.decision || "keep_original";
-  const caseId = intOrNull(button?.dataset.caseId);
-  if (!caseId) return;
+  /* POST /candidates/{id}/duplicate-check/decision — decision is one of
+     request_override | link_existing | discard_draft (schemas/candidate.py). */
+  const allowed = ["request_override", "link_existing", "discard_draft"];
+  const decision = allowed.includes(button?.dataset.decision) ? button.dataset.decision : "request_override";
+  const candidateId = intOrNull(button?.dataset.candidateId) || queryInt("candidate_id");
+  if (!candidateId) return;
+  const matchedId = intOrNull(button?.dataset.matchedCandidateId);
   try {
-    await apiRequest(`/candidates/duplicates/${caseId}/decide`, { method: "POST", body: JSON.stringify({ decision }) });
+    await apiRequest(`/candidates/${candidateId}/duplicate-check/decision`, {
+      method: "POST",
+      body: { decision, matched_candidate_id: matchedId || undefined },
+    });
     showLiveSuccess("Decision recorded");
   } catch (error) { showLiveError(error); }
 }
@@ -3651,7 +4113,7 @@ async function markLiveNotificationRead(button) {
   const notificationId = intOrNull(button?.dataset.notificationId);
   if (!notificationId) return;
   try {
-    await apiRequest(`/notifications/${notificationId}/read`, { method: "POST" });
+    await apiRequest(`/notifications/${notificationId}/read`, { method: "PATCH", body: { status: "read" } });
     showLiveSuccess("Marked as read");
     loadNotifications();
   } catch (error) { showLiveError(error); }
@@ -3731,16 +4193,14 @@ async function loadInterviewDetail() {
   const interviewId = queryInt("interview_id");
   if (!interviewId) return;
   try {
-    const interviews = await apiRequest("/interviews/?page_size=50").catch(() => ({ items: [] }));
-    const item = (interviews.items || []).find((i) => i.id === interviewId);
-    if (item) {
-      const surface = document.querySelector(".workspace-surface");
-      if (surface) {
-        const detail = document.createElement("div");
-        detail.innerHTML = renderInterviewDetail(item);
-        surface.appendChild(detail);
-      }
-    }
+    const item = await apiRequest(`/interviews/${interviewId}`);
+    if (!item) return;
+    const surface = document.querySelector(".workspace-surface");
+    if (!surface) return;
+    const detail = document.createElement("div");
+    detail.innerHTML = renderInterviewDetail(item);
+    surface.querySelector("[data-live-interview-detail]")?.remove();
+    surface.prepend(detail);
   } catch (error) { showLiveError(error); }
 }
 
@@ -3894,6 +4354,43 @@ async function loadOfferManagement() {
   }
 }
 
+/* Currency selector → prefix symbol sync (offer dialog + any form with
+   select[data-currency-select] and [data-currency-symbol] spans). Updates
+   the rendered symbol and derives each input's padding-left from the
+   measured symbol width so wider glyphs (₹, ¥, C$) never overlap digits,
+   at any font size or screen resolution. */
+const CURRENCY_SYMBOLS = { USD: "$", EUR: "€", GBP: "£", CAD: "C$", INR: "₹", JPY: "¥", AUD: "A$" };
+
+/* Per-branch offer tracking flag (branches.offers_enabled, migration 009).
+   Persisted at login as session.offers_enabled; unknown/unset = enabled so
+   the default flow never changes. Offer surfaces hide when disabled. */
+function branchOffersEnabled() {
+  const session = (typeof readSession === "function" && readSession()) || {};
+  return session.offers_enabled !== false;
+}
+
+function syncCurrencySymbols() {
+  document.querySelectorAll("select[data-currency-select]").forEach((select) => {
+    if (!select.dataset.currencyWired) {
+      select.addEventListener("change", syncCurrencySymbols);
+      select.dataset.currencyWired = "true";
+    }
+    const scope = select.closest("form") || select.closest("[data-overlay-surface]") || document;
+    const symbol = CURRENCY_SYMBOLS[select.value] ?? "";
+    scope.querySelectorAll("[data-currency-symbol]").forEach((span) => {
+      const input = document.getElementById(span.dataset.currencySymbol);
+      if (!input) return;
+      span.textContent = symbol;
+      const symbolWidth = Math.ceil(span.getBoundingClientRect().width);
+      /* Symbol sits at left-3 (12px); leave an 8px gutter before digits.
+         Routed through a CSS variable because overlay-input normalization
+         uses !important and would flatten a plain inline padding-left. */
+      input.dataset.currencyInput = "true";
+      input.style.setProperty("--currency-pad", `${symbolWidth + 20}px`);
+    });
+  });
+}
+
 async function loadOfferCreateDialog() {
   /* The offer form uses position/department selects — populate from backend */
   const candidates = await apiRequest("/candidates/?page_size=50").catch(() => ({ items: [] }));
@@ -3909,6 +4406,7 @@ async function loadOfferCreateDialog() {
     const el = document.getElementById("requisition_id");
     if (el) el.value = requisitionId;
   }
+  syncCurrencySymbols();
 }
 
 
@@ -3993,6 +4491,8 @@ const BADGE_POLL_BASE_MS = 30 * 1000;
 const BADGE_POLL_MAX_MS = 2 * 60 * 1000;
 const BADGE_POLL_IDLE_MS = 2 * BADGE_POLL_BASE_MS;
 let badgePollTimer = null;
+let badgePollTimerDelay = 0;
+let badgePollTimerScheduledAt = 0;
 let badgePollSkipBackoffMs = BADGE_POLL_BASE_MS;
 let badgePollFailureBackoffMs = BADGE_POLL_BASE_MS;
 let badgePollLastActivity = Date.now();
@@ -4174,6 +4674,59 @@ async function undoMarkAllNotificationsSeen() {
   pendingMarkAllUndoIds = null;
   refreshNotificationBadge();
   return Number(payload?.reverted ?? 0);
+}
+
+/* ── Notifications center: AI Triage review mode ─────────────── */
+function exitNotificationsTriage() {
+  window.notificationsTriageState = null;
+  document.querySelector("[data-triage-banner]")?.remove();
+  if (routeId() === "notifications-center") loadNotifications();
+}
+
+async function enterNotificationsTriage(button) {
+  if (button?.disabled) return;
+  if (button) {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+  }
+  try {
+    const run = await apiRequest("/agents/inbox_triage/run", {
+      method: "POST",
+      body: JSON.stringify({ status: "unread", max_items: 50 }),
+    });
+    const queue = run.output_draft?.queue || [];
+    window.notificationsTriageState = { runId: run.id, queue, done: new Set() };
+    renderNotificationsTriage();
+    showToast("AI Triage ready", `${queue.length} unread sorted by priority. Nothing changes until you act.`);
+  } catch (error) {
+    showLiveError(error);
+  }
+  if (button) {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+}
+
+async function triageGotItAction(button) {
+  const id = intOrNull(button.dataset.notificationId);
+  const state = window.notificationsTriageState;
+  if (!id || !state) return;
+  button.disabled = true;
+  try {
+    await markNotificationSeen(id);
+    state.done.add(String(id));
+    applyTriageDoneToDom(id);
+    updateTriageProgress();
+  } catch (error) {
+    button.disabled = false;
+    showLiveError(error);
+  }
+}
+
+function triageOpenAction(button) {
+  const id = intOrNull(button.dataset.notificationId);
+  if (!id) return;
+  navigateToRoute(`notification-detail-panel.html?notification_id=${id}`);
 }
 
 async function markAllNotificationsReadAction(button) {
@@ -4369,8 +4922,12 @@ async function loadApprovalsInbox() {
   if (metrics[1]) metrics[1].textContent = overdue;
   if (metrics[2]) metrics[2].textContent = awaiting;
   /* Update the mobile tab strip: live count + active-tab filtering */
-  const pendingCount = document.querySelector('[data-approval-count="pending"]');
-  if (pendingCount) pendingCount.textContent = pending;
+  document.querySelectorAll("[data-approval-count]").forEach((node) => {
+    const key = node.dataset.approvalCount;
+    if (key === "pending") node.textContent = pending;
+    else if (key === "all") node.textContent = total;
+    else if (key === "actioned") node.textContent = Math.max(0, total - pending);
+  });
   wireApprovalTabs(items);
   /* Render table filtered to the active tab */
   const renderTbody = (typeof workspaceTbody === "function" ? workspaceTbody() : null) || document.querySelector(".workspace-surface tbody") || document.querySelector("tbody");
@@ -4704,9 +5261,9 @@ async function submitDailyUpdate(options = {}) {
     setTimeout(() => { window.location.href = pageHref("daily-updates-review.html"); }, 1000);
   } catch (error) {
     const msg = error?.message || String(error);
-    if (/403|linked.*requisition/i.test(msg)) {
+    if (error?.status === 403 || /linked.*requisition/i.test(msg)) {
       showLiveError(new Error("You are not assigned to this requisition. Contact your admin to assign you first."));
-    } else if (/409|already exists/i.test(msg)) {
+    } else if (error?.status === 409 || /already exists/i.test(msg)) {
       showLiveError(new Error("An update for this requisition already exists today."));
     } else { showLiveError(error); }
   }
@@ -4779,7 +5336,7 @@ async function submitOfferCreate() {
     afterOverlaySave("offer-management.html");
   } catch (error) {
     const msg = error?.message || String(error);
-    if (/500|database/i.test(msg)) {
+    if (error?.status >= 500 || /database/i.test(msg)) {
       showLiveError(new Error("The offer could not be created. The candidate may need to be in an interview stage first."));
     } else { showLiveError(error); }
   }
@@ -5008,6 +5565,76 @@ function bindLiveApiInteractions() {
       event.preventDefault();
       event.stopPropagation();
       markAllNotificationsReadAction(markAllReadButton);
+      return;
+    }
+
+    // Agents: open run detail
+    const openRunButton = target?.closest("[data-live-agents-open-run]");
+    if (openRunButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openAgentRunDetail(openRunButton);
+      return;
+    }
+
+    // Notifications center: AI triage review mode
+    const triageToggle = target?.closest("[data-live-notifications-triage]");
+    if (triageToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      enterNotificationsTriage(triageToggle);
+      return;
+    }
+    if (target?.closest("[data-triage-exit]")) {
+      event.preventDefault();
+      event.stopPropagation();
+      exitNotificationsTriage();
+      return;
+    }
+    const triageGotIt = target?.closest("[data-triage-got-it]");
+    if (triageGotIt) {
+      event.preventDefault();
+      event.stopPropagation();
+      triageGotItAction(triageGotIt);
+      return;
+    }
+    const triageOpen = target?.closest("[data-triage-open]");
+    if (triageOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      triageOpenAction(triageOpen);
+      return;
+    }
+
+    // Agents: run the selected agent
+    const runAgentButton = target?.closest("[data-live-agents-open-runner]");
+    if (runAgentButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      runAgentAction(runAgentButton);
+      return;
+    }
+
+    // Agents: Run AI Screener from a candidate page (deep-links to workbench)
+    const screenerButton = target?.closest("[data-live-agents-run-screener]");
+    if (screenerButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const candidateId = screenerButton.dataset.candidateId;
+      if (!candidateId) {
+        showToast("Hold on", "Load the candidate profile first, then run the screener.");
+        return;
+      }
+      navigateToRoute(`agents-workbench.html?candidate_id=${encodeURIComponent(candidateId)}`);
+      return;
+    }
+
+    // Agents: accept/reject a run
+    const decideAgentButton = target?.closest("[data-live-agents-decide]");
+    if (decideAgentButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      decideAgentRunAction(decideAgentButton);
       return;
     }
 
@@ -5312,6 +5939,13 @@ async function bootPage() {
     return;
   }
 
+  /* Resolve fresh permission codes before the deep-link gate and the
+     loaders run, so a revoked grant is enforced on the very next page. */
+  if (RecruitOpsLive.session?.token && !PUBLIC_ROUTES.has(route)) {
+    await syncUserPermissions();
+    if (!RecruitOpsLive.session?.token) return; /* 401: handler is redirecting */
+  }
+
   const loaders = {
     "candidate-profiles": loadCandidates,
     "candidate-detail": loadCandidateDetail,
@@ -5397,6 +6031,9 @@ async function bootPage() {
         const cells = row.querySelectorAll("td");
         /* Column order: Requisition | Client | Openings | Ownership | Location | Priority | Status | Age */
         setStackedCell(cells[0], item.title || item.requisition_code, item.client_name || "");
+        if (cells[0] && typeof entityBadgeHtml === "function" && item.requisition_code && !cells[0].querySelector(":scope > .entity-badge")) {
+          cells[0].insertAdjacentHTML("beforeend", entityBadgeHtml(item.requisition_code, item.branch_code));
+        }
         paintPersonCell(cells[1], item.client_name);
         setCellValue(cells[2], `${item.openings_count ?? "—"} opening${item.openings_count === 1 ? "" : "s"}`);
         paintPersonCell(cells[3], item.primary_owner_name);
@@ -5407,6 +6044,7 @@ async function bootPage() {
         row.dataset.filterStatus = String(item.status || "").toLowerCase();
         row.dataset.filterPriority = String(item.priority || "").toLowerCase();
         row.dataset.filterClient = item.client_name || "";
+        row.dataset.filterCode = item.requisition_code || "";
         row.dataset.filterOwner = item.primary_owner_name || "";
         row.dataset.filterLocation = item.work_mode || item.location_name || "";
         const detailRoute = `requisition-detail.html?requisition_id=${item.id}`;
@@ -5437,6 +6075,37 @@ async function bootPage() {
     "support-workspace": async () => {
       // Support page - no API needed, shows static help content
     },
+    "agents-workbench": async () => {
+      const [catalog, runsPayload] = await Promise.all([
+        loadAgentsCatalog(),
+        loadAgentsRuns().catch(() => ({ items: [] })),
+      ]);
+      /* Deep-link support: ?candidate_id=X prefills the Resume Screener
+         context from a candidate page; &autorun=1 fires it immediately. */
+      const linkedCandidateId = queryInt("candidate_id");
+      if (linkedCandidateId) {
+        agentsRunContext = {
+          candidate_id: linkedCandidateId,
+          requisition_id: queryInt("requisition_id") || undefined,
+          run: queryInt("autorun") === 1,
+        };
+        renderAgentsRunContextBanner(catalog);
+        const candidate = await apiRequest(`/candidates/${linkedCandidateId}`).catch(() => null);
+        if (candidate?.full_name) {
+          agentsRunContext.candidate_name = candidate.full_name;
+          renderAgentsRunContextBanner(catalog, true);
+        }
+        const selectEl = document.querySelector("[data-agents-select]");
+        if (selectEl) selectEl.value = "resume_screener";
+      }
+      if (renderAgentsWorkbench(catalog, { items: agentsRunsCache })) {
+        wireAgentsWorkbenchFilters();
+      }
+      if (agentsRunContext?.run && typeof runAgentAction === "function") {
+        const runButton = document.querySelector("[data-live-agents-open-runner]");
+        runAgentAction(runButton, { ...agentsRunContext, agentId: "resume_screener" });
+      }
+    },
     "onboarding-company-profile": async () => { wireOnboardingLocationGuidance(); },
     "onboarding-hiring-teams": async () => {},
     "onboarding-locations": async () => { wireOnboardingLocationGuidance(); },
@@ -5455,68 +6124,28 @@ async function bootPage() {
     if (loaders[overlayRoute]) await loaders[overlayRoute]();
   };
 
-  /* RBAC: Block access to unauthorized pages */
+  /* RBAC: Block access to unauthorized pages. The gate map now lives in
+     navigation.config.js (NAV_PAGE_PERMISSIONS) — this file no longer
+     duplicates it. Deep-link gating behavior is unchanged. */
   if (!isAdmin() && !PUBLIC_ROUTES.has(route)) {
-    const pagePermMap = {
-      "location-management": ["location.read"],
-      "location-dashboard": ["location.read"],
-      "user-management": ["user.read"],
-      "user-detail": ["user.read"],
-      "role-management": ["role.read"],
-      "role-permissions-editor": ["role.permissions.assign"],
-      "role-dashboard": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr"],
-      "business-titles": ["settings.read"],
-      "visibility-rules": ["settings.read"],
-      "work-assignment": ["assignment.read", "requisition.read"],
-      "portal-accounts": ["portal.read"],
-      "approvals-inbox": ["approval.read"],
-      "client-directory": ["client.read"],
-      "client-detail": ["client.read"],
-      "contact-form-dialog": ["client.contact.create"],
-      "candidate-profiles": ["candidate.read"],
-      "candidate-detail": ["candidate.read"],
-      "candidate-review-drawer": ["candidate.create"],
-      "pipeline-board": ["pipeline.read.summary"],
-      "application-detail-drawer": ["pipeline.read.detail"],
-      "stage-move-dialog": ["pipeline.stage.move"],
-      "requisition-list": ["requisition.read"],
-      "requisition-detail": ["requisition.read"],
-      "requisition-intake": ["requisition.create"],
-      "requisition-intake-edit": ["requisition.update"],
-      "interview-scheduler": ["interview.read"],
-      "interview-detail": ["interview.read"],
-      "interview-feedback-dialog": ["interview.read"],
-      "offer-management": ["offer.read"],
-      "offer-create-dialog": ["offer.create"],
-      "meetings": ["meeting.read"],
-      "meeting-form-dialog": ["meeting.create"],
-      "follow-ups": ["meeting.read"],
-      "follow-up-form-dialog": ["meeting.create"],
-      "join-tracker": ["offer.read"],
-      "daily-updates-workspace": ["daily_update.read"],
-      "daily-updates-submission": ["daily_update.create_main", "daily_update.read"],
-      "daily-updates-review": ["daily_update.read"],
-      "daily-update-detail-panel": ["daily_update.read"],
-      "notifications-center": ["notification.read"],
-      "notification-detail-panel": ["notification.read"],
-      "analytics-dashboard": ["dashboard.view_admin", "dashboard.view_hr", "dashboard.view_manager", "dashboard.view_recruiter"],
-      "company-dashboard": ["dashboard.view_admin"],
-      "user-performance-reports": ["dashboard.view_admin", "dashboard.view_manager"],
-      "team-workload": ["dashboard.view_admin", "dashboard.view_manager"],
-      "reports": ["report.read"],
-      "custom-report-builder": ["report.read"],
-      "report-viewer": ["report.read"],
-      "pipeline-analytics": ["pipeline.read.summary"],
-      "time-to-fill-report": ["report.read"],
-      "source-effectiveness": ["report.read"],
-      "sla-tracker": ["report.read"],
-    };
+    const pagePermMap = (window.NAV_CONFIG && window.NAV_CONFIG.pagePermissions) || {};
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {
       hidePageLoader();
       showAccessDenied("access this page");
       return;
     }
+  }
+
+  /* Per-branch offer streamlining: on branches with offer tracking off,
+     offer pages deep-linked directly get a clear denial instead of a
+     half-functional screen. The toggle is branch configuration (managed
+     in Locations), not a permission, so admins are gated like everyone. */
+  if (["offer-management", "offer-create-dialog", "join-tracker"].includes(route)
+    && typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
+    hidePageLoader();
+    showAccessDenied("track offers — offer tracking is disabled for this branch and offers are handed off to the client directly");
+    return;
   }
 
   try {
@@ -5551,6 +6180,18 @@ RecruitOpsLive.reloadCurrentPage = RecruitOpsLive.reloadCurrentPage || (async ()
   if (typeof hydrateLiveFilters === "function") hydrateLiveFilters();
 });
 RecruitOpsLive.startNotificationBadgePolling = startNotificationBadgePolling;
+RecruitOpsLive.apiRequest = apiRequest;
+RecruitOpsLive.ApiError = ApiError;
+RecruitOpsLive.setUnauthorizedHandler = setUnauthorizedHandler;
+RecruitOpsLive.readSession = readSession;
+RecruitOpsLive.writeSession = writeSession;
+RecruitOpsLive.syncUserPermissions = syncUserPermissions;
+RecruitOpsLive.bootRBACGate = bootRBACGate;
+RecruitOpsLive.hasPermission = hasPermission;
+RecruitOpsLive.userPermissions = userPermissions;
+RecruitOpsLive.isAdmin = isAdmin;
+RecruitOpsLive.logout = handleLogout;
+RecruitOpsLive.showAccessDenied = showAccessDenied;
 RecruitOpsLive.onSessionChangedBadgePoll = onSessionChangedBadgePoll;
 window.RecruitOpsLive = RecruitOpsLive;
 
@@ -5570,13 +6211,20 @@ function startLiveApiClient() {
   if (!isLandingPage) decorateShell();
   bindLiveApiInteractions();
 
-  // Handle logout links — call API, clear session, redirect
-  document.querySelectorAll('[data-logout-link]').forEach((link) => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
+  /* Logout: one delegated listener owns every [data-logout-link], including
+     links navigation.js renders after this runs (the sidebar is rebuilt on
+     boot). It must revoke the server session (POST /auth/logout) before
+     leaving — app.js's router skips these anchors (ANCHOR_ROUTER_EXCLUSIONS). */
+  if (!startLiveApiClient.logoutWired) {
+    startLiveApiClient.logoutWired = true;
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest?.("a[data-logout-link]");
+      if (!link) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
       handleLogout();
-    });
-  });
+    }, true);
+  }
 
   // Clear session if arriving with ?loggedOut=true
   if (window.location.search.includes('loggedOut=true')) {
@@ -5590,6 +6238,7 @@ function startLiveApiClient() {
 
   if (!isLandingPage && (RecruitOpsLive.session || readSession())) {
     startNotificationBadgePolling();
+    startPermissionRefresh();
   }
 }
 

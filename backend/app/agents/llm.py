@@ -12,6 +12,8 @@ provider by adding a new factory branch in :func:`get_llm_provider`.
 """
 from __future__ import annotations
 
+import re
+
 from typing import Protocol, TypedDict
 
 from app.agents.registry import AgentDefinition
@@ -57,13 +59,42 @@ class MockLLMProvider:
         candidate = context.get("candidate") or {}
         requisition = context.get("requisition")
         full_name = candidate.get("full_name") or "Candidate"
-        designations = [candidate.get("current_designation") or ""]
-        haystack = " ".join(designations + [candidate.get("current_company") or ""]).lower()
+        haystack = " ".join(
+            part
+            for part in [
+                candidate.get("current_designation") or "",
+                candidate.get("current_company") or "",
+            ]
+            if part
+        ).lower()
 
         must_have = (requisition or {}).get("must_have_skills") or []
         good_to_have = (requisition or {}).get("good_to_have_skills") or []
-        extracted = [skill for skill in must_have + good_to_have if skill.lower() in haystack]
-        match_score = round(len(extracted) / len(must_have), 2) if must_have else None
+
+        def _matches(skill) -> bool:
+            """Whole-word match, so "java" never matches "javascript".
+
+            Lookarounds instead of \b keep symbol skills like c++ working
+            (a trailing \b would demand a word char after '+').
+            """
+            if not skill:
+                return False
+            needle = str(skill).strip()
+            if not needle:
+                return False
+            pattern = r"(?<!\w)" + re.escape(needle) + r"(?!\w)"
+            return re.search(pattern, haystack, flags=re.IGNORECASE) is not None
+
+        # Dedup and drop blanks on both sides of the ratio so repeated or
+        # empty rows can't inflate or deflate the score; capped at 1.0
+        # because matched good-to-have skills must never push a must-have
+        # ratio over 100%.
+        cleaned_must = [s for s in dict.fromkeys(must_have) if s and str(s).strip()]
+        cleaned_good = [s for s in dict.fromkeys(good_to_have) if s and str(s).strip()]
+        matched_must = [s for s in cleaned_must if _matches(s)]
+        matched_good = [s for s in cleaned_good if _matches(s) and s not in matched_must]
+        extracted = matched_must + matched_good
+        match_score = min(round(len(matched_must) / len(cleaned_must), 2), 1.0) if cleaned_must else None
 
         profile = {
             "full_name": full_name,
@@ -78,8 +109,9 @@ class MockLLMProvider:
             "extracted_skills": extracted,
             "match_score": match_score,
             "match_notes": [
-                f"Matched {len(extracted)} of {len(must_have)} must-have skills"
-                if must_have
+                f"Matched {len(matched_must)} of {len(cleaned_must)} must-have skills"
+                + (f" (+{len(matched_good)} good-to-have)" if matched_good else "")
+                if cleaned_must
                 else "No requisition selected; skills listed for manual review",
             ],
         }
@@ -119,21 +151,29 @@ class MockLLMProvider:
     def _inbox_triage(context: dict) -> LLMResult:
         notifications = context.get("notifications") or []
         priority_order = {"critical": 0, "high": 1, "normal": 2, "low": 3}
+        # Secondary sort key keeps the order deterministic for equal
+        # priorities instead of depending on input ordering.
         sorted_items = sorted(
             notifications,
-            key=lambda item: priority_order.get(item.get("priority", "normal"), 4),
+            key=lambda item: (
+                priority_order.get(item.get("priority", "normal"), 4),
+                -(item.get("id") or 0),
+            ),
         )
-        queue = [
-            {
-                "id": item.get("id"),
-                "module": item.get("module_name"),
-                "what": item.get("title") or item.get("message")[:80],
-                "why": item.get("message"),
-                "next": f"Open {item.get('entity_type', 'item')} and review",
-                "priority": item.get("priority"),
-            }
-            for item in sorted_items
-        ]
+        queue = []
+        for item in sorted_items:
+            message = item.get("message") or ""
+            title = item.get("title") or message[:80] or "(untitled notification)"
+            queue.append(
+                {
+                    "id": item.get("id"),
+                    "module": item.get("module_name"),
+                    "what": title,
+                    "why": message,
+                    "next": f"Open {item.get('entity_type') or 'item'} and review",
+                    "priority": item.get("priority") or "normal",
+                }
+            )
         draft = {"summary": f"{len(queue)} notifications prioritized for review.", "queue": queue}
         return {"output_draft": draft, "output_summary": draft["summary"]}
 

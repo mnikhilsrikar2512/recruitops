@@ -1,0 +1,75 @@
+name: CI
+
+# Required for merge (Phase 1.1): backend tests against a throwaway SQL Server,
+# plus the frontend gates (syntax, undefined globals, API contract, assets,
+# browser sweep of every page, end-to-end UI flows against a contract mock).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests (pytest + SQL Server)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Microsoft ODBC Driver 18
+        # GitHub's Ubuntu image already ships the Microsoft package repo
+        # (microsoft-prod.list) and usually the driver itself; adding the repo
+        # again with a different keyring breaks apt. Only install if missing.
+        run: |
+          if odbcinst -q -d 2>/dev/null | grep -q "ODBC Driver 18 for SQL Server"; then
+            echo "ODBC Driver 18 already installed"
+          else
+            if ! ls /etc/apt/sources.list.d/ | grep -qi microsoft; then
+              curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+              echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+            fi
+            sudo apt-get update
+            sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+          fi
+          sudo apt-get install -y unixodbc-dev
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements-dev.txt
+      - name: Lint (ruff, report-only until the baseline is clean)
+        continue-on-error: true
+        run: .venv/bin/ruff check app tests
+      - name: Assert production config guardrails (AI flag off, no wildcard CORS)
+        run: .venv/bin/python -m pytest tests/test_config_safety.py -q
+      - name: Tests (throwaway SQL Server → schema → seed → pytest)
+        run: DB_PORT=1433 ./scripts/run_tests_ci.sh
+
+  frontend:
+    name: Frontend gates (contract + browser)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tooling
+        run: |
+          sudo apt-get update && sudo apt-get install -y unixodbc
+          python -m pip install -r backend/requirements.txt playwright
+          python -m playwright install --with-deps chromium
+          npm install --no-save --prefix tools/ci typescript@5  # TS 7 (native) has no JS compiler API
+      - name: Frontend checks
+        env:
+          NODE_PATH: tools/ci/node_modules
+          OPENAPI: ${{ github.workspace }}/frontend/tests/openapi.json
+        run: tools/ci/run_frontend_checks.sh

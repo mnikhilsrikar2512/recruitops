@@ -45,13 +45,29 @@ def _application_record() -> SimpleNamespace:
     )
 
 
-def test_pipeline_detail_allows_sourced_by_user(monkeypatch) -> None:
+def test_pipeline_detail_blocks_sourced_by_user_outside_tenant(monkeypatch) -> None:
+    """sourced_by_user_id is projected from the GLOBAL candidate record, so it
+    must NOT grant application access outside the tenant — the original source
+    recruiter of a cross-company candidate would otherwise read other tenants'
+    notes and offer terms (multi-tenant isolation regression)."""
     monkeypatch.setattr(
         "app.services.pipeline.find_pipeline_application_by_id",
         lambda engine, application_id: _application_record(),
     )
 
-    response = get_pipeline_application_detail_service(object(), 201, _auth_context(user_id=77, location_id=3))
+    with pytest.raises(HTTPException) as exc_info:
+        get_pipeline_application_detail_service(object(), 201, _auth_context(user_id=77, location_id=3))
+
+    assert exc_info.value.status_code == 403
+
+
+def test_pipeline_detail_allows_sourced_by_user_within_tenant(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.pipeline.find_pipeline_application_by_id",
+        lambda engine, application_id: _application_record(),
+    )
+
+    response = get_pipeline_application_detail_service(object(), 201, _auth_context(user_id=77, location_id=8))
 
     assert response.application_id == 201
 

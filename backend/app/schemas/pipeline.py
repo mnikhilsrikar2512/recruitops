@@ -44,6 +44,9 @@ class PipelineBoardItemResponse(BaseModel):
     candidate_name: str
     requisition_id: int
     requisition_title: str
+    requisition_code: str | None = None
+    candidate_code: str | None = None
+    branch_code: str | None = None
     location_id: int
     location_name: str | None
     owner_user_id: int
@@ -65,6 +68,9 @@ class PipelineApplicationDetailResponse(BaseModel):
     candidate_name: str
     requisition_id: int
     requisition_title: str
+    requisition_code: str | None = None
+    candidate_code: str | None = None
+    branch_code: str | None = None
     location_id: int
     location_name: str | None
     owner_user_id: int

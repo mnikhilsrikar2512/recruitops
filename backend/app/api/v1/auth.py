@@ -66,8 +66,9 @@ def logout_endpoint(
 @router.get("/me", response_model=CurrentSessionResponse)
 def me_endpoint(
     auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
 ) -> CurrentSessionResponse:
-    return get_current_session_service(auth_context)
+    return get_current_session_service(engine, auth_context)
 
 
 @router.patch("/profile", response_model=CurrentSessionResponse)
