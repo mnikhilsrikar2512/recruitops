@@ -102,15 +102,15 @@ def world():
             text(
                 """
                 INSERT INTO dbo.users (
-                    full_name, email, password_hash, password_setup_status,
+                    full_name, email, employee_code, password_hash, password_setup_status,
                     force_password_change_on_first_login, status,
                     default_role_id, hierarchy_level, location_id, tenant_id
                 )
                 OUTPUT INSERTED.id
-                VALUES (N'Company B Admin', :email, :hash, N'active', 0, N'active', :role, N'L5', :office, :t)
+                VALUES (N'Company B Admin', :email, :code, :hash, N'active', 0, N'active', :role, N'L5', :office, :t)
                 """
             ),
-            {"email": email_b, "hash": hash_password(B_PASSWORD), "role": admin_role, "office": office_b, "t": tenant_b},
+            {"email": email_b, "code": f"ADMB-{sfx}", "hash": hash_password(B_PASSWORD), "role": admin_role, "office": office_b, "t": tenant_b},
         ).scalar_one()
         connection.execute(
             text(

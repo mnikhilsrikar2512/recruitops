@@ -77,6 +77,8 @@ def make_login_user_record(
     find_user_for_login / find_user_by_email."""
     fields = dict(
         id=user_id,
+        tenant_id=None,
+        tenant_status="active",
         employee_code=employee_code,
         full_name=full_name,
         email=email,

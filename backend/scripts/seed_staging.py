@@ -152,15 +152,15 @@ def ensure_company(engine, tenant: dict) -> tuple[int, str, int]:
                 SET NOCOUNT ON;
                 IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = :email)
                     INSERT INTO dbo.users (
-                        full_name, email, password_hash, password_setup_status,
+                        full_name, email, employee_code, password_hash, password_setup_status,
                         force_password_change_on_first_login, status,
                         default_role_id, hierarchy_level, location_id, tenant_id
                     )
-                    VALUES (:full_name, :email, :hash, N'active', 0, N'active', :role, N'L5', :office, :tenant_id);
+                    VALUES (:full_name, :email, :code, :hash, N'active', 0, N'active', :role, N'L5', :office, :tenant_id);
                 SELECT id FROM dbo.users WHERE email = :email;
                 """
             ),
-            {"full_name": f"{tenant['company']} Admin", "email": admin_email, "hash": hash_password(PASSWORD),
+            {"full_name": f"{tenant['company']} Admin", "email": admin_email, "code": f"ADMIN-{tenant['code']}", "hash": hash_password(PASSWORD),
              "role": admin_role, "office": branch_id, "tenant_id": tenant_id},
         ).scalar_one()
         connection.execute(
