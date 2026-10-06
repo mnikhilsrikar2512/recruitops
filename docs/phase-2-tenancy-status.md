@@ -135,3 +135,7 @@ Backend **438 passed**, 3 skipped (incl. tenancy coverage, parity harness, per-c
 | No `role_code == "admin"` authorization (CI grep gate) | `admin_bypass_gate.py` (identity checks only) |
 
 Rest of the shared-table enforcement (pipeline templates, report locks, transfer/access requests) is tracked in `app/core/tenancy.py` and applied when those routes are built.
+
+### Phase 2 closing run (2026-10-06, commit `7b36716`)
+
+Backend **441 passed**, 3 skipped · live smoke **48/48** · browser sweeps admin and recruiter 101/101 clean · migrations 008–012 on a fresh staging database. **Phase 2 exit gate: met.**
