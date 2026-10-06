@@ -56,3 +56,17 @@ Dev database (once, deliberately — your launchd backend needs it after pulling
 ```bash
 cd backend && .venv/bin/python scripts/apply_migration.py 010_tenants.sql
 ```
+
+## Result of the verification run (2026-10-06, fresh `recruitops_staging`, commit `d84586c`)
+
+| Check | Result |
+|---|---|
+| Backend suite | **417 passed**, 3 skipped (incl. `test_company_isolation_db.py`) |
+| Staging seed | 2 real companies (Northwind, Contoso), each: company admin + manager + recruiter, 2 clients, 2 requisitions, 3 applications, 2 approvals |
+| Live API smoke | **38/38** (incl. 7 company-admin isolation checks) |
+| Browser sweep, Northwind company admin | 101 pages, 0 failing |
+| Browser sweep, Northwind recruiter | 101 pages, 0 failing |
+
+Fixed on the way: `UQ_users_employee_code` treats NULL as a value (SQL-inserted admins now get codes);
+login tolerates records without a tenant status; the Admin role answers 403 "System roles are read-only"
+to company admins (stricter than the old 409).
