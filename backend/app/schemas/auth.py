@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
+from app.core.password_policy import validate_new_password
+
 
 def _normalize_text(value: str | None) -> str | None:
     if value is None:
@@ -71,7 +73,12 @@ class LogoutResponse(BaseModel):
 
 class PasswordChangeRequest(BaseModel):
     current_password: str = Field(min_length=1)
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=1, max_length=256)
+
+    @field_validator("new_password")
+    @classmethod
+    def _password_policy(cls, value: str) -> str:
+        return validate_new_password(value)
 
 
 class PasswordChangeResponse(BaseModel):
@@ -100,7 +107,12 @@ class ProfileUpdateRequest(BaseModel):
 
 class PasswordSetupRequest(BaseModel):
     token: str = Field(min_length=1)
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=1, max_length=256)
+
+    @field_validator("new_password")
+    @classmethod
+    def _password_policy(cls, value: str) -> str:
+        return validate_new_password(value)
 
 
 class PasswordSetupResponse(BaseModel):
@@ -122,7 +134,12 @@ class PasswordForgotResponse(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     token: str = Field(min_length=1)
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=1, max_length=256)
+
+    @field_validator("new_password")
+    @classmethod
+    def _password_policy(cls, value: str) -> str:
+        return validate_new_password(value)
 
 
 class PasswordResetResponse(BaseModel):

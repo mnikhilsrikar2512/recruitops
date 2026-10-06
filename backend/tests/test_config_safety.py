@@ -26,7 +26,7 @@ def test_production_rejects_plain_http_origins():
 
 def test_production_accepts_exact_https_origins():
     config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
-                       JWT_SIGNING_KEY="k" * 48)
+                       JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0")
     assert validate_settings(config) == []
 
 

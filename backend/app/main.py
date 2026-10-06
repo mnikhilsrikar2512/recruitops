@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.api.router import api_router
 from app.core.config import settings, validate_settings
+from app.core.security_headers import SecurityHeadersMiddleware
 
 
 def _database_unavailable_response(_request: Request, _exc: OperationalError) -> JSONResponse:
@@ -68,6 +69,8 @@ def create_application() -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept", "Idempotency-Key"],
     )
+    if settings.security_headers_enabled:
+        application.add_middleware(SecurityHeadersMiddleware)
     application.add_exception_handler(RequestValidationError, _validation_error_response)
     application.add_exception_handler(IntegrityError, _integrity_error_response)
     application.add_exception_handler(OperationalError, _database_unavailable_response)

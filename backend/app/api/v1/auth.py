@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 
 from app.api.deps import get_current_auth_context, get_engine
+from app.core import rate_limit
 from app.core.config import settings
 from app.core.tokens import REFRESH_COOKIE, REFRESH_COOKIE_PATH
 from app.schemas.auth import (
@@ -77,6 +78,8 @@ def login_endpoint(
     response: Response,
     engine: Engine = Depends(get_engine),
 ) -> LoginResponse:
+    rate_limit.enforce("login:ip", rate_limit.client_ip(request))
+    rate_limit.enforce("login:account", str(payload.email))
     body, refresh_raw = login_service(
         engine,
         payload,
@@ -90,6 +93,7 @@ def login_endpoint(
 @router.post("/refresh", response_model=RefreshResponse)
 def refresh_endpoint(request: Request, response: Response, engine: Engine = Depends(get_engine)):
     """New access token from the refresh cookie; the cookie rotates each time."""
+    rate_limit.enforce("refresh:ip", rate_limit.client_ip(request))
     try:
         body, refresh_raw = refresh_service(engine, request.cookies.get(REFRESH_COOKIE))
     except HTTPException as exc:
@@ -166,22 +170,29 @@ def change_password_endpoint(
 @router.post("/password/setup", response_model=PasswordSetupResponse)
 def setup_password_endpoint(
     payload: PasswordSetupRequest,
+    request: Request,
     engine: Engine = Depends(get_engine),
 ) -> PasswordSetupResponse:
+    rate_limit.enforce("password_token:ip", rate_limit.client_ip(request))
     return setup_password_service(engine, payload)
 
 
 @router.post("/password/forgot", response_model=PasswordForgotResponse)
 def forgot_password_endpoint(
     payload: PasswordForgotRequest,
+    request: Request,
     engine: Engine = Depends(get_engine),
 ) -> PasswordForgotResponse:
+    rate_limit.enforce("forgot:ip", rate_limit.client_ip(request))
+    rate_limit.enforce("forgot:account", str(payload.email))
     return forgot_password_service(engine, payload)
 
 
 @router.post("/password/reset", response_model=PasswordResetResponse)
 def reset_password_endpoint(
     payload: PasswordResetRequest,
+    request: Request,
     engine: Engine = Depends(get_engine),
 ) -> PasswordResetResponse:
+    rate_limit.enforce("password_token:ip", rate_limit.client_ip(request))
     return reset_password_service(engine, payload)

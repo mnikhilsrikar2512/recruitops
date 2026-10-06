@@ -44,6 +44,9 @@ else
   printf '\n%s\n' "${SUMMARY[@]}"; exit 1
 fi
 export DB_NAME="$STAGING_DB"
+# The verification signs in many personas from 127.0.0.1 within a minute;
+# rate limits themselves are proven by backend/tests/test_auth_protection.py.
+export RATE_LIMIT_ENABLED=false
 
 echo "→ 3/6 baseline seed + backend tests"
 $PY scripts/seed_ci.py >"$LOGS/seed_ci.log" 2>&1 || record FAIL "seed_ci (see $LOGS/seed_ci.log)"

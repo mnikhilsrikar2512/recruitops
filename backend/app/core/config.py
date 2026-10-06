@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = Field(default=14, alias="REFRESH_TOKEN_TTL_DAYS")
     # Hard cap on one sign-in, however often it refreshes.
     session_absolute_ttl_days: int = Field(default=30, alias="SESSION_ABSOLUTE_TTL_DAYS")
+    # Password policy / login protection (Phase 3.5, 3.7).
+    password_breach_check: str = Field(default="off", alias="PASSWORD_BREACH_CHECK")  # off | hibp
+    login_lockout_threshold: int = Field(default=5, alias="LOGIN_LOCKOUT_THRESHOLD")
+    login_lockout_minutes: int = Field(default=15, alias="LOGIN_LOCKOUT_MINUTES")
+    rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
+    security_headers_enabled: bool = Field(default=True, alias="SECURITY_HEADERS_ENABLED")
 
     @property
     def is_production(self) -> bool:
@@ -108,6 +114,10 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("DB_PASSWORD must be set in staging/production")
     if config.ai_enabled:
         errors.append("AI_ENABLED must stay false until the §4.16 AI gates ship (decision D-10)")
+    if not config.redis_url:
+        errors.append("REDIS_URL must be set in staging/production (shared rate limits across instances)")
+    if not config.rate_limit_enabled:
+        errors.append("RATE_LIMIT_ENABLED must stay true in staging/production")
     if len(config.jwt_signing_key) < 32 or config.jwt_signing_key == DEV_JWT_SIGNING_KEY:
         errors.append("JWT_SIGNING_KEY must be a secret of at least 32 characters in staging/production")
     return errors

@@ -47,6 +47,19 @@ def _stub_admin_grants(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _rate_limits_off(monkeypatch):
+    """The suite signs in hundreds of times from one client; rate limits are
+    exercised explicitly in test_auth_protection.py, which turns them on."""
+    from app.core import rate_limit
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "rate_limit_enabled", False)
+    rate_limit.reset_rate_limits()
+    yield
+    rate_limit.reset_rate_limits()
+
+
+@pytest.fixture(autouse=True)
 def _clear_permission_cache():
     deps._permission_cache.clear()
     yield

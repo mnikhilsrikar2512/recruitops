@@ -37,6 +37,8 @@ from app.repositories.auth import (
     list_active_sessions,
     list_resolved_permissions,
     mark_refresh_token_used,
+    record_failed_login,
+    reset_failed_logins,
     revoke_session,
     revoke_session_by_hash,
     revoke_user_sessions,
@@ -205,8 +207,18 @@ def login_service(
     """Returns the response body and the raw refresh token (set as an
     HttpOnly cookie by the endpoint, never put in the body)."""
     user = find_user_for_login(engine, payload.email)
+    locked_until = getattr(user, "locked_until", None) if user else None
+    if locked_until is not None and _as_utc(locked_until) > datetime.now(timezone.utc):
+        # Lockout/backoff (Phase 3.5): no password check while locked.
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed sign-in attempts. Try again later or reset your password.",
+        )
     if not user or not verify_password(payload.password, user.password_hash):
+        if user:
+            record_failed_login(engine, user.id, settings.login_lockout_threshold, settings.login_lockout_minutes)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    reset_failed_logins(engine, user.id)  # a correct password clears the count
     if user.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not allowed to access the system")
     if getattr(user, "tenant_status", "active") != "active":

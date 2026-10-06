@@ -26,6 +26,7 @@ class LoginUserRecord:
     # Company (tenant) the user belongs to — scripts/010_tenants.sql.
     tenant_id: int | None = None
     tenant_status: str = "active"
+    locked_until: datetime | None = None
 
 
 @dataclass
@@ -63,7 +64,8 @@ def _user_auth_select_sql() -> str:
           b.code AS location_code,
           b.name AS location_name,
           u.tenant_id,
-          t.status AS tenant_status
+          t.status AS tenant_status,
+          u.locked_until
         FROM dbo.users AS u
         LEFT JOIN dbo.tenants AS t
           ON t.id = u.tenant_id
@@ -97,6 +99,7 @@ def _map_user(row) -> LoginUserRecord:
         location_name=row["location_name"],
         tenant_id=row.get("tenant_id"),
         tenant_status=row.get("tenant_status") or "active",
+        locked_until=row.get("locked_until"),
     )
 
 
@@ -425,3 +428,35 @@ def purge_stale_sessions(engine: Engine, older_than_days: int = 30) -> int:
             {"days": older_than_days},
         )
     return int(result.rowcount or 0)
+
+
+# ---- failed sign-in lockout (Phase 3.5) ------------------------------------
+
+
+def record_failed_login(engine: Engine, user_id: int, threshold: int, lock_minutes: int) -> bool:
+    """Count a wrong password; at the threshold lock the account for
+    ``lock_minutes`` and start counting again. True when this call locked it."""
+    with engine.begin() as connection:
+        row = connection.execute(
+            text(
+                """
+                UPDATE dbo.users
+                SET failed_login_count = CASE WHEN failed_login_count + 1 >= :threshold THEN 0 ELSE failed_login_count + 1 END,
+                    locked_until = CASE WHEN failed_login_count + 1 >= :threshold
+                                        THEN DATEADD(MINUTE, :minutes, SYSUTCDATETIME()) ELSE locked_until END
+                OUTPUT INSERTED.locked_until
+                WHERE id = :user_id;
+                """
+            ),
+            {"user_id": user_id, "threshold": threshold, "minutes": lock_minutes},
+        ).first()
+    return bool(row and row[0])
+
+
+def reset_failed_logins(engine: Engine, user_id: int) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE dbo.users SET failed_login_count = 0, locked_until = NULL "
+                 "WHERE id = :user_id AND (failed_login_count <> 0 OR locked_until IS NOT NULL);"),
+            {"user_id": user_id},
+        )
