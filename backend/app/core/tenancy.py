@@ -72,6 +72,7 @@ TABLE_TENANCY: dict[str, str] = {
     "duplicate_review_cases": "parent:candidate_id->candidates",
     # ---- through a user -----------------------------------------------
     "user_sessions": "user:user_id",
+    "user_refresh_tokens": "parent:session_id->user_sessions",
     "password_reset_tokens": "user:user_id",
     "user_invitations": "user:user_id",
     "user_notification_preferences": "user:user_id",

@@ -42,6 +42,7 @@ def test_change_password_rejects_incorrect_current_password(monkeypatch) -> None
 
 
 def test_change_password_succeeds_with_correct_password(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.auth.revoke_user_sessions", lambda *args, **kwargs: 0)
     from app.core.security import sha256_hex
 
     correct_hash = f"sha256:{sha256_hex('oldpassword')}"
@@ -158,6 +159,7 @@ def test_reset_password_rejects_invalid_token(monkeypatch) -> None:
 
 
 def test_reset_password_succeeds_with_valid_token(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.auth.revoke_user_sessions", lambda *args, **kwargs: 0)
     token_record = {"id": 1, "user_id": 22}
     monkeypatch.setattr(
         "app.services.auth.find_valid_password_reset_token",

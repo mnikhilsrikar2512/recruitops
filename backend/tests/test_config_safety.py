@@ -25,8 +25,14 @@ def test_production_rejects_plain_http_origins():
 
 
 def test_production_accepts_exact_https_origins():
-    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
+                       JWT_SIGNING_KEY="k" * 48)
     assert validate_settings(config) == []
+
+
+def test_production_requires_a_real_jwt_signing_key():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    assert any("JWT_SIGNING_KEY" in error for error in validate_settings(config))
 
 
 def test_ai_flag_is_off_in_production_and_cannot_be_enabled():

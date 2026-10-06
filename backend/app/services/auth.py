@@ -219,7 +219,7 @@ def login_service(
     session, token, refresh_raw, access_expires_at = _start_session(engine, user, ip_address, user_agent)
     update_last_login(engine, user.id)
 
-    return LoginResponse(
+    body = LoginResponse(
         token=token,
         access_expires_at=access_expires_at,
         user={
@@ -248,6 +248,7 @@ def login_service(
             "force_password_change_on_first_login": user.force_password_change_on_first_login,
         },
     )
+    return body, refresh_raw
 
 
 def _unauthorized(detail: str = "Authentication is required") -> HTTPException:
