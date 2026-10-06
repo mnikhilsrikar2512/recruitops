@@ -26,8 +26,13 @@ _UPDATABLE_FIELDS = {
 }
 
 
-def _require_profile(engine: Engine):
-    record = settings_repo.get_primary_company_profile(engine)
+def _require_profile(engine: Engine, tenant_id: int | None = None):
+    """The caller's company profile; a company without one gets it created
+    from its name on first use (migration 012)."""
+    record = settings_repo.get_primary_company_profile(engine, tenant_id)
+    if record is None and tenant_id is not None:
+        settings_repo.create_company_profile_for_tenant(engine, tenant_id)
+        record = settings_repo.get_primary_company_profile(engine, tenant_id)
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -36,14 +41,14 @@ def _require_profile(engine: Engine):
     return record
 
 
-def get_company_profile_service(engine: Engine) -> CompanyProfileResponse:
-    return CompanyProfileResponse.model_validate(_require_profile(engine))
+def get_company_profile_service(engine: Engine, tenant_id: int | None = None) -> CompanyProfileResponse:
+    return CompanyProfileResponse.model_validate(_require_profile(engine, tenant_id))
 
 
 def update_company_profile_service(
-    engine: Engine, payload: CompanyProfileUpdate
+    engine: Engine, payload: CompanyProfileUpdate, tenant_id: int | None = None
 ) -> CompanyProfileResponse:
-    profile = _require_profile(engine)
+    profile = _require_profile(engine, tenant_id)
     fields = {
         name: value
         for name, value in payload.model_dump(exclude_unset=True).items()
@@ -54,9 +59,9 @@ def update_company_profile_service(
 
 
 def update_company_logo_service(
-    engine: Engine, payload: CompanyLogoUpdate
+    engine: Engine, payload: CompanyLogoUpdate, tenant_id: int | None = None
 ) -> CompanyLogoResponse:
-    profile = _require_profile(engine)
+    profile = _require_profile(engine, tenant_id)
     settings_repo.set_company_logo(engine, profile.id, payload.data_url)
     return CompanyLogoResponse(logo_url=f"/api/v1/settings/logo?v={profile.id}")
 
@@ -81,8 +86,12 @@ def get_company_logo_raw(engine: Engine, company_id: int) -> tuple[bytes, str]:
     return image_bytes, media_type
 
 
-def get_company_logo_for_primary(engine: Engine) -> tuple[bytes, str]:
-    company_id = settings_repo.get_primary_company_id(engine)
+def get_company_logo_for_primary(engine: Engine, company_id: int | None = None) -> tuple[bytes, str]:
+    """Logo by profile id (``?v=`` from the profile's logo_url). Without an id
+    there is no single "primary" company any more (migration 012)."""
+    if company_id is not None:
+        return get_company_logo_raw(engine, company_id)
+    company_id = settings_repo.get_primary_company_id(engine) if settings_repo.count_primary_profiles(engine) == 1 else None
     if company_id is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -91,7 +100,7 @@ def get_company_logo_for_primary(engine: Engine) -> tuple[bytes, str]:
     return get_company_logo_raw(engine, company_id)
 
 
-def clear_company_logo_service(engine: Engine) -> CompanyLogoResponse:
-    profile = _require_profile(engine)
+def clear_company_logo_service(engine: Engine, tenant_id: int | None = None) -> CompanyLogoResponse:
+    profile = _require_profile(engine, tenant_id)
     settings_repo.set_company_logo(engine, profile.id, None)
     return CompanyLogoResponse(logo_url=None)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_permissions
 from app.schemas.master_data import (
     MasterDataCategoryResponse,
     MasterDataValueCreate,
@@ -36,13 +36,13 @@ def get_category_endpoint(
     response_model=MasterDataValueListResponse,
 )
 def list_values_endpoint(
-    _auth: object = Depends(require_permissions("settings.read")),
+    auth: object = Depends(require_permissions("settings.read")),
     category_code: str = Path(..., min_length=1, max_length=100),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     engine: Engine = Depends(get_engine),
 ) -> MasterDataValueListResponse:
-    return list_values_service(engine, category_code, page, page_size)
+    return list_values_service(engine, category_code, page, page_size, caller_tenant_id(auth))
 
 
 @router.post(
@@ -52,11 +52,11 @@ def list_values_endpoint(
 )
 def create_value_endpoint(
     payload: MasterDataValueCreate,
-    _auth: object = Depends(require_permissions("settings.create")),
+    auth: object = Depends(require_permissions("settings.create")),
     category_code: str = Path(..., min_length=1, max_length=100),
     engine: Engine = Depends(get_engine),
 ) -> MasterDataValueResponse:
-    return create_value_service(engine, category_code, payload)
+    return create_value_service(engine, category_code, payload, caller_tenant_id(auth))
 
 
 @router.patch(
@@ -65,8 +65,8 @@ def create_value_endpoint(
 )
 def update_value_endpoint(
     payload: MasterDataValueUpdate,
-    _auth: object = Depends(require_permissions("settings.update")),
+    auth: object = Depends(require_permissions("settings.update")),
     value_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> MasterDataValueResponse:
-    return update_value_service(engine, value_id, payload)
+    return update_value_service(engine, value_id, payload, caller_tenant_id(auth))

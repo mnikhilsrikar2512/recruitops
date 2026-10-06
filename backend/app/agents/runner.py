@@ -88,10 +88,10 @@ def _collect_input(
 ) -> tuple[dict, dict]:
     ctx = auth_context.user
     location_id = ctx.location_id
-    # Phase 2: the read tools only know offices, not companies, so a company
-    # admin's agent reads stay on their own office until the tools are made
-    # tenant-aware (AI is off outside dev anyway — D-10).
-    is_admin = False
+    # Company-wide callers read every office of THEIR company; every tool also
+    # gets the company id and refuses anything outside it.
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
     context: dict = {}
     input_refs: dict = {}
 
@@ -107,6 +107,7 @@ def _collect_input(
             candidate_id=payload.candidate_id,
             location_id=location_id,
             is_admin=is_admin,
+            tenant_id=tenant_id,
         )
         candidate["resume"] = tools.read_candidate_resume(
             engine=engine,
@@ -121,6 +122,7 @@ def _collect_input(
                 requisition_id=payload.requisition_id,
                 location_id=location_id,
                 is_admin=is_admin,
+            tenant_id=tenant_id,
             )
         if payload.resume_document_id:
             input_refs["resume_document_id"] = payload.resume_document_id
@@ -130,6 +132,7 @@ def _collect_input(
                 candidate_id=payload.candidate_id,
                 location_id=location_id,
                 is_admin=is_admin,
+            tenant_id=tenant_id,
             )
         return context, input_refs
 
@@ -142,6 +145,7 @@ def _collect_input(
             user_id=ctx.id,
             location_id=location_id,
             is_admin=is_admin,
+            tenant_id=tenant_id,
             max_items=payload.max_items,
         )
         context["actions"] = tools.read_workflow_queue(
@@ -150,6 +154,7 @@ def _collect_input(
             actor_location_id=location_id,
             actor_role_code=ctx.role_code,
             is_admin=is_admin,
+            tenant_id=tenant_id,
             max_items=payload.max_items,
         )
         return context, input_refs

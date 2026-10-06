@@ -1,7 +1,8 @@
 """Read-only tool adapters for V1 agents.
 
-Every tool reads through existing repositories and enforces tenant scope:
-non-admin callers may only read records their location can already see.
+Every tool reads through existing repositories and enforces scope: nothing
+outside the caller's company (tenant_id), and non-company-wide callers only
+what their office can already see.
 Nothing here writes to domain tables — agents are draft-only.
 """
 from __future__ import annotations
@@ -20,6 +21,11 @@ from app.repositories.workflow_actions import list_workflow_action_items
 from app.schemas.daily_update import DailyUpdateListFilters
 from app.schemas.notification import NotificationListFilters
 from app.schemas.workflow_action import WorkflowActionQueueFilters
+from app.services import scope
+
+
+def _not_found(label: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{label} was not found")
 
 
 def _iso(value) -> str | None:
@@ -38,8 +44,12 @@ def _guard_location(record_location_id: int | None, scope_location_id: int | Non
         )
 
 
-def read_candidate(*, engine, candidate_id: int, location_id: int | None, is_admin: bool) -> dict:
+def read_candidate(
+    *, engine, candidate_id: int, location_id: int | None, is_admin: bool, tenant_id: int | None = None
+) -> dict:
     record = find_candidate_by_id(engine, candidate_id)
+    if record is not None and not scope.candidate_in_tenant(engine, candidate_id, tenant_id):
+        record = None  # another company's candidate is "not found"
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
 
@@ -103,8 +113,11 @@ def read_candidate_document(
     candidate_id: int,
     location_id: int | None,
     is_admin: bool,
+    tenant_id: int | None = None,
 ) -> dict:
     """Validate that resume_document_id actually belongs to this candidate."""
+    if not scope.candidate_in_tenant(engine, candidate_id, tenant_id):
+        raise _not_found("Candidate document")
     try:
         document = find_candidate_document_by_id(engine, document_id)
     except RuntimeError:
@@ -127,8 +140,12 @@ def read_candidate_document(
     }
 
 
-def read_requisition(*, engine, requisition_id: int, location_id: int | None, is_admin: bool) -> dict:
+def read_requisition(
+    *, engine, requisition_id: int, location_id: int | None, is_admin: bool, tenant_id: int | None = None
+) -> dict:
     record = find_requisition_by_id(engine, requisition_id)
+    if record is not None and tenant_id is not None and not scope.office_in_tenant(engine, record.location_id, tenant_id):
+        record = None
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
     _guard_location(record.location_id, location_id, is_admin)
@@ -148,7 +165,10 @@ def read_requisition(*, engine, requisition_id: int, location_id: int | None, is
     }
 
 
-def read_daily_updates(*, engine, scope: str, user_id: int, location_id: int | None, is_admin: bool, max_items: int) -> list[dict]:
+def read_daily_updates(
+    *, engine, scope: str, user_id: int, location_id: int | None, is_admin: bool, max_items: int,
+    tenant_id: int | None = None,
+) -> list[dict]:
     # Non-admins can only ever see their own updates or their location's;
     # "location" scope for a non-admin without a location silently narrows
     # to the user's own updates rather than leaking other branches' data.
@@ -158,6 +178,7 @@ def read_daily_updates(*, engine, scope: str, user_id: int, location_id: int | N
         filters = DailyUpdateListFilters(location_id=location_id, page=1, page_size=max_items)
     else:
         filters = DailyUpdateListFilters(user_id=user_id, page=1, page_size=max_items)
+    filters.tenant_id = tenant_id
     records, _total = list_daily_updates(engine, filters)
     return [
         {
@@ -186,8 +207,9 @@ def read_workflow_queue(
     actor_role_code: str,
     is_admin: bool,
     max_items: int,
+    tenant_id: int | None = None,
 ) -> list[dict]:
-    filters = WorkflowActionQueueFilters(status="open", page=1, page_size=max_items)
+    filters = WorkflowActionQueueFilters(status="open", page=1, page_size=max_items, tenant_id=tenant_id)
     records, _total = list_workflow_action_items(
         engine,
         actor_user_id=actor_user_id,

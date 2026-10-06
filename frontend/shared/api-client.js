@@ -3720,7 +3720,7 @@ async function loadReportLetterhead() {
     const img = document.querySelector("#lh-logo");
     const fallback = document.querySelector("#lh-logo-fallback");
     if (img) {
-      img.src = `/api/v1/settings/logo?t=${Date.now()}`;
+      img.src = `/api/v1/settings/logo?v=${profile.id}&t=${Date.now()}`;
       img.classList.remove("hidden");
       if (fallback) fallback.classList.add("hidden");
     }

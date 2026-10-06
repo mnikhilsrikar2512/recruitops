@@ -473,12 +473,12 @@ def main() -> None:
                 )
                     INSERT INTO dbo.company_entities (
                         display_name, legal_name, company_code, company_type_code,
-                        hq_city, country_name, support_email, website_url, is_primary, status
+                        hq_city, country_name, support_email, website_url, is_primary, status, tenant_id
                     )
                     VALUES (
                         N'RecruitOps Demo', N'RecruitOps Demo Pvt Ltd', N'RCI', N'recruitment-agency',
                         N'Hyderabad', N'India', N'hello@recruitops-demo.test', N'https://recruitops-demo.test',
-                        1, N'active'
+                        1, N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default')
                     );
                 """
             ),

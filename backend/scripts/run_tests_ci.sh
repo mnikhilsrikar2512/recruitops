@@ -102,7 +102,7 @@ if [ "$SKIP_DOCKER" != "1" ]; then
 
     # Migrations newer than the schema dump (005/006 are in schema.sql;
     # 007 is covered by seed_ci.py). Same list as scripts/create_staging_db.py.
-    for migration in 008_display_ids.sql 009_branch_offer_toggle.sql 010_tenants.sql 011_admin_seed.sql; do
+    for migration in 008_display_ids.sql 009_branch_offer_toggle.sql 010_tenants.sql 011_admin_seed.sql 012_tenant_settings.sql; do
       echo "→ applying migration $migration…"
       if ! run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DB_NAME" -b \
         -i /dev/stdin < "$BACKEND_DIR/../scripts/$migration" >/tmp/migration_apply.log 2>&1; then

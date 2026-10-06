@@ -39,8 +39,8 @@
 |---|---|
 | 2.4 login | Email-only login already finds the company (D-02); signup is Phase 5. |
 | 2.5 + 2.6 | **Done (see below).** |
-| AI agents | Agent read tools are office-scoped for everyone (company admins included) until the tools are tenant-aware. AI is off outside dev (D-10). |
-| Portal accounts, master data | Still global catalogues; decide per-company vs shared before launch. |
+| AI agents | **Done:** every read tool takes the caller's company and answers "not found" outside it; company-wide callers read every office of their own company. |
+| Portal accounts, master data, company profile | **Done (migration 012):** see below. |
 | `dbo.locations` mirror | New offices are mirrored with the same id via `IDENTITY_INSERT`, which needs ALTER permission on the table. Collapse the two tables before production DB credentials are least-privilege (Phase 6). |
 | 2.8 / 2.9 | Footprint is tenant-only now; the parity harness is next. |
 
@@ -98,3 +98,16 @@ Known leftover: `services/daily_updates.py` still lets a submitter whose primary
 | Live API smoke | **48/48** (incl. Stage 2c: admin holds `scope.company`, 200 on control-plane routes, 403 on execution routes) |
 | Browser sweep, Northwind company admin | 101 pages, 0 failing (execution pages show Access Denied, control-plane pages load) |
 | Browser sweep, Northwind recruiter | 101 pages, 0 failing |
+
+## 2.3 completion — settings, portal accounts, agents, coverage gate, parity harness
+
+| Item | Delivered |
+|---|---|
+| Company profile | `company_entities.tenant_id`: one profile/letterhead/logo **per company** (before: one shared row every company edited). Created from the company name on first use. Logo URL carries the profile id (`/settings/logo?v=<id>`). |
+| Pick-lists (master data) | `master_data_values.tenant_id`: NULL rows are shared templates; a company gets its own editable copy of a list the first time it opens it; codes unique per company. Editing a template or another company's value is "not found". |
+| Portal accounts | Lists, availability and usage summary filtered to the caller's company; every `/{portal_account_id}` route 404s outside it; payload users/offices checked. |
+| AI agent tools | Tenant-aware (see table above). |
+| Coverage gate | `app/core/tenancy.py` classifies all 64 tables (company root, via office, via parent, via user, or shared with a reason); `tests/test_tenancy_coverage.py` fails when a table is added without a line or a named column is missing. |
+| Parity harness | `tests/test_rbac_parity_db.py`: two users with identical grants in the same office get identical results on 11 shared lists and identical permissions/pages/scopes. |
+
+Still open in Phase 2: 2.7 (catalog drift: `pipeline.read.summary`, `pipeline.stage.reopen`), 2.8 (footprint → platform-ops API), admin sidebar == PRD §3.1 check, and enforcing scope on the less-used tables the map lists (pipeline templates, report locks, transfer/access requests) when their routes are built.

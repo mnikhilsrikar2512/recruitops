@@ -157,6 +157,7 @@ _REF_SQL = {
 _FIELD_KIND = {
     "location_id": "office",
     "new_primary_location_id": "office",
+    "branch_id": "office",
     "client_id": "client",
     "end_client_id": "client",
     "requisition_id": "requisition",

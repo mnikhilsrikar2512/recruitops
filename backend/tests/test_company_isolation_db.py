@@ -201,6 +201,7 @@ def _cleanup(engine, w) -> None:
         ("DELETE FROM dbo.user_sessions WHERE user_id IN (SELECT id FROM dbo.users WHERE tenant_id = :t)", {}),
         ("DELETE FROM dbo.user_branch_roles WHERE user_id IN (SELECT id FROM dbo.users WHERE tenant_id = :t)", {}),
         ("DELETE FROM dbo.client_companies WHERE branch_id = :office", {}),
+        ("DELETE FROM dbo.company_entities WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.users WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.role_permissions WHERE role_id IN (SELECT id FROM dbo.roles WHERE tenant_id = :t)", {}),
         ("DELETE FROM dbo.roles WHERE tenant_id = :t", {}),
@@ -360,3 +361,17 @@ def test_company_admin_is_denied_execution_routes(world) -> None:
     c = world["client"]
     for path in ("/candidates/", "/requisitions/", "/clients/", "/pipeline/board"):
         assert c.get(f"{API}{path}", headers=world["b"]).status_code == 403, path
+
+
+# ---- company settings are per company (migration 012) -----------------------
+
+def test_company_profile_is_per_company(world) -> None:
+    c = world["client"]
+    a = c.get(f"{API}/settings/profile", headers=world["a"])
+    b = c.get(f"{API}/settings/profile", headers=world["b"])
+    assert a.status_code == 200 and b.status_code == 200, (a.text, b.text)
+    assert a.json()["id"] != b.json()["id"]
+    assert b.json()["display_name"].startswith("Company B")
+    renamed = c.patch(f"{API}/settings/profile", headers=world["b"], json={"hq_city": f"B-City-{world['sfx']}"})
+    assert renamed.status_code == 200
+    assert c.get(f"{API}/settings/profile", headers=world["a"]).json()["hq_city"] != f"B-City-{world['sfx']}"

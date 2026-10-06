@@ -86,9 +86,12 @@ def test_patch_profile_roundtrip(client, admin_headers):
 
 
 def test_logo_set_serve_clear_cycle(client, admin_headers):
-    # Clear first so the cycle starts from a known state.
+    # Clear first so the cycle starts from a known state. Logos are served per
+    # company profile (?v=<profile id>, migration 012).
     client.delete("/api/v1/settings/logo", headers=admin_headers)
-    assert client.get("/api/v1/settings/logo").status_code == 404
+    profile_id = client.get("/api/v1/settings/profile", headers=admin_headers).json()["id"]
+    logo_path = f"/api/v1/settings/logo?v={profile_id}"
+    assert client.get(logo_path).status_code == 404
 
     put = client.put(
         "/api/v1/settings/logo", json={"data_url": TINY_PNG}, headers=admin_headers
@@ -96,7 +99,8 @@ def test_logo_set_serve_clear_cycle(client, admin_headers):
     assert put.status_code == 200
     assert put.json()["logo_url"]
 
-    served = client.get("/api/v1/settings/logo")
+    assert put.json()["logo_url"].endswith(f"v={profile_id}")
+    served = client.get(logo_path)
     assert served.status_code == 200
     assert served.headers["content-type"].startswith("image/")
     assert len(served.content) > 0
@@ -107,7 +111,7 @@ def test_logo_set_serve_clear_cycle(client, admin_headers):
     delete = client.delete("/api/v1/settings/logo", headers=admin_headers)
     assert delete.status_code == 200
     assert delete.json()["logo_url"] is None
-    assert client.get("/api/v1/settings/logo").status_code == 404
+    assert client.get(logo_path).status_code == 404
 
 
 def test_logo_rejects_non_image_payload(client, admin_headers):
