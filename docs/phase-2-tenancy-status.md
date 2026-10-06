@@ -111,3 +111,7 @@ Known leftover: `services/daily_updates.py` still lets a submitter whose primary
 | Parity harness | `tests/test_rbac_parity_db.py`: two users with identical grants in the same office get identical results on 11 shared lists and identical permissions/pages/scopes. |
 
 Still open in Phase 2: 2.7 (catalog drift: `pipeline.read.summary`, `pipeline.stage.reopen`), 2.8 (footprint → platform-ops API), admin sidebar == PRD §3.1 check, and enforcing scope on the less-used tables the map lists (pipeline templates, report locks, transfer/access requests) when their routes are built.
+
+### Result of the 2.3-completion run (2026-10-06, commit `fda0003`)
+
+Backend **438 passed**, 3 skipped (incl. tenancy coverage, parity harness, per-company profile) · live smoke **48/48** · browser sweeps admin and recruiter 101/101 clean · migrations 008–012 on a fresh staging database.
