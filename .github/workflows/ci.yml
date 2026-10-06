@@ -1,6 +1,3 @@
-# Move to .github/workflows/ci.yml to enable (written here because this session
-# cannot create files under .github/):  mkdir -p .github/workflows && git mv tools/ci/github-workflow-ci.yml .github/workflows/ci.yml
-
 name: CI
 
 # Required for merge (Phase 1.1): backend tests against a throwaway SQL Server,
@@ -27,11 +24,21 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Microsoft ODBC Driver 18
+        # GitHub's Ubuntu image already ships the Microsoft package repo
+        # (microsoft-prod.list) and usually the driver itself; adding the repo
+        # again with a different keyring breaks apt. Only install if missing.
         run: |
-          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
+          if odbcinst -q -d 2>/dev/null | grep -q "ODBC Driver 18 for SQL Server"; then
+            echo "ODBC Driver 18 already installed"
+          else
+            if ! ls /etc/apt/sources.list.d/ | grep -qi microsoft; then
+              curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+              echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+            fi
+            sudo apt-get update
+            sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+          fi
+          sudo apt-get install -y unixodbc-dev
       - name: Install dependencies
         run: |
           python -m venv .venv
@@ -60,7 +67,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y unixodbc
           python -m pip install -r backend/requirements.txt playwright
           python -m playwright install --with-deps chromium
-          npm install --no-save --prefix tools/ci typescript
+          npm install --no-save --prefix tools/ci typescript@5  # TS 7 (native) has no JS compiler API
       - name: Frontend checks
         env:
           NODE_PATH: tools/ci/node_modules

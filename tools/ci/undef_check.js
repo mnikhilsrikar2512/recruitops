@@ -7,14 +7,18 @@
 //   npm install --no-save typescript   (or have it globally)
 //   node tools/ci/undef_check.js frontend/shared
 function loadTypeScript() {
+  // Needs the TypeScript 5.x JS compiler API (TS 7's native build has none).
+  const usable = (ts) => ts && typeof ts.createProgram === "function" && ts.ScriptTarget;
   for (const id of ["typescript", "/opt/npm-tools/node_modules/typescript"]) {
-    try { return require(id); } catch { /* try next */ }
+    try { const ts = require(id); if (usable(ts)) return ts; } catch { /* try next */ }
   }
   try {
     const globalRoot = require("child_process").execSync("npm root -g").toString().trim();
-    return require(require("path").join(globalRoot, "typescript"));
+    const ts = require(require("path").join(globalRoot, "typescript"));
+    if (usable(ts)) return ts;
+    throw new Error("unusable typescript");
   } catch {
-    console.error("typescript not found: npm install --no-save typescript");
+    console.error("TypeScript 5.x compiler API not found: npm install --no-save typescript@5");
     process.exit(2);
   }
 }
