@@ -88,3 +88,13 @@ user, give them an execution role as a second office role (like the CI admin).
 Known leftover: `services/daily_updates.py` still lets a submitter whose primary role is
 `admin` skip the same-office/linked-requisition checks; admins no longer hold
 `daily_update.create_main`, so it is unreachable, and it goes with the Phase 4 cleanup.
+
+### Result of the 2.5/2.6 verification run (2026-10-06, commit `b738580`)
+
+| Check | Result |
+|---|---|
+| Backend suite | **423 passed**, 3 skipped (incl. `test_admin_seed.py`, pure-admin control-plane/denied checks) |
+| Staging seed | built by company admin (roles, users) → manager (clients, requisitions, approvals) → recruiter (candidates) |
+| Live API smoke | **48/48** (incl. Stage 2c: admin holds `scope.company`, 200 on control-plane routes, 403 on execution routes) |
+| Browser sweep, Northwind company admin | 101 pages, 0 failing (execution pages show Access Denied, control-plane pages load) |
+| Browser sweep, Northwind recruiter | 101 pages, 0 failing |
