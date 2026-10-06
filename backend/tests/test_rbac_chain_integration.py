@@ -476,7 +476,7 @@ class TestAdminRoleProtection:
         )
         # 409 = all-access guard; 403 = shared system role is read-only to companies (Phase 2)
         assert response.status_code in (403, 409), response.text
-        assert "full access" in response.json()["detail"]
+        assert response.json()["detail"] in ("System roles are read-only",) or "full access" in response.json()["detail"]
 
     def test_admin_role_permissions_unchanged_after_attempt(self, client, rbac_chain):
         response = client.get(

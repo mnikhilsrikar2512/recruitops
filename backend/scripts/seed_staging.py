@@ -260,8 +260,24 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
         "description": "Staging seed: pending headcount approval.", "priority": "high",
         "requester_user_id": recruiter_id, "assigned_reviewer_user_id": manager_id,
     })
+    # A second pending approval for the company admin, so their inbox is never
+    # empty after the live smoke decides the manager's one.
+    admin.call("POST", "/approvals/", {
+        "location_id": branch_id, "approval_type": "requisition", "related_entity_type": "requisition",
+        "related_entity_id": requisitions[1], "title": f"Approve {tenant['requisitions'][1]} budget",
+        "description": "Staging seed: pending budget approval.", "priority": "medium",
+        "requester_user_id": manager_id, "assigned_reviewer_user_id": admin_id,
+    })
+    from app.schemas.notification import NotificationCreate  # noqa: PLC0415
+    from app.services.notifications import create_notification_service  # noqa: PLC0415
+
+    for user_id in (admin_id, manager_id):
+        create_notification_service(engine, NotificationCreate(
+            location_id=branch_id, user_id=user_id, title="Welcome to staging",
+            message=f"{tenant['company']} staging data is ready.", module_name="system",
+        ))
     print(f"✓ company {tenant['key']} ({tenant['company']}): admin + 2 users, {len(clients)} clients, "
-          f"{len(requisitions)} requisitions, {len(applications)} applications, 1 approval")
+          f"{len(requisitions)} requisitions, {len(applications)} applications, 2 approvals")
     return {"admin": admin_email, "manager": manager_email, "recruiter": recruiter_email}
 
 
