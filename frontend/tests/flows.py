@@ -25,7 +25,7 @@ def mock(base, path):
         return json.loads(r.read() or b"{}")
 
 
-def session(persona="admin"):
+def session(persona="full"):
     return {"token": f"mock-{persona}-token", "user_id": 1, "email": "asha@example.test", "user_name": "Asha Rao",
             "role": persona, "role_name": persona.title(), "role_code": persona, "location_id": 1,
             "location_name": "Bengaluru", "offers_enabled": True, "permissions": []}
@@ -44,7 +44,7 @@ class Flow:
         self.page: Page = self.context.new_page()
         self.errors: list[str] = []
         self.page.on("pageerror", lambda e: self.errors.append(f"uncaught: {e}"))
-        mock(base, "/__mock/reset?persona=admin")
+        mock(base, "/__mock/reset?persona=full")
 
     def open(self, name):
         self.page.goto(f"{self.base}/pages/{name}", wait_until="networkidle")

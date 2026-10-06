@@ -25,7 +25,7 @@ sys.path.insert(0, str(BACKEND))
 # 005/006 tables are already in db/schema.sql (005 also inserts demo approvals
 # that need existing locations); 007 is covered by seed_ci.py. Only the
 # migrations newer than the schema dump are applied.
-MIGRATIONS = ["008_display_ids.sql", "009_branch_offer_toggle.sql", "010_tenants.sql"]
+MIGRATIONS = ["008_display_ids.sql", "009_branch_offer_toggle.sql", "010_tenants.sql", "011_admin_seed.sql"]
 
 
 def dev_db_name() -> str:

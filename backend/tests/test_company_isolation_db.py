@@ -119,6 +119,42 @@ def world():
             ),
             {"u": admin_b_id, "b": office_b, "r": admin_role},
         )
+        # A company-B recruiter-manager with an execution role (every code),
+        # because the company admin is control-plane only (D-03).
+        exec_role = connection.execute(
+            text(
+                "INSERT INTO dbo.roles (name, code, description, is_system_role, status, tenant_id) "
+                "OUTPUT INSERTED.id VALUES (:name, :code, N'test', 0, N'active', :t)"
+            ),
+            {"name": f"B Full {sfx}", "code": f"b-full-{sfx}", "t": tenant_b},
+        ).scalar_one()
+        connection.execute(
+            text("INSERT INTO dbo.role_permissions (role_id, permission_id) SELECT :r, id FROM dbo.permissions"),
+            {"r": exec_role},
+        )
+        email_exec_b = f"exec-b-{sfx}@example.com"
+        exec_b_id = connection.execute(
+            text(
+                """
+                INSERT INTO dbo.users (
+                    full_name, email, employee_code, password_hash, password_setup_status,
+                    force_password_change_on_first_login, status,
+                    default_role_id, hierarchy_level, location_id, tenant_id
+                )
+                OUTPUT INSERTED.id
+                VALUES (N'Company B Exec', :email, :code, :hash, N'active', 0, N'active', :role, N'L3', :office, :t)
+                """
+            ),
+            {"email": email_exec_b, "code": f"EXB-{sfx}", "hash": hash_password(B_PASSWORD), "role": exec_role,
+             "office": office_b, "t": tenant_b},
+        ).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO dbo.user_branch_roles (user_id, branch_id, role_id, is_primary, status, start_date) "
+                "VALUES (:u, :b, :r, 1, N'active', CAST(SYSUTCDATETIME() AS DATE))"
+            ),
+            {"u": exec_b_id, "b": office_b, "r": exec_role},
+        )
         client_b = connection.execute(
             text(
                 "INSERT INTO dbo.client_companies (branch_id, name, relationship_type, status) "
@@ -143,9 +179,11 @@ def world():
 
     headers_b = _login(client, email_b, B_PASSWORD)
     assert headers_b, "company B admin could not sign in"
+    headers_exec_b = _login(client, email_exec_b, B_PASSWORD)
+    assert headers_exec_b, "company B exec could not sign in"
     w = {
         "client": client, "engine": engine, "sfx": sfx,
-        "a": headers_a, "b": headers_b,
+        "a": headers_a, "b": headers_b, "exec_b": headers_exec_b,
         "tenant_a": tenant_a, "tenant_b": int(tenant_b),
         "office_a": int(office_a), "office_b": int(office_b),
         "admin_a_id": admin_a_id, "admin_b_id": int(admin_b_id),
@@ -160,12 +198,12 @@ def world():
 def _cleanup(engine, w) -> None:
     """Best effort; never masks a result."""
     statements = [
-        ("DELETE FROM dbo.role_permissions WHERE role_id IN (SELECT id FROM dbo.roles WHERE tenant_id = :t)", {}),
-        ("DELETE FROM dbo.roles WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.user_sessions WHERE user_id IN (SELECT id FROM dbo.users WHERE tenant_id = :t)", {}),
         ("DELETE FROM dbo.user_branch_roles WHERE user_id IN (SELECT id FROM dbo.users WHERE tenant_id = :t)", {}),
         ("DELETE FROM dbo.client_companies WHERE branch_id = :office", {}),
         ("DELETE FROM dbo.users WHERE tenant_id = :t", {}),
+        ("DELETE FROM dbo.role_permissions WHERE role_id IN (SELECT id FROM dbo.roles WHERE tenant_id = :t)", {}),
+        ("DELETE FROM dbo.roles WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.locations WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.branches WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.tenants WHERE id = :t", {}),
@@ -194,9 +232,9 @@ def test_each_company_lists_only_its_own_offices(world) -> None:
 def test_company_b_cannot_list_company_a_records(world) -> None:
     c = world["client"]
     if world["requisition_a"]:
-        assert world["requisition_a"] not in _ids(c.get(f"{API}/requisitions/?page_size=100", headers=world["b"]))
+        assert world["requisition_a"] not in _ids(c.get(f"{API}/requisitions/?page_size=100", headers=world["exec_b"]))
     if world["client_a"]:
-        assert world["client_a"] not in _ids(c.get(f"{API}/clients/?page_size=100", headers=world["b"]))
+        assert world["client_a"] not in _ids(c.get(f"{API}/clients/?page_size=100", headers=world["exec_b"]))
     users_b = _ids(c.get(f"{API}/users/?page_size=100", headers=world["b"]))
     assert world["admin_a_id"] not in users_b
 
@@ -212,9 +250,9 @@ def test_company_a_cannot_list_company_b_records(world) -> None:
 def test_direct_reads_across_companies_are_404(world) -> None:
     c = world["client"]
     if world["requisition_a"]:
-        assert c.get(f"{API}/requisitions/{world['requisition_a']}", headers=world["b"]).status_code == 404
+        assert c.get(f"{API}/requisitions/{world['requisition_a']}", headers=world["exec_b"]).status_code == 404
     if world["client_a"]:
-        assert c.get(f"{API}/clients/{world['client_a']}", headers=world["b"]).status_code == 404
+        assert c.get(f"{API}/clients/{world['client_a']}", headers=world["exec_b"]).status_code == 404
     assert c.get(f"{API}/clients/{world['client_b']}", headers=world["a"]).status_code == 404
     assert c.get(f"{API}/users/{world['admin_a_id']}", headers=world["b"]).status_code == 404
     assert c.get(f"{API}/users/{world['admin_b_id']}", headers=world["a"]).status_code == 404
@@ -255,7 +293,7 @@ def test_cannot_create_requisition_for_another_companys_client(world) -> None:
     c = world["client"]
     response = c.post(
         f"{API}/requisitions/",
-        headers=world["b"],
+        headers=world["exec_b"],
         json={
             "client_id": world["client_a"],
             "location_id": world["office_b"],
@@ -306,3 +344,19 @@ def test_suspended_company_cannot_sign_in(world) -> None:
     finally:
         with engine.begin() as connection:
             connection.execute(text("UPDATE dbo.tenants SET status = N'active' WHERE id = :t"), {"t": world["tenant_b"]})
+
+
+# ---- D-03: the company admin is the control plane, by grant ------------------
+
+def test_company_admin_passes_control_plane_routes_by_grant(world) -> None:
+    c = world["client"]
+    for path in ("/users/", "/roles/", "/locations/", "/approvals/", "/notifications/", "/reports/time-to-fill"):
+        assert c.get(f"{API}{path}", headers=world["b"]).status_code == 200, path
+    me = c.get(f"{API}/permissions/me", headers=world["b"]).json()
+    assert "scope.company" in me["permissions"]
+
+
+def test_company_admin_is_denied_execution_routes(world) -> None:
+    c = world["client"]
+    for path in ("/candidates/", "/requisitions/", "/clients/", "/pipeline/board"):
+        assert c.get(f"{API}{path}", headers=world["b"]).status_code == 403, path

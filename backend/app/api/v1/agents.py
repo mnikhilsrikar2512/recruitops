@@ -34,18 +34,20 @@ def _has_agent_resolved_permission(resolved_permissions: set[str], code: str) ->
     return any(alias in resolved_permissions for alias in aliases)
 
 
+def _resolved_permissions(engine: Engine, auth_context: AuthContext) -> set[str]:
+    return set(list_resolved_permissions(engine, auth_context.user.id))
+
+
 def _require_agent_run_permission(
     request: Request,
     auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> AuthContext:
-    if auth_context.user.role_code == "admin":
-        return auth_context
     agent_id = request.path_params.get("agent_id")
     spec = find_agent_by_id(agent_id)
     if spec is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent was not found")
-    resolved = set(list_resolved_permissions(engine, auth_context.user.id))
+    resolved = _resolved_permissions(engine, auth_context)
     if not _has_agent_resolved_permission(resolved, "ai.use") or not _has_agent_resolved_permission(
         resolved, spec.required_permission
     ):

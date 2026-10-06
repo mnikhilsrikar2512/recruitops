@@ -142,14 +142,16 @@ def main() -> int:
     check("2.3 company A admin login", adm_a.login(COMPANY_ADMINS[0], opts.password))
     check("2.3 company B admin login", adm_b.login(COMPANY_ADMINS[1], opts.password))
     if adm_a.token and adm_b.token:
-        status, reqs, _ = adm_a.call("GET", "/requisitions/?page_size=100")
-        titles = {r.get("title") for r in items(reqs)}
-        check("2.3 company admin A sees all of company A", status == 200 and "Senior Backend Engineer" in titles, str(titles))
-        check("2.3 company admin A sees none of company B",
-              not ({"Supply Chain Planner", "Store Operations Lead"} & titles), str(titles))
-        if b_ids:
-            status, payload, _ = adm_a.call("GET", f"/requisitions/{b_ids[0]}")
-            check("2.3 company admin A reading B's requisition by id → 404", status == 404 and not leaks(payload), str(status))
+        status, appr, _ = adm_a.call("GET", "/approvals/?page_size=100")
+        titles = {a.get("title") or "" for a in items(appr)}
+        check("2.3 company admin A sees company A's approvals", status == 200 and any("Senior Backend Engineer" in t for t in titles), str(titles))
+        check("2.3 company admin A sees none of company B's approvals",
+              not any("Supply Chain Planner" in t or "Store Operations Lead" in t for t in titles), str(titles))
+        status, appr_b, _ = adm_b.call("GET", "/approvals/?page_size=100")
+        b_approval = next(iter(items(appr_b)), {}).get("id")
+        if b_approval:
+            status, payload, _ = adm_a.call("GET", f"/approvals/{b_approval}")
+            check("2.3 company admin A reading B's approval by id → 404", status == 404 and not leaks(payload), str(status))
         status, locs, _ = adm_a.call("GET", "/locations/?page_size=100")
         codes = {loc.get("location_code") for loc in items(locs)}
         check("2.3 company admin A's offices are company A's only", status == 200 and "STGA" in codes and "STGB" not in codes, str(codes))
@@ -165,6 +167,16 @@ def main() -> int:
                 "full_name": "Cross Company", "email": f"cross.{int(time.time())}@contoso-staging.example.com",
                 "employee_code": f"X{int(time.time())}", "primary_location_id": a_office, "primary_role_id": b_role})
             check("2.3 company admin B cannot place a user in company A's office → 404", status == 404, f"{status} {payload}")
+    if adm_a.token:
+        print("── Stage 2c: Admin is the control plane, by grant (D-03, plan 2.5)")
+        status, perms, _ = adm_a.call("GET", "/permissions/me")
+        check("2.4 company admin holds scope.company", status == 200 and "scope.company" in perms.get("permissions", []), str(status))
+        for path in ("/users/", "/roles/", "/locations/", "/approvals/", "/reports/time-to-fill"):
+            status, _, _ = adm_a.call("GET", path)
+            check(f"2.4 company admin passes control-plane {path} → 200", status == 200, str(status))
+        for path in ("/candidates/", "/requisitions/", "/clients/", "/pipeline/board"):
+            status, _, _ = adm_a.call("GET", path)
+            check(f"2.4 company admin denied execution {path} → 403", status == 403, str(status))
     status, reqs, _ = admin.call("GET", "/requisitions/?page_size=100")
     titles = {r.get("title") for r in items(reqs)}
     check("2.3 CI company admin sees neither staging company",

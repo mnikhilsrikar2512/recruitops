@@ -2,7 +2,7 @@
 that powers the custom report builder.
 
 All queries aggregate live operational tables. Read endpoints are guarded by
-the ``report.read`` permission; Admin bypasses via role_code.
+the ``report.read`` permission; company-wide callers (scope.company) see every office of their own company.
 """
 from __future__ import annotations
 

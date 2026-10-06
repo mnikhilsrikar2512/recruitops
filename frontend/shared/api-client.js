@@ -510,14 +510,13 @@ function wireAgentsWorkbenchFilters() {
 }
 
 function hasPermission(permissionCode) {
-  if (isAdmin()) return true;
+  /* No role-code bypass (plan 2.5): admins hold grants like everyone. */
   const perms = userPermissions();
   if (!perms.length) return false;
   return perms.includes(permissionCode);
 }
 
 function hasAnyPermission(...codes) {
-  if (isAdmin()) return true;
   return codes.some((code) => hasPermission(code));
 }
 
@@ -632,7 +631,6 @@ const SIDEBAR_PERMISSION_MAP = {
 };
 
 function enforceSidebarRBAC() {
-  if (isAdmin()) return; /* Admin sees everything */
   document.querySelectorAll(".sidebar-nav a.nav-link, .sidebar-nav .sidebar-cta-link").forEach((link) => {
     const href = link.getAttribute("href") || "";
     const page = href.split("/").pop();
@@ -657,7 +655,7 @@ function enforceSidebarRBAC() {
     }
   });
   /* RBAC: Enforce on action buttons by label text */
-  if (!isAdmin()) {
+  {
     const actionPermMap = {
       "Add Client": "client.create",
       "Create Requisition": "requisition.create",
@@ -852,7 +850,7 @@ function handleFormSubmit(form) {
     "onboarding-hiring-teams": submitOnboardingTeam,
   };
   /* RBAC: Check form submission permissions */
-  if (!isAdmin()) {
+  {
     const formPermMap = {
       "contact-form-dialog": "client.contact.create",
       "requisition-intake": "requisition.create",
@@ -1583,7 +1581,7 @@ async function openClientDialog(clientId, refresh) {
   /* Owners must belong to the client's location (location-integrity rule), so
      fetch staff filtered to a location — the server caps pages at 100 and a
      location-scoped list is always complete. Re-fetched as location changes. */
-  const canReadUsers = isAdmin() || hasPermission("user.read");
+  const canReadUsers = hasPermission("user.read");
   const users = canReadUsers && session?.location_id
     ? await apiRequest(`/users/?page_size=100&location_id=${session.location_id}`).catch(() => ({ items: [] }))
     : { items: [] };
@@ -2376,7 +2374,7 @@ let workAssignmentReqId = null;
 
 async function loadWorkAssignment() {
   workAssignmentReqId = queryInt("requisition_id") || workAssignmentReqId;
-  const canManageAssignments = isAdmin() || hasAnyPermission("assignment.create", "assignment.update");
+  const canManageAssignments = hasAnyPermission("assignment.create", "assignment.update");
   const [requisitions, users] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] })),
@@ -2701,8 +2699,8 @@ function portalOwnershipChip(ownershipType, ownedByName) {
 async function loadPortalAccounts() {
   const surface = document.querySelector("[data-live-portal-accounts]");
   if (!surface) return;
-  const canManage = isAdmin() || hasAnyPermission("portal.create", "portal.update");
-  const canBookSlots = isAdmin() || hasAnyPermission("portal.assign_slot");
+  const canManage = hasAnyPermission("portal.create", "portal.update");
+  const canBookSlots = hasAnyPermission("portal.assign_slot");
 
   const [payload, locations] = await Promise.all([
     apiRequest("/portal-accounts/?page_size=100").catch(() => ({ items: [] })),
@@ -3137,7 +3135,7 @@ async function loadDailyUpdates() {
    date input, and the recent-updates list. Never touches the form fields.
    Users without daily_update.create_main get a read-only view (no submit controls). */
 async function loadDailyUpdateSubmission() {
-  const canSubmit = isAdmin() || hasPermission("daily_update.create_main");
+  const canSubmit = hasPermission("daily_update.create_main");
   const [requisitions, updates] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
@@ -3918,7 +3916,7 @@ async function fetchAndRenderReport() {
 /* Letterhead editor — company profile fields + logo, edited inline from the
    report viewer. Admin-gated: only shown when the actor has settings.update. */
 function openLetterheadDialog(onSaved) {
-  const canEdit = isAdmin() || hasPermission("settings.update");
+  const canEdit = hasPermission("settings.update");
   if (!canEdit) {
     showToast("Not permitted", "Only admins can change the company letterhead.");
     return;
@@ -5492,7 +5490,7 @@ function bindLiveApiInteractions() {
 
     /* RBAC: Check data-rbac-require on clicked buttons */
     const rbacTarget = target?.closest("[data-rbac-require]");
-    if (rbacTarget && !isAdmin()) {
+    if (rbacTarget) {
       const required = rbacTarget.dataset.rbacRequire.split(",");
       if (!hasAnyPermission(...required)) {
         event.preventDefault();
@@ -6127,7 +6125,7 @@ async function bootPage() {
   /* RBAC: Block access to unauthorized pages. The gate map now lives in
      navigation.config.js (NAV_PAGE_PERMISSIONS) — this file no longer
      duplicates it. Deep-link gating behavior is unchanged. */
-  if (!isAdmin() && !PUBLIC_ROUTES.has(route)) {
+  if (!PUBLIC_ROUTES.has(route)) {
     const pagePermMap = (window.NAV_CONFIG && window.NAV_CONFIG.pagePermissions) || {};
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {

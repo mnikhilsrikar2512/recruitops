@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """CI gate: no NEW role-code admin bypasses in the backend (plan 2.6).
 
-Data scoping must go through backend/app/services/scope.py. The sites listed
-in ALLOWED are the known remaining bypasses (permission checks and
-last-admin protection) that Phase 2.5 removes together with the D-03 Admin
-seed; the gate fails if any file gains one, so the list can only shrink.
+Data scoping must go through backend/app/services/scope.py. Since Phase 2.5 no
+route or data check depends on the role code: admins pass by grant (D-03
+template, scope.company). The only remaining uses are listed in ALLOWED;
+the gate fails if any file gains one.
 
     python3 tools/ci/admin_bypass_gate.py
 """
@@ -19,12 +19,8 @@ PATTERN = re.compile(r"""role_code\s*[!=]=\s*["']admin["']|role_code\s*==\s*["']
 
 # file (relative to backend/app) → allowed occurrences. Shrink, never grow.
 ALLOWED = {
-    "api/deps.py": 2,          # require_permissions / require_any_permission  (Phase 2.5)
-    "api/v1/agents.py": 1,     # agent run permission                           (Phase 2.5)
-    "services/agents.py": 1,   # agent permission guard                         (Phase 2.5)
-    "services/auth.py": 1,     # /auth/me scope labels                          (Phase 2.5)
-    "services/users.py": 4,    # last-admin-per-company protection              (Phase 2.5)
-    "services/scope.py": 1,    # THE one place: is_company_wide()
+    "services/users.py": 4,    # last-admin-per-company protection (role identity, not a bypass)
+    "services/scope.py": 1,    # is_company_wide() fallback for hand-built contexts only
 }
 
 
@@ -40,7 +36,7 @@ def main() -> int:
         for line in failures:
             print("   ", line)
         return 1
-    print(f"✓ admin bypass gate: no new role-code checks ({sum(ALLOWED.values())} known, shrinking in Phase 2.5)")
+    print(f"✓ admin bypass gate: no role-code bypasses ({sum(ALLOWED.values())} identity checks allowed)")
     return 0
 
 

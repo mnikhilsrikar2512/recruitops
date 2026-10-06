@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from app.core.rbac import COMPANY_SCOPE_CODE
 from app.repositories.display_ids import find_branch_by_id
 
 from app.core.config import settings
@@ -62,6 +63,8 @@ class AuthContext:
     session_id: int
     session_token_hash: str
     user: LoginUserRecord
+    # Set by the API from the scope.company grant; None in hand-built contexts.
+    company_wide: bool | None = None
 
 
 def _build_allowed_pages(permission_codes: list[str]) -> list[str]:
@@ -76,8 +79,9 @@ def _build_allowed_pages(permission_codes: list[str]) -> list[str]:
     return [page for permission, page in page_map if permission in permission_codes]
 
 
-def _build_scopes(role_code: str, location_id: int | None) -> PermissionScopePayload:
-    if role_code == "admin":
+def _build_scopes(company_wide: bool, location_id: int | None) -> PermissionScopePayload:
+    if company_wide:
+        # "global" here means every office of the user's OWN company.
         return PermissionScopePayload(
             clients="global",
             requisitions="global",
@@ -273,7 +277,7 @@ def get_resolved_permissions_service(engine: Engine, auth_context: AuthContext) 
     return ResolvedPermissionsResponse(
         role_code=auth_context.user.role_code,
         permissions=permissions,
-        scopes=_build_scopes(auth_context.user.role_code, auth_context.user.location_id),
+        scopes=_build_scopes(COMPANY_SCOPE_CODE in permissions, auth_context.user.location_id),
         allowed_pages=_build_allowed_pages(permissions),
     )
 

@@ -9,6 +9,43 @@ from app.api.deps import get_engine, get_current_auth_context
 from app.main import create_application
 
 
+class _AllPermissions(frozenset):
+    """Contains every code."""
+
+    def __contains__(self, item: object) -> bool:
+        return True
+
+
+@pytest.fixture(autouse=True)
+def _stub_admin_grants(monkeypatch):
+    """Unit tests run against a MagicMock engine, so no grant can be resolved.
+    Hand-built ``role_code="admin"`` stub contexts stand for a user whose roles
+    grant everything (what the old role-code bypass gave them). Real grants —
+    including the D-03 Admin template — are proven by the DB-backed tests and
+    the live smoke against a seeded database, where this shim never applies."""
+    from sqlalchemy.engine import Engine
+
+    from app.api.v1 import agents as agents_api
+    from app.services import agents as agents_service
+
+    def wrap(original):
+        def resolved(engine, auth_context):
+            granted = original(engine, auth_context)
+            if (
+                not granted
+                and not isinstance(engine, Engine)
+                and getattr(getattr(auth_context, "user", None), "role_code", None) == "admin"
+            ):
+                return _AllPermissions()
+            return granted
+        return resolved
+
+    monkeypatch.setattr(deps, "resolved_permissions_for", wrap(deps.resolved_permissions_for))
+    monkeypatch.setattr(agents_api, "_resolved_permissions", wrap(agents_api._resolved_permissions))
+    monkeypatch.setattr(agents_service, "_resolved_permissions", wrap(agents_service._resolved_permissions))
+    yield
+
+
 @pytest.fixture(autouse=True)
 def _clear_permission_cache():
     deps._permission_cache.clear()

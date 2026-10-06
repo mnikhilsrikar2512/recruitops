@@ -181,9 +181,29 @@ function permissionCatalog() {
   if (fs.existsSync(apiDir)) walk(apiDir);
   return [...codes].sort();
 }
-const ALL_CODES = permissionCatalog();
+/* Codes the page gates use (navigation.config.js), which may be PRD names
+   with no route of their own (dashboard.view_admin, …). */
+function navCodes() {
+  const file = path.join(REPO, "frontend", "shared", "navigation.config.js");
+  if (!fs.existsSync(file)) return [];
+  return [...new Set([...fs.readFileSync(file, "utf8").matchAll(/"([a-z_]+\.[a-z_.]+)"/g)].map((m) => m[1]))]
+    .filter((c) => !c.endsWith(".html"));
+}
+/* The Admin template (D-03) straight from backend/app/core/rbac.py. */
+function adminCodes() {
+  const file = path.join(REPO, "backend", "app", "core", "rbac.py");
+  if (!fs.existsSync(file)) return [];
+  const text = fs.readFileSync(file, "utf8");
+  const block = (text.split("ADMIN_PERMISSION_CODES: tuple")[1] || "").split("\n)\n")[0];
+  const codes = [...block.matchAll(/"([a-z_]+\.[a-z_.]+)"/g)].map((m) => m[1]);
+  return [...new Set([...codes, "scope.company"])];
+}
+const ALL_CODES = [...new Set([...permissionCatalog(), ...navCodes()])].sort();
 const PERSONAS = {
-  admin: { role_code: "admin", role_name: "Admin", permissions: ALL_CODES },
+  /* control plane only — denied execution pages by design */
+  admin: { role_code: "admin", role_name: "Admin", permissions: adminCodes() },
+  /* every code: sweeps every page with data, drives the UI flows */
+  full: { role_code: "manager", role_name: "Full Access", permissions: ALL_CODES },
   recruiter: {
     role_code: "recruiter",
     role_name: "Recruiter",

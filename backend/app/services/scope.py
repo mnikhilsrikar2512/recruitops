@@ -9,8 +9,7 @@ Model (docs/decisions-2026-10-06.md):
 - Nobody reaches another company's data. There is no global "see
   everything" user in the product API.
 
-Phase 2.5 replaces the role check in ``is_company_wide`` with a permission
-grant; every caller already goes through this module, so that swap is local.
+Company-wide reach is the ``scope.company`` grant (Admin template, D-03).
 """
 
 from __future__ import annotations
@@ -30,7 +29,13 @@ def tenant_id_of(auth_context) -> int | None:
 
 
 def is_company_wide(auth_context) -> bool:
-    """Company-wide reach inside the caller's own company."""
+    """Company-wide reach inside the caller's own company: the scope.company
+    grant (resolved by api/deps.get_current_auth_context). Contexts built by
+    hand (unit tests, scripts) carry no flag and fall back to the Admin role,
+    whose template holds that grant."""
+    flag = getattr(auth_context, "company_wide", None)
+    if flag is not None:
+        return bool(flag)
     return getattr(auth_context.user, "role_code", None) == "admin"
 
 

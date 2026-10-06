@@ -206,7 +206,9 @@ def create_user(client: TestClient, admin: Api, name: str, email: str, branch_id
 
 
 def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
-    """One company, built by its OWN company admin through the API."""
+    """One company, built through the API by its own people: the company
+    admin sets up roles and users (control plane, D-03); the manager creates
+    clients, requisitions and approvals; the recruiter adds candidates."""
     manager_email = f"manager@{tenant['domain']}"
     recruiter_email = f"recruiter@{tenant['domain']}"
     branch_id, admin_email, admin_id = ensure_company(engine, tenant)
@@ -221,9 +223,11 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
                              branch_id, manager_role, "Delivery Manager", issued_by=admin_id)
     recruiter_id = create_user(client, admin, f"{tenant['city']} Recruiter", recruiter_email,
                                branch_id, recruiter_role, "Recruiter", manager_id, issued_by=admin_id)
+    manager = login(client, manager_email, PASSWORD)
+    recruiter = login(client, recruiter_email, PASSWORD)
 
     clients = [
-        admin.call("POST", "/clients/", {
+        manager.call("POST", "/clients/", {
             "client_name": f"{name} ({tenant['code']})", "industry": industry, "location_id": branch_id,
             "client_owner_user_id": manager_id, "business_source_owner_user_id": manager_id,
             "placement_fee_pct": 8.33,
@@ -231,7 +235,7 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
         for name, industry in tenant["clients"]
     ]
     requisitions = [
-        admin.call("POST", "/requisitions/", {
+        manager.call("POST", "/requisitions/", {
             "client_id": clients[i % len(clients)], "location_id": branch_id, "title": title,
             "primary_owner_user_id": recruiter_id, "openings_count": 2, "priority": "high" if i == 0 else "medium",
             "target_closure_date": "2026-12-31", "employment_type": "full-time", "work_mode": "hybrid",
@@ -242,19 +246,19 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
     applications = []
     for i, name in enumerate(tenant["candidates"]):
         slug = name.lower().replace(" ", ".")
-        candidate = admin.call("POST", "/candidates/", {
+        candidate = recruiter.call("POST", "/candidates/", {
             "full_name": name, "email": f"{slug}@{tenant['domain']}", "phone": f"+91 9{len(tenant['key']) + ord(tenant['key']) % 10}000 {i:05d}",
             "source_type": "LinkedIn", "current_company": "Example Corp", "current_designation": "Engineer",
             "total_experience_years": 3 + i, "primary_owner_user_id": recruiter_id, "save_mode": "final",
         })
-        admin.call("GET", f"/candidates/{candidate['id']}/duplicate-check")
-        link = admin.call("POST", f"/candidates/{candidate['id']}/applications", {
+        recruiter.call("GET", f"/candidates/{candidate['id']}/duplicate-check")
+        link = recruiter.call("POST", f"/candidates/{candidate['id']}/applications", {
             "requisition_id": requisitions[i % len(requisitions)], "initial_stage": STAGES[i % len(STAGES)],
             "owner_user_id": recruiter_id,
         })
         applications.append(link.get("application_id") or link.get("id"))
 
-    admin.call("POST", "/approvals/", {
+    manager.call("POST", "/approvals/", {
         "location_id": branch_id, "approval_type": "requisition", "related_entity_type": "requisition",
         "related_entity_id": requisitions[0], "title": f"Approve {tenant['requisitions'][0]} headcount",
         "description": "Staging seed: pending headcount approval.", "priority": "high",
@@ -262,7 +266,7 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
     })
     # A second pending approval for the company admin, so their inbox is never
     # empty after the live smoke decides the manager's one.
-    admin.call("POST", "/approvals/", {
+    manager.call("POST", "/approvals/", {
         "location_id": branch_id, "approval_type": "requisition", "related_entity_type": "requisition",
         "related_entity_id": requisitions[1], "title": f"Approve {tenant['requisitions'][1]} budget",
         "description": "Staging seed: pending budget approval.", "priority": "medium",

@@ -38,10 +38,9 @@
 | Item | Notes |
 |---|---|
 | 2.4 login | Email-only login already finds the company (D-02); signup is Phase 5. |
-| 2.5 + 2.6 | Replace the role-code admin bypass in `require_permissions` with a seeded Admin permission set + `scope.company` permission; frontend admin bypass. The gate's allow-list must reach 0 (except `scope.py`). |
+| 2.5 + 2.6 | **Done (see below).** |
 | AI agents | Agent read tools are office-scoped for everyone (company admins included) until the tools are tenant-aware. AI is off outside dev (D-10). |
 | Portal accounts, master data | Still global catalogues; decide per-company vs shared before launch. |
-| `/auth/me` scope labels | Still say `global` for admins (cosmetic; 2.5). |
 | `dbo.locations` mirror | New offices are mirrored with the same id via `IDENTITY_INSERT`, which needs ALTER permission on the table. Collapse the two tables before production DB credentials are least-privilege (Phase 6). |
 | 2.8 / 2.9 | Footprint is tenant-only now; the parity harness is next. |
 
@@ -70,3 +69,22 @@ cd backend && .venv/bin/python scripts/apply_migration.py 010_tenants.sql
 Fixed on the way: `UQ_users_employee_code` treats NULL as a value (SQL-inserted admins now get codes);
 login tolerates records without a tenant status; the Admin role answers 403 "System roles are read-only"
 to company admins (stricter than the old 409).
+
+## 2.5 + 2.6 — Admin is the control plane, by grant (D-03)
+
+| Item | Delivered |
+|---|---|
+| No role-code bypass | `require_permissions` / `require_any_permission`, the agents guards and the frontend (`hasPermission`, sidebar, page gate, action/form gates) no longer treat `role_code == "admin"` as "allow everything". Every user, admins included, passes routes by grant. |
+| Company-wide reach is a grant | New code `scope.company`. `api/deps.get_current_auth_context` resolves it per request; `services/scope.is_company_wide` reads that flag. |
+| Admin template | `app/core/rbac.py` `ADMIN_PERMISSION_CODES` (39 codes: users, offices, roles, settings, approvals, dashboards/reports, notifications, portal accounts, work assignment, governance, `scope.company`) = PRD §3.2 Admin column. `scripts/011_admin_seed.sql` adds missing catalog rows and **resets** the Admin role to exactly that set; the API refuses to change it (409) and companies can't edit system roles (403). |
+| Seeds | CI admin = Admin template **plus** a CI-only "CI Full Access" role so DB tests can drive recruiting routes. Staging: the company admin creates roles and users only; the manager creates clients, requisitions, approvals; the recruiter adds candidates. |
+| Tests | `test_admin_seed.py` (SQL ↔ code template, no execution codes, no bypass with a real engine, company-wide follows the grant). `test_company_isolation_db.py`: a pure company admin passes control-plane routes and is **403** on candidates/requisitions/clients/pipeline. Live smoke Stage 2c: same checks against staging. Mock sweep adds a `full` persona (every page with data) and the admin persona must reach the control-plane pages. Unit-test stub admins keep full access through a conftest shim that only applies to MagicMock engines. |
+| CI gate | `admin_bypass_gate.py` allow-list is down to identity checks only (last-admin protection, the hand-built-context fallback in `scope.py`). |
+
+**Dev database:** apply `011_admin_seed.sql` (`apply_migration.py`). After it, the dev Admin
+login can no longer open recruiting pages — by design (D-03). To keep recruiting as that
+user, give them an execution role as a second office role (like the CI admin).
+
+Known leftover: `services/daily_updates.py` still lets a submitter whose primary role is
+`admin` skip the same-office/linked-requisition checks; admins no longer hold
+`daily_update.create_main`, so it is unreachable, and it goes with the Phase 4 cleanup.

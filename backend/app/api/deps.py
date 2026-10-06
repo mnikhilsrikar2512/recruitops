@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import Engine
 
+from app.core.rbac import COMPANY_SCOPE_CODE
 from app.db.session import create_db_engine
 from app.repositories.auth import list_resolved_permissions
 from app.services import scope
@@ -121,7 +122,16 @@ def get_current_auth_context(
 ) -> AuthContext:
     if credentials is None or credentials.scheme.lower() != "bearer" or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required")
-    return get_auth_context_from_token(engine, credentials.credentials)
+    auth_context = get_auth_context_from_token(engine, credentials.credentials)
+    # Company-wide reach is a GRANT (scope.company), not a role code (plan 2.5).
+    auth_context.company_wide = COMPANY_SCOPE_CODE in resolved_permissions_for(engine, auth_context)
+    return auth_context
+
+
+def resolved_permissions_for(engine: Engine, auth_context: AuthContext) -> set[str]:
+    """The caller's granted permission codes (cached briefly). Every route
+    check goes through here — no role code bypasses it."""
+    return _get_cached_permissions(engine, auth_context.user.id)
 
 
 def require_permissions(*permission_codes: str) -> Callable[..., AuthContext]:
@@ -129,10 +139,7 @@ def require_permissions(*permission_codes: str) -> Callable[..., AuthContext]:
         auth_context: AuthContext = Depends(get_current_auth_context),
         engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
-
-        resolved_permissions = _get_cached_permissions(engine, auth_context.user.id)
+        resolved_permissions = resolved_permissions_for(engine, auth_context)
         missing_permissions = [
             code for code in permission_codes if not _has_permission(resolved_permissions, code)
         ]
@@ -151,10 +158,7 @@ def require_any_permission(*permission_codes: str) -> Callable[..., AuthContext]
         auth_context: AuthContext = Depends(get_current_auth_context),
         engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
-
-        resolved_permissions = _get_cached_permissions(engine, auth_context.user.id)
+        resolved_permissions = resolved_permissions_for(engine, auth_context)
         if any(_has_permission(resolved_permissions, code) for code in permission_codes):
             return auth_context
 
