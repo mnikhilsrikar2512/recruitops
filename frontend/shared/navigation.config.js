@@ -544,6 +544,15 @@ const NAV_ENTRIES = [
 
   /* ── Account & Settings ──────────────────────────────────────── */
   {
+    id: "tenant-setup",
+    file: "tenant-setup.html",
+    label: "Company Settings",
+    icon: "domain",
+    description: "Company profile, logo and letterhead.",
+    permissions: ["settings.read"], /* PRD §3.1: tenant Settings (Admin) */
+    category: "account",
+  },
+  {
     id: "my-profile",
     file: "my-profile.html",
     label: "My Profile",
@@ -575,6 +584,7 @@ const NAV_PAGE_PERMISSIONS = {
   "role-permissions-editor": ["role.permissions.assign"],
   "role-dashboard": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr", "dashboard.view_admin"],
   "business-titles": ["settings.read"],
+  "tenant-setup": ["settings.read"],
   "visibility-rules": ["settings.read"],
   "work-assignment": ["assignment.read", "requisition.read"],
   "assignment-history-drawer": ["requisition.read"],

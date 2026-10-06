@@ -49,7 +49,7 @@ ADMIN_PAGES = {
     "notifications-center", "notification-detail-panel", "analytics-dashboard",
     "company-dashboard", "user-performance-reports", "team-workload", "reports",
     "custom-report-builder", "report-viewer", "time-to-fill-report", "source-effectiveness",
-    "sla-tracker",
+    "sla-tracker", "tenant-setup",
 }
 
 # Third-party assets are stubbed so the sweep is hermetic and fast.

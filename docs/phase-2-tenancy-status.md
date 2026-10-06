@@ -110,8 +110,28 @@ Known leftover: `services/daily_updates.py` still lets a submitter whose primary
 | Coverage gate | `app/core/tenancy.py` classifies all 64 tables (company root, via office, via parent, via user, or shared with a reason); `tests/test_tenancy_coverage.py` fails when a table is added without a line or a named column is missing. |
 | Parity harness | `tests/test_rbac_parity_db.py`: two users with identical grants in the same office get identical results on 11 shared lists and identical permissions/pages/scopes. |
 
-Still open in Phase 2: 2.7 (catalog drift: `pipeline.read.summary`, `pipeline.stage.reopen`), 2.8 (footprint → platform-ops API), admin sidebar == PRD §3.1 check, and enforcing scope on the less-used tables the map lists (pipeline templates, report locks, transfer/access requests) when their routes are built.
+Remaining Phase 2 items are closed below.
 
 ### Result of the 2.3-completion run (2026-10-06, commit `fda0003`)
 
 Backend **438 passed**, 3 skipped (incl. tenancy coverage, parity harness, per-company profile) · live smoke **48/48** · browser sweeps admin and recruiter 101/101 clean · migrations 008–012 on a fresh staging database.
+
+## 2.7, 2.8 and the exit gate
+
+| Item | Delivered |
+|---|---|
+| 2.7 catalog drift | PRD §3.2: `pipeline.board.read` → `pipeline.read.summary`; rows added for `pipeline.stage.reopen` (planned), `scope.company`; Business Titles named under `settings.write`. New PRD §3.3 maps all 61 finer implementation codes to their §3.2 row. `tests/test_permission_catalog_prd.py` fails when a route, page gate or role template uses a code with no row. |
+| 2.8 footprint | Resolved by D-04: the candidate footprint is limited to the caller's own company (company admins only). A cross-company view, if ever needed, is a platform-ops surface (Phase 6 ops tooling), not part of the product API. |
+| Admin sidebar == PRD §3.1 | `tests/test_admin_sidebar_prd.py`. Changes: Company Settings (`tenant-setup`) added to the sidebar (PRD "tenant Settings"); Pipeline Analytics removed from the admin base (execution data). Not built yet, and listed in the test for when they ship: AI usage & policy, Audit Log, Data Export/Delete Requests. |
+
+### Phase 2 exit gate
+
+| Gate | Status |
+|---|---|
+| Dual-company denial suite green with real `tenant_id` | `test_company_isolation_db.py`, live smoke 2b/2c |
+| Admin sidebar == PRD §3.1 exactly; admin denied every execution route | `test_admin_sidebar_prd.py`; `test_company_isolation_db.py` + live smoke 2c (403s) |
+| Identical grants → identical UI and API results | `test_rbac_parity_db.py` |
+| Wrong login returns a clean error (email-only login, D-02) | live smoke 1.3 (401, no stack trace) |
+| No `role_code == "admin"` authorization (CI grep gate) | `admin_bypass_gate.py` (identity checks only) |
+
+Rest of the shared-table enforcement (pipeline templates, report locks, transfer/access requests) is tracked in `app/core/tenancy.py` and applied when those routes are built.

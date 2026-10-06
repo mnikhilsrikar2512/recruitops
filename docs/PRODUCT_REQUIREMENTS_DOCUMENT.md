@@ -101,7 +101,8 @@ Every code follows `module.action` (or `module.subaction`). This is the source o
 | `requisition.reassign_owner` | Owner reassignment | ○ | ● | ○ |
 | `candidate.read` / `.write` | Candidate profiles, detail, upload | ○/○ | ●/● | ●/● |
 | `candidate.duplicate.decide` | Duplicate-check decision | ○ | ● | ● |
-| `pipeline.board.read` | Pipeline board view | ○ | ● | ● |
+| `pipeline.read.summary` | Pipeline board view (was `pipeline.board.read`) | ○ | ● | ● |
+| `pipeline.stage.reopen` | Reopen a rejected/withdrawn application (planned; not yet granted by any route) | ○ | ● | ○ |
 | `pipeline.stage.move` | Stage-move action | ○ | ● | ● |
 | `interview.write` / `offer.write` | Schedule interview / create offer | ○/○ | ●/● | ●/○ |
 | `interview.feedback.write` | Submit interview feedback | ○ | ● | ● |
@@ -113,9 +114,78 @@ Every code follows `module.action` (or `module.subaction`). This is the source o
 | `meeting.write` / `followup.write` | Meetings, follow-ups | ○/○ | ●/● | ●/● |
 | `notification.read` | Notifications center | ● | ● | ● |
 | `report.read` | Reports library, analytics | ● | ● | ○ (own metrics only) |
-| `settings.write` | Tenant Settings (branding, timezone) | ● | ○ | ○ |
+| `settings.write` | Tenant Settings (branding, timezone), Business Titles and other pick-lists | ● | ○ | ○ |
+| `scope.company` | Reach every office of the user's own company (lists, dashboards, reports); without it a user reaches their own office only | ● | ○ | ○ |
 
 New codes introduced by a future module (§5) must be added to this table before that module ships — no page or action ships without a row here.
+
+### 3.3 Implementation codes (finer-grained codes the API checks)
+
+The API checks finer codes than the product rows above; each one implements exactly one §3.2 row. A role template grants a §3.2 row by granting all of that row's implementation codes. `tests/test_permission_catalog_prd.py` fails the build when a route, page gate or role template uses a code that has no row in §3.2 or here.
+
+| Implementation code | §3.2 row |
+|---|---|
+| `approval.create` | `approval.request` |
+| `approval.read` | `approval.decide` |
+| `assignment.create` | `work_assignment.write` |
+| `assignment.read` | `work_assignment.write` |
+| `assignment.update` | `work_assignment.write` |
+| `candidate.create` | `candidate.write` |
+| `candidate.duplicate.check` | `candidate.duplicate.decide` |
+| `candidate.duplicate.discard_draft` | `candidate.duplicate.decide` |
+| `candidate.duplicate.link_existing` | `candidate.duplicate.decide` |
+| `candidate.duplicate.request_override` | `candidate.duplicate.decide` |
+| `candidate.link_requisition` | `candidate.write` |
+| `candidate.resume.upload` | `candidate.write` |
+| `candidate.update` | `candidate.write` |
+| `client.contact.create` | `client.write` |
+| `client.contact.read` | `client.read` |
+| `client.contact.update` | `client.write` |
+| `client.create` | `client.write` |
+| `client.update` | `client.write` |
+| `daily_update.create_main` | `daily_update.write` |
+| `daily_update.read` | `daily_update.review` |
+| `dashboard.read_my_work` | `dashboard.view_execution` |
+| `dashboard.read_pipeline_summary` | `dashboard.view_execution` |
+| `dashboard.view_hr` | `dashboard.view_execution` |
+| `dashboard.view_manager` | `dashboard.view_execution` |
+| `dashboard.view_recruiter` | `dashboard.view_execution` |
+| `interview.create` | `interview.write` |
+| `interview.feedback.submit` | `interview.feedback.write` |
+| `interview.read` | `interview.write` |
+| `location.create` | `location.write` |
+| `location.update` | `location.write` |
+| `meeting.create` | `meeting.write` |
+| `meeting.read` | `meeting.write` |
+| `meeting.update` | `meeting.write` |
+| `notification.mark_read` | `notification.read` |
+| `offer.create` | `offer.write` |
+| `offer.decide` | `offer.decision.write` |
+| `offer.read` | `offer.write` |
+| `pipeline.board.read` | `pipeline.read.summary` |
+| `pipeline.read.detail` | `pipeline.read.summary` |
+| `pipeline.stage.history.read` | `pipeline.read.summary` |
+| `portal.assign_slot` | `portal_accounts.write` |
+| `portal.create` | `portal_accounts.write` |
+| `portal.read` | `portal_accounts.write` |
+| `portal.update` | `portal_accounts.write` |
+| `requisition.create` | `requisition.write` |
+| `requisition.status.update` | `requisition.status.write` |
+| `requisition.update` | `requisition.write` |
+| `role.create` | `role.write` |
+| `role.permissions.assign` | `role.write` |
+| `role.update` | `role.write` |
+| `settings.create` | `settings.write` |
+| `settings.read` | `settings.write` |
+| `settings.update` | `settings.write` |
+| `user.create` | `user.write` |
+| `user.credentials.manage` | `user.write` |
+| `user.update` | `user.write` |
+| `workflow_action.nudge` | `dashboard.view_execution` |
+| `workflow_action.read` | `dashboard.view_execution` |
+| `workflow_action.resolve` | `dashboard.view_execution` |
+| `workflow_action.run` | `dashboard.view_execution` |
+| `workflow_overlay.submit` | `dashboard.view_execution` |
 
 ---
 
