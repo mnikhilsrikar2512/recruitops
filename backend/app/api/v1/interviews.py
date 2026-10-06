@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions
 from app.schemas.interview import InterviewCreate, InterviewFeedbackUpdate, InterviewListFilters, InterviewListResponse, InterviewResponse
 from app.services.auth import AuthContext
 from app.services.interviews import create_interview_service, get_interview_detail_service, list_interviews_service, update_interview_feedback_service
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -30,6 +31,7 @@ def list_interviews_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_interviews_service(engine, filters, auth_context)
 
 
@@ -40,6 +42,7 @@ def create_interview_endpoint(
     auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> InterviewResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_interview_service(engine, payload, auth_context)
 
 
@@ -61,4 +64,5 @@ def submit_interview_feedback_endpoint(
     interview_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> InterviewResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_interview_feedback_service(engine, interview_id, payload, auth_context)

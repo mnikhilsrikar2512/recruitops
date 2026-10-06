@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    caller_tenant_id,
     get_current_auth_context,
     get_engine,
     pinned_location_id,
@@ -23,6 +24,7 @@ from app.services.meetings import (
     update_meeting_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -56,6 +58,7 @@ def list_meetings_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_meetings_service(engine, filters)
 
 
@@ -64,8 +67,10 @@ def create_meeting_endpoint(
     payload: MeetingCreate,
     _auth: object = Depends(require_permissions("meeting.create")),
     _scope: object = Depends(require_location_scope("location_id")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> MeetingResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_meeting_service(engine, payload)
 
 
@@ -85,6 +90,8 @@ def update_meeting_endpoint(
     _auth: object = Depends(require_permissions("meeting.update")),
     _in_scope: object = Depends(_scope_meeting),
     meeting_id: int = Path(..., ge=1),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> MeetingResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_meeting_service(engine, meeting_id, payload)

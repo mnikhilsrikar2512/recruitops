@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_any_permission, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateFootprintResponse,
@@ -33,6 +33,7 @@ from app.services.candidates import (
     upload_candidate_document_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter()
 
@@ -60,6 +61,7 @@ def list_candidates_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_candidates_service(engine, filters, auth_context)
 
 
@@ -69,6 +71,7 @@ def create_candidate_endpoint(
     auth_context: AuthContext = Depends(require_permissions("candidate.create")),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_candidate_service(engine, payload)
 
 
@@ -103,6 +106,7 @@ def update_candidate_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_candidate_service(engine, candidate_id, payload, auth_context)
 
 
@@ -113,6 +117,7 @@ def create_candidate_document_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDocumentResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_candidate_document_service(engine, candidate_id, payload, auth_context)
 
 
@@ -149,6 +154,7 @@ def create_candidate_duplicate_decision_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDuplicateReviewCaseResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_candidate_duplicate_decision_service(engine, candidate_id, payload, auth_context)
 
 
@@ -159,6 +165,7 @@ def finalize_candidate_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateFinalizeResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return finalize_candidate_service(engine, candidate_id, payload, auth_context)
 
 
@@ -169,6 +176,7 @@ def create_candidate_application_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateFinalizeResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return finalize_candidate_service(engine, candidate_id, payload, auth_context)
 
 
@@ -179,4 +187,5 @@ def reassign_candidate_owner_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateOwnerReassignmentResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return reassign_candidate_owner_service(engine, candidate_id, payload, auth_context)

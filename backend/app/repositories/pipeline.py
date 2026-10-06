@@ -125,6 +125,7 @@ def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[P
         AND (:sourced_by_user_id IS NULL OR c.created_by_user_id = :sourced_by_user_id)
         AND (:stage IS NULL OR ca.current_stage = :stage)
         AND (:location_id IS NULL OR r.branch_id = :location_id)
+        AND (:tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
         ORDER BY ca.stage_updated_at DESC, ca.id DESC;
         """
     )
@@ -137,6 +138,7 @@ def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[P
                 "sourced_by_user_id": filters.sourced_by_user_id,
                 "stage": filters.stage,
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
             },
         ).mappings().all()
     return [PipelineBoardRecord(**row) for row in rows]

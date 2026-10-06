@@ -27,6 +27,9 @@ python3 tools/ci/api_contract_check.py "$ROOT"
 echo "→ 4/6 static assets"
 python3 tools/ci/static_assets_check.py
 
+echo "→ backend admin-bypass gate (Phase 2.6)"
+python3 tools/ci/admin_bypass_gate.py
+
 OPENAPI="${OPENAPI:-$ROOT/frontend/tests/openapi.json}"
 if [ "${EXPORT_OPENAPI:-1}" = "1" ] && python3 -c "import fastapi" 2>/dev/null; then
   echo "→ exporting OpenAPI from the backend"

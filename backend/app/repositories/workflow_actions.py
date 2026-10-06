@@ -127,6 +127,8 @@ def list_workflow_action_items(
           WHERE (:status IS NULL OR wai.status = :status)
           AND (:source IS NULL OR wai.source = :source)
           AND (:location_id IS NULL OR wai.location_id = :location_id)
+          AND (:tenant_id IS NULL OR wai.location_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id)
+               OR (wai.location_id IS NULL AND wai.assigned_user_id IN (SELECT tu.id FROM dbo.users AS tu WHERE tu.tenant_id = :tenant_id)))
           AND (
             :is_admin = 1
             OR wai.location_id IS NULL
@@ -156,6 +158,7 @@ def list_workflow_action_items(
                 "status": filters.status,
                 "source": filters.source,
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "actor_location_id": actor_location_id,
                 "actor_user_id": actor_user_id,
                 "actor_role_code": actor_role_code,

@@ -10,6 +10,8 @@ ResetMode = Literal["temporary-password", "setup-link"]
 
 
 class UserListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     role_id: int | None = Field(default=None, ge=1)
     status: UserStatus | None = None

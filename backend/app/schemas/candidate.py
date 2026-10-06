@@ -32,6 +32,8 @@ class SocialProfileInput(BaseModel):
 
 
 class CandidateListFilters(BaseModel):
+    # Set from the caller, never from the client.
+    tenant_id: int | None = None
     search: str | None = Field(default=None, min_length=1, max_length=200)
     requisition_id: int | None = Field(default=None, ge=1)
     source_type: str | None = Field(default=None, min_length=1, max_length=50)

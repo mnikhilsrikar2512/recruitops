@@ -106,6 +106,8 @@ def _assert_session_active(session_record: SessionWithUserRecord) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is no longer active")
     if session_record.user.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not allowed to access the system")
+    if session_record.user.tenant_status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This company account is not active")
 
 
 def _branch_offers_enabled(engine: Engine, location_id: int | None) -> bool | None:
@@ -156,6 +158,8 @@ def login_service(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     if user.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not allowed to access the system")
+    if user.tenant_status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This company account is not active")
 
     # Transparent migration: legacy unsalted hashes upgrade to bcrypt on next login.
     if needs_rehash(user.password_hash):

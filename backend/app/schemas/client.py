@@ -10,6 +10,8 @@ ClientContactStatus = Literal["active", "inactive"]
 
 
 class ClientListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     status: ClientStatus | None = None
     client_owner_user_id: int | None = Field(default=None, ge=1)

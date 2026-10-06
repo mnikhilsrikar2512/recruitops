@@ -11,6 +11,8 @@ def _normalize_text(value: str | None) -> str | None:
 
 
 class PipelineBoardFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     requisition_id: int | None = Field(default=None, ge=1)
     owner_user_id: int | None = Field(default=None, ge=1)
     sourced_by_user_id: int | None = Field(default=None, ge=1)

@@ -72,15 +72,15 @@ def get_role_permissions_service(engine: Engine, role_id: int) -> RolePermission
     )
 
 
-def create_role_service(engine: Engine, payload: RoleCreate) -> RoleResponse:
-    existing = find_role_by_code(engine, payload.code)
+def create_role_service(engine: Engine, payload: RoleCreate, tenant_id: int | None = None) -> RoleResponse:
+    existing = find_role_by_code(engine, payload.code, tenant_id)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Role code already exists",
         )
 
-    created = create_role(engine, payload)
+    created = create_role(engine, payload, tenant_id)
     if created is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

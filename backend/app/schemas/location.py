@@ -68,6 +68,8 @@ class LocationUpdate(BaseModel):
 
 
 class LocationListFilters(BaseModel):
+    # Set from the caller, never from the client.
+    tenant_id: int | None = None
     status: LocationStatus | None = None
     search: str | None = Field(default=None, min_length=1, max_length=150)
     page: int = Field(default=1, ge=1)

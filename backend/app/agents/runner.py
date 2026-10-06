@@ -25,11 +25,16 @@ from app.repositories.agents import (
 )
 from app.repositories.audit import insert_audit_log
 from app.schemas.agent import AgentRunDecisionRequest, AgentRunRequest
+from app.services import scope
 from app.services.auth import AuthContext
 
 
-def _is_admin(auth_context: AuthContext) -> bool:
-    return auth_context.user.role_code == "admin"
+def _same_company(engine: Engine, auth_context: AuthContext, user_id: int | None) -> bool:
+    try:
+        scope.assert_user_in_tenant(engine, auth_context, user_id, "Agent run was not found")
+    except HTTPException:
+        return False
+    return True
 
 
 def run_agent(
@@ -83,7 +88,10 @@ def _collect_input(
 ) -> tuple[dict, dict]:
     ctx = auth_context.user
     location_id = ctx.location_id
-    is_admin = _is_admin(auth_context)
+    # Phase 2: the read tools only know offices, not companies, so a company
+    # admin's agent reads stay on their own office until the tools are made
+    # tenant-aware (AI is off outside dev anyway — D-10).
+    is_admin = False
     context: dict = {}
     input_refs: dict = {}
 
@@ -170,7 +178,9 @@ def decide_agent_run(
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent run was not found")
 
-    if not _is_admin(auth_context) and run.actor_user_id != auth_context.user.id:
+    if run.actor_user_id != auth_context.user.id and not (
+        scope.is_company_wide(auth_context) and _same_company(engine, auth_context, run.actor_user_id)
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Agent run access is not allowed",

@@ -25,6 +25,8 @@ def _normalize_code(value: str | None) -> str | None:
 
 
 class ApprovalListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     approval_type: str | None = Field(default=None, min_length=1, max_length=50)
     status: str | None = Field(default=None, min_length=1, max_length=20)

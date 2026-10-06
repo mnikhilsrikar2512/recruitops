@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    caller_tenant_id,
     get_current_auth_context,
     get_engine,
     pinned_location_id,
@@ -29,6 +30,7 @@ from app.services.clients import (
     update_client_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -62,6 +64,7 @@ def list_clients_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_clients_service(engine, filters)
 
 
@@ -70,8 +73,10 @@ def create_client_endpoint(
     payload: ClientCreate,
     _auth: object = Depends(require_permissions("client.create")),
     _scope: object = Depends(require_location_scope("location_id")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> ClientResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_client_service(engine, payload)
 
 
@@ -91,8 +96,10 @@ def update_client_endpoint(
     _auth: object = Depends(require_permissions("client.update")),
     _in_scope: object = Depends(_scope_client),
     client_id: int = Path(..., ge=1),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> ClientResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_client_service(engine, client_id, payload)
 
 
@@ -112,8 +119,10 @@ def create_client_contact_endpoint(
     _auth: object = Depends(require_permissions("client.contact.create")),
     _in_scope: object = Depends(_scope_client),
     client_id: int = Path(..., ge=1),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> ClientContactResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_client_contact_service(engine, client_id, payload)
 
 
@@ -122,6 +131,8 @@ def update_client_contact_endpoint(
     payload: ClientContactUpdate,
     _auth: object = Depends(require_permissions("client.contact.update")),
     contact_id: int = Path(..., ge=1),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> ClientContactResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_client_contact_service(engine, contact_id, payload)

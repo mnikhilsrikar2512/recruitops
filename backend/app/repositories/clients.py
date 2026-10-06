@@ -119,6 +119,7 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
           LEFT JOIN dbo.users AS client_owner
             ON client_owner.id = c.account_manager_user_id
           WHERE (:location_id IS NULL OR c.branch_id = :location_id)
+          AND (:tenant_id IS NULL OR c.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:status IS NULL OR c.status = :status)
           AND (:client_owner_user_id IS NULL OR c.account_manager_user_id = :client_owner_user_id)
           AND (
@@ -142,6 +143,7 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
           query,
           {
               "location_id": filters.location_id,
+              "tenant_id": filters.tenant_id,
               "status": filters.status,
               "client_owner_user_id": filters.client_owner_user_id,
               "business_source_owner_user_id": filters.business_source_owner_user_id,

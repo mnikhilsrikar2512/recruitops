@@ -7,6 +7,7 @@ from app.repositories.users import find_user_by_id
 from app.repositories.display_ids import find_branch_by_id
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters, OfferListResponse, OfferResponse
 from app.schemas.pagination import PaginationMeta
+from app.services import scope
 from app.services.auth import AuthContext
 from app.services.pipeline import _assert_pipeline_application_access
 
@@ -16,7 +17,7 @@ def list_offers_service(
     filters: OfferListFilters,
     auth_context: AuthContext | None = None,
 ) -> OfferListResponse:
-    if auth_context and auth_context.user.role_code != "admin" and filters.location_id is None:
+    if auth_context and not scope.is_company_wide(auth_context) and filters.location_id is None:
         filters = filters.model_copy(update={"location_id": auth_context.user.location_id})
     items, total = list_offers(engine, filters)
     return OfferListResponse(
@@ -37,7 +38,7 @@ def get_offer_detail_service(
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
-        _assert_pipeline_application_access(application, auth_context)
+        _assert_pipeline_application_access(application, auth_context, engine)
     return OfferResponse.model_validate(offer)
 
 
@@ -50,7 +51,7 @@ def create_offer_service(
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
-        _assert_pipeline_application_access(application, auth_context)
+        _assert_pipeline_application_access(application, auth_context, engine)
     branch = find_branch_by_id(engine, application.location_id)
     if branch is not None and branch.offers_enabled is False:
         raise HTTPException(

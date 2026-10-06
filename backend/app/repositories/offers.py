@@ -92,6 +92,7 @@ def _offer_select_sql() -> str:
 def list_offers(engine: Engine, filters: OfferListFilters) -> tuple[list[OfferRecord], int]:
     where = [
         "(:location_id IS NULL OR location_id = :location_id)",
+        "(:tenant_id IS NULL OR location_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))",
         "(:requisition_id IS NULL OR requisition_id = :requisition_id)",
         "(:status IS NULL OR offer_status = :status)",
         "(offer_created_at IS NOT NULL OR LOWER(current_stage) LIKE N'%offer%' OR application_status = N'joined' OR approval_request_id IS NOT NULL)",
@@ -113,6 +114,7 @@ def list_offers(engine: Engine, filters: OfferListFilters) -> tuple[list[OfferRe
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "requisition_id": filters.requisition_id,
                 "status": filters.status,
                 "offset": (filters.page - 1) * filters.page_size,

@@ -23,6 +23,7 @@ import urllib.request
 ADMIN = ("ci.admin@recruitops-test.com", "admin123")
 TENANT_A = ("manager@northwind-staging.example.com", "recruiter@northwind-staging.example.com")
 TENANT_B = ("manager@contoso-staging.example.com", "recruiter@contoso-staging.example.com")
+COMPANY_ADMINS = ("admin@northwind-staging.example.com", "admin@contoso-staging.example.com")
 
 results: list[tuple[str, bool, str]] = []
 
@@ -135,6 +136,39 @@ def main() -> int:
     status, board_a, _ = rec_a.call("GET", "/pipeline/board")
     names_a = {r.get("candidate_name") for r in items(board_a)}
     check("2.2 pipeline board isolated", status == 200 and not ({"Farhan Qureshi", "Sneha Reddy", "Vivek Sharma"} & names_a), str(names_a))
+
+    print("── Stage 2b: company isolation (company admins, Phase 2)")
+    adm_a, adm_b = Api(base), Api(base)
+    check("2.3 company A admin login", adm_a.login(COMPANY_ADMINS[0], opts.password))
+    check("2.3 company B admin login", adm_b.login(COMPANY_ADMINS[1], opts.password))
+    if adm_a.token and adm_b.token:
+        status, reqs, _ = adm_a.call("GET", "/requisitions/?page_size=100")
+        titles = {r.get("title") for r in items(reqs)}
+        check("2.3 company admin A sees all of company A", status == 200 and "Senior Backend Engineer" in titles, str(titles))
+        check("2.3 company admin A sees none of company B",
+              not ({"Supply Chain Planner", "Store Operations Lead"} & titles), str(titles))
+        if b_ids:
+            status, payload, _ = adm_a.call("GET", f"/requisitions/{b_ids[0]}")
+            check("2.3 company admin A reading B's requisition by id → 404", status == 404 and not leaks(payload), str(status))
+        status, locs, _ = adm_a.call("GET", "/locations/?page_size=100")
+        codes = {loc.get("location_code") for loc in items(locs)}
+        check("2.3 company admin A's offices are company A's only", status == 200 and "STGA" in codes and "STGB" not in codes, str(codes))
+        status, users, _ = adm_a.call("GET", "/users/?page_size=100")
+        emails = {u.get("email") for u in items(users)}
+        check("2.3 company admin A's users exclude company B",
+              status == 200 and not any("contoso-staging" in (e or "") for e in emails), str(sorted(emails))[:200])
+        a_office = next((loc.get("id") for loc in items(locs) if loc.get("location_code") == "STGA"), None)
+        status, roles, _ = adm_b.call("GET", "/roles/?page_size=100")
+        b_role = next((r.get("id") for r in items(roles) if r.get("code") == "recruiter-stgb"), None)
+        if a_office and b_role:
+            status, payload, _ = adm_b.call("POST", "/users/", {
+                "full_name": "Cross Company", "email": f"cross.{int(time.time())}@contoso-staging.example.com",
+                "employee_code": f"X{int(time.time())}", "primary_location_id": a_office, "primary_role_id": b_role})
+            check("2.3 company admin B cannot place a user in company A's office → 404", status == 404, f"{status} {payload}")
+    status, reqs, _ = admin.call("GET", "/requisitions/?page_size=100")
+    titles = {r.get("title") for r in items(reqs)}
+    check("2.3 CI company admin sees neither staging company",
+          status == 200 and not ({"Senior Backend Engineer", "Supply Chain Planner"} & titles), str(titles))
 
     print("── Stage 3: RBAC")
     status, _, _ = rec_a.call("GET", "/users/")

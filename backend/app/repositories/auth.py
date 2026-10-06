@@ -23,6 +23,9 @@ class LoginUserRecord:
     role_name: str
     location_code: str | None
     location_name: str | None
+    # Company (tenant) the user belongs to — scripts/010_tenants.sql.
+    tenant_id: int | None = None
+    tenant_status: str = "active"
 
 
 @dataclass
@@ -58,8 +61,12 @@ def _user_auth_select_sql() -> str:
           r.code AS role_code,
           r.name AS role_name,
           b.code AS location_code,
-          b.name AS location_name
+          b.name AS location_name,
+          u.tenant_id,
+          t.status AS tenant_status
         FROM dbo.users AS u
+        LEFT JOIN dbo.tenants AS t
+          ON t.id = u.tenant_id
         INNER JOIN dbo.roles AS r
           ON r.id = u.default_role_id
         LEFT JOIN dbo.user_branch_roles AS ubr
@@ -88,6 +95,8 @@ def _map_user(row) -> LoginUserRecord:
         role_name=row["role_name"],
         location_code=row["location_code"],
         location_name=row["location_name"],
+        tenant_id=row.get("tenant_id"),
+        tenant_status=row.get("tenant_status") or "active",
     )
 
 

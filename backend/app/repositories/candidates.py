@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import RowMapping
 
+from app.services.scope import CANDIDATE_IN_TENANT_SQL
+
 from app.repositories.display_ids import ENTITY_CANDIDATE, allocate_display_id
 from app.schemas.candidate import (
     CandidateCreate,
@@ -258,6 +260,7 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
           AND (:duplicate_state IS NULL OR c.duplicate_check_status = :duplicate_state)
           AND (:owner_user_id IS NULL OR c.primary_owner_user_id = :owner_user_id)
           AND (:sourced_by_user_id IS NULL OR c.created_by_user_id = :sourced_by_user_id)
+          AND (:tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL})
           AND (
             :requisition_id IS NULL
             OR EXISTS (
@@ -314,6 +317,7 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
                 "duplicate_state": filters.duplicate_state,
                 "owner_user_id": filters.owner_user_id,
                 "sourced_by_user_id": filters.sourced_by_user_id,
+                "tenant_id": filters.tenant_id,
                 "requisition_id": filters.requisition_id,
                 "search": filters.search,
                 "offset": (filters.page - 1) * filters.page_size,

@@ -315,7 +315,7 @@ class TestLastAdminGuardUnit:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
         monkeypatch.setattr(
             users_service,
             "update_user",
@@ -343,7 +343,7 @@ class TestLastAdminGuardUnit:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 2)
         monkeypatch.setattr(
             users_service, "update_user", lambda engine, uid, payload, before: record
         )
@@ -413,7 +413,7 @@ class TestLastAdminDeactivateGuardUnit:
         monkeypatch.setattr(
             users_service, "find_user_by_id", lambda engine, user_id: record
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
 
         with pytest.raises(HTTPException) as excinfo:
             users_service.deactivate_user_service(
@@ -437,7 +437,7 @@ class TestLastAdminDeactivateGuardUnit:
         monkeypatch.setattr(
             users_service, "find_user_by_id", lambda engine, user_id: record
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 2)
         for count_fn in (
             "count_user_active_requisitions",
             "count_user_active_assignments",
@@ -628,7 +628,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: count)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: count)
         try:
             users_service.update_user_service(
                 engine=SimpleNamespace(), user_id=1, payload=payload
@@ -650,7 +650,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
 
         with pytest.raises(HTTPException) as excinfo:
             users_service.update_user_service(
@@ -673,7 +673,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 2)
         monkeypatch.setattr(
             users_service, "update_user", lambda engine, uid, payload, before: record
         )
@@ -701,7 +701,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "find_user_by_id", lambda engine, user_id: record
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )

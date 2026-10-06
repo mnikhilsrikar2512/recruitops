@@ -22,6 +22,8 @@ def _normalize_skill_list(values: list[str]) -> list[str]:
 
 
 class RequisitionListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     client_id: int | None = Field(default=None, ge=1)
     primary_owner_user_id: int | None = Field(default=None, ge=1)

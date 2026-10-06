@@ -51,14 +51,15 @@ def list_roles(engine: Engine, filters: RoleListFilters) -> tuple[list[RoleRecor
             r.code,
             r.name,
             r.description,
-            CAST(CASE WHEN r.code = N'admin' THEN 1 ELSE 0 END AS BIT) AS is_system_role,
+            CAST(CASE WHEN r.tenant_id IS NULL THEN 1 ELSE 0 END AS BIT) AS is_system_role,
             N'active' AS status,
             CAST(NULL AS BIGINT) AS created_by_user_id,
             r.created_at,
             r.updated_at,
             COUNT(*) OVER() AS total_count
           FROM dbo.roles AS r
-          WHERE (
+          WHERE (:tenant_id IS NULL OR r.tenant_id IS NULL OR r.tenant_id = :tenant_id)
+          AND (
             :search IS NULL
             OR r.name LIKE '%' + :search + '%'
             OR r.code LIKE '%' + :search + '%'
@@ -76,6 +77,7 @@ def list_roles(engine: Engine, filters: RoleListFilters) -> tuple[list[RoleRecor
             query,
             {
                 "status": filters.status,
+                "tenant_id": filters.tenant_id,
                 "search": filters.search,
                 "offset": (filters.page - 1) * filters.page_size,
                 "page_size": filters.page_size,
@@ -95,7 +97,7 @@ def find_role_by_id(engine: Engine, role_id: int) -> RoleRecord | None:
           r.code,
           r.name,
           r.description,
-          CAST(CASE WHEN r.code = N'admin' THEN 1 ELSE 0 END AS BIT) AS is_system_role,
+          CAST(CASE WHEN r.tenant_id IS NULL THEN 1 ELSE 0 END AS BIT) AS is_system_role,
           N'active' AS status,
           CAST(NULL AS BIGINT) AS created_by_user_id,
           r.created_at,
@@ -109,7 +111,8 @@ def find_role_by_id(engine: Engine, role_id: int) -> RoleRecord | None:
     return _map_role(row) if row else None
 
 
-def find_role_by_code(engine: Engine, code: str) -> RoleRecord | None:
+def find_role_by_code(engine: Engine, code: str, tenant_id: int | None = None) -> RoleRecord | None:
+    """System roles and the company's own roles share one code space."""
     query = text(
         """
         SELECT TOP 1
@@ -117,33 +120,37 @@ def find_role_by_code(engine: Engine, code: str) -> RoleRecord | None:
           r.code,
           r.name,
           r.description,
-          CAST(CASE WHEN r.code = N'admin' THEN 1 ELSE 0 END AS BIT) AS is_system_role,
+          CAST(CASE WHEN r.tenant_id IS NULL THEN 1 ELSE 0 END AS BIT) AS is_system_role,
           N'active' AS status,
           CAST(NULL AS BIGINT) AS created_by_user_id,
           r.created_at,
           r.updated_at
         FROM dbo.roles AS r
-        WHERE r.code = :code;
+        WHERE r.code = :code
+          AND (:tenant_id IS NULL OR r.tenant_id IS NULL OR r.tenant_id = :tenant_id);
         """
     )
     with engine.connect() as connection:
-        row = connection.execute(query, {"code": code}).mappings().first()
+        row = connection.execute(query, {"code": code, "tenant_id": tenant_id}).mappings().first()
     return _map_role(row) if row else None
 
 
-def create_role(engine: Engine, payload: RoleCreate) -> RoleRecord | None:
+def create_role(engine: Engine, payload: RoleCreate, tenant_id: int | None = None) -> RoleRecord | None:
+    # tenant_id None only in legacy/unit contexts: the default company.
     query = text(
         """
         INSERT INTO dbo.roles (
           code,
           name,
-          description
+          description,
+          tenant_id
         )
         OUTPUT INSERTED.id
         VALUES (
           :code,
           :name,
-          :description
+          :description,
+          COALESCE(:tenant_id, (SELECT t.id FROM dbo.tenants AS t WHERE t.slug = N'default'))
         );
         """
     )
@@ -154,6 +161,7 @@ def create_role(engine: Engine, payload: RoleCreate) -> RoleRecord | None:
                 "code": payload.code,
                 "name": payload.name,
                 "description": payload.description,
+                "tenant_id": tenant_id,
             },
         ).mappings().first()
     return find_role_by_id(engine, int(row["id"])) if row else None

@@ -20,6 +20,7 @@ from app.schemas.pipeline import (
     PipelineStageMoveResponse,
 )
 from app.schemas.notification import NotificationCreate
+from app.services import scope
 from app.services.auth import AuthContext
 from app.services.notifications import create_notification_service
 
@@ -27,8 +28,15 @@ from app.services.notifications import create_notification_service
 def _can_access_pipeline_application(
     application: PipelineApplicationDetailResponse,
     auth_context: AuthContext,
+    engine: Engine | None = None,
 ) -> bool:
-    if auth_context.user.role_code == "admin":
+    # Company boundary first: an application on another company's office is
+    # never reachable, whatever role or contribution the caller has.
+    if engine is not None and not scope.office_in_tenant(
+        engine, application.location_id, scope.tenant_id_of(auth_context)
+    ):
+        return False
+    if scope.is_company_wide(auth_context):
         return True
 
     actor_id = auth_context.user.id
@@ -52,8 +60,13 @@ def _can_access_pipeline_application(
 def _assert_pipeline_application_access(
     application: PipelineApplicationDetailResponse,
     auth_context: AuthContext,
+    engine: Engine | None = None,
 ) -> None:
-    if _can_access_pipeline_application(application, auth_context):
+    if engine is not None and not scope.office_in_tenant(
+        engine, application.location_id, scope.tenant_id_of(auth_context)
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
+    if _can_access_pipeline_application(application, auth_context, engine):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Pipeline access is not allowed")
 
@@ -63,7 +76,7 @@ def list_pipeline_board_service(
     filters: PipelineBoardFilters,
     auth_context: AuthContext | None = None,
 ) -> list[PipelineBoardItemResponse]:
-    if auth_context and auth_context.user.role_code != "admin" and filters.location_id is None:
+    if auth_context and not scope.is_company_wide(auth_context) and filters.location_id is None:
         filters = filters.model_copy(update={"location_id": auth_context.user.location_id})
     items = list_pipeline_board(engine, filters)
     return [PipelineBoardItemResponse.model_validate(item) for item in items]
@@ -79,7 +92,7 @@ def get_pipeline_application_detail_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     response = PipelineApplicationDetailResponse.model_validate(application)
     if auth_context:
-        _assert_pipeline_application_access(response, auth_context)
+        _assert_pipeline_application_access(response, auth_context, engine)
     return response
 
 

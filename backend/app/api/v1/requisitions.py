@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    caller_tenant_id,
     get_current_auth_context,
     get_engine,
     pinned_location_id,
@@ -33,6 +34,7 @@ from app.services.requisitions import (
     update_requisition_status_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -74,6 +76,7 @@ def list_requisitions_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_requisitions_service(engine, filters)
 
 
@@ -82,8 +85,10 @@ def create_requisition_endpoint(
     payload: RequisitionCreate,
     _auth: object = Depends(require_permissions("requisition.create")),
     _scope: object = Depends(require_location_scope("location_id")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_requisition_service(engine, payload)
 
 
@@ -103,8 +108,10 @@ def update_requisition_endpoint(
     _auth: object = Depends(require_permissions("requisition.update")),
     _in_scope: object = Depends(_scope_requisition),
     requisition_id: int = Path(..., ge=1),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_requisition_service(engine, requisition_id, payload)
 
 
@@ -117,6 +124,7 @@ def update_requisition_status_endpoint(
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_requisition_status_service(engine, requisition_id, payload, auth_context)
 
 
@@ -136,8 +144,10 @@ def create_requisition_assignment_endpoint(
     _auth: object = Depends(require_permissions("assignment.create")),
     _in_scope: object = Depends(_scope_requisition),
     requisition_id: int = Path(..., ge=1),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionAssignmentResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_requisition_assignment_service(engine, requisition_id, payload)
 
 
@@ -159,4 +169,5 @@ def reassign_requisition_owners_endpoint(
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionOwnerReassignmentResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return reassign_requisition_owners_service(engine, requisition_id, payload, auth_context)

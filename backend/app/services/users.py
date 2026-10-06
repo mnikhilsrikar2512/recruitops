@@ -144,7 +144,7 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
     if (
         existing.primary_role_code == "admin"
         and next_role_id != existing.primary_role_id
-        and count_active_admins(engine) <= 1
+        and count_active_admins(engine, user_id) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -160,7 +160,7 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
         payload.status is not None
         and payload.status != "active"
         and existing.primary_role_code == "admin"
-        and count_active_admins(engine) <= 1
+        and count_active_admins(engine, user_id) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -265,7 +265,7 @@ def deactivate_user_service(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is already inactive")
     # Same lockout rule as the role-change guard: the workspace must always
     # keep at least one active admin account.
-    if existing.primary_role_code == "admin" and count_active_admins(engine) <= 1:
+    if existing.primary_role_code == "admin" and count_active_admins(engine, user_id) <= 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot deactivate the last active admin",
@@ -391,7 +391,7 @@ def move_user_service(
     if (
         role_changed
         and existing.primary_role_code == "admin"
-        and count_active_admins(engine) <= 1
+        and count_active_admins(engine, user_id) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

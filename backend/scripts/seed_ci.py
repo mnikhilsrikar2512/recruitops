@@ -167,8 +167,8 @@ def seed_display_ids(engine, location_id: int) -> None:
                 """
                 SET NOCOUNT ON;
                 IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HYD01')
-                    INSERT INTO dbo.branches (name, code, location, status)
-                    VALUES (N'Hyderabad', N'HYD01', N'Hyderabad', N'active');
+                    INSERT INTO dbo.branches (name, code, location, status, tenant_id)
+                    VALUES (N'Hyderabad', N'HYD01', N'Hyderabad', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
                 SELECT id FROM dbo.branches WHERE code = N'HYD01';
                 """
             )
@@ -200,6 +200,18 @@ def seed_display_ids(engine, location_id: int) -> None:
 def main() -> None:
     engine = create_db_engine()
     with engine.begin() as connection:
+        # Company (tenant, 010_tenants.sql): the CI database is one company.
+        if connection.execute(text("SELECT OBJECT_ID(N'dbo.tenants')")).scalar() is None:
+            raise SystemExit("dbo.tenants is missing — apply scripts/010_tenants.sql before seeding")
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (SELECT 1 FROM dbo.tenants WHERE slug = N'default')
+                    INSERT INTO dbo.tenants (slug, display_name, status)
+                    VALUES (N'default', N'CI Company', N'active');
+                """
+            )
+        )
         # Location: user creation validates primary_location_id against
         # dbo.branches (see location_exists), so the branch IS the location row.
         location_id = connection.execute(
@@ -207,9 +219,9 @@ def main() -> None:
                 """
                 IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HO')
                 BEGIN
-                    INSERT INTO dbo.branches (name, code, location, status)
+                    INSERT INTO dbo.branches (name, code, location, status, tenant_id)
                     OUTPUT INSERTED.id
-                    VALUES (N'Head Office', N'HO', N'Head Office', N'active');
+                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
                 END
                 ELSE
                 BEGIN
@@ -224,8 +236,8 @@ def main() -> None:
             text(
                 """
                 IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE code = N'HO')
-                    INSERT INTO dbo.locations (name, code, location, status)
-                    VALUES (N'Head Office', N'HO', N'Head Office', N'active');
+                    INSERT INTO dbo.locations (name, code, location, status, tenant_id)
+                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
                 """
             )
         )
@@ -286,12 +298,12 @@ def main() -> None:
                     INSERT INTO dbo.users (
                         full_name, email, password_hash, password_setup_status,
                         force_password_change_on_first_login, status,
-                        default_role_id, hierarchy_level, location_id
+                        default_role_id, hierarchy_level, location_id, tenant_id
                     )
                     OUTPUT INSERTED.id
                     VALUES (
                         N'Admin', N'ci.admin@recruitops-test.com', :password_hash, N'active',
-                        0, N'active', :role_id, N'L5', :location_id
+                        0, N'active', :role_id, N'L5', :location_id, (SELECT id FROM dbo.tenants WHERE slug = N'default')
                     );
                 END
                 ELSE
@@ -342,11 +354,11 @@ def main() -> None:
                     INSERT INTO dbo.users (
                         full_name, email, password_hash, password_setup_status,
                         force_password_change_on_first_login, status,
-                        default_role_id, hierarchy_level, location_id
+                        default_role_id, hierarchy_level, location_id, tenant_id
                     )
                     VALUES (
                         N'Admin', N'ci.admin@recruitops-test.com', :password_hash, N'active',
-                        0, N'active', :role_id, N'L5', :location_id
+                        0, N'active', :role_id, N'L5', :location_id, (SELECT id FROM dbo.tenants WHERE slug = N'default')
                     )
                 """
             ),

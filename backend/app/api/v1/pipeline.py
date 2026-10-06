@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions
 from app.schemas.pipeline import (
     PipelineApplicationDetailResponse,
     PipelineBoardFilters,
@@ -17,6 +17,7 @@ from app.services.pipeline import (
     move_pipeline_stage_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -40,6 +41,7 @@ def list_pipeline_board_endpoint(
         stage=stage,
         location_id=location_id,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_pipeline_board_service(engine, filters, auth_context)
 
 
@@ -61,6 +63,7 @@ def move_pipeline_stage_endpoint(
     application_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> PipelineStageMoveResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return move_pipeline_stage_service(engine, application_id, payload, auth_context)
 
 

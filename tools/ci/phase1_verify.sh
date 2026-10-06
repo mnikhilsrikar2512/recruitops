@@ -95,7 +95,7 @@ backend/.venv/bin/python tools/ci/live_smoke.py --base "$BASE" --password "$STAG
 [ "${PIPESTATUS[0]}" = "0" ] && record PASS "live smoke ($(tail -1 "$LOGS/live_smoke.log"))" \
   || record FAIL "live smoke ($(tail -1 "$LOGS/live_smoke.log")) — see $LOGS/live_smoke.log"
 backend/.venv/bin/python frontend/tests/page_sweep.py --base "$BASE" --live \
-  --email ci.admin@recruitops-test.com --password admin123 --persona admin \
+  --email admin@northwind-staging.example.com --password "$STAGING_PASSWORD" --persona admin \
   >"$LOGS/sweep_admin.log" 2>&1 \
   && record PASS "browser sweep admin ($(tail -1 "$LOGS/sweep_admin.log"))" \
   || record FAIL "browser sweep admin ($(tail -1 "$LOGS/sweep_admin.log")) — see $LOGS/sweep_admin.log"

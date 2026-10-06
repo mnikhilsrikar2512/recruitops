@@ -12,6 +12,7 @@ from app.schemas.interview import (
     InterviewResponse,
 )
 from app.schemas.pagination import PaginationMeta
+from app.services import scope
 from app.services.auth import AuthContext
 from app.services.pipeline import _assert_pipeline_application_access
 
@@ -21,7 +22,7 @@ def list_interviews_service(
     filters: InterviewListFilters,
     auth_context: AuthContext | None = None,
 ) -> InterviewListResponse:
-    if auth_context and auth_context.user.role_code != "admin" and filters.location_id is None:
+    if auth_context and not scope.is_company_wide(auth_context) and filters.location_id is None:
         filters = filters.model_copy(update={"location_id": auth_context.user.location_id})
     items, total = list_interviews(engine, filters)
     return InterviewListResponse(
@@ -42,7 +43,7 @@ def get_interview_detail_service(
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
-        _assert_pipeline_application_access(application, auth_context)
+        _assert_pipeline_application_access(application, auth_context, engine)
     return InterviewResponse.model_validate(interview)
 
 
@@ -55,7 +56,7 @@ def create_interview_service(
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
-        _assert_pipeline_application_access(application, auth_context)
+        _assert_pipeline_application_access(application, auth_context, engine)
     if payload.interviewer_user_id and not find_user_by_id(engine, payload.interviewer_user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interviewer user was not found")
     created_by_user_id = payload.created_by_user_id

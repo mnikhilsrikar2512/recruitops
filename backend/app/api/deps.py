@@ -8,6 +8,7 @@ from sqlalchemy import Engine
 
 from app.db.session import create_db_engine
 from app.repositories.auth import list_resolved_permissions
+from app.services import scope
 from app.services.auth import AuthContext, get_auth_context_from_token
 
 http_bearer = HTTPBearer(auto_error=False)
@@ -169,12 +170,11 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
     async def scope_dependency(
         request: Request,
         auth_context: AuthContext = Depends(get_current_auth_context),
+        engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
-
+        company_wide = scope.is_company_wide(auth_context)
         actor_location_id = auth_context.user.location_id
-        if actor_location_id is None:
+        if not company_wide and actor_location_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Location scope is not available for this user",
@@ -205,7 +205,9 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
         if not normalized_values:
             return auth_context
 
-        if any(value != actor_location_id for value in normalized_values):
+        # Company-wide users may name any office of THEIR company; everyone
+        # else only their own office. Another company's office is never allowed.
+        if any(not scope.can_reach_office(engine, auth_context, value) for value in normalized_values):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Location scope does not allow this action",
@@ -216,19 +218,25 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
     return scope_dependency
 
 
-# ── Row-level location (tenant) scoping ─────────────────────────────────────
-# Until Phase 2 adds tenant_id, a non-admin's tenant boundary is their primary
-# location. require_location_scope() only rejects an explicit foreign
-# location_id; these helpers close the two remaining gaps found by the live
-# smoke test: list endpoints called WITHOUT location_id, and direct-id routes.
+# ── Row-level company (tenant) and office scoping ───────────────────────────
+# Lists: non-company-wide users are pinned to their own office; every list is
+# additionally filtered to the caller's company (filters.tenant_id). Direct-id
+# routes: a record outside reach answers 404 so foreign ids can't be probed.
+# The rules themselves live in app/services/scope.py.
 
 
 def pinned_location_id(auth_context: AuthContext, requested: int | None) -> int | None:
-    """Effective list filter: admins keep what they asked for (None = all
-    locations); everyone else is pinned to their own location."""
-    if auth_context.user.role_code == "admin":
+    """Effective office filter: company-wide users keep what they asked for
+    (None = every office of their company, enforced by the tenant filter);
+    everyone else is pinned to their own office."""
+    if scope.is_company_wide(auth_context):
         return requested
     return auth_context.user.location_id
+
+
+def caller_tenant_id(auth_context: AuthContext) -> int | None:
+    """The company every list must be restricted to."""
+    return scope.tenant_id_of(auth_context)
 
 
 def require_record_in_location(
@@ -236,8 +244,9 @@ def require_record_in_location(
     load_location_id: Callable[[Engine, int], int | None],
     not_found_detail: str,
 ) -> Callable[..., AuthContext]:
-    """Dependency for direct-id routes: a record outside the caller's location
-    answers 404 (not 403) so ids in other tenants cannot be discovered.
+    """Dependency for direct-id routes: a record outside the caller's reach
+    (another office, or another company) answers 404 (not 403) so ids in
+    other companies cannot be discovered.
 
     ``load_location_id`` returns the record's location id and raises its own
     404 when the record does not exist."""
@@ -247,11 +256,8 @@ def require_record_in_location(
         auth_context: AuthContext = Depends(get_current_auth_context),
         engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
         record_id = int(request.path_params[path_param])
-        if load_location_id(engine, record_id) != auth_context.user.location_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
+        scope.assert_office_reachable(engine, auth_context, load_location_id(engine, record_id), not_found_detail)
         return auth_context
 
     return dependency

@@ -40,7 +40,7 @@ def test_location_summary_defaults_to_actor_location_for_non_admin(monkeypatch) 
 def test_role_dashboard_uses_actor_context(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.dashboards.get_role_dashboard_counts",
-        lambda engine, actor_user_id, actor_location_id, is_admin: SimpleNamespace(
+        lambda engine, actor_user_id, actor_location_id, is_admin, tenant_id=None: SimpleNamespace(
             open_requisitions=2,
             active_candidates=5,
             active_applications=4,
@@ -101,7 +101,7 @@ def test_company_summary_blocks_non_admin() -> None:
 def test_company_summary_aggregates_admin_view(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.dashboards.list_company_location_summaries",
-        lambda engine: [
+        lambda engine, tenant_id=None: [
             SimpleNamespace(
                 location_id=1,
                 location_name="Hyderabad",

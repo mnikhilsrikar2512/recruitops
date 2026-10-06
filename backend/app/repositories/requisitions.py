@@ -180,6 +180,7 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
         WITH filtered_requisitions AS (
           {_requisition_select_sql()}
           WHERE (:location_id IS NULL OR r.branch_id = :location_id)
+          AND (:tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:client_id IS NULL OR r.client_company_id = :client_id)
           AND (:primary_owner_user_id IS NULL OR r.owner_user_id = :primary_owner_user_id)
           AND (:delivery_owner_user_id IS NULL OR :delivery_owner_user_id IS NOT NULL AND 1 = 0)
@@ -206,6 +207,7 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "client_id": filters.client_id,
                 "primary_owner_user_id": filters.primary_owner_user_id,
                 "delivery_owner_user_id": filters.delivery_owner_user_id,

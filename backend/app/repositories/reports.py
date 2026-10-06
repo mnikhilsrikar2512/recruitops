@@ -73,13 +73,15 @@ class ClientSummaryRecord:
 
 def _location_scope_clause(is_admin: bool) -> str:
     """Requisitions are location-bound via branch_id."""
-    return "" if is_admin else "AND r.branch_id = :actor_location_id"
+    # Company-wide callers see every office of THEIR company, never others.
+    return "AND (:actor_tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))" if is_admin else "AND r.branch_id = :actor_location_id"
 
 
 def get_time_to_fill_summary(
     engine: Engine,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> TimeToFillSummaryRecord:
     """Time-to-fill per closed/filled requisition, computed in SQL from
     requisition created_at to the joined application's stage-updated time
@@ -124,7 +126,7 @@ def get_time_to_fill_summary(
     with engine.connect() as connection:
         row = connection.execute(
             query,
-            {"actor_location_id": actor_location_id},
+            {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id},
         ).mappings().first()
 
     if row is None or row["filled_count"] == 0:
@@ -152,10 +154,10 @@ def get_time_to_fill_summary(
     )
     with engine.connect() as connection:
         fastest_name = connection.execute(
-            names_query, {"actor_location_id": actor_location_id, "days": row["fastest_days"]}
+            names_query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "days": row["fastest_days"]}
         ).scalar_one_or_none()
         slowest_name = connection.execute(
-            names_query, {"actor_location_id": actor_location_id, "days": row["slowest_days"]}
+            names_query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "days": row["slowest_days"]}
         ).scalar_one_or_none()
 
     return TimeToFillSummaryRecord(
@@ -174,6 +176,7 @@ def get_time_to_fill_breakdown(
     group_by: str,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[TimeToFillBreakdownRecord]:
     """Average days-to-fill grouped by department_name (or seniority bucket
     derived from the requisition title)."""
@@ -225,7 +228,7 @@ def get_time_to_fill_breakdown(
         """
     )
     with engine.connect() as connection:
-        rows = connection.execute(query, {"actor_location_id": actor_location_id}).mappings().all()
+        rows = connection.execute(query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id}).mappings().all()
     return [
         TimeToFillBreakdownRecord(
             key=str(row["key"]),
@@ -241,6 +244,7 @@ def get_source_effectiveness(
     engine: Engine,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[SourceEffectivenessRowRecord]:
     """Candidates grouped by source; hired = candidates owning an application
     that is joined/hired or carries an accepted/joined offer status."""
@@ -260,7 +264,9 @@ def get_source_effectiveness(
             ON ca.candidate_id = c.id
         WHERE c.status = N'active'
           AND (
-            :is_admin = 1
+            (:is_admin = 1 AND (:actor_tenant_id IS NULL
+              OR c.created_by_user_id IN (SELECT tu.id FROM dbo.users AS tu WHERE tu.tenant_id = :actor_tenant_id)
+              OR ca.requisition_id IN (SELECT r.id FROM dbo.requisitions AS r WHERE r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))))
             OR c.created_by_user_id IN (
                 SELECT u.id FROM dbo.users AS u WHERE u.location_id = :actor_location_id
             )
@@ -273,7 +279,7 @@ def get_source_effectiveness(
         """
     )
     with engine.connect() as connection:
-        rows = connection.execute(query, {"actor_location_id": actor_location_id, "is_admin": 1 if is_admin else 0}).mappings().all()
+        rows = connection.execute(query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "is_admin": 1 if is_admin else 0}).mappings().all()
     return [
         SourceEffectivenessRowRecord(
             source=str(row["source"]),
@@ -289,6 +295,7 @@ def get_report_dataset(
     dataset: str,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> ReportDatasetRowRecord:
     """Flat rows for the custom report builder's Generate Now action."""
     scope = _location_scope_clause(is_admin)
@@ -336,7 +343,9 @@ def get_report_dataset(
             LEFT JOIN dbo.candidate_applications AS ca ON ca.candidate_id = c.id
             WHERE c.status = N'active'
               AND (
-                :is_admin = 1
+                (:is_admin = 1 AND (:actor_tenant_id IS NULL
+                  OR c.created_by_user_id IN (SELECT tu.id FROM dbo.users AS tu WHERE tu.tenant_id = :actor_tenant_id)
+                  OR ca.requisition_id IN (SELECT r.id FROM dbo.requisitions AS r WHERE r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))))
                 OR c.created_by_user_id IN (
                     SELECT u.id FROM dbo.users AS u WHERE u.location_id = :actor_location_id
                 )
@@ -430,7 +439,7 @@ def get_report_dataset(
 
     with engine.connect() as connection:
         rows = connection.execute(
-            query, {"actor_location_id": actor_location_id, "is_admin": 1 if is_admin else 0}
+            query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "is_admin": 1 if is_admin else 0}
         ).mappings().all()
 
     # datetime/date objects are not JSON-serializable; stringify them.
@@ -493,8 +502,9 @@ def get_placements(
     period_to,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[PlacementRecord]:
-    scope = "" if is_admin else "AND r.branch_id = :actor_location_id"
+    scope = _location_scope_clause(is_admin)
     query = text(
         f"""
         {_PLACEMENT_SELECT}
@@ -508,7 +518,7 @@ def get_placements(
     params = {
         "period_from": period_from,
         "period_to": period_to,
-        "actor_location_id": actor_location_id,
+        "actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id,
     }
     with engine.connect() as connection:
         rows = connection.execute(query, params).mappings().all()
@@ -538,8 +548,13 @@ def get_client_summary(
     period_to,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[ClientSummaryRecord]:
-    scope = "" if is_admin else "WHERE cc.branch_id = :actor_location_id"
+    scope = (
+        "WHERE (:actor_tenant_id IS NULL OR cc.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))"
+        if is_admin
+        else "WHERE cc.branch_id = :actor_location_id"
+    )
     query = text(
         f"""
         SELECT
@@ -588,7 +603,7 @@ def get_client_summary(
     params = {
         "period_from": period_from,
         "period_to": period_to,
-        "actor_location_id": actor_location_id,
+        "actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id,
     }
     with engine.connect() as connection:
         rows = connection.execute(query, params).mappings().all()
