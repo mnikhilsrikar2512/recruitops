@@ -57,4 +57,6 @@ class TestPermissionCatalog:
         response = client.get("/api/v1/permissions/", headers=admin_headers)
         assert response.status_code == 200
         ai_items = [item for item in response.json()["items"] if item["module_name"] == "ai"]
-        assert len(ai_items) == 4
+        # ai.use + the three agent codes (ai.policy.write is the Admin's governance code, D-03)
+        agent_codes = {item["code"] for item in ai_items if item["code"] == "ai.use" or item["code"].startswith("ai.agent.")}
+        assert agent_codes == {"ai.use", "ai.agent.daily_brief", "ai.agent.inbox_triage", "ai.agent.resume_screener"}

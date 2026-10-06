@@ -18,6 +18,8 @@ import uuid
 
 import pytest
 
+from app.core.rbac import ADMIN_PERMISSION_CODES
+
 from tests.stubs import make_role_record, make_user_record
 from fastapi.testclient import TestClient
 
@@ -489,7 +491,7 @@ class TestAdminRoleProtection:
 
 class TestAdminRoleProtectionUnit:
     """Unit coverage: guard fires exactly when the submitted set differs from
-    the full catalog, and passes through when it matches."""
+    the Admin template (D-03, app/core/rbac.py), and passes when it matches."""
 
     @staticmethod
     def _admin_role() -> object:
@@ -510,9 +512,6 @@ class TestAdminRoleProtectionUnit:
         monkeypatch.setattr(
             roles_service, "find_role_by_id", lambda engine, role_id: self._admin_role()
         )
-        monkeypatch.setattr(
-            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
-        )
 
         with pytest.raises(HTTPException) as excinfo:
             roles_service.assign_role_permissions_service(
@@ -523,18 +522,15 @@ class TestAdminRoleProtectionUnit:
                 ),
             )
         assert excinfo.value.status_code == 409
-        assert "full access" in excinfo.value.detail
+        assert "fixed" in excinfo.value.detail
 
-    def test_guard_passes_full_catalog(self, monkeypatch) -> None:
+    def test_guard_passes_the_admin_template(self, monkeypatch) -> None:
         from types import SimpleNamespace
 
         import app.services.roles as roles_service
 
         monkeypatch.setattr(
             roles_service, "find_role_by_id", lambda engine, role_id: self._admin_role()
-        )
-        monkeypatch.setattr(
-            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
         )
         monkeypatch.setattr(
             roles_service, "count_permissions_by_codes", lambda engine, codes: len(codes)
@@ -555,7 +551,7 @@ class TestAdminRoleProtectionUnit:
             engine=SimpleNamespace(),
             role_id=1,
             payload=roles_service.RolePermissionsUpdate(
-                permission_codes=["a.read", "b.read"], scope_rules={}
+                permission_codes=list(ADMIN_PERMISSION_CODES), scope_rules={}
             ),
         )
         assert response.permission_codes == ["a.read", "b.read"]
@@ -570,9 +566,6 @@ class TestAdminRoleProtectionUnit:
         role.is_system_role = False
         monkeypatch.setattr(
             roles_service, "find_role_by_id", lambda engine, role_id: role
-        )
-        monkeypatch.setattr(
-            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
         )
         monkeypatch.setattr(
             roles_service, "count_permissions_by_codes", lambda engine, codes: len(codes)
