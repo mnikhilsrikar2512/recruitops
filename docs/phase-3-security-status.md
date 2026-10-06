@@ -14,3 +14,7 @@
 | Tests | `test_tokens.py` (expiry, wrong key, wrong type, `alg=none`), `test_jwt_sessions_db.py` (cookie flags, rotation, **refresh theft kills the family**, expired refresh, opaque cutover, tampered JWT, logout, sign-out-others, password change), live smoke 1.6–1.8. |
 
 Next: 3B — password policy (3.5), rate limiting (3.7), perimeter headers (3.8). 3C — MFA (3.6).
+
+### Result of the 3A run (2026-10-06, commit `32ed6c9`)
+
+Backend **456 passed**, 3 skipped (incl. refresh-theft, expired refresh, cutover) · live smoke **52/52** · sweeps admin + recruiter 101/101 · dev database on 013, dev backend verified (login JWT, refresh, sessions, logout).
