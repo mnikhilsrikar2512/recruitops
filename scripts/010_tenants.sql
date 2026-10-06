@@ -107,12 +107,18 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_users_tenant' AND obj
   CREATE INDEX IX_users_tenant ON dbo.users (tenant_id);
 GO
 
+/* Older databases enforce these as UNIQUE constraints, newer ones as
+   unique indexes; drop whichever exists. */
 /* Office codes unique per company (two companies may both have "HYD"). */
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_branches_code' AND object_id = OBJECT_ID(N'dbo.branches'))
+IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = N'UQ_branches_code' AND parent_object_id = OBJECT_ID(N'dbo.branches'))
+  ALTER TABLE dbo.branches DROP CONSTRAINT UQ_branches_code;
+ELSE IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_branches_code' AND object_id = OBJECT_ID(N'dbo.branches'))
   DROP INDEX UQ_branches_code ON dbo.branches;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_branches_tenant_code' AND object_id = OBJECT_ID(N'dbo.branches'))
   CREATE UNIQUE INDEX UQ_branches_tenant_code ON dbo.branches (tenant_id, code);
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_locations_code' AND object_id = OBJECT_ID(N'dbo.locations'))
+IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = N'UQ_locations_code' AND parent_object_id = OBJECT_ID(N'dbo.locations'))
+  ALTER TABLE dbo.locations DROP CONSTRAINT UQ_locations_code;
+ELSE IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_locations_code' AND object_id = OBJECT_ID(N'dbo.locations'))
   DROP INDEX UQ_locations_code ON dbo.locations;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_locations_tenant_code' AND object_id = OBJECT_ID(N'dbo.locations'))
   CREATE UNIQUE INDEX UQ_locations_tenant_code ON dbo.locations (tenant_id, code);
@@ -121,7 +127,9 @@ GO
 /* Role codes: system roles (tenant_id NULL) are unique among themselves;
    company roles are unique within their company. The service also refuses a
    company role whose code equals a system role's. */
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_roles_code' AND object_id = OBJECT_ID(N'dbo.roles'))
+IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = N'UQ_roles_code' AND parent_object_id = OBJECT_ID(N'dbo.roles'))
+  ALTER TABLE dbo.roles DROP CONSTRAINT UQ_roles_code;
+ELSE IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_roles_code' AND object_id = OBJECT_ID(N'dbo.roles'))
   DROP INDEX UQ_roles_code ON dbo.roles;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_roles_system_code' AND object_id = OBJECT_ID(N'dbo.roles'))
   CREATE UNIQUE INDEX UQ_roles_system_code ON dbo.roles (code) WHERE tenant_id IS NULL;
