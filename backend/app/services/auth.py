@@ -17,14 +17,29 @@ from app.core.security import (
     needs_rehash,
     verify_password,
 )
+from app.core.tokens import (
+    InvalidToken,
+    decode_access_token,
+    hash_refresh_token,
+    issue_access_token,
+    looks_like_jwt,
+    new_refresh_token,
+)
 from app.repositories.auth import (
     LoginUserRecord,
     SessionWithUserRecord,
+    find_refresh_token,
     find_session_with_user_by_hash,
+    find_session_with_user_by_id,
     find_user_for_login,
+    insert_refresh_token,
     insert_user_session,
+    list_active_sessions,
     list_resolved_permissions,
+    mark_refresh_token_used,
+    revoke_session,
     revoke_session_by_hash,
+    revoke_user_sessions,
     touch_session,
     update_last_login,
 )
@@ -151,12 +166,44 @@ def _current_session_payload(user: LoginUserRecord, engine: Engine | None = None
     )
 
 
+def _refresh_expiry(session_expires_at: datetime) -> datetime:
+    """Idle expiry of a refresh token, never past the sign-in's absolute cap."""
+    idle = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_ttl_days)
+    return min(idle, _as_utc(session_expires_at))
+
+
+def _start_session(
+    engine: Engine, user: LoginUserRecord, ip_address: str | None, user_agent: str | None
+) -> tuple[object, str, str, datetime]:
+    """New sign-in = new refresh-token family. Returns (session, access, refresh, access_expiry)."""
+    session = insert_user_session(
+        engine,
+        user_id=user.id,
+        # NOT NULL legacy column; never accepted as a credential for JWT sessions.
+        session_token_hash=hash_session_token(generate_session_token()),
+        ip_address=ip_address,
+        user_agent=(user_agent or "")[:1000] or None,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.session_absolute_ttl_days),
+        auth_kind="jwt",
+    )
+    refresh_raw, refresh_hash = new_refresh_token()
+    insert_refresh_token(engine, session.id, refresh_hash, _refresh_expiry(session.expires_at)
+                         if isinstance(session.expires_at, datetime)
+                         else datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_ttl_days))
+    access, access_expires_at = issue_access_token(
+        user_id=user.id, tenant_id=getattr(user, "tenant_id", None), session_id=session.id
+    )
+    return session, access, refresh_raw, access_expires_at
+
+
 def login_service(
     engine: Engine,
     payload: LoginRequest,
     ip_address: str | None,
     user_agent: str | None,
-) -> LoginResponse:
+) -> tuple[LoginResponse, str]:
+    """Returns the response body and the raw refresh token (set as an
+    HttpOnly cookie by the endpoint, never put in the body)."""
     user = find_user_for_login(engine, payload.email)
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
@@ -169,20 +216,12 @@ def login_service(
     if needs_rehash(user.password_hash):
         update_user_password_hash(engine, user_id=user.id, password_hash=hash_password(payload.password))
 
-    token = generate_session_token()
-    session_hash = hash_session_token(token)
-    session = insert_user_session(
-        engine,
-        user_id=user.id,
-        session_token_hash=session_hash,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=SESSION_TTL_HOURS),
-    )
+    session, token, refresh_raw, access_expires_at = _start_session(engine, user, ip_address, user_agent)
     update_last_login(engine, user.id)
 
     return LoginResponse(
         token=token,
+        access_expires_at=access_expires_at,
         user={
             "id": user.id,
             "full_name": user.full_name,
@@ -211,23 +250,80 @@ def login_service(
     )
 
 
+def _unauthorized(detail: str = "Authentication is required") -> HTTPException:
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+
+
 def get_auth_context_from_token(engine: Engine, raw_token: str) -> AuthContext:
-    session_hash = hash_session_token(raw_token)
-    session_record = find_session_with_user_by_hash(engine, session_hash)
-    if not session_record:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required")
+    """Bearer JWT → active session → user. Pre-JWT opaque tokens are refused
+    (one-release cutover, D-08)."""
+    if not looks_like_jwt(raw_token):
+        raise _unauthorized()
+    try:
+        claims = decode_access_token(raw_token)
+    except InvalidToken:
+        raise _unauthorized("Session is no longer active") from None
+    session_record = find_session_with_user_by_id(engine, int(claims["sid"]))
+    if not session_record or str(session_record.user.id) != str(claims["sub"]):
+        raise _unauthorized()
     _assert_session_active(session_record)
     touch_session(engine, session_record.session.id)
     return AuthContext(
         session_id=session_record.session.id,
-        session_token_hash=session_hash,
+        session_token_hash="",
         user=session_record.user,
     )
 
 
 def logout_service(engine: Engine, auth_context: AuthContext) -> LogoutResponse:
-    revoke_session_by_hash(engine, auth_context.session_token_hash)
+    # The whole sign-in ends: its access tokens stop at the next request and
+    # its refresh tokens can no longer be used.
+    revoke_session(engine, auth_context.session_id, "logout")
     return LogoutResponse(message="Logged out successfully")
+
+
+def refresh_service(engine: Engine, refresh_raw: str | None) -> tuple[dict, str]:
+    """Rotate: a refresh token is used exactly once. Re-using a used token is
+    treated as theft and revokes the whole sign-in (family). Expired or
+    revoked → 401, full re-login."""
+    if not refresh_raw:
+        raise _unauthorized()
+    token = find_refresh_token(engine, hash_refresh_token(refresh_raw))
+    if token is None:
+        raise _unauthorized()
+    if token.used_at is not None or not mark_refresh_token_used(engine, token.id):
+        revoke_session(engine, token.session_id, "refresh-reuse")
+        raise _unauthorized("Session is no longer active")
+    if _as_utc(token.expires_at) < datetime.now(timezone.utc):
+        raise _unauthorized("Session is no longer active")
+    record = find_session_with_user_by_id(engine, token.session_id)
+    if record is None:
+        raise _unauthorized()
+    _assert_session_active(record)
+    refresh_raw_next, refresh_hash = new_refresh_token()
+    insert_refresh_token(engine, record.session.id, refresh_hash, _refresh_expiry(record.session.expires_at))
+    access, access_expires_at = issue_access_token(
+        user_id=record.user.id, tenant_id=getattr(record.user, "tenant_id", None), session_id=record.session.id
+    )
+    return {"token": access, "access_expires_at": access_expires_at}, refresh_raw_next
+
+
+def list_sessions_service(engine: Engine, auth_context: AuthContext) -> dict:
+    items = list_active_sessions(engine, auth_context.user.id)
+    for item in items:
+        item["current"] = item["id"] == auth_context.session_id
+    return {"items": items}
+
+
+def revoke_own_session_service(engine: Engine, auth_context: AuthContext, session_id: int) -> None:
+    owned = {item["id"] for item in list_active_sessions(engine, auth_context.user.id)}
+    if session_id not in owned:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session was not found")
+    revoke_session(engine, session_id, "user-revoked")
+
+
+def revoke_other_sessions_service(engine: Engine, auth_context: AuthContext) -> int:
+    return revoke_user_sessions(engine, auth_context.user.id, "user-revoked-others", except_session_id=auth_context.session_id)
 
 
 def get_current_session_service(engine: Engine, auth_context: AuthContext) -> CurrentSessionResponse:
@@ -300,6 +396,8 @@ def change_password_service(
         password_setup_status="setup-complete",
         force_password_change_on_first_login=False,
     )
+    # Every other sign-in of this user ends; this one continues.
+    revoke_user_sessions(engine, auth_context.user.id, "password-change", except_session_id=auth_context.session_id)
     return PasswordChangeResponse(message="Password changed successfully")
 
 
@@ -375,4 +473,5 @@ def reset_password_service(
         force_password_change_on_first_login=False,
     )
     mark_password_reset_token_used(engine, token_record["id"])
+    revoke_user_sessions(engine, token_record["user_id"], "password-reset")
     return PasswordResetResponse(message="Password reset successfully")

@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     jwt_signing_key: str = Field(default="", alias="JWT_SIGNING_KEY")
     jwt_access_ttl_minutes: int = Field(default=15, alias="JWT_ACCESS_TTL_MINUTES")
     refresh_token_ttl_days: int = Field(default=14, alias="REFRESH_TOKEN_TTL_DAYS")
+    # Hard cap on one sign-in, however often it refreshes.
+    session_absolute_ttl_days: int = Field(default=30, alias="SESSION_ABSOLUTE_TTL_DAYS")
 
     @property
     def is_production(self) -> bool:
@@ -83,6 +85,11 @@ class Settings(BaseSettings):
     )
 
 
+# Development-only fallback so local tokens survive backend reloads. Refused
+# by validate_settings() in staging/production.
+DEV_JWT_SIGNING_KEY = "dev-only-insecure-jwt-signing-key-change-me-0000"
+
+
 def validate_settings(config: "Settings") -> list[str]:
     """Return configuration errors that must stop a production/staging boot.
 
@@ -101,6 +108,8 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("DB_PASSWORD must be set in staging/production")
     if config.ai_enabled:
         errors.append("AI_ENABLED must stay false until the §4.16 AI gates ship (decision D-10)")
+    if len(config.jwt_signing_key) < 32 or config.jwt_signing_key == DEV_JWT_SIGNING_KEY:
+        errors.append("JWT_SIGNING_KEY must be a secret of at least 32 characters in staging/production")
     return errors
 
 

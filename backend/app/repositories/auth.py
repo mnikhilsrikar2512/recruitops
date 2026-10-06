@@ -122,6 +122,7 @@ def insert_user_session(
     ip_address: str | None,
     user_agent: str | None,
     expires_at: datetime,
+    auth_kind: str = "jwt",
 ) -> SessionRecord:
     query = text(
         """
@@ -130,7 +131,8 @@ def insert_user_session(
           session_token_hash,
           ip_address,
           user_agent,
-          expires_at
+          expires_at,
+          auth_kind
         )
         OUTPUT
           INSERTED.id,
@@ -144,7 +146,8 @@ def insert_user_session(
           :session_token_hash,
           :ip_address,
           :user_agent,
-          :expires_at
+          :expires_at,
+          :auth_kind
         );
         """
     )
@@ -157,6 +160,7 @@ def insert_user_session(
                 "ip_address": ip_address,
                 "user_agent": user_agent,
                 "expires_at": expires_at,
+                "auth_kind": auth_kind,
             },
         ).mappings().one()
     return SessionRecord(**row)
@@ -265,3 +269,159 @@ def list_resolved_permissions(engine: Engine, user_id: int) -> list[str]:
     with engine.connect() as connection:
         rows = connection.execute(query, {"user_id": user_id}).mappings().all()
     return sorted(row["permission_code"] for row in rows)
+
+
+# ---- JWT sessions and rotating refresh tokens (Phase 3.1–3.3) ---------------
+
+
+def find_session_with_user_by_id(engine: Engine, session_id: int) -> SessionWithUserRecord | None:
+    query = text(
+        f"""
+        SELECT TOP 1
+          s.id AS session_id,
+          s.user_id AS session_user_id,
+          s.session_token_hash,
+          s.expires_at,
+          s.revoked_at,
+          s.last_seen_at,
+          auth_users.*
+        FROM dbo.user_sessions AS s
+        INNER JOIN (
+          {_user_auth_select_sql()}
+        ) AS auth_users
+          ON auth_users.user_id = s.user_id
+        WHERE s.id = :session_id AND s.auth_kind = N'jwt';
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(query, {"session_id": session_id}).mappings().first()
+    if not row:
+        return None
+    session = SessionRecord(
+        id=row["session_id"],
+        user_id=row["session_user_id"],
+        session_token_hash=row["session_token_hash"],
+        expires_at=row["expires_at"],
+        revoked_at=row["revoked_at"],
+        last_seen_at=row["last_seen_at"],
+    )
+    return SessionWithUserRecord(session=session, user=_map_user(row))
+
+
+def revoke_session(engine: Engine, session_id: int, reason: str) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                UPDATE dbo.user_sessions
+                SET revoked_at = SYSUTCDATETIME(), revoked_reason = :reason, updated_at = SYSUTCDATETIME()
+                WHERE id = :session_id AND revoked_at IS NULL;
+                """
+            ),
+            {"session_id": session_id, "reason": reason},
+        )
+
+
+def revoke_user_sessions(
+    engine: Engine, user_id: int, reason: str, except_session_id: int | None = None
+) -> int:
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(
+                """
+                UPDATE dbo.user_sessions
+                SET revoked_at = SYSUTCDATETIME(), revoked_reason = :reason, updated_at = SYSUTCDATETIME()
+                WHERE user_id = :user_id AND revoked_at IS NULL
+                  AND (:except_id IS NULL OR id <> :except_id);
+                """
+            ),
+            {"user_id": user_id, "reason": reason, "except_id": except_session_id},
+        )
+    return int(result.rowcount or 0)
+
+
+def insert_refresh_token(engine: Engine, session_id: int, token_hash: str, expires_at: datetime) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO dbo.user_refresh_tokens (session_id, token_hash, expires_at) "
+                "VALUES (:session_id, :token_hash, :expires_at);"
+            ),
+            {"session_id": session_id, "token_hash": token_hash, "expires_at": expires_at},
+        )
+
+
+@dataclass
+class RefreshTokenRecord:
+    id: int
+    session_id: int
+    expires_at: datetime
+    used_at: datetime | None
+
+
+def find_refresh_token(engine: Engine, token_hash: str) -> RefreshTokenRecord | None:
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT id, session_id, expires_at, used_at FROM dbo.user_refresh_tokens "
+                "WHERE token_hash = :token_hash;"
+            ),
+            {"token_hash": token_hash},
+        ).mappings().first()
+    return RefreshTokenRecord(**row) if row else None
+
+
+def mark_refresh_token_used(engine: Engine, token_id: int) -> bool:
+    """Atomic: True only for the first caller; a second use is a replay."""
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(
+                "UPDATE dbo.user_refresh_tokens SET used_at = SYSUTCDATETIME() "
+                "WHERE id = :token_id AND used_at IS NULL;"
+            ),
+            {"token_id": token_id},
+        )
+    return (result.rowcount or 0) == 1
+
+
+def list_active_sessions(engine: Engine, user_id: int) -> list[dict]:
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                """
+                SELECT id, ip_address, user_agent, created_at, last_seen_at, expires_at
+                FROM dbo.user_sessions
+                WHERE user_id = :user_id AND revoked_at IS NULL AND auth_kind = N'jwt'
+                  AND expires_at > SYSUTCDATETIME()
+                ORDER BY COALESCE(last_seen_at, created_at) DESC;
+                """
+            ),
+            {"user_id": user_id},
+        ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def purge_stale_sessions(engine: Engine, older_than_days: int = 30) -> int:
+    """Delete refresh tokens and sessions that ended more than N days ago."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                DELETE rt FROM dbo.user_refresh_tokens AS rt
+                INNER JOIN dbo.user_sessions AS s ON s.id = rt.session_id
+                WHERE COALESCE(s.revoked_at, s.expires_at) < DATEADD(DAY, -:days, SYSUTCDATETIME());
+                """
+            ),
+            {"days": older_than_days},
+        )
+        result = connection.execute(
+            text(
+                """
+                DELETE FROM dbo.user_sessions
+                WHERE COALESCE(revoked_at, expires_at) < DATEADD(DAY, -:days, SYSUTCDATETIME())
+                  AND NOT EXISTS (SELECT 1 FROM dbo.user_refresh_tokens AS rt WHERE rt.session_id = dbo.user_sessions.id);
+                """
+            ),
+            {"days": older_than_days},
+        )
+    return int(result.rowcount or 0)

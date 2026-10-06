@@ -114,6 +114,27 @@ def main() -> int:
     status, perms, _ = rec_a.call("GET", "/permissions/me")
     check("1.5 /permissions/me returns grants", status == 200 and perms.get("permissions"), str(status))
 
+    print("── Stage 1b: tokens (Phase 3.1–3.2)")
+
+    def refresh_cookie(headers: dict) -> str:
+        raw = next((v for k, v in headers.items() if k.lower() == "set-cookie"), "") or ""
+        return raw.split("ro_refresh=", 1)[1].split(";", 1)[0] if "ro_refresh=" in raw else ""
+
+    rt = Api(base)
+    status, payload, headers = rt.call("POST", "/auth/login", {"email": TENANT_A[1], "password": opts.password})
+    set_cookie = next((v for k, v in headers.items() if k.lower() == "set-cookie"), "") or ""
+    first = refresh_cookie(headers)
+    check("1.6 login: JWT access token + HttpOnly refresh cookie",
+          status == 200 and str(payload.get("token", "")).count(".") == 2 and first and "httponly" in set_cookie.lower(),
+          set_cookie[:80])
+    status, payload, headers = rt.call("POST", "/auth/refresh", headers={"Cookie": f"ro_refresh={first}"})
+    second = refresh_cookie(headers)
+    check("1.7 refresh rotates the token", status == 200 and payload.get("token") and second and second != first, str(status))
+    status, _, _ = rt.call("POST", "/auth/refresh", headers={"Cookie": f"ro_refresh={first}"})
+    check("1.8 replayed refresh token → 401", status == 401, str(status))
+    status, _, _ = rt.call("POST", "/auth/refresh", headers={"Cookie": f"ro_refresh={second}"})
+    check("1.8 replay revokes the whole sign-in", status == 401, str(status))
+
     print("── Stage 2: tenant isolation")
     status, reqs_a, _ = rec_a.call("GET", "/requisitions/?page_size=100")
     status_b, reqs_b, _ = rec_b.call("GET", "/requisitions/?page_size=100")

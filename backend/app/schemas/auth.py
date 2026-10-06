@@ -51,6 +51,8 @@ class AuthSessionSummary(BaseModel):
 
 class LoginResponse(BaseModel):
     token: str
+    # Access token (JWT) expiry; the refresh token travels in an HttpOnly cookie.
+    access_expires_at: datetime | None = None
     user: AuthUserSummary
     primary_role: AuthRoleSummary
     primary_location: AuthLocationSummary
@@ -125,3 +127,26 @@ class PasswordResetRequest(BaseModel):
 
 class PasswordResetResponse(BaseModel):
     message: str
+
+
+class RefreshResponse(BaseModel):
+    token: str
+    access_expires_at: datetime
+
+
+class SessionInfo(BaseModel):
+    id: int
+    ip_address: str | None = None
+    user_agent: str | None = None
+    created_at: datetime
+    last_seen_at: datetime | None = None
+    expires_at: datetime
+    current: bool = False
+
+
+class SessionListResponse(BaseModel):
+    items: list[SessionInfo]
+
+
+class SessionsRevokedResponse(BaseModel):
+    revoked: int

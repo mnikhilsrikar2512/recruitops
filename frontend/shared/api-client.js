@@ -142,6 +142,35 @@ function defaultUnauthorizedHandler() {
 }
 let unauthorizedHandler = defaultUnauthorizedHandler;
 
+/* One refresh at a time: parallel 401s share the same attempt (a refresh
+   token is single-use, so two concurrent refreshes would look like theft). */
+let refreshInFlight = null;
+function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const root = cachedApiRoot || "/api/v1";
+      const response = await fetch(apiUrl("/auth/refresh", root), {
+        method: "POST", credentials: "include", headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return false;
+      const body = await response.json();
+      const session = RecruitOpsLive.session || readSession();
+      if (!session || !body?.token) return false;
+      session.token = body.token;
+      session.access_expires_at = body.access_expires_at;
+      writeSession(session);
+      RecruitOpsLive.session = session;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setTimeout(() => { refreshInFlight = null; }, 0);
+    }
+  })();
+  return refreshInFlight;
+}
+
 function setUnauthorizedHandler(handler) {
   unauthorizedHandler = typeof handler === "function" ? handler : defaultUnauthorizedHandler;
 }
@@ -169,7 +198,11 @@ async function apiRequest(path, options = {}) {
     body = JSON.stringify(body);
   }
   if (typeof body === "string" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  const init = { ...options, headers, body };
+  /* "include": the refresh-token cookie must also reach the API when it is
+     served from another origin (dev :8000); CORS allows credentials only for
+     the exact allowlisted origins. */
+  const { _retried, ...fetchOptions } = options;
+  const init = { credentials: "include", ...fetchOptions, headers, body };
 
   const roots = cachedApiRoot ? [cachedApiRoot] : apiRootCandidates();
   let lastError = null;
@@ -206,7 +239,16 @@ async function apiRequest(path, options = {}) {
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
       const error = apiErrorFromBody(response.status, payload);
-      if (response.status === 401) unauthorizedHandler(error);
+      if (response.status === 401) {
+        /* Phase 3.9: an expired access token is renewed once from the
+           HttpOnly refresh cookie and the call retried; if that fails the
+           sign-in is over (clear session → login). */
+        if (!options._retried && session?.token && !/^\/auth\/(login|refresh)\b/.test(path)
+            && await refreshAccessToken()) {
+          return apiRequest(path, { ...options, _retried: true });
+        }
+        unauthorizedHandler(error);
+      }
       throw error;
     }
     return payload ?? {};

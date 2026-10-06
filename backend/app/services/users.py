@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.security import hash_password, hash_session_token, random_secret
 
 from app.repositories.audit import insert_audit_log
+from app.repositories.auth import revoke_user_sessions
 from app.repositories.users import (
     count_active_admins,
     count_user_active_assignments,
@@ -304,6 +305,12 @@ def deactivate_user_service(
         user_id=user_id,
         transfer_to_user_id=payload.transfer_to_user_id,
     )
+    # Admin force-revoke (plan 3.3): every sign-in of the deactivated user ends
+    # now. (Requests would already be refused by the user-status check.)
+    try:
+        revoke_user_sessions(engine, user_id, "user-deactivated")
+    except Exception:  # noqa: BLE001 — hygiene only; never blocks deactivation
+        pass
     try:
         create_notification_service(
             engine,
