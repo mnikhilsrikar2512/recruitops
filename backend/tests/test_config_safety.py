@@ -26,7 +26,8 @@ def test_production_rejects_plain_http_origins():
 
 def test_production_accepts_exact_https_origins():
     config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
-                       JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0")
+                       JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0",
+                       RATE_LIMIT_ENABLED=True)  # explicit: the verify script exports it false
     assert validate_settings(config) == []
 
 
@@ -44,3 +45,9 @@ def test_ai_flag_is_off_in_production_and_cannot_be_enabled():
 
 def test_ai_agents_stay_available_in_development():
     assert _settings(APP_ENV="development").ai_agents_available is True
+
+
+def test_production_refuses_disabled_rate_limits():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
+                       JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0", RATE_LIMIT_ENABLED=False)
+    assert any("RATE_LIMIT_ENABLED" in error for error in validate_settings(config))
