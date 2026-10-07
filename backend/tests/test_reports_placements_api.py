@@ -40,10 +40,12 @@ def _cleanup(engine) -> None:
         connection.execute(
             text(
                 """
+                EXEC sp_set_session_context N'recruitops.history_maintenance', 1;
                 DELETE h FROM dbo.candidate_stage_history AS h
                 INNER JOIN dbo.candidate_applications AS ca ON ca.id = h.candidate_application_id
                 INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
-                WHERE r.title = :m
+                WHERE r.title = :m;
+                EXEC sp_set_session_context N'recruitops.history_maintenance', NULL;
                 """
             ),
             {"m": f"{MARKER} Requisition"},

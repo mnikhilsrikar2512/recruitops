@@ -273,9 +273,10 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
             ELSE rejection_side
           END,
           expected_joining_date = COALESCE(:joining_date, expected_joining_date),
-          application_status = CASE
-            WHEN :to_stage IN (N'rejected', N'client-rejected') THEN N'rejected'
-            WHEN :to_stage IN (N'joined', N'hired') THEN N'joined'
+          application_status = CASE dbo.fn_application_stage_bucket(:application_id, :to_stage)
+            WHEN N'rejected' THEN N'rejected'
+            WHEN N'withdrawn' THEN N'withdrawn'
+            WHEN N'joined' THEN N'joined'
             ELSE application_status
           END,
           stage_updated_at = SYSUTCDATETIME(),

@@ -337,10 +337,12 @@ class TenantIsolationFixtures:
         # statements run individually and failures are recorded, not silent.
         statements = [
             ("candidate_stage_history", """
+                EXEC sp_set_session_context N'recruitops.history_maintenance', 1;
                 DELETE FROM dbo.candidate_stage_history
                 WHERE candidate_application_id IN (
                   SELECT id FROM dbo.candidate_applications WHERE candidate_id IN (
-                    SELECT id FROM dbo.candidates WHERE email LIKE :candidate_email));"""),
+                    SELECT id FROM dbo.candidates WHERE email LIKE :candidate_email));
+                EXEC sp_set_session_context N'recruitops.history_maintenance', NULL;"""),
             ("candidate_applications", """
                 DELETE FROM dbo.candidate_applications
                 WHERE candidate_id IN (

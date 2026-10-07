@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Stage Bucket Map - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+  <body class="bg-background text-on-background antialiased" data-route-id="stage-bucket-map" data-route-kind="app" data-route-title="Stage Bucket Map" data-route-section="Administration">
+  
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <a href="../index.html" class="sidebar-brand" title="Return to frontend index">
+          <div class="sidebar-mark">R</div>
+          <div class="sidebar-brand-copy">
+            <div class="sidebar-brand-name">RecruitOps</div>
+            <div class="sidebar-brand-meta">Recruitment OS</div>
+          </div>
+        </a>
+        <a href="candidate-review-drawer.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Open the candidate workspace to add or refine a profile."><span class="material-symbols-outlined text-[18px]">person_add</span><span class="sidebar-cta-copy">Add Candidate</span></a>
+        <nav class="sidebar-nav" aria-label="Primary navigation" data-nav-root></nav>
+        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" data-mobile-nav-open class="inline-flex rounded-full border border-border bg-surface p-2 text-on-surface lg:hidden" aria-label="Open mobile navigation">
+              <span class="material-symbols-outlined text-[18px]">menu</span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Administration</p>
+              <p class="truncate text-sm font-semibold text-on-surface" data-shell-page-title>Stage Bucket Map</p>
+            </div>
+          </div>
+          <div class="topbar-search hidden md:block" data-topbar-search-host>
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-muted">search</span>
+            <label class="sr-only" for="topbar-search">Search within RecruitOps</label>
+            <input id="topbar-search" data-global-search type="text" placeholder="Search within RecruitOps..." aria-label="Search within RecruitOps" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="topbar-action rounded-full border border-border bg-surface p-2 text-on-surface" data-route="notifications-center.html" aria-label="Review notifications" title="Open Notifications Center">
+              <span class="material-symbols-outlined text-[18px]">notifications</span>
+            </button>
+            <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
+              <span class="material-symbols-outlined text-[18px]">help</span>
+            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
+              BN
+            </button>
+          </div>
+        </header>
+        
+    <dialog id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+      <div class="mobile-nav-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">RecruitOps</p>
+            <h2 class="mt-1 text-lg font-bold text-on-surface">Navigation</h2>
+          </div>
+          <button type="button" data-mobile-nav-close class="rounded-full border border-border p-2 text-on-surface" aria-label="Close mobile navigation">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="space-y-4" data-mobile-nav-root>
+          <details class="nav-group"
+          <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+        
+        </div>
+      </div>
+    </dialog>
+    
+        <main id="main-content" tabindex="-1" class="app-canvas">
+          <div class="page-stack">
+    
+    <section class="shell-card">
+      <div class="workspace-surface">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div>
+            <h2 class="font-headline-lg text-headline-lg text-on-surface">Stage Bucket Map</h2>
+            <p class="font-body-sm text-body-sm text-text-muted mt-1">Every pipeline stage your company uses is counted in one reporting bucket. Check that your own stage names land in the right one — reports such as Time to Fill, Placements and the dashboards count by bucket.</p>
+          </div>
+        </div>
+        <p class="hidden mt-4 rounded-lg px-3 py-2 text-[13px]" role="alert" id="bucket-message"></p>
+        <div class="mt-4 bg-surface border border-border rounded-lg shadow-sm overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-alt border-b border-border">
+              <tr>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Stage</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Applications</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Counted as</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Set by</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="bucket-rows" class="font-data-tabular text-data-tabular text-on-surface divide-y divide-border">
+              <tr><td class="px-4 py-3" colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="font-body-sm text-body-sm text-text-muted mt-3">A change applies to reports straight away. Stage moves already recorded keep the bucket they had when they happened, so past reports stay the same.</p>
+      </div>
+    </section>
+    
+  
+          </div>
+        </main>
+      </div>
+    </div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    
+    <script src="../shared/renderers.js?v=1790668771"></script>
+    <script src="../shared/api-client.js?v=1790668771"></script>
+    <script src="../shared/ui-utils.js?v=1790668771"></script>
+    <script src="../shared/tables.js?v=1790668771"></script>
+    <script src="../shared/forms.js?v=1790668771"></script>
+    <script src="../shared/sidebar.js?v=1790668771"></script>
+    <script src="../shared/pipeline.js?v=1790668771"></script>
+    <script src="../shared/routing.js?v=1790668771"></script>
+
+  <script src="../shared/navigation.config.js?v=1790668771"></script>
+    <script src="../shared/navigation.js?v=1790668771"></script>
+    <script src="../shared/app.js?v=1790668771"></script>
+
+  <script>
+  (function () {
+    var rows = document.getElementById("bucket-rows");
+    var message = document.getElementById("bucket-message");
+    function canEdit() { return typeof hasPermission === "function" && hasPermission("settings.update"); }
+    var buckets = [];
+    var SOURCE = { company: "Your company", platform: "RecruitOps default", inferred: "Guessed from the name" };
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    function say(text, ok) {
+      message.textContent = text;
+      message.classList.remove("hidden");
+      message.style.background = ok ? "#EAF3EC" : "#FBECEA";
+      message.style.color = ok ? "#2F5A3A" : "#8A2E22";
+    }
+    function options(selected) {
+      return buckets.map(function (b) { return '<option value="' + esc(b.code) + '"' + (b.code === selected ? " selected" : "") + ">" + esc(b.label) + "</option>"; }).join("");
+    }
+    function render(stages) {
+      if (!stages.length) { rows.innerHTML = '<tr><td class="px-4 py-3" colspan="5">No stages in use yet.</td></tr>'; return; }
+      rows.innerHTML = stages.map(function (s) {
+        var label = s.example_label || s.stage_key;
+        var select = canEdit()
+          ? '<label class="sr-only" for="b-' + esc(s.stage_key) + '">Bucket for ' + esc(label) + '</label><select id="b-' + esc(s.stage_key) + '" data-stage="' + esc(s.stage_key) + '" class="rounded-lg border border-border bg-surface px-2 py-1 text-[13px]">' + options(s.metric_bucket) + "</select>"
+          : esc(s.metric_bucket);
+        var reset = canEdit() && s.source === "company"
+          ? '<button type="button" data-reset="' + esc(s.stage_key) + '" class="rounded-lg border border-border bg-surface px-3 py-1 text-[12px] hover:bg-highlight-soft">Use default</button>'
+          : "";
+        return '<tr class="h-table-row"><td class="px-4 py-2 font-semibold">' + esc(label) + '</td><td class="px-4 py-2">' + esc(s.applications) + '</td><td class="px-4 py-2">' + select + '</td><td class="px-4 py-2 text-text-muted">' + esc(SOURCE[s.source] || s.source) + '</td><td class="px-4 py-2 text-right">' + reset + "</td></tr>";
+      }).join("");
+    }
+    async function load() {
+      try {
+        var data = await apiRequest("/settings/stage-buckets");
+        buckets = data.buckets || [];
+        render(data.stages || []);
+      } catch (error) {
+        rows.innerHTML = '<tr><td class="px-4 py-3" colspan="5">' + esc((error && error.detail) || "Couldn't load the stage map.") + "</td></tr>";
+      }
+    }
+    rows.addEventListener("change", async function (event) {
+      var select = event.target.closest("[data-stage]");
+      if (!select) return;
+      try {
+        await apiRequest("/settings/stage-buckets/" + encodeURIComponent(select.dataset.stage), { method: "PUT", body: JSON.stringify({ metric_bucket: select.value }) });
+        say("Saved. Reports now count this stage as " + select.options[select.selectedIndex].text + ".", true);
+        load();
+      } catch (error) { say((error && error.detail) || "Couldn't save that change.", false); load(); }
+    });
+    rows.addEventListener("click", async function (event) {
+      var button = event.target.closest("[data-reset]");
+      if (!button) return;
+      try {
+        await apiRequest("/settings/stage-buckets/" + encodeURIComponent(button.dataset.reset), { method: "DELETE" });
+        say("Back to the default bucket.", true);
+        load();
+      } catch (error) { say((error && error.detail) || "Couldn't reset that stage.", false); }
+    });
+    load();
+  })();
+  </script>
+</body>
+</html>

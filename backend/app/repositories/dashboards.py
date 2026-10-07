@@ -170,11 +170,9 @@ def get_location_summary_counts(engine: Engine, location_id: int) -> LocationSum
           ) AS active_applications,
           (
             SELECT COUNT(*)
-            FROM dbo.candidate_applications AS ca
-            INNER JOIN dbo.requisitions AS r
-              ON r.id = ca.requisition_id
-            WHERE r.branch_id = l.id
-            AND ca.current_stage IN (N'submitted', N'submitted_to_client', N'client-review')
+            FROM dbo.vw_application_metric_state AS ms
+            WHERE ms.branch_id = l.id
+            AND ms.current_bucket = N'submitted'
           ) AS submitted_profiles,
           (
             SELECT COUNT(*)
@@ -235,11 +233,9 @@ def list_company_location_summaries(engine: Engine, tenant_id: int | None = None
           ) AS active_applications,
           (
             SELECT COUNT(*)
-            FROM dbo.candidate_applications AS ca
-            INNER JOIN dbo.requisitions AS r
-              ON r.id = ca.requisition_id
-            WHERE r.branch_id = l.id
-            AND ca.current_stage IN (N'submitted', N'submitted_to_client', N'client-review')
+            FROM dbo.vw_application_metric_state AS ms
+            WHERE ms.branch_id = l.id
+            AND ms.current_bucket = N'submitted'
           ) AS submitted_profiles,
           (
             SELECT COUNT(*)

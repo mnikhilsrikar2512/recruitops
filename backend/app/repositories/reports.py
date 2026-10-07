@@ -71,6 +71,13 @@ class ClientSummaryRecord:
     avg_days_to_fill: float | None
 
 
+# Phase 4.5: reports never match raw stage labels. "Joined" is the metric
+# bucket (scripts/016_metric_buckets.sql): history rows carry to_bucket
+# snapshotted at insert, and dbo.vw_application_metric_state resolves the
+# bucket of an application's current stage. A company's custom label
+# ("Onboarding", "Start Date Confirmed") counts once it maps to 'joined'.
+
+
 def _location_scope_clause(is_admin: bool) -> str:
     """Requisitions are location-bound via branch_id."""
     # Company-wide callers see every office of THEIR company, never others.
@@ -107,7 +114,7 @@ def get_time_to_fill_summary(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE r.status IN (N'closed', N'filled')
@@ -143,7 +150,7 @@ def get_time_to_fill_summary(
             INNER JOIN dbo.candidate_applications AS ca
                 ON ca.id = h.candidate_application_id
             WHERE ca.requisition_id = r.id
-              AND h.to_stage IN (N'joined', N'hired')
+              AND h.to_bucket = N'joined'
             ORDER BY h.changed_at ASC
         ) AS join_hist
         WHERE r.status IN (N'closed', N'filled')
@@ -210,7 +217,7 @@ def get_time_to_fill_breakdown(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE r.status IN (N'closed', N'filled')
@@ -255,7 +262,7 @@ def get_source_effectiveness(
             COUNT(DISTINCT c.id) AS candidates,
             COUNT(DISTINCT CASE
                 WHEN ca.application_status IN (N'joined', N'hired')
-                  OR ca.current_stage IN (N'joined', N'hired')
+                  OR ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
                   OR ca.offer_status IN (N'accepted', N'joined')
                 THEN c.id
             END) AS hired
@@ -320,7 +327,7 @@ def get_report_dataset(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE r.status IN (N'closed', N'filled')
@@ -335,7 +342,7 @@ def get_report_dataset(
                 COUNT(c.id) AS candidates,
                 SUM(CASE
                     WHEN ca.application_status IN (N'joined', N'hired')
-                      OR ca.current_stage IN (N'joined', N'hired')
+                      OR ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
                       OR ca.offer_status IN (N'accepted', N'joined')
                     THEN 1 ELSE 0
                 END) AS hired
@@ -411,7 +418,7 @@ def get_report_dataset(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE 1 = 1
@@ -490,7 +497,7 @@ _PLACEMENT_SELECT = """
         SELECT TOP (1) h.changed_at
         FROM dbo.candidate_stage_history AS h
         WHERE h.candidate_application_id = ca.id
-          AND h.to_stage IN (N'joined', N'hired')
+          AND h.to_bucket = N'joined'
         ORDER BY h.changed_at ASC
     ) AS jh
 """
@@ -508,7 +515,7 @@ def get_placements(
     query = text(
         f"""
         {_PLACEMENT_SELECT}
-        WHERE ca.current_stage IN (N'joined', N'hired')
+        WHERE ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
           AND jh.changed_at >= :period_from
           AND jh.changed_at < DATEADD(DAY, 1, :period_to)
           {scope}
@@ -588,11 +595,11 @@ def get_client_summary(
                 SELECT TOP (1) h.changed_at
                 FROM dbo.candidate_stage_history AS h
                 WHERE h.candidate_application_id = ca.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS jh
             WHERE r.client_company_id = cc.id
-              AND ca.current_stage IN (N'joined', N'hired')
+              AND ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
               AND jh.changed_at >= :period_from
               AND jh.changed_at < DATEADD(DAY, 1, :period_to)
         ) AS pl

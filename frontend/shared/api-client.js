@@ -651,6 +651,7 @@ const SIDEBAR_PERMISSION_MAP = {
   "role-permissions-editor.html": ["role.permissions.assign"],
   "business-titles.html": ["settings.read"],
   "visibility-rules.html": ["settings.read", "role.read"],
+  "stage-bucket-map.html": ["settings.read"],
   "work-assignment.html": ["assignment.read", "requisition.assign"],
   "portal-accounts.html": ["portal.read"],
   "approvals-inbox.html": ["approval.read"],

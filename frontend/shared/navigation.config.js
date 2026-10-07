@@ -431,6 +431,15 @@ const NAV_ENTRIES = [
     category: "admin",
   },
   {
+    id: "stage-bucket-map",
+    file: "stage-bucket-map.html",
+    label: "Stage Bucket Map",
+    icon: "account_tree",
+    description: "How each pipeline stage is counted in reports.",
+    permissions: ["settings.read"],
+    category: "admin",
+  },
+  {
     id: "work-assignment",
     file: "work-assignment.html",
     label: "Work Assignment",
@@ -586,6 +595,7 @@ const NAV_PAGE_PERMISSIONS = {
   "business-titles": ["settings.read"],
   "tenant-setup": ["settings.read"],
   "visibility-rules": ["settings.read"],
+  "stage-bucket-map": ["settings.read"],
   "work-assignment": ["assignment.read", "requisition.read"],
   "assignment-history-drawer": ["requisition.read"],
   "portal-accounts": ["portal.read"],

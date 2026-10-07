@@ -21,6 +21,8 @@ PRD_ADMIN_SIDEBAR = {
     # Admin
     "user-management", "location-management", "role-management", "role-permissions-editor",
     "business-titles", "visibility-rules", "work-assignment", "portal-accounts",
+    # Stage Bucket Map: pipeline spec §1.3 control-plane page (Phase 4.5)
+    "stage-bucket-map",
     # Reports (library + oversight views)
     "analytics-dashboard", "reports", "custom-report-builder", "time-to-fill-report",
     "source-effectiveness", "sla-tracker", "user-performance-reports", "team-workload",

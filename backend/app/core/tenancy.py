@@ -21,6 +21,7 @@ TABLE_TENANCY: dict[str, str] = {
     "roles": "tenant",  # tenant_id NULL = shared system role (Admin template)
     "company_entities": "tenant",  # company profile / letterhead (012)
     "master_data_values": "tenant",  # NULL = shared template values (012)
+    "stage_bucket_map": "tenant",  # NULL = platform default label map (016)
     # ---- through an office --------------------------------------------
     "agent_runs": "office:location_id",
     "approvals": "office:location_id",
@@ -86,4 +87,5 @@ TABLE_TENANCY: dict[str, str] = {
     "role_templates": "shared:system role templates",
     "role_template_permissions": "shared:system role templates",
     "backend_sql_executions": "shared:migration bookkeeping",
+    "metric_buckets": "shared:the fixed reporting bucket enum (016)",
 }

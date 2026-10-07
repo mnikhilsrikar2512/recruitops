@@ -9,6 +9,12 @@ from app.schemas.settings import (
     CompanyProfileResponse,
     CompanyProfileUpdate,
 )
+from app.schemas.stage_buckets import StageBucketMapResponse, StageBucketResponse, StageBucketUpdate
+from app.services.stage_buckets import (
+    get_stage_bucket_map_service,
+    reset_stage_bucket_service,
+    set_stage_bucket_service,
+)
 from app.services.settings import (
     clear_company_logo_service,
     get_company_logo_for_primary,
@@ -64,3 +70,33 @@ def get_company_logo_endpoint(
     profile id carried in the profile's logo_url."""
     image_bytes, media_type = get_company_logo_for_primary(engine, v)
     return Response(content=image_bytes, media_type=media_type)
+
+
+# ---- Stage Bucket Map (Phase 4.5) -------------------------------------
+@router.get("/stage-buckets", response_model=StageBucketMapResponse)
+def get_stage_bucket_map_endpoint(
+    auth: object = Depends(require_permissions("settings.read")),
+    engine: Engine = Depends(get_engine),
+) -> StageBucketMapResponse:
+    """How every stage label this company uses is counted in reports."""
+    return get_stage_bucket_map_service(engine, auth)
+
+
+@router.put("/stage-buckets/{stage}", response_model=StageBucketResponse)
+def set_stage_bucket_endpoint(
+    stage: str,
+    payload: StageBucketUpdate,
+    auth: object = Depends(require_permissions("settings.update")),
+    engine: Engine = Depends(get_engine),
+) -> StageBucketResponse:
+    return set_stage_bucket_service(engine, stage, payload, auth)
+
+
+@router.delete("/stage-buckets/{stage}", response_model=StageBucketResponse)
+def reset_stage_bucket_endpoint(
+    stage: str,
+    auth: object = Depends(require_permissions("settings.update")),
+    engine: Engine = Depends(get_engine),
+) -> StageBucketResponse:
+    """Drop the company's own mapping; the platform default applies again."""
+    return reset_stage_bucket_service(engine, stage, auth)
