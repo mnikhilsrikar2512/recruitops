@@ -3,6 +3,7 @@ from sqlalchemy import Engine
 from app.repositories.versioning import StaleWriteConflict
 
 from app.repositories.candidates import (
+    find_candidate_document_by_id,
     archive_candidate,
     count_open_applications_in_tenant,
     find_open_candidate_archive,
@@ -26,6 +27,7 @@ from app.repositories.audit import insert_audit_log
 from app.repositories.requisitions import find_requisition_by_id
 from app.repositories.users import find_user_by_id
 from app.schemas.candidate import (
+    FileLinkResponse,
     CandidateFootprintEntry,
     CandidateFootprintResponse,
     CandidateCreate,
@@ -46,7 +48,10 @@ from app.schemas.candidate import (
 )
 from app.schemas.notification import NotificationCreate
 from app.schemas.pagination import PaginationMeta
-from app.core.storage import save_candidate_document
+from app.core.config import settings
+from app.core.file_storage import get_storage
+from app.repositories.uploads import find_idempotent_document, remember_idempotent_document
+from app.services.uploads import ingest, read_capped
 from app.services import scope
 from app.services.auth import AuthContext
 from app.services.notifications import create_notification_service
@@ -341,7 +346,11 @@ async def upload_candidate_document_service(
     file: UploadFile,
     document_type: str,
     auth_context: AuthContext | None = None,
+    idempotency_key: str | None = None,
 ) -> CandidateDocumentResponse:
+    """Phase 4.1/4.2: sniff + allowlist + size cap + quarantine + malware scan,
+    then store under the company's prefix. A retried upload carrying the same
+    Idempotency-Key returns the first result instead of a second copy."""
     if auth_context:
         get_candidate_detail_service(engine, candidate_id, auth_context)
     else:
@@ -349,16 +358,58 @@ async def upload_candidate_document_service(
         if not candidate_record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
 
-    file_name, file_path = await save_candidate_document(candidate_id, file)
     uploaded_by_user_id = auth_context.user.id if auth_context else None
+    key = (idempotency_key or "").strip()[:100] or None
+    if key and uploaded_by_user_id is not None:
+        previous = find_idempotent_document(engine, uploaded_by_user_id, key, "candidate", candidate_id)
+        if previous is not None:
+            return CandidateDocumentResponse.model_validate(find_candidate_document_by_id(engine, int(previous)))
+
+    purpose = "resume" if document_type == "resume" else "document"
+    content = await read_capped(file, purpose)
+    stored = ingest(
+        engine,
+        content=content,
+        file_name=file.filename or "",
+        purpose=purpose,
+        tenant_id=scope.tenant_id_of(auth_context) if auth_context else None,
+        area="candidates",
+        entity_type="candidate",
+        entity_id=candidate_id,
+        actor_user_id=uploaded_by_user_id,
+        actor_location_id=auth_context.user.location_id if auth_context else None,
+    )
     payload = CandidateDocumentCreate(
         document_type=document_type,
-        file_name=file_name,
-        file_path=file_path,
+        file_name=stored.file_name,
+        file_path=stored.storage_key,
         uploaded_by_user_id=uploaded_by_user_id,
     )
-    created = create_candidate_document(engine, candidate_id, payload)
+    created = create_candidate_document(engine, candidate_id, payload, stored)
+    if key and uploaded_by_user_id is not None:
+        remember_idempotent_document(engine, uploaded_by_user_id, key, "candidate", candidate_id, int(created.id))
     return CandidateDocumentResponse.model_validate(created)
+
+
+def candidate_document_link_service(
+    engine: Engine, candidate_id: int, document_id: int, auth_context: AuthContext
+) -> FileLinkResponse:
+    """Phase 4.1: a link is issued only after the caller passed the same
+    access checks as reading the candidate, only for a clean scanned file,
+    and only for a short time."""
+    get_candidate_detail_service(engine, candidate_id, auth_context)
+    try:
+        document = find_candidate_document_by_id(engine, document_id)
+    except RuntimeError:
+        document = None
+    if document is None or int(document.candidate_id) != int(candidate_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document was not found")
+    if not document.storage_key or document.scan_status != "clean":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This document has no checked file to download")
+    ttl = settings.file_link_ttl_seconds
+    url = get_storage().link(document.storage_key, document.file_name, document.content_type or "application/octet-stream", ttl)
+    return FileLinkResponse(url=url, expires_in_seconds=ttl, file_name=document.file_name,
+                            content_type=document.content_type or "application/octet-stream")
 
 
 def get_candidate_duplicate_check_service(

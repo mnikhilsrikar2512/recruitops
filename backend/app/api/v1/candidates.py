@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Path, Query, UploadFile
 from sqlalchemy import Engine
 
 from fastapi import HTTPException
 
 from app.api.deps import caller_has_permission, caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions, reject_unknown_query_params, sort_clause
 from app.schemas.candidate import (
+    FileLinkResponse,
     ArchiveRequest,
     CandidateCreate,
     CandidateFootprintResponse,
@@ -23,6 +24,7 @@ from app.schemas.candidate import (
     CandidateUpdate,
 )
 from app.services.candidates import (
+    candidate_document_link_service,
     archive_candidate_service,
     restore_candidate_service,
     create_candidate_document_service,
@@ -168,8 +170,24 @@ async def upload_candidate_document_endpoint(
     auth_context: AuthContext = Depends(require_permissions("candidate.resume.upload")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=100),
 ) -> CandidateDocumentResponse:
-    return await upload_candidate_document_service(engine, candidate_id, file, document_type, auth_context)
+    """Phase 4.2: the file is type-sniffed, size-capped and malware-scanned
+    before it is stored. Send an Idempotency-Key to make retries safe."""
+    extra = {"idempotency_key": idempotency_key} if idempotency_key else {}
+    return await upload_candidate_document_service(engine, candidate_id, file, document_type, auth_context, **extra)
+
+
+@router.get("/{candidate_id}/documents/{document_id}/link", response_model=FileLinkResponse)
+def candidate_document_link_endpoint(
+    auth_context: AuthContext = Depends(require_permissions("candidate.read")),
+    candidate_id: int = Path(..., ge=1),
+    document_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> FileLinkResponse:
+    """A short-lived download link (FILE_LINK_TTL_SECONDS), issued only after
+    the same access checks as reading the candidate."""
+    return candidate_document_link_service(engine, candidate_id, document_id, auth_context)
 
 
 @router.get("/{candidate_id}/duplicate-check", response_model=CandidateDuplicateCheckResponse)

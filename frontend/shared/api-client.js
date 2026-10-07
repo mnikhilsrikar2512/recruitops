@@ -253,6 +253,16 @@ function showStaleWriteDialog(message) {
  */
 async function apiRequest(path, options = {}) {
   const session = RecruitOpsLive.session || readSession();
+  /* Phase 4.2: uploads carry an Idempotency-Key so a retried upload (e.g.
+     after a token refresh) returns the first result, not a second copy.
+     Stored on options so the retry reuses the same key. */
+  if (typeof FormData !== "undefined" && options.body instanceof FormData
+      && String(options.method || "GET").toUpperCase() === "POST"
+      && !(options.headers && options.headers["Idempotency-Key"])) {
+    const key = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    options.headers = { ...(options.headers || {}), "Idempotency-Key": key };
+  }
   const headers = { Accept: "application/json", ...options.headers };
   if (session?.token) headers["Authorization"] = `Bearer ${session.token}`;
   let body = options.body;

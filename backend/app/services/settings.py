@@ -62,8 +62,37 @@ def update_company_logo_service(
     engine: Engine, payload: CompanyLogoUpdate, tenant_id: int | None = None
 ) -> CompanyLogoResponse:
     profile = _require_profile(engine, tenant_id)
-    settings_repo.set_company_logo(engine, profile.id, payload.data_url)
+    data_url = _checked_logo_data_url(payload.data_url)
+    settings_repo.set_company_logo(engine, profile.id, data_url)
     return CompanyLogoResponse(logo_url=f"/api/v1/settings/logo?v={profile.id}")
+
+
+def _checked_logo_data_url(data_url: str) -> str:
+    """Phase 4.2: the logo is served publicly, so it must really be a PNG or
+    JPEG (no SVG, which can carry script) and pass the malware scan. The
+    stored media type comes from the bytes, not from the client's label."""
+    import base64
+
+    from app.core.errors import ApiError
+    from app.core.file_types import FileRejected, check_file
+    from app.core.malware import ScanUnavailable, get_scanner
+
+    try:
+        encoded = data_url.split(",", 1)[1]
+        image_bytes = base64.b64decode(encoded, validate=True)
+    except Exception:
+        raise ApiError(422, "UNSUPPORTED_FILE_TYPE", "The logo must be a PNG or JPEG image") from None
+    try:
+        kind = check_file("logo.png" if image_bytes.startswith(b"\x89PNG") else "logo.jpg", image_bytes, "logo")
+    except FileRejected as rejected:
+        raise ApiError(413 if rejected.code == "FILE_TOO_LARGE" else 422, rejected.code, rejected.message) from None
+    try:
+        result = get_scanner().scan(image_bytes)
+    except ScanUnavailable:
+        raise ApiError(503, "SCANNER_UNAVAILABLE", "Images can't be checked for viruses right now; try again shortly") from None
+    if not result.clean:
+        raise ApiError(422, "MALWARE_DETECTED", "This image failed the virus check and was not accepted")
+    return f"data:{kind.content_type};base64,{encoded}"
 
 
 def get_company_logo_raw(engine: Engine, company_id: int) -> tuple[bytes, str]:

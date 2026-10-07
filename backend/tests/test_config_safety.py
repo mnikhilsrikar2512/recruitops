@@ -27,7 +27,8 @@ def test_production_rejects_plain_http_origins():
 def test_production_accepts_exact_https_origins():
     config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
                        JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0",
-                       RATE_LIMIT_ENABLED=True)  # explicit: the verify script exports it false
+                       RATE_LIMIT_ENABLED=True,  # explicit: the verify script exports it false
+                       STORAGE_BACKEND="s3", S3_BUCKET="recruitops-files", MALWARE_SCANNER="clamav")
     assert validate_settings(config) == []
 
 
@@ -51,3 +52,13 @@ def test_production_refuses_disabled_rate_limits():
     config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
                        JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0", RATE_LIMIT_ENABLED=False)
     assert any("RATE_LIMIT_ENABLED" in error for error in validate_settings(config))
+
+
+def test_production_refuses_local_storage_and_builtin_scanner():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
+                       JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0", RATE_LIMIT_ENABLED=True)
+    errors = validate_settings(config)
+    assert any("STORAGE_BACKEND" in e for e in errors)
+    assert any("MALWARE_SCANNER" in e for e in errors)
+    bucketless = _settings(APP_ENV="production", STORAGE_BACKEND="s3", MALWARE_SCANNER="clamav")
+    assert any("S3_BUCKET" in e for e in validate_settings(bucketless))

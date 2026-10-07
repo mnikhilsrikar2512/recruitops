@@ -21,8 +21,9 @@ TABLE_TENANCY: dict[str, str] = {
     "roles": "tenant",  # tenant_id NULL = shared system role (Admin template)
     "company_entities": "tenant",  # company profile / letterhead (012)
     "master_data_values": "tenant",  # NULL = shared template values (012)
-    "stage_bucket_map": "tenant",
-    "candidate_archives": "tenant",  # an archive hides a shared candidate from ONE company (019)  # NULL = platform default label map (016)
+    "stage_bucket_map": "tenant",  # NULL = platform default label map (016)
+    "candidate_archives": "tenant",  # an archive hides a shared candidate from ONE company (019)
+    "upload_quarantine": "tenant",  # uploads that failed the malware scan (021)
     # ---- through an office --------------------------------------------
     "agent_runs": "office:location_id",
     "approvals": "office:location_id",
@@ -81,6 +82,7 @@ TABLE_TENANCY: dict[str, str] = {
     "user_invitations": "user:user_id",
     "user_notification_preferences": "user:user_id",
     "user_extra_permissions": "user:user_id",
+    "upload_idempotency": "user:user_id",  # Idempotency-Key -> document (021)
     "automation_jobs": "user:triggered_by_user_id",
     # ---- shared on purpose ----------------------------------------------
     "permissions": "shared:the permission catalog",

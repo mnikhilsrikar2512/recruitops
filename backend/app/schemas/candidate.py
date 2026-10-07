@@ -187,6 +187,10 @@ class CandidateDocumentResponse(BaseModel):
     verified_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    # Phase 4.2: set for uploads that went through sniff + scan.
+    content_type: str | None = None
+    size_bytes: int | None = None
+    scan_status: str | None = None
 
 
 class CandidateDuplicateMatchResponse(BaseModel):
@@ -364,3 +368,11 @@ class ArchiveRequest(BaseModel):
         if len(normalized) < 3:
             raise ValueError("Give a reason of at least 3 characters")
         return normalized
+
+
+class FileLinkResponse(BaseModel):
+    """Phase 4.1: a short-lived download link, issued only after access checks."""
+    url: str
+    expires_in_seconds: int
+    file_name: str
+    content_type: str

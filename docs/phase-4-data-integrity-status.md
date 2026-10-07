@@ -228,3 +228,46 @@ The repository's `find_duplicate_matches` now sorts matches into two tiers:
 | An `.exe` renamed `.pdf` is rejected; an EICAR file is quarantined and never linkable | ⏳ | Needs 4.1/4.2 (storage and malware scanner; cloud choice I-2) |
 
 Built: 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9. Still to build: 4.1 (storage adapter) and 4.2 (upload pipeline).
+
+## 4.1 Storage adapter + 4.2 upload pipeline — built (portable; cloud still undecided, I-2)
+
+Decision D-4.1 (2026-10-08): files are stored through the S3 standard, so any S3-compatible store works. The cloud choice is only settings.
+
+- **Storage (`app/core/file_storage.py`):**
+  - `STORAGE_BACKEND=local` (development and CI only) or `s3`. S3 covers AWS S3, Cloudflare R2, Backblaze B2, DigitalOcean Spaces and MinIO through `S3_ENDPOINT_URL`. `boto3` is imported only when S3 is in use.
+  - Object keys are always `tenant_<id>/<area>/<entity>/<uuid><ext>`. Path escapes are refused.
+  - Links: the S3 backend issues presigned GETs to a private bucket (AWS: SSE-AES256). The local backend issues short-lived signed tokens served by `GET /files/signed/{token}`. Tokens carry their own audience, so they can never be used as an access token, and they never point into `quarantine/`. Lifetime is `FILE_LINK_TTL_SECONDS`, default 300.
+  - Links are issued **only after authorisation**: `GET /candidates/{id}/documents/{doc_id}/link` runs the full candidate access check (company, office, archive) and requires a clean scanned file.
+- **Security fix: removed `GET /files/{path}`.** It served any stored file to any signed-in user who knew the path, with no company or record check.
+- **Upload pipeline (`app/services/uploads.py`):** sniff → allowlist → size cap → `quarantine/` → malware scan → final key.
+  - **Type sniffing** (`file_types.py`):
+    - The file type comes from its first bytes: PDF, DOC (OLE), DOCX, PNG, JPEG.
+    - The extension must agree with the content, so an `.exe` renamed `.pdf` gets 422 `UNSUPPORTED_FILE_TYPE`.
+    - Allowed per purpose: resume = PDF/DOC/DOCX; document = those plus PNG/JPEG; logo = PNG/JPEG.
+    - Size caps: resumes and documents 10 MB, logo 5 MB. The upload is read only to cap + 1 bytes.
+  - **Scanning** (`malware.py`):
+    - `MALWARE_SCANNER=clamav` talks to clamd INSTREAM over TCP; no new dependency.
+    - `builtin` (development and CI) detects only the EICAR test signature.
+    - A scanner that can't answer refuses the upload: 503 `SCANNER_UNAVAILABLE` (fail closed).
+  - **Infected files:**
+    - The bytes stay under `quarantine/` and a row goes into `upload_quarantine`.
+    - The block is audited as `upload.malware_blocked`, and the caller gets 422 `MALWARE_DETECTED`.
+    - No document row is created, so nothing can link to the file.
+  - **Idempotency:** an `Idempotency-Key` header returns the first document on retry (`upload_idempotency`). `api-client.js` adds a key to every FormData POST.
+  - **Company logo:** must really be PNG or JPEG (SVG could carry script on a public URL) and is scanned. The stored media type comes from the bytes.
+- **Migration `021_file_pipeline.sql`:**
+  - Adds to `candidate_documents`: `storage_key`, `content_type`, `size_bytes`, `sha256` and the scan fields.
+  - New tables: `upload_quarantine` and `upload_idempotency`.
+  - Rows from before this migration have no `storage_key` and are never linked.
+- **Config guard:** staging and production refuse to start with `STORAGE_BACKEND != s3`, without an `S3_BUCKET`, or with `MALWARE_SCANNER != clamav`.
+- **Tests:**
+  - Unit tests in `test_file_pipeline.py` cover the sniff rules, the EICAR scanner, the ClamAV protocol against a fake clamd, fail-closed behaviour, path escapes, and signed-link tamper and expiry.
+  - The exit gate is `test_upload_pipeline_db.py`:
+    - A renamed `.exe` gets 422.
+    - An EICAR file is quarantined, with no document and no link.
+    - A clean upload lands under the company prefix and is idempotent.
+    - The signed link downloads the file, the raw path returns 404, and a forged link returns 403.
+- **Still needed for go-live:**
+  - Pick the bucket provider and set the `S3_*` settings.
+  - Run a ClamAV daemon next to the API (`clamav/clamav` image, port 3310).
+  - Move existing local files into the bucket (none exist today; readiness Q15 counted 0 uploads).

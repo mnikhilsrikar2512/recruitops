@@ -35,6 +35,19 @@ class Settings(BaseSettings):
         default=".pdf,.doc,.docx,.jpg,.jpeg,.png",
         alias="ALLOWED_UPLOAD_EXTENSIONS",
     )
+    # Phase 4.1/4.2: file storage + upload scanning. "local" and "builtin"
+    # are for development and CI only; staging/production need s3 + clamav.
+    storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")
+    s3_bucket: str = Field(default="", alias="S3_BUCKET")
+    s3_region: str = Field(default="", alias="S3_REGION")
+    s3_endpoint_url: str = Field(default="", alias="S3_ENDPOINT_URL")  # R2 / MinIO / Backblaze / DO Spaces
+    s3_access_key_id: str = Field(default="", alias="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str = Field(default="", alias="S3_SECRET_ACCESS_KEY")
+    file_link_ttl_seconds: int = Field(default=300, alias="FILE_LINK_TTL_SECONDS")
+    malware_scanner: str = Field(default="builtin", alias="MALWARE_SCANNER")
+    clamav_host: str = Field(default="127.0.0.1", alias="CLAMAV_HOST")
+    clamav_port: int = Field(default=3310, alias="CLAMAV_PORT")
+    clamav_timeout_seconds: float = Field(default=30.0, alias="CLAMAV_TIMEOUT_SECONDS")
     smtp_host: str = Field(default="", alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
     smtp_user: str = Field(default="", alias="SMTP_USER")
@@ -128,6 +141,12 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("RATE_LIMIT_ENABLED must stay true in staging/production")
     if len(config.jwt_signing_key) < 32 or config.jwt_signing_key == DEV_JWT_SIGNING_KEY:
         errors.append("JWT_SIGNING_KEY must be a secret of at least 32 characters in staging/production")
+    if config.storage_backend.strip().lower() != "s3":
+        errors.append("STORAGE_BACKEND must be s3 in staging/production (local disk is for development only)")
+    elif not config.s3_bucket:
+        errors.append("S3_BUCKET must be set when STORAGE_BACKEND=s3")
+    if config.malware_scanner.strip().lower() != "clamav":
+        errors.append("MALWARE_SCANNER must be clamav in staging/production (builtin only detects the EICAR test file)")
     return errors
 
 

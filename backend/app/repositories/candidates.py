@@ -104,6 +104,11 @@ class CandidateDocumentRecord:
     verified_at: object
     created_at: object
     updated_at: object
+    storage_key: str | None = None
+    content_type: str | None = None
+    size_bytes: int | None = None
+    sha256: str | None = None
+    scan_status: str | None = None
 
 
 @dataclass
@@ -732,7 +737,11 @@ def update_candidate(engine: Engine, candidate_id: int, payload: CandidateUpdate
     return updated
 
 
-def create_candidate_document(engine: Engine, candidate_id: int, payload: CandidateDocumentCreate) -> CandidateDocumentRecord:
+def create_candidate_document(
+    engine: Engine, candidate_id: int, payload: CandidateDocumentCreate, stored: object | None = None
+) -> CandidateDocumentRecord:
+    """``stored`` (app.services.uploads.StoredFile) is set for files that went
+    through the Phase 4.2 pipeline; only those can ever be linked."""
     query = text(
         """
         INSERT INTO dbo.candidate_documents (
@@ -741,7 +750,13 @@ def create_candidate_document(engine: Engine, candidate_id: int, payload: Candid
           file_name,
           file_path,
           verification_status,
-          uploaded_by_user_id
+          uploaded_by_user_id,
+          storage_key,
+          content_type,
+          size_bytes,
+          sha256,
+          scan_status,
+          scanned_at
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -750,7 +765,13 @@ def create_candidate_document(engine: Engine, candidate_id: int, payload: Candid
           :file_name,
           :file_path,
           :verification_status,
-          :uploaded_by_user_id
+          :uploaded_by_user_id,
+          :storage_key,
+          :content_type,
+          :size_bytes,
+          :sha256,
+          :scan_status,
+          :scanned_at
         );
         """
     )
@@ -764,6 +785,12 @@ def create_candidate_document(engine: Engine, candidate_id: int, payload: Candid
                 "file_path": payload.file_path,
                 "verification_status": payload.verification_status,
                 "uploaded_by_user_id": payload.uploaded_by_user_id,
+                "storage_key": getattr(stored, "storage_key", None),
+                "content_type": getattr(stored, "content_type", None),
+                "size_bytes": getattr(stored, "size_bytes", None),
+                "sha256": getattr(stored, "sha256", None),
+                "scan_status": getattr(stored, "scan_status", None),
+                "scanned_at": getattr(stored, "scanned_at", None),
             },
         ).scalar_one()
     return find_candidate_document_by_id(engine, int(document_id))
@@ -783,7 +810,12 @@ def find_candidate_document_by_id(engine: Engine, document_id: int) -> Candidate
           verified_by_user_id,
           verified_at,
           created_at,
-          updated_at
+          updated_at,
+          storage_key,
+          content_type,
+          size_bytes,
+          sha256,
+          scan_status
         FROM dbo.candidate_documents
         WHERE id = :document_id;
         """
