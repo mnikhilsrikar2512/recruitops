@@ -532,7 +532,9 @@ class TestRouteRegistration:
         from app.main import app
         paths = app.openapi()["paths"]
 
-        assert "/api/v1/files/{file_path}" in paths
+        # Phase 4.1: only signed links are served; the raw path route is gone.
+        assert "/api/v1/files/signed/{token}" in paths
+        assert "/api/v1/files/{file_path}" not in paths
 
     def test_auth_routes_registered(self):
         from app.main import app

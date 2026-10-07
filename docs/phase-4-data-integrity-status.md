@@ -271,3 +271,8 @@ Decision D-4.1 (2026-10-08): files are stored through the S3 standard, so any S3
   - Pick the bucket provider and set the `S3_*` settings.
   - Run a ClamAV daemon next to the API (`clamav/clamav` image, port 3310).
   - Move existing local files into the bucket (none exist today; readiness Q15 counted 0 uploads).
+
+**4.1/4.2 verify run (`0e15686`):** 516 passed, 1 failed; smoke 52/52; sweeps 105/105. 021 applied to dev.
+
+- `test_file_serve_route_registered` still expected the removed `GET /files/{file_path}` route. It now checks that `/files/signed/{token}` exists and that the raw path route is gone.
+- GitHub CI's frontend gates failed `flow_logout` with "Transition was aborted because of invalid state". That is Chromium's own cross-document View Transition promise being rejected when logout navigates mid-transition. The browser sweep already ignored this message; the UI-flow runner now ignores it the same way (`_BENIGN_ERRORS`). The navigation itself completes and the flow's assertions still run.

@@ -31,6 +31,18 @@ def session(persona="full"):
             "location_name": "Bengaluru", "offers_enabled": True, "permissions": []}
 
 
+# Chromium rejects the cross-document View Transition promise ("Transition
+# was aborted because of invalid state") when a navigation starts while the
+# page is mid-transition — e.g. logout redirecting at once. It is the
+# browser's own internal promise, not app code, and the navigation still
+# completes; newer Chromium in CI surfaces it as a pageerror.
+_BENIGN_ERRORS = ("Transition was aborted because of invalid state",)
+
+
+def _benign(message: str) -> bool:
+    return any(marker in message for marker in _BENIGN_ERRORS)
+
+
 class Flow:
     def __init__(self, browser, base, signed_in=True):
         self.base = base
@@ -43,7 +55,7 @@ class Flow:
             status=200, content_type="application/javascript", body=TAILWIND_STUB if "tailwind" in r.request.url else ""))
         self.page: Page = self.context.new_page()
         self.errors: list[str] = []
-        self.page.on("pageerror", lambda e: self.errors.append(f"uncaught: {e}"))
+        self.page.on("pageerror", lambda e: None if _benign(str(e)) else self.errors.append(f"uncaught: {e}"))
         mock(base, "/__mock/reset?persona=full")
 
     def open(self, name):
