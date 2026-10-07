@@ -209,3 +209,8 @@ The repository's `find_duplicate_matches` now sorts matches into two tiers:
 - **Pagination.** Every list already takes `page` and `page_size` (max 100) and returns `meta.total`. Defaults are 20 on most lists; the PRD says 25, and that change is left alone so pages don't shift under the current UI.
 - **Foreign-tenant IDs in responses.** Already covered by the Phase 2 isolation suites (`test_tenant_isolation_db.py`, `test_company_isolation_db.py`). 4.7 closed the one known leak, contact details in duplicate matches.
 - **Not done:** cursor pagination for notifications and audit logs (the audit log viewer is Phase 5.4), and `sort` on the other 13 lists.
+
+**First 4.9 run (`f79dc35`):** 39 failed, 465 passed; live smoke 28/48; the sweeps showed failing pages. Every strict list endpoint returned 500.
+
+- **Cause:** `reject_unknown_query_params` imported `fastapi.dependencies.utils.get_flat_dependant`. That function no longer exists in the installed FastAPI (0.141). The same version nests included routers (`_IncludedRouter`), so the test's walk over `app.routes` found nothing either.
+- **Fix:** the allowed names now come from the endpoint's own signature (`scope["endpoint"]`, its `Query` parameters and plain scalar defaults). This doesn't depend on FastAPI's routing internals, so a version bump can't break it the same way. The contract test now finds strict lists from the source files.

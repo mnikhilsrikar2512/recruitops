@@ -274,19 +274,48 @@ def require_record_in_location(
 
 
 # ---- PRD §9.0 list conventions (Phase 4.9) ------------------------------
+def _endpoint_query_names(endpoint) -> frozenset[str]:
+    """Query parameter names an endpoint declares, read from its signature
+    (works on every FastAPI version: no routing internals)."""
+    import inspect
+
+    from fastapi import params as fastapi_params
+
+    cached = getattr(endpoint, "__query_names__", None)
+    if cached is not None:
+        return cached
+    names: set[str] = set()
+    for name, parameter in inspect.signature(endpoint).parameters.items():
+        default = parameter.default
+        if isinstance(default, fastapi_params.Query):
+            names.add(default.alias or name)
+        elif isinstance(default, (fastapi_params.Depends, fastapi_params.Path, fastapi_params.Body,
+                                  fastapi_params.Header, fastapi_params.Cookie)):
+            continue
+        elif parameter.annotation in (Request,) or name in {"request", "engine", "auth", "auth_context"}:
+            continue
+        elif default is not inspect.Parameter.empty or parameter.annotation in (int, str, bool, float):
+            names.add(name)  # plain scalar default = implicit query parameter
+    result = frozenset(names)
+    try:
+        endpoint.__query_names__ = result
+    except (AttributeError, TypeError):
+        pass
+    return result
+
+
 def reject_unknown_query_params(request: Request) -> None:
     """List endpoints refuse query parameters they do not support (400
     UNSUPPORTED_FILTER) instead of silently ignoring them, so a typo or a
-    filter the API never had cannot return a misleadingly unfiltered list."""
-    from fastapi.dependencies.utils import get_flat_dependant
-
+    filter the API never had cannot return a misleadingly unfiltered list.
+    Every list endpoint declares its filters in its own signature (Query),
+    including the ones its scope dependencies read (e.g. location_id)."""
     from app.core.errors import ApiError
 
-    route = request.scope.get("route")
-    dependant = getattr(route, "dependant", None)
-    if dependant is None:
+    endpoint = request.scope.get("endpoint")
+    if endpoint is None:
         return
-    allowed = {param.alias for param in get_flat_dependant(dependant).query_params}
+    allowed = _endpoint_query_names(endpoint)
     unknown = sorted(key for key in request.query_params.keys() if key not in allowed)
     if unknown:
         raise ApiError(
