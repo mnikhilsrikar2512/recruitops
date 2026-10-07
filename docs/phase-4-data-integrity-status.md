@@ -162,3 +162,9 @@ One company-wide limit is too blunt when roles pay differently, so the requisiti
 - **Tests:**
   - The unit table in `test_offer_threshold_rule` covers 9 cases.
   - `test_offer_threshold_db.py::test_requisition_budget_decides_when_set` shows the budget overriding a company threshold of 0.
+
+**Fifth verify run (`ceca100`):** 492 passed, 2 failed, both in `test_offer_threshold_db.py`. 020 applied to dev.
+
+- **Cause: an old bug, now fixed.** Every offer that needed approval returned 500 on a real database. `create_offer` inserted into `approval_requests.location_id`, but that table's column is `branch_id`. No earlier test created an offer against a real database, and the unit tests mock the repository, so the bug never showed up before. The direct-approve path (new in 4.8) passed; the approval path exposed it.
+- Fix: the INSERT now writes `branch_id`.
+- Database errors are now logged on the server with the request path and the real SQL error. Before, they were swallowed into a generic 500, which made this hard to find.

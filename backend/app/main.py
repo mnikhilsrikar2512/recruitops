@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -46,7 +47,12 @@ def _integrity_error_response(_request: Request, exc: IntegrityError) -> JSONRes
     return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": detail})
 
 
-def _sqlalchemy_error_response(_request: Request, _exc: SQLAlchemyError) -> JSONResponse:
+def _sqlalchemy_error_response(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    # The client gets a generic message; the real cause goes to the server
+    # log so a failing query can be found (it was invisible before).
+    logging.getLogger("recruitops.db").error(
+        "database error on %s %s: %s", request.method, request.url.path, exc, exc_info=exc
+    )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "A database error prevented this request from completing"},

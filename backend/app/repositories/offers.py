@@ -172,7 +172,7 @@ def create_offer(
     approval_query = text(
         """
         INSERT INTO dbo.approval_requests (
-          location_id,
+          branch_id,
           request_type,
           source_type,
           source_id,
