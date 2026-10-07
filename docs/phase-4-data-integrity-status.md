@@ -168,3 +168,24 @@ One company-wide limit is too blunt when roles pay differently, so the requisiti
 - **Cause: an old bug, now fixed.** Every offer that needed approval returned 500 on a real database. `create_offer` inserted into `approval_requests.location_id`, but that table's column is `branch_id`. No earlier test created an offer against a real database, and the unit tests mock the repository, so the bug never showed up before. The direct-approve path (new in 4.8) passed; the approval path exposed it.
 - Fix: the INSERT now writes `branch_id`.
 - Database errors are now logged on the server with the request path and the real SQL error. Before, they were swallowed into a generic 500, which made this hard to find.
+
+**Sixth verify run (`82a5d59`):** 494 passed, smoke 52/52, sweeps 105/105.
+
+## 4.7 Duplicate matching — built
+
+The repository's `find_duplicate_matches` now sorts matches into two tiers:
+
+| Tier | Rule | Effect | Scope |
+|---|---|---|---|
+| **exact** | Same e-mail (ignoring case and spaces) or same phone (last 10 digits; spaces, dashes, brackets and `+` ignored) | Flags the candidate `in-review` | Every company, because candidates are shared identity records |
+| **suggested** | Name similarity ≥ 0.85 (word order, case and punctuation ignored) **and** the same location (current or preferred city) | A hint only; never changes the duplicate state | The caller's company only |
+
+**Other changes:**
+
+- A match that is only the same name (with no shared city) is no longer reported. Before, an exact name match alone flagged the candidate.
+- **Privacy fix:** an exact match that belongs to another company comes back with `in_your_company: false` and no e-mail, phone or employer. Before, the duplicate check showed other companies' contact details.
+- The response gains `match_tier` and `in_your_company`. Scores: exact matches score 90–100; suggestions are capped at 79.
+- Duplicate decisions were already audited (`duplicate_decision_created`).
+- **Tests:**
+  - Unit tests in `tests/test_duplicate_tiers.py` cover name normalisation, phone digits, cross-company redaction and the suggestion cut-off.
+  - `tests/test_duplicate_tiers_db.py` runs the full set of cases against a real database.

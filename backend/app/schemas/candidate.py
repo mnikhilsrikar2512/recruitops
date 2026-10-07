@@ -199,6 +199,11 @@ class CandidateDuplicateMatchResponse(BaseModel):
     duplicate_state: str
     match_score: int
     match_reasons: list[str]
+    # Phase 4.7: "exact" (same e-mail/phone, flags for review) or "suggested"
+    # (similar name + same location, a hint only).
+    match_tier: str = "exact"
+    # False for an exact match in another company: contact details withheld.
+    in_your_company: bool = True
 
 
 class CandidateDuplicateReviewCaseResponse(BaseModel):

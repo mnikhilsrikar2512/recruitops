@@ -117,6 +117,8 @@ class CandidateDuplicateMatchRecord:
     duplicate_state: str
     match_score: int
     match_reasons: list[str]
+    match_tier: str = "exact"
+    in_your_company: bool = True
 
 
 @dataclass
@@ -793,49 +795,132 @@ def find_candidate_document_by_id(engine: Engine, document_id: int) -> Candidate
     return CandidateDocumentRecord(**row)
 
 
-def find_duplicate_matches(engine: Engine, candidate_id: int) -> list[CandidateDuplicateMatchRecord]:
-    query = text(
-        """
+_PHONE_DIGITS_SQL = (
+    "RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({col}, N' ', N''), N'-', N''), N'+', N''),"
+    " N'(', N''), N')', N''), N'.', N''), 10)"
+)
+
+
+def _normalized_name(value: str | None) -> str:
+    return " ".join(sorted("".join(ch if ch.isalnum() else " " for ch in (value or "").lower()).split()))
+
+
+def _name_similarity(left: str | None, right: str | None) -> float:
+    from difflib import SequenceMatcher
+
+    a, b = _normalized_name(left), _normalized_name(right)
+    if not a or not b:
+        return 0.0
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _phone_digits(value: str | None) -> str:
+    digits = "".join(ch for ch in (value or "") if ch.isdigit())
+    return digits[-10:]
+
+
+def find_duplicate_matches(
+    engine: Engine, candidate_id: int, tenant_id: int | None = None
+) -> list[CandidateDuplicateMatchRecord]:
+    """Phase 4.7 — two tiers.
+
+    exact      same e-mail (case-insensitive) or same phone (last 10 digits).
+               Auto-flags the candidate for review. Searched across every
+               company (candidates are shared identity records), but a match
+               outside the caller's company comes back without contact
+               details or employer — only that a profile exists.
+    suggested  similar name (>= 0.85 after normalising) AND the same
+               location, inside the caller's company only. Shown as a hint;
+               never changes the candidate's duplicate state.
+    A same-name match with no shared location is not reported at all.
+    """
+    phone_current = _PHONE_DIGITS_SQL.format(col="cur.phone")
+    phone_existing = _PHONE_DIGITS_SQL.format(col="c.phone")
+    in_tenant = f"CASE WHEN :tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL} THEN 1 ELSE 0 END"
+    exact_query = text(
+        f"""
         SELECT
-          existing.id AS matched_candidate_id,
-          existing.full_name AS matched_candidate_name,
-          existing.email,
-          existing.phone,
-          CAST(NULL AS NVARCHAR(150)) AS current_company,
-          CAST(NULL AS NVARCHAR(150)) AS current_designation,
-          existing.duplicate_check_status AS duplicate_state,
-          current_candidate.email AS current_email,
-          current_candidate.phone AS current_phone,
-          current_candidate.full_name AS current_name
-        FROM dbo.candidates AS current_candidate
-        INNER JOIN dbo.candidates AS existing
-          ON existing.id <> current_candidate.id
+          c.id AS matched_candidate_id,
+          c.full_name AS matched_candidate_name,
+          c.email,
+          c.phone,
+          c.current_company,
+          c.current_designation,
+          c.duplicate_check_status AS duplicate_state,
+          CASE WHEN cur.email IS NOT NULL AND LOWER(LTRIM(RTRIM(c.email))) = LOWER(LTRIM(RTRIM(cur.email))) THEN 1 ELSE 0 END AS email_match,
+          CASE WHEN LEN({phone_current}) >= 7 AND {phone_existing} = {phone_current} THEN 1 ELSE 0 END AS phone_match,
+          {in_tenant} AS in_tenant
+        FROM dbo.candidates AS cur
+        INNER JOIN dbo.candidates AS c
+          ON c.id <> cur.id
          AND (
-           (current_candidate.email IS NOT NULL AND existing.email = current_candidate.email)
-           OR (current_candidate.phone IS NOT NULL AND existing.phone = current_candidate.phone)
-           OR (
-             current_candidate.full_name = existing.full_name
-           )
+           (cur.email IS NOT NULL AND LTRIM(RTRIM(cur.email)) <> N'' AND LOWER(LTRIM(RTRIM(c.email))) = LOWER(LTRIM(RTRIM(cur.email))))
+           OR (cur.phone IS NOT NULL AND LEN({phone_current}) >= 7 AND {phone_existing} = {phone_current})
          )
-        WHERE current_candidate.id = :candidate_id
-        ORDER BY existing.updated_at DESC, existing.id DESC;
+        WHERE cur.id = :candidate_id
+        ORDER BY c.updated_at DESC, c.id DESC;
         """
     )
+    fuzzy_query = text(
+        f"""
+        SELECT TOP (200)
+          c.id AS matched_candidate_id,
+          c.full_name AS matched_candidate_name,
+          c.email,
+          c.phone,
+          c.current_company,
+          c.current_designation,
+          c.duplicate_check_status AS duplicate_state,
+          cur.full_name AS current_name
+        FROM dbo.candidates AS cur
+        INNER JOIN dbo.candidates AS c
+          ON c.id <> cur.id
+         AND DIFFERENCE(c.full_name, cur.full_name) >= 3
+         AND LOWER(LTRIM(RTRIM(COALESCE(c.current_location, c.preferred_location_text))))
+             = LOWER(LTRIM(RTRIM(COALESCE(cur.current_location, cur.preferred_location_text))))
+        WHERE cur.id = :candidate_id
+          AND COALESCE(cur.current_location, cur.preferred_location_text) IS NOT NULL
+          AND (:tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL})
+        ORDER BY c.updated_at DESC, c.id DESC;
+        """
+    )
+    params = {"candidate_id": candidate_id, "tenant_id": tenant_id}
     with engine.connect() as connection:
-        rows = connection.execute(query, {"candidate_id": candidate_id}).mappings().all()
+        exact_rows = connection.execute(exact_query, params).mappings().all()
+        fuzzy_rows = connection.execute(fuzzy_query, params).mappings().all()
+
     matches: list[CandidateDuplicateMatchRecord] = []
-    for row in rows:
-        reasons: list[str] = []
-        score = 40
-        if row["email"] and row["current_email"] and row["email"] == row["current_email"]:
+    seen: set[int] = set()
+    for row in exact_rows:
+        reasons = []
+        if row["email_match"]:
             reasons.append("email_match")
-            score += 35
-        if row["phone"] and row["current_phone"] and row["phone"] == row["current_phone"]:
+        if row["phone_match"]:
             reasons.append("phone_match")
-            score += 35
-        if row["matched_candidate_name"] == row["current_name"]:
-            reasons.append("name_match")
-            score += 15
+        score = 100 if len(reasons) == 2 else (95 if "email_match" in reasons else 90)
+        visible = bool(row["in_tenant"])
+        seen.add(int(row["matched_candidate_id"]))
+        matches.append(
+            CandidateDuplicateMatchRecord(
+                matched_candidate_id=row["matched_candidate_id"],
+                matched_candidate_name=row["matched_candidate_name"],
+                email=row["email"] if visible else None,
+                phone=row["phone"] if visible else None,
+                current_company=row["current_company"] if visible else None,
+                current_designation=row["current_designation"] if visible else None,
+                duplicate_state=row["duplicate_state"],
+                match_score=score,
+                match_reasons=reasons,
+                match_tier="exact",
+                in_your_company=visible,
+            )
+        )
+    for row in fuzzy_rows:
+        if int(row["matched_candidate_id"]) in seen:
+            continue
+        similarity = _name_similarity(row["matched_candidate_name"], row["current_name"])
+        if similarity < 0.85:
+            continue
         matches.append(
             CandidateDuplicateMatchRecord(
                 matched_candidate_id=row["matched_candidate_id"],
@@ -845,8 +930,10 @@ def find_duplicate_matches(engine: Engine, candidate_id: int) -> list[CandidateD
                 current_company=row["current_company"],
                 current_designation=row["current_designation"],
                 duplicate_state=row["duplicate_state"],
-                match_score=min(score, 100),
-                match_reasons=reasons,
+                match_score=min(79, int(round(similarity * 80))),
+                match_reasons=["similar_name", "same_location"],
+                match_tier="suggested",
+                in_your_company=True,
             )
         )
     return matches

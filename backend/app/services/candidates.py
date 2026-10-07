@@ -372,8 +372,12 @@ def get_candidate_duplicate_check_service(
         candidate = find_candidate_by_id(engine, candidate_id)
         if not candidate:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
-    matches = find_duplicate_matches(engine, candidate_id)
-    duplicate_state = "in-review" if matches else "cleared"
+    matches = find_duplicate_matches(
+        engine, candidate_id, scope.tenant_id_of(auth_context) if auth_context else None
+    )
+    # Phase 4.7: only exact (e-mail/phone) matches flag the candidate;
+    # similar-name suggestions are hints and never block.
+    duplicate_state = "in-review" if any(m.match_tier == "exact" for m in matches) else "cleared"
     update_candidate_duplicate_state(engine, candidate_id, duplicate_state)
     return CandidateDuplicateCheckResponse(candidate_id=candidate_id, duplicate_state=duplicate_state, matches=matches)
 
