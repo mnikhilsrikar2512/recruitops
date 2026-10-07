@@ -3,7 +3,7 @@ from sqlalchemy import Engine
 
 from decimal import Decimal
 
-from app.repositories.offer_settings import get_offer_approval_threshold
+from app.repositories.offer_settings import find_requisition_budget_for_application, get_offer_approval_threshold
 from app.repositories.offers import create_offer, find_offer_by_application_id, list_offers, update_offer_decision
 from app.repositories.pipeline import find_pipeline_application_by_id
 from app.repositories.users import find_user_by_id
@@ -46,13 +46,25 @@ def get_offer_detail_service(
 
 
 def offer_requires_approval(engine: Engine, location_id: int, payload: OfferCreate) -> bool:
-    """Phase 4.8 (D-06): the offer's total (CTC + signing bonus) above the
-    company's threshold needs approval; at or below it is approved now.
-    Default threshold 0: every paid offer needs approval. An offer with no
-    amount yet always goes to approval (nothing to compare)."""
+    """Phase 4.8 (D-06, revised): which offers need approval.
+
+    The offer total is CTC + signing bonus.
+    1. No amount yet -> approval (nothing to compare).
+    2. The requisition has a max budget -> the budget decides: at or under
+       it the offer is approved now, over it needs approval. An offer in a
+       different currency from the budget needs approval (it can't be
+       compared safely).
+    3. No budget on the requisition -> the company threshold decides
+       (default 0 = every paid offer needs approval).
+    """
     if payload.offered_ctc is None:
         return True
     total = Decimal(payload.offered_ctc) + Decimal(payload.signing_bonus or 0)
+    budget_max, budget_currency = find_requisition_budget_for_application(engine, payload.candidate_application_id)
+    if budget_max is not None and budget_max > 0:
+        if budget_currency and payload.offer_currency and budget_currency.strip().upper() != payload.offer_currency.upper():
+            return True
+        return total > budget_max
     threshold = get_offer_approval_threshold(engine, scope.tenant_of_office(engine, location_id))
     return total > threshold
 

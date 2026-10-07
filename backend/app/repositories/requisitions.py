@@ -49,6 +49,9 @@ class RequisitionRecord:
     must_have_skills: list[str]
     good_to_have_skills: list[str]
     version: int = 1
+    budget_min: float | None = None
+    budget_max: float | None = None
+    currency_code: str | None = None
 
 
 @dataclass
@@ -98,7 +101,10 @@ def _requisition_select_sql() -> str:
           CAST(NULL AS BIGINT) AS pipeline_template_id,
           r.created_at,
           r.updated_at,
-          r.version
+          r.version,
+          r.budget_min,
+          r.budget_max,
+          r.currency_code
         FROM dbo.requisitions AS r
         LEFT JOIN dbo.branches AS b
           ON b.id = r.branch_id
@@ -142,6 +148,9 @@ def _map_requisition(row: RowMapping, must_have_skills: list[str], good_to_have_
         must_have_skills=must_have_skills,
         good_to_have_skills=good_to_have_skills,
         version=int(row.get("version", 1) or 1),
+        budget_min=float(row["budget_min"]) if row.get("budget_min") is not None else None,
+        budget_max=float(row["budget_max"]) if row.get("budget_max") is not None else None,
+        currency_code=row.get("currency_code"),
     )
 
 
@@ -319,7 +328,10 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
           target_close_date,
           client_round_required,
           job_description,
-          important_notes
+          important_notes,
+          budget_min,
+          budget_max,
+          currency_code
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -335,7 +347,10 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
           :target_close_date,
           :client_round_required,
           :job_description,
-          :preferred_update_time_text
+          :preferred_update_time_text,
+          :budget_min,
+          :budget_max,
+          :currency_code
         );
         """
     )
@@ -363,6 +378,9 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
                 "employment_type": payload.employment_type,
                 "work_mode": payload.work_mode,
                 "pipeline_template_id": payload.stage_template_id,
+                "budget_min": payload.budget_min,
+                "budget_max": payload.budget_max,
+                "currency_code": payload.currency_code,
             },
         ).scalar_one()
         _replace_requisition_skills(connection, int(requisition_id), payload.must_have_skills, payload.good_to_have_skills)
@@ -388,6 +406,9 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
           target_close_date = COALESCE(:target_close_date, target_close_date),
           client_round_required = COALESCE(:client_round_required, client_round_required),
           job_description = COALESCE(:job_description, job_description),
+          budget_min = CASE WHEN :has_budget_min = 1 THEN :budget_min ELSE budget_min END,
+          budget_max = CASE WHEN :has_budget_max = 1 THEN :budget_max ELSE budget_max END,
+          currency_code = CASE WHEN :has_currency_code = 1 THEN :currency_code ELSE currency_code END,
           important_notes = CASE
             WHEN :has_preferred_update_time_text = 1 THEN :preferred_update_time_text
             ELSE important_notes
@@ -423,6 +444,12 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
                 "preferred_update_time_text": payload.profile_update_window_text,
                 "client_round_required": payload.client_round_required,
                 "job_description": payload.job_description,
+                "has_budget_min": 1 if "budget_min" in payload.model_fields_set else 0,
+                "budget_min": payload.budget_min,
+                "has_budget_max": 1 if "budget_max" in payload.model_fields_set else 0,
+                "budget_max": payload.budget_max,
+                "has_currency_code": 1 if "currency_code" in payload.model_fields_set else 0,
+                "currency_code": payload.currency_code,
                 "has_pipeline_template_id": 1 if "stage_template_id" in payload.model_fields_set else 0,
                 "pipeline_template_id": payload.stage_template_id,
             },

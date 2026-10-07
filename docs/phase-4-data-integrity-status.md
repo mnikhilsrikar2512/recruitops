@@ -142,3 +142,23 @@ Built on work that was already in the tree but not committed (migration 018, `ve
     - Above it, the offer goes to approval.
     - With the threshold at 0, every offer goes to approval.
     - A negative threshold is rejected.
+
+### 4.8 revised — the requisition's pay range decides first (decision D-06a)
+
+One company-wide limit is too blunt when roles pay differently, so the requisition's own budget now decides first. Chosen 2026-10-07.
+
+1. **The offer has no amount yet:** it goes to approval.
+2. **The requisition has a `budget_max`:**
+   - An offer total (CTC + bonus) at or under `budget_max` is approved directly.
+   - An offer over it needs approval.
+   - An offer in a different currency from the budget needs approval, because it can't be compared safely.
+3. **The requisition has no budget:** the company threshold applies (default 0, so every paid offer needs approval).
+
+**What else changed:**
+
+- `requisitions.budget_min`, `budget_max` and `currency_code` already existed in the database but were never exposed. They are now part of requisition create, update and response (`budget_min <= budget_max` is enforced, and the currency is stored in upper case).
+- The intake form has a **Pay range** section, which is filled in when editing an existing requisition.
+- The Company Settings text now explains that the threshold is the fallback.
+- **Tests:**
+  - The unit table in `test_offer_threshold_rule` covers 9 cases.
+  - `test_offer_threshold_db.py::test_requisition_budget_decides_when_set` shows the budget overriding a company threshold of 0.

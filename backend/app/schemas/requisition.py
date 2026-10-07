@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import datetime
 from typing import Literal
 
@@ -42,6 +43,14 @@ class RequisitionListFilters(BaseModel):
         return _normalize_text(value)
 
 
+def _check_budget(model):
+    if model.currency_code:
+        model.currency_code = model.currency_code.strip().upper()
+    if model.budget_min is not None and model.budget_max is not None and model.budget_min > model.budget_max:
+        raise ValueError("budget_min cannot be more than budget_max")
+    return model
+
+
 class RequisitionCreate(BaseModel):
     client_id: int = Field(ge=1)
     primary_contact_id: int | None = Field(default=None, ge=1)
@@ -63,6 +72,14 @@ class RequisitionCreate(BaseModel):
     job_description: str = Field(min_length=1)
     stage_template_id: int | None = Field(default=None, ge=1)
     created_by_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.8: pay range for the role; offers above budget_max need approval.
+    budget_min: Decimal | None = Field(default=None, ge=0)
+    budget_max: Decimal | None = Field(default=None, ge=0)
+    currency_code: str | None = Field(default=None, min_length=3, max_length=10)
+
+    @model_validator(mode="after")
+    def check_budget(self) -> "RequisitionCreate":
+        return _check_budget(self)
 
     @field_validator("title", "employment_type", "work_mode", "profile_update_window_text", "job_description", "target_closure_date")
     @classmethod
@@ -93,6 +110,15 @@ class RequisitionUpdate(BaseModel):
     client_round_required: bool | None = None
     job_description: str | None = Field(default=None, min_length=1)
     stage_template_id: int | None = Field(default=None, ge=1)
+    # Phase 4.8: pay range for the role; offers above budget_max need approval.
+    budget_min: Decimal | None = Field(default=None, ge=0)
+    budget_max: Decimal | None = Field(default=None, ge=0)
+    currency_code: str | None = Field(default=None, min_length=3, max_length=10)
+
+    @model_validator(mode="after")
+    def check_budget(self) -> "RequisitionUpdate":
+        return _check_budget(self)
+
     # Phase 4.3: the version the client loaded; a stale one answers 409.
     version: int | None = Field(default=None, ge=1)
 
@@ -186,6 +212,9 @@ class RequisitionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: int = 1
+    budget_min: float | None = None
+    budget_max: float | None = None
+    currency_code: str | None = None
 
 
 class RequisitionListResponse(BaseModel):

@@ -1078,7 +1078,19 @@ async function submitRequisition() {
   const skillsRaw = document.getElementById("req-skills")?.value || firstValueOf(["must_have_skills"], [/must have/i, /required skills/i]);
   const niceSkillsRaw = firstValueOf(["good_to_have_skills"], [/good to have/i, /nice to have/i]);
   const jobDesc = document.getElementById("job-description")?.value || firstValueOf(["job_description"], [/job description/i, /description/i]) || "To be updated";
+  /* Phase 4.8: the role's pay range decides which offers need approval. */
+  const numberOrNull = (value) => (value === undefined || value === null || String(value).trim() === "" ? null : Number(value));
+  const budgetMin = numberOrNull(document.getElementById("budget-min")?.value);
+  const budgetMax = numberOrNull(document.getElementById("budget-max")?.value);
+  const budgetCurrency = (document.getElementById("budget-currency")?.value || "").trim().toUpperCase() || null;
+  if (budgetMin != null && budgetMax != null && budgetMin > budgetMax) {
+    showLiveError(new Error("The budget's lower amount can't be more than the upper amount.")); return;
+  }
+  const budgetFields = document.getElementById("budget-max")
+    ? { budget_min: budgetMin, budget_max: budgetMax, currency_code: budgetCurrency }
+    : {};
   const createPayload = {
+    ...budgetFields,
     title,
     client_id: clientId,
     location_id: locationId,
@@ -1093,6 +1105,7 @@ async function submitRequisition() {
     good_to_have_skills: splitSkillList(niceSkillsRaw),
   };
   const updatePayload = {
+    ...budgetFields,
     title: title || undefined,
     openings_count: openings,
     target_closure_date: targetDate,
@@ -1267,6 +1280,9 @@ async function loadRequisitionIntake() {
       set("req-skills", (req.must_have_skills || []).join(", "));
       set("client_id", req.client_id);
       set("location_id", req.location_id);
+      set("budget-min", req.budget_min);
+      set("budget-max", req.budget_max);
+      set("budget-currency", req.currency_code);
       if (req.work_mode) document.querySelectorAll('input[name="work-mode"]').forEach((radio) => { radio.checked = radio.value === req.work_mode; });
     }
   }

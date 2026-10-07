@@ -22,11 +22,11 @@ def offer_setup(client, admin):
     with engine.connect() as connection:
         before = connection.execute(text("SELECT offer_approval_threshold FROM dbo.tenants WHERE id = :t"),
                                     {"t": admin["tenant_id"]}).scalar_one()
-    apps = [_seed_application(engine, admin, stage="interview", suffix=f"offer{i}") for i in range(3)]
+    apps = [_seed_application(engine, admin, stage="interview", suffix=f"offer{i}") for i in range(5)]
     with engine.begin() as connection:
         branch_ids = connection.execute(text(
             "SELECT DISTINCT r.branch_id FROM dbo.candidate_applications ca JOIN dbo.requisitions r ON r.id = ca.requisition_id "
-            "WHERE ca.id IN (:a, :b, :c)"), {"a": apps[0], "b": apps[1], "c": apps[2]}).scalars().all()
+            f"WHERE ca.id IN ({', '.join(str(int(a)) for a in apps)})")).scalars().all()
         toggles = {b: connection.execute(text("SELECT offers_enabled FROM dbo.branches WHERE id = :b"), {"b": b}).scalar()
                    for b in branch_ids}
         for b in branch_ids:
@@ -38,8 +38,8 @@ def offer_setup(client, admin):
         connection.execute(text("UPDATE dbo.tenants SET offer_approval_threshold = :v WHERE id = :t"),
                            {"v": before, "t": admin["tenant_id"]})
         connection.execute(text(
-            "DELETE FROM dbo.approval_requests WHERE request_type = N'offer-approval' AND source_id IN (:a, :b, :c)"),
-            {"a": apps[0], "b": apps[1], "c": apps[2]})
+            "DELETE FROM dbo.approval_requests WHERE request_type = N'offer-approval' "
+            f"AND source_id IN ({', '.join(str(int(a)) for a in apps)})"))
     _cleanup(engine, admin["tenant_id"])
 
 
@@ -60,7 +60,7 @@ def _approvals(application_id):
 
 
 def test_threshold_routes_offers(client, admin, offer_setup):
-    below, above, default = offer_setup
+    below, above, default = offer_setup[:3]
 
     assert client.get("/api/v1/settings/offer-approval", headers=admin["headers"]).status_code == 200
     set_response = client.put("/api/v1/settings/offer-approval", json={"threshold": 500000}, headers=admin["headers"])
@@ -84,3 +84,23 @@ def test_threshold_routes_offers(client, admin, offer_setup):
 def test_negative_threshold_rejected(client, admin):
     response = client.put("/api/v1/settings/offer-approval", json={"threshold": -1}, headers=admin["headers"])
     assert response.status_code == 422
+
+
+def test_requisition_budget_decides_when_set(client, admin, offer_setup):
+    """A requisition with a max budget overrides the company threshold."""
+    within, over = offer_setup[3:]
+    with _engine().begin() as connection:
+        connection.execute(text(
+            "UPDATE r SET budget_max = 800000, currency_code = N'INR', version = r.version + 1 "
+            "FROM dbo.requisitions r JOIN dbo.candidate_applications ca ON ca.requisition_id = r.id "
+            f"WHERE ca.id IN ({int(within)}, {int(over)})"))
+    # Company threshold 0 would send everything to approval; the budget wins.
+    assert client.put("/api/v1/settings/offer-approval", json={"threshold": 0}, headers=admin["headers"]).status_code == 200
+
+    inside = _offer(client, admin, within, 700000, 100000)  # total == budget -> direct
+    assert inside["offer_status"] == "approved"
+    assert _approvals(within) == 0
+
+    outside = _offer(client, admin, over, 800000, 1)  # just over budget -> approval
+    assert outside["offer_status"] == "pending-approval"
+    assert _approvals(over) == 1

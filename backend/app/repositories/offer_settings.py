@@ -27,3 +27,23 @@ def set_offer_approval_threshold(engine: Engine, tenant_id: int, threshold: Deci
             ),
             {"tenant_id": tenant_id, "threshold": threshold},
         )
+
+
+def find_requisition_budget_for_application(engine: Engine, application_id: int) -> tuple[Decimal | None, str | None]:
+    """(budget_max, currency_code) of the application's requisition."""
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                """
+                SELECT r.budget_max, r.currency_code
+                FROM dbo.candidate_applications AS ca
+                INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
+                WHERE ca.id = :application_id;
+                """
+            ),
+            {"application_id": application_id},
+        ).mappings().first()
+    if row is None:
+        return None, None
+    budget = Decimal(str(row["budget_max"])) if row["budget_max"] is not None else None
+    return budget, row["currency_code"]
