@@ -214,3 +214,17 @@ The repository's `find_duplicate_matches` now sorts matches into two tiers:
 
 - **Cause:** `reject_unknown_query_params` imported `fastapi.dependencies.utils.get_flat_dependant`. That function no longer exists in the installed FastAPI (0.141). The same version nests included routers (`_IncludedRouter`), so the test's walk over `app.routes` found nothing either.
 - **Fix:** the allowed names now come from the endpoint's own signature (`scope["endpoint"]`, its `Query` parameters and plain scalar defaults). This doesn't depend on FastAPI's routing internals, so a version bump can't break it the same way. The contract test now finds strict lists from the source files.
+
+**Eighth verify run (`4f966cc`):** 504 passed, smoke 52/52, sweeps 105/105. Pushed.
+
+## Phase 4 status
+
+| Exit gate | Status | Proof |
+|---|---|---|
+| A report over the 5 live custom stage labels counts them in the right buckets | ✅ | `test_metric_buckets_db.py` |
+| Two concurrent edits: the second gets 409 with the fresh row | ✅ | `test_row_versions_db.py` |
+| Archived candidates are hidden from lists and from direct reads by users without the grant; restore works for users with it | ✅ | `test_soft_delete_db.py` |
+| An offer under the threshold is approved directly; over it creates an approval; threshold 0 sends every offer to approval (plus the requisition pay range, D-06a) | ✅ | `test_offer_threshold_db.py` |
+| An `.exe` renamed `.pdf` is rejected; an EICAR file is quarantined and never linkable | ⏳ | Needs 4.1/4.2 (storage and malware scanner; cloud choice I-2) |
+
+Built: 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9. Still to build: 4.1 (storage adapter) and 4.2 (upload pipeline).
