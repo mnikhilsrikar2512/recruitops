@@ -1,5 +1,6 @@
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Engine
+from app.repositories.versioning import StaleWriteConflict
 
 from app.repositories.candidates import (
     count_candidate_applications_for_requisition,
@@ -263,6 +264,7 @@ def get_candidate_detail_service(
         applications=applications,
         created_at=candidate.created_at,
         updated_at=candidate.updated_at,
+        version=getattr(candidate, "version", 1) or 1,
     )
     if auth_context:
         # Another company's candidate is indistinguishable from a missing one.
@@ -292,7 +294,11 @@ def update_candidate_service(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
     _assert_user_exists(engine, payload.primary_owner_user_id, "Primary owner user")
     _assert_user_exists(engine, payload.sourced_by_user_id, "Sourced by user")
-    update_candidate(engine, candidate_id, payload)
+    try:
+        update_candidate(engine, candidate_id, payload)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_candidate_detail_service(engine, candidate_id, auth_context)
+        raise
     return get_candidate_detail_service(engine, candidate_id, auth_context)
 
 

@@ -91,6 +91,8 @@ class CandidateUpdate(BaseModel):
     social_profiles: list[SocialProfileInput] | None = None
     sourced_by_user_id: int | None = Field(default=None, ge=1)
     primary_owner_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("full_name", "phone", "source_type", "source_detail", "current_company", "current_designation")
     @classmethod
@@ -106,7 +108,7 @@ class CandidateUpdate(BaseModel):
 
     @model_validator(mode="after")
     def ensure_any_field_present(self) -> "CandidateUpdate":
-        if not self.model_fields_set:
+        if not (self.model_fields_set - {"version"}):
             raise ValueError("At least one field must be provided")
         return self
 
@@ -269,6 +271,7 @@ class CandidateResponse(BaseModel):
     applications: list[CandidateApplicationSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+    version: int = 1
 
 
 class CandidateListItemResponse(BaseModel):

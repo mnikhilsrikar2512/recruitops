@@ -93,6 +93,8 @@ class RequisitionUpdate(BaseModel):
     client_round_required: bool | None = None
     job_description: str | None = Field(default=None, min_length=1)
     stage_template_id: int | None = Field(default=None, ge=1)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("title", "target_closure_date", "employment_type", "work_mode", "profile_update_window_text", "job_description")
     @classmethod
@@ -108,7 +110,7 @@ class RequisitionUpdate(BaseModel):
 
     @model_validator(mode="after")
     def ensure_any_field_present(self) -> "RequisitionUpdate":
-        if not self.model_fields_set:
+        if not (self.model_fields_set - {"version"}):
             raise ValueError("At least one field must be provided")
         return self
 
@@ -116,6 +118,8 @@ class RequisitionUpdate(BaseModel):
 class RequisitionStatusUpdate(BaseModel):
     status: RequisitionStatus
     reason: str = Field(min_length=1, max_length=500)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("reason")
     @classmethod
@@ -181,6 +185,7 @@ class RequisitionResponse(BaseModel):
     good_to_have_skills: list[str]
     created_at: datetime
     updated_at: datetime
+    version: int = 1
 
 
 class RequisitionListResponse(BaseModel):

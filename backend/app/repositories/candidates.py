@@ -9,6 +9,7 @@ from sqlalchemy.engine import RowMapping
 from app.services.scope import CANDIDATE_IN_TENANT_SQL
 
 from app.repositories.display_ids import ENTITY_CANDIDATE, allocate_display_id
+from app.repositories.versioning import check_version
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDocumentCreate,
@@ -49,6 +50,7 @@ class CandidateRecord:
     updated_at: object
     applications_count: int = 0
     linked_requisition_titles: list[str] | None = None
+    version: int = 1
 
 
 @dataclass
@@ -170,6 +172,7 @@ def _candidate_select_sql() -> str:
           c.finalized_at,
           c.created_at,
           c.updated_at,
+          c.version,
           COUNT(ca.id) AS applications_count
         FROM dbo.candidates AS c
         LEFT JOIN dbo.branches AS cb
@@ -214,6 +217,7 @@ def _map_candidate(row: RowMapping, linked_requisition_titles: list[str] | None 
         updated_at=row["updated_at"],
         applications_count=row.get("applications_count", 0) or 0,
         linked_requisition_titles=linked_requisition_titles or [],
+        version=int(row.get("version", 1) or 1),
     )
 
 
@@ -301,7 +305,8 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
             c.resume_uploaded_at,
             c.finalized_at,
             c.created_at,
-            c.updated_at
+            c.updated_at,
+            c.version
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered_candidates
@@ -359,7 +364,8 @@ def find_candidate_by_id(engine: Engine, candidate_id: int) -> CandidateRecord |
             c.resume_uploaded_at,
             c.finalized_at,
             c.created_at,
-            c.updated_at
+            c.updated_at,
+            c.version
         ) AS selected_candidates;
         """
     )
@@ -589,6 +595,7 @@ def update_candidate(engine: Engine, candidate_id: int, payload: CandidateUpdate
         """
         UPDATE dbo.candidates
         SET
+          version = version + 1,
           full_name = COALESCE(:full_name, full_name),
           email = CASE WHEN :has_email = 1 THEN :email ELSE email END,
           phone = CASE WHEN :has_phone = 1 THEN :phone ELSE phone END,
@@ -603,6 +610,7 @@ def update_candidate(engine: Engine, candidate_id: int, payload: CandidateUpdate
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "candidates", candidate_id, getattr(payload, "version", None))
         connection.execute(
             query,
             {
@@ -763,7 +771,7 @@ def update_candidate_duplicate_state(engine: Engine, candidate_id: int, duplicat
     query = text(
         """
         UPDATE dbo.candidates
-        SET duplicate_check_status = :duplicate_state,
+        SET version = version + 1, duplicate_check_status = :duplicate_state,
             intake_stage = CASE
               WHEN :duplicate_state = N'in-review' THEN N'duplicate-review'
               WHEN :duplicate_state IN (N'cleared', N'merged') THEN N'ready-to-save'
@@ -881,6 +889,7 @@ def finalize_candidate_into_requisition(engine: Engine, candidate_id: int, paylo
                 """
                 UPDATE dbo.candidates
                 SET
+                  version = version + 1,
                   profile_status = N'active',
                   intake_stage = N'finalized',
                   finalized_at = SYSUTCDATETIME(),

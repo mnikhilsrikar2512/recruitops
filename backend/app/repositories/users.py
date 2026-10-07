@@ -485,6 +485,7 @@ def transfer_active_user_work_and_deactivate(
                     """
                     UPDATE dbo.requisitions
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id;
@@ -497,6 +498,7 @@ def transfer_active_user_work_and_deactivate(
                     """
                     UPDATE dbo.candidates
                     SET
+                      version = version + 1,
                       primary_owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE primary_owner_user_id = :user_id
@@ -510,6 +512,7 @@ def transfer_active_user_work_and_deactivate(
                     """
                     UPDATE dbo.candidate_applications
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id
@@ -602,6 +605,7 @@ def transfer_active_user_work_and_move(
                     """
                     UPDATE dbo.requisitions
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id;
@@ -614,6 +618,7 @@ def transfer_active_user_work_and_move(
                     """
                     UPDATE dbo.candidates
                     SET
+                      version = version + 1,
                       primary_owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE primary_owner_user_id = :user_id
@@ -627,6 +632,7 @@ def transfer_active_user_work_and_move(
                     """
                     UPDATE dbo.candidate_applications
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id

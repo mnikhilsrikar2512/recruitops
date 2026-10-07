@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
+from app.repositories.versioning import check_version
 from app.schemas.pipeline import PipelineBoardFilters, PipelineStageMove
 
 
@@ -62,6 +63,7 @@ class PipelineApplicationDetailRecord:
     expected_joining_date: object
     applied_at: object
     updated_at: object
+    version: int = 1
 
 
 @dataclass
@@ -178,7 +180,8 @@ def find_pipeline_application_by_id(engine: Engine, application_id: int) -> Pipe
           ca.updated_at AS last_activity_at,
           ca.expected_joining_date,
           ca.applied_at,
-          ca.updated_at
+          ca.updated_at,
+          ca.version
         FROM dbo.candidate_applications AS ca
         INNER JOIN dbo.candidates AS c
           ON c.id = ca.candidate_id
@@ -265,17 +268,18 @@ def resolve_application_stage_bucket(engine: Engine, application_id: int, stage:
 
 
 def reopen_application(
-    engine: Engine, application_id: int, to_stage: str, reason: str, user_id: int
+    engine: Engine, application_id: int, to_stage: str, reason: str, user_id: int, expected_version: int | None = None
 ) -> tuple[str, PipelineApplicationDetailRecord]:
     before = find_pipeline_application_by_id(engine, application_id)
     if before is None:
         raise RuntimeError("Pipeline application could not be reloaded")
     with engine.begin() as connection:
+        check_version(connection, "candidate_applications", application_id, expected_version)
         connection.execute(
             text(
                 """
                 UPDATE dbo.candidate_applications
-                SET current_stage = :to_stage,
+                SET version = version + 1, current_stage = :to_stage,
                     application_status = N'active',
                     stage_reason = :reason,
                     rejection_side = N'none',
@@ -320,6 +324,7 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
         """
         UPDATE dbo.candidate_applications
         SET
+          version = version + 1,
           current_stage = :to_stage,
           stage_reason = CASE WHEN :notes IS NOT NULL THEN :notes ELSE stage_reason END,
           rejection_reason = :rejection_reason,
@@ -367,6 +372,7 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "candidate_applications", application_id, getattr(payload, "version", None))
         connection.execute(
             query,
             {

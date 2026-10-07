@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
+from app.repositories.versioning import StaleWriteConflict
 
 from app.core.stage_buckets import BUCKET_LABELS, BUCKET_ORDER, TERMINAL_BUCKETS
 from app.repositories.audit import insert_audit_log
@@ -220,7 +221,11 @@ def move_pipeline_stage_service(
             detail="Joining date is required for joining stages",
         )
 
-    from_stage, updated = move_pipeline_stage(engine, application_id, payload)
+    try:
+        from_stage, updated = move_pipeline_stage(engine, application_id, payload)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_pipeline_application_detail_service(engine, application_id, auth_context)
+        raise
 
     if updated.owner_user_id:
         try:
@@ -251,6 +256,7 @@ def move_pipeline_stage_service(
         to_stage=updated.current_stage,
         application_status=updated.application_status,
         stage_updated_at=updated.stage_updated_at,
+        version=getattr(updated, "version", None),
     )
 
 
@@ -297,7 +303,13 @@ def reopen_pipeline_application_service(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Reopen into an open stage (not Rejected, Withdrawn or Joined)",
         )
-    from_stage, updated = reopen_application(engine, application_id, payload.to_stage, payload.reason, auth_context.user.id)
+    try:
+        from_stage, updated = reopen_application(
+            engine, application_id, payload.to_stage, payload.reason, auth_context.user.id, payload.version
+        )
+    except StaleWriteConflict as conflict:
+        conflict.current = get_pipeline_application_detail_service(engine, application_id, auth_context)
+        raise
     insert_audit_log(
         engine,
         actor_user_id=auth_context.user.id,
@@ -314,4 +326,5 @@ def reopen_pipeline_application_service(
         to_stage=updated.current_stage,
         application_status=updated.application_status,
         stage_updated_at=updated.stage_updated_at,
+        version=getattr(updated, "version", None),
     )

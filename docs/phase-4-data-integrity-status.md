@@ -74,3 +74,22 @@ Order of work: the parts that need nothing from outside first (4.5 → 4.6 → 4
 - **Unit tests without a database** resolve buckets through the Python copy of the stage map (`app/core/stage_buckets.py`, via a conftest shim). `tests/test_stage_buckets_twin.py` fails if that copy drifts from the 016 seed.
 - **Tests:** `tests/test_pipeline_lifecycle_db.py` covers backward moves needing a reason, withdraw as a closed state, the reopen rules, history rows and the audit entry.
 - **Still to do in the UI:** a Reopen button on the application view. The API is ready; the button lands with the 4.3 conflict dialog work.
+
+**Second verify run (`3745536`):** 483 passed, smoke 52/52, sweeps 105/105. 016 and 017 applied to dev.
+
+## 4.3 Optimistic locking — built
+
+Built on work that was already in the tree but not committed (migration 018, `versioning.py`, schema and repository changes). Reviewed and finished in this commit.
+
+- **Migration `018_row_versions.sql`** adds `version INT NOT NULL DEFAULT 1` to `candidates`, `requisitions` and `candidate_applications`.
+- **Every UPDATE of those tables bumps `version`.** This includes user-deactivation transfers, offers, duplicate state and assignments. `tests/test_row_versions_static.py` scans `app/` and fails on any UPDATE that forgets the bump.
+- **Edits can carry the version the client loaded.** `CandidateUpdate`, `RequisitionUpdate`, `RequisitionStatusUpdate`, `PipelineStageMove`, `PipelineReopen` and `OfferDecisionUpdate` accept an optional `version`.
+  - `check_version` reads the row under UPDLOCK/HOLDLOCK in the same transaction, so two writers serialise.
+  - A stale version raises `StaleWriteConflict`. The API answers 409 with `{code: "stale_write", current_version, current: <fresh record>}`.
+  - An edit without a version is not checked, so older clients and system writes keep working.
+- **Detail responses include `version`:** candidate, requisition, pipeline application and stage-move responses. The candidate detail response was missing it and is now fixed.
+- **Frontend (`api-client.js`):**
+  - Detail reads remember each record's version.
+  - Candidate edit, requisition edit and status change, stage move, and reopen send that version automatically.
+  - A `stale_write` 409 opens a "This record changed" dialog with **Reload latest** and **Keep my screen**.
+- **Exit gate:** `tests/test_row_versions_db.py` runs two edits against the same loaded version, for a candidate, a requisition and a stage move. The second edit gets 409 with the fresh row, and an edit without a version still succeeds.

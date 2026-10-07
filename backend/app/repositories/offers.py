@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
+from app.repositories.versioning import check_version
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters
 
 
@@ -146,6 +147,7 @@ def create_offer(engine: Engine, payload: OfferCreate, *, location_id: int, acto
         """
         UPDATE dbo.candidate_applications
         SET
+          version = version + 1,
           current_stage = CASE WHEN LOWER(current_stage) LIKE N'%offer%' THEN current_stage ELSE N'offer' END,
           offer_status = N'pending-approval',
           offered_ctc = :offered_ctc,
@@ -210,6 +212,7 @@ def update_offer_decision(engine: Engine, application_id: int, payload: OfferDec
         """
         UPDATE dbo.candidate_applications
         SET
+          version = version + 1,
           offer_status = :offer_status,
           application_status = CASE WHEN :is_accepted = 1 THEN N'joined' ELSE application_status END,
           expected_joining_date = COALESCE(:expected_joining_date, expected_joining_date),
@@ -242,6 +245,7 @@ def update_offer_decision(engine: Engine, application_id: int, payload: OfferDec
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "candidate_applications", application_id, getattr(payload, "version", None))
         connection.execute(
             update_query,
             {

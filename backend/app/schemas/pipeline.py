@@ -31,6 +31,8 @@ class PipelineStageMove(BaseModel):
     rejection_reason: str | None = Field(default=None, max_length=1000)
     joining_date: date | None = None
     changed_by_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("to_stage", "notes", "rejection_reason")
     @classmethod
@@ -41,6 +43,8 @@ class PipelineStageMove(BaseModel):
 class PipelineReopen(BaseModel):
     to_stage: str = Field(min_length=1, max_length=50)
     reason: str = Field(min_length=3, max_length=1000)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("to_stage", "reason")
     @classmethod
@@ -108,6 +112,7 @@ class PipelineApplicationDetailResponse(BaseModel):
     expected_joining_date: date | None
     applied_at: datetime
     updated_at: datetime
+    version: int = 1
 
 
 class PipelineStageMoveResponse(BaseModel):
@@ -118,6 +123,7 @@ class PipelineStageMoveResponse(BaseModel):
     to_stage: str
     application_status: str
     stage_updated_at: datetime
+    version: int | None = None
 
 
 class PipelineHistoryItemResponse(BaseModel):

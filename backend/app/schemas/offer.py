@@ -64,6 +64,8 @@ class OfferDecisionUpdate(BaseModel):
     status: OfferStatus
     expected_joining_date: date | None = None
     decision_notes: str | None = Field(default=None, max_length=1000)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("status", mode="before")
     @classmethod

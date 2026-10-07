@@ -6,6 +6,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.engine import RowMapping
 
 from app.repositories.display_ids import ENTITY_REQUISITION, allocate_display_id
+from app.repositories.versioning import check_version
 from app.schemas.requisition import (
     RequisitionAssignmentCreate,
     RequisitionCreate,
@@ -47,6 +48,7 @@ class RequisitionRecord:
     updated_at: object
     must_have_skills: list[str]
     good_to_have_skills: list[str]
+    version: int = 1
 
 
 @dataclass
@@ -95,7 +97,8 @@ def _requisition_select_sql() -> str:
           CAST(NULL AS NVARCHAR(50)) AS work_mode,
           CAST(NULL AS BIGINT) AS pipeline_template_id,
           r.created_at,
-          r.updated_at
+          r.updated_at,
+          r.version
         FROM dbo.requisitions AS r
         LEFT JOIN dbo.branches AS b
           ON b.id = r.branch_id
@@ -138,6 +141,7 @@ def _map_requisition(row: RowMapping, must_have_skills: list[str], good_to_have_
         updated_at=row["updated_at"],
         must_have_skills=must_have_skills,
         good_to_have_skills=good_to_have_skills,
+        version=int(row.get("version", 1) or 1),
     )
 
 
@@ -376,6 +380,7 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
         """
         UPDATE dbo.requisitions
         SET
+          version = version + 1,
           title = COALESCE(:title, title),
           owner_user_id = COALESCE(:primary_owner_user_id, owner_user_id),
           open_positions = COALESCE(:open_positions, open_positions),
@@ -392,6 +397,7 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "requisitions", requisition_id, getattr(payload, "version", None))
         connection.execute(
             query,
             {
@@ -436,12 +442,14 @@ def update_requisition_status(engine: Engine, requisition_id: int, payload: Requ
         """
         UPDATE dbo.requisitions
         SET
+          version = version + 1,
           status = :status,
           updated_at = SYSUTCDATETIME()
         WHERE id = :requisition_id;
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "requisitions", requisition_id, getattr(payload, "version", None))
         connection.execute(query, {"requisition_id": requisition_id, "status": payload.status})
     updated = find_requisition_by_id(engine, requisition_id)
     if updated is None:
@@ -550,7 +558,7 @@ def create_requisition_assignment(
                 text(
                     """
                     UPDATE dbo.requisitions
-                    SET owner_user_id = :assigned_user_id, updated_at = SYSUTCDATETIME()
+                    SET version = version + 1, owner_user_id = :assigned_user_id, updated_at = SYSUTCDATETIME()
                     WHERE id = :requisition_id;
                     """
                 ),

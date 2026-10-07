@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from app.api.router import api_router
 from app.core.config import settings, validate_settings
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.repositories.versioning import StaleWriteConflict
 
 
 def _database_unavailable_response(_request: Request, _exc: OperationalError) -> JSONResponse:
@@ -14,6 +15,22 @@ def _database_unavailable_response(_request: Request, _exc: OperationalError) ->
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
             "detail": "Database is currently unavailable. Please restore SQL Server connectivity and try again."
+        },
+    )
+
+
+def _stale_write_response(_request: Request, exc: StaleWriteConflict) -> JSONResponse:
+    """Phase 4.3: the record changed after the client loaded it. The fresh
+    record comes back so the client can show what changed and reload."""
+    from fastapi.encoders import jsonable_encoder
+
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "detail": "This record was changed by someone else after you opened it. Reload to see the latest version, then make your change again.",
+            "code": "stale_write",
+            "current_version": exc.current_version,
+            "current": jsonable_encoder(exc.current) if exc.current is not None else None,
         },
     )
 
@@ -72,6 +89,7 @@ def create_application() -> FastAPI:
     if settings.security_headers_enabled:
         application.add_middleware(SecurityHeadersMiddleware)
     application.add_exception_handler(RequestValidationError, _validation_error_response)
+    application.add_exception_handler(StaleWriteConflict, _stale_write_response)
     application.add_exception_handler(IntegrityError, _integrity_error_response)
     application.add_exception_handler(OperationalError, _database_unavailable_response)
     application.add_exception_handler(SQLAlchemyError, _sqlalchemy_error_response)

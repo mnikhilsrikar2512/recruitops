@@ -175,6 +175,67 @@ function setUnauthorizedHandler(handler) {
   unauthorizedHandler = typeof handler === "function" ? handler : defaultUnauthorizedHandler;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Phase 4.3 — optimistic locking. Detail reads of a candidate,
+   requisition or pipeline application remember the record's version; the
+   edits below carry it, and a 409 "stale_write" (someone else saved first)
+   opens a reload dialog instead of silently overwriting their change.
+   ═══════════════════════════════════════════════════════════════ */
+const recordVersions = new Map();
+const VERSIONED_READ = /^\/(candidates|requisitions|pipeline\/applications)\/(\d+)\/?(?:\?.*)?$/;
+const VERSIONED_WRITES = [
+  { method: "PATCH", pattern: /^\/(candidates)\/(\d+)\/?$/ },
+  { method: "PATCH", pattern: /^\/(requisitions)\/(\d+)(?:\/status)?\/?$/ },
+  { method: "PATCH", pattern: /^\/(pipeline\/applications)\/(\d+)\/stage\/?$/ },
+  { method: "POST", pattern: /^\/(pipeline\/applications)\/(\d+)\/reopen\/?$/ },
+];
+
+function versionedWriteKey(path, method) {
+  const verb = String(method || "GET").toUpperCase();
+  for (const rule of VERSIONED_WRITES) {
+    const match = rule.method === verb && String(path).match(rule.pattern);
+    if (match) return `${match[1]}/${match[2]}`;
+  }
+  return null;
+}
+
+function rememberRecordVersion(path, payload) {
+  const match = String(path).match(VERSIONED_READ);
+  if (match && payload && Number.isInteger(payload.version)) recordVersions.set(`${match[1]}/${match[2]}`, payload.version);
+}
+
+function withRecordVersion(body, key) {
+  if (!key || !recordVersions.has(key) || typeof body !== "string") return body;
+  try {
+    const parsed = JSON.parse(body);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || parsed.version != null) return body;
+    return JSON.stringify({ ...parsed, version: recordVersions.get(key) });
+  } catch { return body; }
+}
+
+function showStaleWriteDialog(message) {
+  if (typeof document === "undefined" || document.getElementById("stale-write-dialog")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "stale-write-dialog";
+  overlay.setAttribute("role", "alertdialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "stale-write-title");
+  overlay.className = "fixed inset-0 z-[10000] flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm";
+  overlay.innerHTML = `<div class="bg-surface rounded-xl border border-border shadow-2xl p-6 max-w-md w-full mx-4">
+    <h2 id="stale-write-title" class="text-lg font-bold text-on-surface">This record changed</h2>
+    <p class="mt-2 text-sm text-text-muted"></p>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="button" data-stale-close class="rounded-lg border border-border bg-surface px-4 py-2 text-sm">Keep my screen</button>
+      <button type="button" data-stale-reload class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Reload latest</button>
+    </div></div>`;
+  overlay.querySelector("p").textContent = message
+    || "Someone else saved this record after you opened it. Reload to see the latest version, then make your change again.";
+  overlay.querySelector("[data-stale-close]").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("[data-stale-reload]").addEventListener("click", () => window.location.reload());
+  document.body.appendChild(overlay);
+  overlay.querySelector("[data-stale-reload]").focus();
+}
+
 /**
  * The one way pages call the API. Returns parsed JSON ({} for 204).
  *
@@ -197,6 +258,8 @@ async function apiRequest(path, options = {}) {
       && !(typeof Blob !== "undefined" && body instanceof Blob)) {
     body = JSON.stringify(body);
   }
+  const versionKey = versionedWriteKey(path, options.method);
+  body = withRecordVersion(body, versionKey);
   if (typeof body === "string" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   /* "include": the refresh-token cookie must also reach the API when it is
      served from another origin (dev :8000); CORS allows credentials only for
@@ -249,7 +312,17 @@ async function apiRequest(path, options = {}) {
         }
         unauthorizedHandler(error);
       }
+      if (response.status === 409 && payload?.code === "stale_write") {
+        if (versionKey && Number.isInteger(payload.current_version)) recordVersions.delete(versionKey);
+        showStaleWriteDialog(payload.detail);
+      }
       throw error;
+    }
+    if (versionKey) {
+      if (payload && Number.isInteger(payload.version)) recordVersions.set(versionKey, payload.version);
+      else recordVersions.delete(versionKey);
+    } else if (String(init.method || "GET").toUpperCase() === "GET") {
+      rememberRecordVersion(path, payload);
     }
     return payload ?? {};
   }
