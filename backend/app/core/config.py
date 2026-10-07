@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = Field(default=15, alias="LOGIN_LOCKOUT_MINUTES")
     rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
     security_headers_enabled: bool = Field(default=True, alias="SECURITY_HEADERS_ENABLED")
+    # D-09: admins must enrol MFA. None = on in staging/production, off in dev.
+    mfa_enforce_admin_enrollment_setting: bool | None = Field(default=None, alias="MFA_ENFORCE_ADMIN_ENROLLMENT")
+
+    @property
+    def mfa_enforce_admin_enrollment(self) -> bool:
+        if self.mfa_enforce_admin_enrollment_setting is not None:
+            return self.mfa_enforce_admin_enrollment_setting
+        return self.is_production
 
     @property
     def is_production(self) -> bool:

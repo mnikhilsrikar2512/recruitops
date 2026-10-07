@@ -22,7 +22,7 @@ const RecruitOpsLive = { session: null };
 const LIVE_API_ENABLED = true;
 const API_BASE = "/api/v1";
 const PUBLIC_ROUTES = new Set([
-  "index", "login", "landing", "forgot-password", "reset-password",
+  "index", "login", "landing", "forgot-password", "reset-password", "mfa-challenge",
   "password-setup", "product-tour", "use-cases", "onboarding-welcome",
   "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup",
   "onboarding-pipeline-stage-builder", "onboarding-add-custom-stage-overlay",
@@ -778,6 +778,20 @@ async function handleLoginOnce(form) {
 
   try {
     const data = await apiRequest("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    if (data.mfa_required) {
+      /* Phase 3.6: password accepted — the authenticator code comes next. */
+      try { sessionStorage.setItem("recruitops-mfa", JSON.stringify({ token: data.mfa_token, email })); } catch { /* private mode */ }
+      window.location.href = pageHref("mfa-challenge.html");
+      return;
+    }
+    await finishSignIn(data, email);
+  } catch (error) {
+    signInFailed(error, overlay, submitBtn);
+  }
+}
+
+/* Shared by password sign-in and the MFA challenge page. */
+async function finishSignIn(data, email) {
     writeSession({
       token: data.token || data.access_token,
       user_id: data.user?.id || data.user_id,
@@ -800,12 +814,18 @@ async function handleLoginOnce(form) {
     /* Check if onboarding has been completed — if not, redirect to onboarding flow */
     const onboardingComplete = localStorage.getItem("recruitops-onboarding-complete");
     const isFirstLogin = data.session?.force_password_change_on_first_login;
-    if (!onboardingComplete && isFirstLogin) {
+    if (data.mfa_enrollment_required) {
+      window.location.href = pageHref("mfa-enroll.html"); /* D-09: Admins enrol first */
+    } else if (!onboardingComplete && isFirstLogin) {
       window.location.href = pageHref("onboarding-welcome.html");
     } else {
       window.location.href = pageHref("home.html");
     }
-  } catch (error) {
+}
+
+function signInFailed(error, overlay, submitBtn) {
+  const passwordInput = document.getElementById("password");
+  {
     if (overlay) {
       overlay.classList.add("hidden");
       overlay.hidden = true;

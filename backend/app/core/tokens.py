@@ -69,3 +69,27 @@ def new_refresh_token() -> tuple[str, str]:
 
 def hash_refresh_token(raw: str) -> str:
     return sha256_hex(raw)
+
+
+MFA_TYPE = "mfa"
+MFA_TOKEN_MINUTES = 5
+
+
+def issue_mfa_token(*, user_id: int, email: str) -> tuple[str, datetime]:
+    """Proof that the password was right; only exchangeable at
+    /auth/mfa/challenge together with a valid code, within 5 minutes."""
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=MFA_TOKEN_MINUTES)
+    claims = {"sub": str(user_id), "email": email, "typ": MFA_TYPE,
+              "iat": int(now.timestamp()), "exp": int(expires_at.timestamp())}
+    return jwt.encode(claims, _signing_key(), algorithm=ALGORITHM), expires_at
+
+
+def decode_mfa_token(token: str) -> dict:
+    try:
+        claims = jwt.decode(token, _signing_key(), algorithms=[ALGORITHM], options={"require": ["exp", "sub", "typ"]})
+    except jwt.PyJWTError as exc:
+        raise InvalidToken(str(exc)) from exc
+    if claims.get("typ") != MFA_TYPE:
+        raise InvalidToken("not an MFA token")
+    return claims

@@ -24,7 +24,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 PAGES = Path(__file__).resolve().parent.parent / "pages"
-PUBLIC = {"login", "landing", "forgot-password", "reset-password", "password-setup", "use-cases",
+PUBLIC = {"login", "landing", "forgot-password", "reset-password", "password-setup", "use-cases", "mfa-challenge",
           "not-found", "access-denied", "product-tour"}
 
 # Core module pages must show rows that came from the API (Phase 1 exit gate).

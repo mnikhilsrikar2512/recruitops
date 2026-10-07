@@ -21,7 +21,9 @@ from app.core.tokens import (
     InvalidToken,
     decode_access_token,
     hash_refresh_token,
+    decode_mfa_token,
     issue_access_token,
+    issue_mfa_token,
     looks_like_jwt,
     new_refresh_token,
 )
@@ -46,6 +48,7 @@ from app.repositories.auth import (
     update_last_login,
 )
 from app.repositories.audit import insert_audit_log
+from app.repositories.mfa import find_mfa
 from app.repositories.users import (
     create_password_reset_token,
     find_user_by_email,
@@ -60,6 +63,8 @@ from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    MfaChallengeRequest,
+    MfaChallengeResponse,
     PasswordChangeRequest,
     PasswordChangeResponse,
     PasswordForgotRequest,
@@ -203,9 +208,10 @@ def login_service(
     payload: LoginRequest,
     ip_address: str | None,
     user_agent: str | None,
-) -> tuple[LoginResponse, str]:
+) -> tuple[LoginResponse | MfaChallengeResponse, str | None]:
     """Returns the response body and the raw refresh token (set as an
-    HttpOnly cookie by the endpoint, never put in the body)."""
+    HttpOnly cookie by the endpoint, never put in the body). With MFA on,
+    the body is a challenge and there is no session yet."""
     user = find_user_for_login(engine, payload.email)
     locked_until = getattr(user, "locked_until", None) if user else None
     if locked_until is not None and _as_utc(locked_until) > datetime.now(timezone.utc):
@@ -228,10 +234,27 @@ def login_service(
     if needs_rehash(user.password_hash):
         update_user_password_hash(engine, user_id=user.id, password_hash=hash_password(payload.password))
 
+    mfa = find_mfa(engine, user.id)
+    if mfa is not None and mfa.enabled_at is not None:
+        # Second factor (Phase 3.6): no session until the code is verified.
+        mfa_token, mfa_expires_at = issue_mfa_token(user_id=user.id, email=user.email)
+        return MfaChallengeResponse(mfa_token=mfa_token, mfa_expires_at=mfa_expires_at), None
+    return _complete_sign_in(engine, user, ip_address, user_agent, mfa_enrolled=mfa is not None and mfa.enabled_at is not None)
+
+
+def _complete_sign_in(
+    engine: Engine, user: LoginUserRecord, ip_address: str | None, user_agent: str | None, *, mfa_enrolled: bool
+) -> tuple[LoginResponse, str]:
     session, token, refresh_raw, access_expires_at = _start_session(engine, user, ip_address, user_agent)
     update_last_login(engine, user.id)
+    enrollment_required = (
+        settings.mfa_enforce_admin_enrollment
+        and not mfa_enrolled
+        and COMPANY_SCOPE_CODE in set(list_resolved_permissions(engine, user.id))
+    )
 
     body = LoginResponse(
+        mfa_enrollment_required=enrollment_required,
         token=token,
         access_expires_at=access_expires_at,
         user={
@@ -488,3 +511,37 @@ def reset_password_service(
     mark_password_reset_token_used(engine, token_record["id"])
     revoke_user_sessions(engine, token_record["user_id"], "password-reset")
     return PasswordResetResponse(message="Password reset successfully")
+
+
+
+def mfa_challenge_service(
+    engine: Engine, payload: MfaChallengeRequest, ip_address: str | None, user_agent: str | None
+) -> tuple[LoginResponse, str]:
+    """Second step of sign-in: the MFA token from /auth/login plus a code from
+    the authenticator app (each code works once) or an unused recovery code."""
+    from app.core import rate_limit  # noqa: PLC0415
+    from app.core.totp import hash_recovery_code, matching_step  # noqa: PLC0415
+    from app.repositories.mfa import claim_step, use_recovery_code  # noqa: PLC0415
+
+    try:
+        claims = decode_mfa_token(payload.mfa_token)
+    except InvalidToken:
+        raise _unauthorized("The sign-in step expired. Please sign in again.") from None
+    rate_limit.enforce("mfa:account", str(claims["sub"]))
+    user = find_user_for_login(engine, str(claims.get("email", "")))
+    if user is None or str(user.id) != str(claims["sub"]):
+        raise _unauthorized()
+    if user.status != "active" or getattr(user, "tenant_status", "active") != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not allowed to access the system")
+    mfa = find_mfa(engine, user.id)
+    if mfa is None or mfa.enabled_at is None:
+        raise _unauthorized()
+    accepted = False
+    if payload.code:
+        step = matching_step(mfa.totp_secret, payload.code)
+        accepted = step is not None and claim_step(engine, user.id, step)
+    elif payload.recovery_code:
+        accepted = use_recovery_code(engine, user.id, hash_recovery_code(payload.recovery_code))
+    if not accepted:
+        raise _unauthorized("Invalid verification code")
+    return _complete_sign_in(engine, user, ip_address, user_agent, mfa_enrolled=True)

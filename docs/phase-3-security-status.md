@@ -24,6 +24,20 @@
 | 3.8 Perimeter | Security headers on every API response (nosniff, frame DENY, no-referrer, Permissions-Policy, COOP, CSP `default-src 'none'`, `Cache-Control: no-store`); in staging/production HSTS and an HTTP→HTTPS 308 redirect (via `X-Forwarded-Proto` from the load balancer). CORS: exact allowlist, credentials allowed only for those origins. TLS at the load balancer waits for the domain (I-3). |
 | Tests | `test_auth_protection.py`: 8-char and common/breached passwords rejected, 429 at 5/min/IP and 10/min/account, forgot-password limit, headers, CORS probe from a disallowed origin, lockout after 5 wrong passwords. |
 
+## 3C — Two-step verification (3.6)
+
+| Item | Delivered |
+|---|---|
+| TOTP | `app/core/totp.py` (RFC 6238, 30 s, 6 digits, ±1 step for clock drift; RFC test vector checked). `015_mfa.sql`: `user_mfa` (secret, confirmed-at, last used step) and `user_mfa_recovery_codes` (10, SHA-256, single use). |
+| Sign-in | With MFA on, `/auth/login` returns `{mfa_required, mfa_token}` (5-minute JWT, no session, no cookie); `/auth/mfa/challenge` + a code or a recovery code completes the sign-in. **Each code works once** (last used step stored); recovery codes once each. Rate-limited per account. |
+| Manage | `GET /auth/mfa`, `POST /auth/mfa/enroll` (secret + otpauth link), `POST /auth/mfa/verify` (confirms, returns recovery codes once), `DELETE /auth/mfa` with a code or recovery code (re-verify; signs out other devices). **Admins can't turn it off** (D-09; decided by the `scope.company` grant, not the role code). Audited. |
+| Admins | `MFA_ENFORCE_ADMIN_ENROLLMENT` (on in staging/production): an Admin without MFA is sent to enrolment right after sign-in. **A company cannot be set active while any active Admin lacks MFA** — `app/services/tenants.activate_tenant`, `scripts/activate_company.py`. |
+| Break-glass | `scripts/mfa_break_glass.py --email … --reason … --operator-email …`: removes the authenticator, ends every session, writes an audit row. |
+| Pages | `mfa-challenge.html` (sign-in step 2), `mfa-enroll.html`, `active-sessions.html`; linked from My Profile → Security. Password forms ask for 12+. |
+| Tests | `test_mfa_db.py`: two-step sign-in, wrong code, single-use code, recovery code once, disable needs a code, Admin can't disable, **Admin without MFA blocks company activation**. |
+
+Known gap: the TOTP secret is stored as-is (encryption at rest with a managed key is Phase 6 secrets work).
+
 ### Result of the 3A run (2026-10-06, commit `32ed6c9`)
 
 Backend **456 passed**, 3 skipped (incl. refresh-theft, expired refresh, cutover) · live smoke **52/52** · sweeps admin + recruiter 101/101 · dev database on 013, dev backend verified (login JWT, refresh, sessions, logout).

@@ -55,6 +55,9 @@ class LoginResponse(BaseModel):
     token: str
     # Access token (JWT) expiry; the refresh token travels in an HttpOnly cookie.
     access_expires_at: datetime | None = None
+    # D-09: an Admin who has not enrolled an authenticator is sent to enrolment
+    # (enforced when MFA_ENFORCE_ADMIN_ENROLLMENT is on — default in production).
+    mfa_enrollment_required: bool = False
     user: AuthUserSummary
     primary_role: AuthRoleSummary
     primary_location: AuthLocationSummary
@@ -167,3 +170,38 @@ class SessionListResponse(BaseModel):
 
 class SessionsRevokedResponse(BaseModel):
     revoked: int
+
+
+class MfaChallengeResponse(BaseModel):
+    """Password accepted; a code from the authenticator app is still needed."""
+    mfa_required: bool = True
+    mfa_token: str
+    mfa_expires_at: datetime
+
+
+class MfaChallengeRequest(BaseModel):
+    mfa_token: str = Field(min_length=10)
+    code: str | None = Field(default=None, max_length=12)
+    recovery_code: str | None = Field(default=None, max_length=20)
+
+
+class MfaEnrollResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class MfaCodeRequest(BaseModel):
+    code: str | None = Field(default=None, max_length=12)
+    recovery_code: str | None = Field(default=None, max_length=20)
+
+
+class MfaVerifyResponse(BaseModel):
+    enabled: bool
+    recovery_codes: list[str]
+
+
+class MfaStatusResponse(BaseModel):
+    enabled: bool
+    pending: bool
+    required: bool
+    recovery_codes_remaining: int

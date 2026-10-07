@@ -13,6 +13,12 @@ from app.schemas.auth import (
     SessionsRevokedResponse,
     LoginRequest,
     LoginResponse,
+    MfaChallengeRequest,
+    MfaChallengeResponse,
+    MfaCodeRequest,
+    MfaEnrollResponse,
+    MfaStatusResponse,
+    MfaVerifyResponse,
     LogoutResponse,
     PasswordChangeRequest,
     PasswordChangeResponse,
@@ -32,6 +38,7 @@ from app.services.auth import (
     list_sessions_service,
     login_service,
     logout_service,
+    mfa_challenge_service,
     refresh_service,
     revoke_other_sessions_service,
     revoke_own_session_service,
@@ -39,6 +46,8 @@ from app.services.auth import (
     setup_password_service,
     update_own_profile_service,
 )
+
+from app.services.mfa import disable_service, enroll_service, mfa_status_service, verify_enrollment_service
 
 router = APIRouter()
 
@@ -71,13 +80,13 @@ def _clear_refresh_cookie(response: Response) -> None:
                            secure=settings.is_production, httponly=True)
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse | MfaChallengeResponse)
 def login_endpoint(
     payload: LoginRequest,
     request: Request,
     response: Response,
     engine: Engine = Depends(get_engine),
-) -> LoginResponse:
+) -> LoginResponse | MfaChallengeResponse:
     rate_limit.enforce("login:ip", rate_limit.client_ip(request))
     rate_limit.enforce("login:account", str(payload.email))
     body, refresh_raw = login_service(
@@ -86,8 +95,61 @@ def login_endpoint(
         ip_address=_resolve_ip_address(request),
         user_agent=request.headers.get("user-agent"),
     )
+    if refresh_raw:  # no session yet when a second factor is required
+        _set_refresh_cookie(response, refresh_raw)
+    return body
+
+
+@router.post("/mfa/challenge", response_model=LoginResponse)
+def mfa_challenge_endpoint(
+    payload: MfaChallengeRequest,
+    request: Request,
+    response: Response,
+    engine: Engine = Depends(get_engine),
+) -> LoginResponse:
+    """Sign-in step 2: the token from /auth/login + a code from the app."""
+    rate_limit.enforce("login:ip", rate_limit.client_ip(request))
+    body, refresh_raw = mfa_challenge_service(
+        engine, payload, ip_address=_resolve_ip_address(request), user_agent=request.headers.get("user-agent")
+    )
     _set_refresh_cookie(response, refresh_raw)
     return body
+
+
+@router.get("/mfa", response_model=MfaStatusResponse)
+def mfa_status_endpoint(
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> MfaStatusResponse:
+    return mfa_status_service(engine, auth_context)
+
+
+@router.post("/mfa/enroll", response_model=MfaEnrollResponse)
+def mfa_enroll_endpoint(
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> MfaEnrollResponse:
+    return enroll_service(engine, auth_context)
+
+
+@router.post("/mfa/verify", response_model=MfaVerifyResponse)
+def mfa_verify_endpoint(
+    payload: MfaCodeRequest,
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> MfaVerifyResponse:
+    """Confirms set-up with a first code; returns the recovery codes once."""
+    return verify_enrollment_service(engine, auth_context, payload)
+
+
+@router.delete("/mfa", status_code=204)
+def mfa_disable_endpoint(
+    payload: MfaCodeRequest,
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> Response:
+    disable_service(engine, auth_context, payload)
+    return Response(status_code=204)
 
 
 @router.post("/refresh", response_model=RefreshResponse)

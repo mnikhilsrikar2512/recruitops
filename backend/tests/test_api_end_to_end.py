@@ -396,6 +396,7 @@ class TestLoginEndpoint:
         assert resp.status_code == 401
 
     def test_login_valid_credentials_returns_200(self, monkeypatch):
+        monkeypatch.setattr("app.services.auth.find_mfa", lambda engine, user_id: None)
         from app.core.security import sha256_hex
         correct_hash = f"sha256:{sha256_hex('correctpass')}"
         monkeypatch.setattr(

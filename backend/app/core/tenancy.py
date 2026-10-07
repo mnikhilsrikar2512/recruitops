@@ -73,6 +73,8 @@ TABLE_TENANCY: dict[str, str] = {
     # ---- through a user -----------------------------------------------
     "user_sessions": "user:user_id",
     "user_refresh_tokens": "parent:session_id->user_sessions",
+    "user_mfa": "user:user_id",
+    "user_mfa_recovery_codes": "user:user_id",
     "password_reset_tokens": "user:user_id",
     "user_invitations": "user:user_id",
     "user_notification_preferences": "user:user_id",
