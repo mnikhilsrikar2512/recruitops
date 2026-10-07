@@ -41,3 +41,18 @@ Known gap: the TOTP secret is stored as-is (encryption at rest with a managed ke
 ### Result of the 3A run (2026-10-06, commit `32ed6c9`)
 
 Backend **456 passed**, 3 skipped (incl. refresh-theft, expired refresh, cutover) · live smoke **52/52** · sweeps admin + recruiter 101/101 · dev database on 013, dev backend verified (login JWT, refresh, sessions, logout).
+
+### Phase 3 closing run (2026-10-07, commit `ade5e21`)
+
+Backend **473 passed**, 3 skipped · live smoke **52/52** · sweeps admin + recruiter **104/104** (3 new pages) · migrations 008–015 on a fresh staging database.
+
+| Exit gate | Proof |
+|---|---|
+| Reusing a rotated refresh token kills the whole family | `test_jwt_sessions_db.py`, live smoke 1.8 |
+| Expired refresh requires a full re-login | `test_jwt_sessions_db.py` |
+| An Admin without MFA blocks a company from going active | `test_mfa_db.py` |
+| CORS probe from a disallowed origin is rejected | `test_auth_protection.py` |
+| 429 at the documented thresholds (5/min/IP, 10/min/account) | `test_auth_protection.py` |
+| 8-character and breached passwords are rejected | `test_auth_protection.py` |
+
+**Phase 3 exit gate: met.** Waiting on outside inputs: TLS/HSTS at a real load balancer and a domain (I-3); a Redis service for staging (I-2); CI workflow gains a Redis service when staging does.
