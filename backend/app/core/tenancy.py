@@ -21,7 +21,8 @@ TABLE_TENANCY: dict[str, str] = {
     "roles": "tenant",  # tenant_id NULL = shared system role (Admin template)
     "company_entities": "tenant",  # company profile / letterhead (012)
     "master_data_values": "tenant",  # NULL = shared template values (012)
-    "stage_bucket_map": "tenant",  # NULL = platform default label map (016)
+    "stage_bucket_map": "tenant",
+    "candidate_archives": "tenant",  # an archive hides a shared candidate from ONE company (019)  # NULL = platform default label map (016)
     # ---- through an office --------------------------------------------
     "agent_runs": "office:location_id",
     "approvals": "office:location_id",

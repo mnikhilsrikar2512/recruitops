@@ -51,7 +51,7 @@ MANAGER_CODES = RECRUITER_CODES + [
     "requisition.create", "requisition.update", "requisition.assign", "requisition.status.update",
     "client.create", "client.update", "client.contact.create", "client.contact.update",
     "offer.create", "offer.decide", "approval.read", "approval.decide", "approval.create",
-    "pipeline.stage.reopen",
+    "pipeline.stage.reopen", "candidate.delete.soft", "client.delete.soft",
     "report.read", "dashboard.read_pipeline_summary", "user.read",
 ]
 

@@ -2346,6 +2346,56 @@ async function loadClients() {
   });
 }
 
+/* Phase 4.4 (D-07): archive / restore control on a detail page. Shown only
+   to callers holding <entity>.delete.soft; archived records show a banner. */
+function renderArchiveControl({ kind, record, resourcePath, permission, anchor }) {
+  if (!record || !anchor || document.querySelector("[data-archive-control]")) return;
+  const label = kind === "client" ? "client" : "candidate";
+  const box = document.createElement("div");
+  box.dataset.archiveControl = "true";
+  box.className = "mt-3 flex flex-wrap items-center gap-2 text-[13px]";
+  const archived = Boolean(record.archived_at);
+  const canManage = typeof hasPermission === "function" && hasPermission(permission);
+  if (!archived && !canManage) return;
+  if (archived) {
+    const banner = document.createElement("span");
+    banner.className = "rounded-lg bg-warning-bg px-3 py-1 font-semibold text-on-surface";
+    banner.textContent = `Archived ${typeof formatWhen === "function" ? (formatWhen(record.archived_at) || "") : ""}${record.archive_reason ? ` — ${record.archive_reason}` : ""}`;
+    box.appendChild(banner);
+  }
+  if (canManage) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rounded-lg border border-border bg-surface px-3 py-1 hover:bg-highlight-soft";
+    button.textContent = archived ? `Restore ${label}` : `Archive ${label}`;
+    const reasonWrap = document.createElement("span");
+    reasonWrap.hidden = true;
+    reasonWrap.innerHTML = `<label class="sr-only" for="archive-reason">Reason for archiving</label>
+      <input id="archive-reason" type="text" maxlength="500" placeholder="Why archive? (kept in history)" class="rounded-lg border border-border px-2 py-1 text-[13px]" />
+      <button type="button" data-archive-confirm class="rounded-lg bg-primary px-3 py-1 font-semibold text-on-primary">Confirm archive</button>`;
+    button.addEventListener("click", async () => {
+      if (!archived) { reasonWrap.hidden = false; reasonWrap.querySelector("input").focus(); return; }
+      try {
+        await apiRequest(`${resourcePath}/restore`, { method: "POST" });
+        showLiveSuccess?.(`${label[0].toUpperCase()}${label.slice(1)} restored`, record.full_name || record.client_name || "");
+        window.location.reload();
+      } catch (error) { showLiveError?.(error); }
+    });
+    reasonWrap.querySelector("[data-archive-confirm]").addEventListener("click", async () => {
+      const reason = reasonWrap.querySelector("input").value.trim();
+      if (reason.length < 3) { showLiveError?.(new Error("Give a reason of at least 3 characters.")); return; }
+      try {
+        await apiRequest(`${resourcePath}/archive`, { method: "POST", body: { reason } });
+        showLiveSuccess?.(`${label[0].toUpperCase()}${label.slice(1)} archived`, "Hidden from lists; you can restore it here.");
+        window.location.reload();
+      } catch (error) { showLiveError?.(error); }
+    });
+    box.appendChild(button);
+    box.appendChild(reasonWrap);
+  }
+  anchor.insertAdjacentElement("afterend", box);
+}
+
 async function loadClientDetail() {
   const client = await detailFromRoute(["client_id", "id"], "/clients/?page_size=1", (id) => `/clients/${id}`);
   if (!client) return;
@@ -2354,6 +2404,10 @@ async function loadClientDetail() {
   setApiField("open_requisitions", "—");
   setApiField("priority_roles", "—");
   setApiField("last_activity", formatWhen(client.updated_at) || "—");
+  renderArchiveControl({
+    kind: "client", record: client, resourcePath: `/clients/${client.id}`, permission: "client.delete.soft",
+    anchor: document.querySelector("[data-client-detail] h1") || surface?.querySelector("h1, h2"),
+  });
 }
 
 
@@ -2753,6 +2807,10 @@ async function loadCandidateDetail() {
       `Run the AI resume screener for ${candidate.full_name || "this candidate"}`,
     );
   }
+  renderArchiveControl({
+    kind: "candidate", record: candidate, resourcePath: `/candidates/${candidate.id}`, permission: "candidate.delete.soft",
+    anchor: candidateNameHost?.parentElement || candidateNameHost,
+  });
 }
 
 async function loadCandidateReviewDrawer() {

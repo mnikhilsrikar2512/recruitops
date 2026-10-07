@@ -134,6 +134,12 @@ def resolved_permissions_for(engine: Engine, auth_context: AuthContext) -> set[s
     return _get_cached_permissions(engine, auth_context.user.id)
 
 
+def caller_has_permission(engine: Engine, auth_context: AuthContext, code: str) -> bool:
+    """For routes whose behaviour (not access) depends on a grant, e.g.
+    whether archived records are visible (Phase 4.4)."""
+    return _has_permission(resolved_permissions_for(engine, auth_context), code)
+
+
 def require_permissions(*permission_codes: str) -> Callable[..., AuthContext]:
     def permission_dependency(
         auth_context: AuthContext = Depends(get_current_auth_context),

@@ -17,6 +17,8 @@ class ClientListFilters(BaseModel):
     client_owner_user_id: int | None = Field(default=None, ge=1)
     business_source_owner_user_id: int | None = Field(default=None, ge=1)
     search: str | None = Field(default=None, min_length=1, max_length=200)
+    # Phase 4.4: archived clients are left out unless asked for.
+    include_archived: bool = False
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -159,6 +161,8 @@ class ClientResponse(BaseModel):
     created_by_user_id: int | None
     created_at: datetime
     updated_at: datetime
+    archived_at: datetime | None = None
+    archive_reason: str | None = None
 
 
 class ClientListResponse(BaseModel):

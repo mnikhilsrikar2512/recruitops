@@ -96,11 +96,13 @@ Every code follows `module.action` (or `module.subaction`). This is the source o
 | `audit_log.read` | Admin → Audit Log | ● | ○ | ○ |
 | `privacy_request.write` | Admin → Data Export/Delete Requests | ● | ○ | ○ |
 | `client.read` / `client.write` | Client Directory, detail, create/edit | ○/○ | ●/● | ●/○ |
+| `client.delete.soft` | Archive and restore a client (D-07; hidden from lists, never hard-deleted) | ○ | ● | ○ |
 | `requisition.read` / `.write` | Requisition list/intake/detail | ○/○ | ●/● | ●/○ |
 | `requisition.status.write` | Requisition status change | ○ | ● | ○ |
 | `requisition.reassign_owner` | Owner reassignment | ○ | ● | ○ |
 | `candidate.read` / `.write` | Candidate profiles, detail, upload | ○/○ | ●/● | ●/● |
 | `candidate.duplicate.decide` | Duplicate-check decision | ○ | ● | ● |
+| `candidate.delete.soft` | Archive and restore a candidate for your company (D-07; hidden from lists, never hard-deleted) | ○ | ● | ○ |
 | `pipeline.read.summary` | Pipeline board view (was `pipeline.board.read`) | ○ | ● | ● |
 | `pipeline.stage.reopen` | Reopen a rejected, withdrawn or joined application (`POST /pipeline/applications/{id}/reopen`, reason required) | ○ | ● | ○ |
 | `pipeline.stage.move` | Stage-move action | ○ | ● | ● |

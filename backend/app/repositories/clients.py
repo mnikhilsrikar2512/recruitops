@@ -31,6 +31,8 @@ class ClientRecord:
     created_by_user_id: int | None
     created_at: object
     updated_at: object
+    archived_at: object = None
+    archive_reason: str | None = None
 
 
 @dataclass
@@ -70,6 +72,8 @@ def _map_client(row: RowMapping) -> ClientRecord:
         created_by_user_id=row["created_by_user_id"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        archived_at=row.get("archived_at"),
+        archive_reason=row.get("archive_reason"),
     )
 
 
@@ -112,6 +116,8 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
             CAST(NULL AS BIGINT) AS created_by_user_id,
             c.created_at,
             c.updated_at,
+            c.archived_at,
+            c.archive_reason,
             COUNT(*) OVER() AS total_count
           FROM dbo.client_companies AS c
           LEFT JOIN dbo.users AS source_owner
@@ -121,6 +127,7 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
           WHERE (:location_id IS NULL OR c.branch_id = :location_id)
           AND (:tenant_id IS NULL OR c.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:status IS NULL OR c.status = :status)
+          AND (:include_archived = 1 OR c.archived_at IS NULL)
           AND (:client_owner_user_id IS NULL OR c.account_manager_user_id = :client_owner_user_id)
           AND (
             :business_source_owner_user_id IS NULL
@@ -148,6 +155,7 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
               "client_owner_user_id": filters.client_owner_user_id,
               "business_source_owner_user_id": filters.business_source_owner_user_id,
               "search": filters.search,
+              "include_archived": 1 if filters.include_archived else 0,
               "offset": (filters.page - 1) * filters.page_size,
               "page_size": filters.page_size,
           },
@@ -174,7 +182,9 @@ def _client_select_sql() -> str:
           c.notes,
           CAST(NULL AS BIGINT) AS created_by_user_id,
           c.created_at,
-          c.updated_at
+          c.updated_at,
+          c.archived_at,
+          c.archive_reason
         FROM dbo.client_companies AS c
         LEFT JOIN dbo.users AS source_owner
           ON source_owner.id = c.account_manager_user_id
@@ -426,3 +436,30 @@ def update_client_contact(engine: Engine, contact_id: int, payload: ClientContac
     if updated is None:
         raise RuntimeError("Updated client contact could not be reloaded")
     return updated
+
+
+def count_open_requisitions_for_client(engine: Engine, client_id: int) -> int:
+    query = text(
+        """
+        SELECT COUNT(*) FROM dbo.requisitions
+        WHERE client_company_id = :client_id AND status IN (N'draft', N'open', N'on-hold');
+        """
+    )
+    with engine.connect() as connection:
+        return int(connection.execute(query, {"client_id": client_id}).scalar_one())
+
+
+def set_client_archived(engine: Engine, client_id: int, user_id: int | None, reason: str | None) -> None:
+    """Archive (reason given) or restore (reason None) a client — Phase 4.4."""
+    query = text(
+        """
+        UPDATE dbo.client_companies
+        SET archived_at = CASE WHEN :reason IS NULL THEN NULL ELSE SYSUTCDATETIME() END,
+            archived_by_user_id = CASE WHEN :reason IS NULL THEN NULL ELSE :user_id END,
+            archive_reason = :reason,
+            updated_at = SYSUTCDATETIME()
+        WHERE id = :client_id;
+        """
+    )
+    with engine.begin() as connection:
+        connection.execute(query, {"client_id": client_id, "user_id": user_id, "reason": reason})

@@ -3,6 +3,10 @@ from sqlalchemy import Engine
 from app.repositories.versioning import StaleWriteConflict
 
 from app.repositories.candidates import (
+    archive_candidate,
+    count_open_applications_in_tenant,
+    find_open_candidate_archive,
+    restore_candidate,
     count_candidate_applications_for_requisition,
     count_active_candidate_applications,
     create_candidate,
@@ -230,6 +234,7 @@ def get_candidate_detail_service(
     engine: Engine,
     candidate_id: int,
     auth_context: AuthContext | None = None,
+    include_archived: bool = False,
 ) -> CandidateResponse:
     candidate = find_candidate_by_id(engine, candidate_id)
     if not candidate:
@@ -272,6 +277,15 @@ def get_candidate_detail_service(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
         _assert_candidate_access(response, auth_context)
         response = _tenant_scoped_candidate_response(response, auth_context)
+        # Phase 4.4: archived for this company -> gone, unless the caller
+        # may archive/restore (then it is shown, marked archived).
+        archive = find_open_candidate_archive(engine, candidate_id, scope.tenant_id_of(auth_context))
+        if archive is not None:
+            if not include_archived:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
+            response = response.model_copy(
+                update={"archived_at": archive.archived_at, "archive_reason": archive.archive_reason}
+            )
         offices = scope.company_office_ids(engine, auth_context)
         if offices is not None:
             own = [a for a in response.applications if a.location_id in offices]
@@ -570,3 +584,56 @@ def reassign_candidate_owner_service(
         review_required=review_required,
         reason=payload.reason,
     )
+
+
+def _require_company(auth_context: AuthContext) -> int:
+    tenant_id = scope.tenant_id_of(auth_context)
+    if tenant_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archiving belongs to a company; sign in as a company user")
+    return int(tenant_id)
+
+
+def archive_candidate_service(engine: Engine, candidate_id: int, reason: str, auth_context: AuthContext) -> CandidateResponse:
+    """Phase 4.4 (D-07): hide a candidate from this company. Nothing is
+    deleted; other companies working the same person are not affected."""
+    tenant_id = _require_company(auth_context)
+    get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+    if find_open_candidate_archive(engine, candidate_id, tenant_id) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate is already archived")
+    open_applications = count_open_applications_in_tenant(engine, candidate_id, tenant_id)
+    if open_applications:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Candidate has {open_applications} open application(s); close or withdraw them before archiving",
+        )
+    archive_candidate(engine, candidate_id, tenant_id, auth_context.user.id, reason)
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="candidate",
+        entity_id=candidate_id,
+        action_type="candidate.archive",
+        new_values={"tenant_id": tenant_id, "reason": reason},
+    )
+    return get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+
+
+def restore_candidate_service(engine: Engine, candidate_id: int, auth_context: AuthContext) -> CandidateResponse:
+    tenant_id = _require_company(auth_context)
+    archive = find_open_candidate_archive(engine, candidate_id, tenant_id)
+    if archive is None:
+        get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate is not archived")
+    get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+    restore_candidate(engine, archive.id, candidate_id, auth_context.user.id)
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="candidate",
+        entity_id=candidate_id,
+        action_type="candidate.restore",
+        old_values={"archived_at": archive.archived_at, "reason": archive.archive_reason},
+    )
+    return get_candidate_detail_service(engine, candidate_id, auth_context)

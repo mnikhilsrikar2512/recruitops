@@ -93,3 +93,31 @@ Built on work that was already in the tree but not committed (migration 018, `ve
   - Candidate edit, requisition edit and status change, stage move, and reopen send that version automatically.
   - A `stale_write` 409 opens a "This record changed" dialog with **Reload latest** and **Keep my screen**.
 - **Exit gate:** `tests/test_row_versions_db.py` runs two edits against the same loaded version, for a candidate, a requisition and a stage move. The second edit gets 409 with the fresh row, and an edit without a version still succeeds.
+
+**Third verify run (`e8ec25b`):** 487 passed, smoke 52/52, sweeps 105/105. 018 applied to dev.
+
+## 4.4 Soft delete (D-07) — built
+
+- **Migration `019_soft_delete.sql`:**
+  - `dbo.candidate_archives`: candidates are shared identity records, so an archive belongs to **one company** and hides the candidate from that company only. Rows are kept after a restore as archive history.
+  - `client_companies` gains `archived_at`, `archived_by_user_id` and `archive_reason`.
+  - Adds the permission codes `candidate.delete.soft` and `client.delete.soft`. One code covers both archive and restore (readiness Q17). They are granted once to manager-shaped roles, the ones that edit the record and also hold `requisition.update`. PRD §3.2 rows added.
+- **API:**
+  - `POST /candidates/{id}/archive` (reason required) and `POST /candidates/{id}/restore`; the same pair for `/clients/{id}`.
+  - Archiving is refused while the candidate still has open applications in the company, or the client still has open requisitions.
+  - Every archive and restore is audited.
+- **Hidden by default:**
+  - The candidate and client lists leave archived records out. `?include_archived=true` needs the delete.soft grant (403 without it).
+  - Direct-ID reads answer 404 for callers without the grant. Callers with the grant see the record marked `archived_at`.
+  - Archived clients cannot be used for requisitions.
+  - The filtering is done in the repository and service layers.
+- **Hard delete is still not reachable from the app.**
+- **Frontend:** the candidate and client detail pages show an archived banner and an Archive/Restore control (with a reason field) to holders of the grant.
+- **Unit tests** see no archives on MagicMock engines (conftest shim); real engines always query `candidate_archives`.
+- **Exit gate:** `tests/test_soft_delete_db.py` covers:
+  - Archiving is blocked while records are still open.
+  - Archived records are hidden from lists and shown with `include_archived`.
+  - Direct reads answer 404 without the grant.
+  - Restore brings records back.
+  - Audit rows and archive history are written.
+- **Not in scope:** a "show archived" toggle on the list pages (the API already supports it), and user and company soft delete. Users already have deactivation; company deletion belongs to Phase 5 privacy.

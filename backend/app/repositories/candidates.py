@@ -255,6 +255,89 @@ def _parse_social_profiles(value: str | None) -> list[dict]:
     return parsed if isinstance(parsed, list) else []
 
 
+# Phase 4.4: an archive belongs to one company (dbo.candidate_archives).
+# NULL tenant (platform scope) treats any open archive as archived.
+ARCHIVED_FOR_TENANT_SQL = (
+    "EXISTS (SELECT 1 FROM dbo.candidate_archives AS arc WHERE arc.candidate_id = c.id "
+    "AND arc.restored_at IS NULL AND (:tenant_id IS NULL OR arc.tenant_id = :tenant_id))"
+)
+
+
+@dataclass
+class CandidateArchiveRecord:
+    id: int
+    tenant_id: int
+    candidate_id: int
+    archived_at: object
+    archived_by_user_id: int
+    archive_reason: str
+
+
+def find_open_candidate_archive(engine: Engine, candidate_id: int, tenant_id: int | None) -> CandidateArchiveRecord | None:
+    query = text(
+        """
+        SELECT TOP 1 id, tenant_id, candidate_id, archived_at, archived_by_user_id, archive_reason
+        FROM dbo.candidate_archives
+        WHERE candidate_id = :candidate_id AND restored_at IS NULL
+          AND (:tenant_id IS NULL OR tenant_id = :tenant_id)
+        ORDER BY archived_at DESC;
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(query, {"candidate_id": candidate_id, "tenant_id": tenant_id}).mappings().first()
+    return CandidateArchiveRecord(**row) if row else None
+
+
+def count_open_applications_in_tenant(engine: Engine, candidate_id: int, tenant_id: int) -> int:
+    query = text(
+        """
+        SELECT COUNT(*)
+        FROM dbo.candidate_applications AS ca
+        INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
+        INNER JOIN dbo.branches AS b ON b.id = r.branch_id
+        WHERE ca.candidate_id = :candidate_id AND b.tenant_id = :tenant_id
+          AND ca.application_status = N'active';
+        """
+    )
+    with engine.connect() as connection:
+        return int(connection.execute(query, {"candidate_id": candidate_id, "tenant_id": tenant_id}).scalar_one())
+
+
+def archive_candidate(engine: Engine, candidate_id: int, tenant_id: int, user_id: int, reason: str) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO dbo.candidate_archives (tenant_id, candidate_id, archived_by_user_id, archive_reason)
+                VALUES (:tenant_id, :candidate_id, :user_id, :reason);
+                """
+            ),
+            {"tenant_id": tenant_id, "candidate_id": candidate_id, "user_id": user_id, "reason": reason},
+        )
+        connection.execute(
+            text("UPDATE dbo.candidates SET version = version + 1, updated_at = SYSUTCDATETIME() WHERE id = :candidate_id;"),
+            {"candidate_id": candidate_id},
+        )
+
+
+def restore_candidate(engine: Engine, archive_id: int, candidate_id: int, user_id: int) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                UPDATE dbo.candidate_archives
+                SET restored_at = SYSUTCDATETIME(), restored_by_user_id = :user_id
+                WHERE id = :archive_id AND restored_at IS NULL;
+                """
+            ),
+            {"archive_id": archive_id, "user_id": user_id},
+        )
+        connection.execute(
+            text("UPDATE dbo.candidates SET version = version + 1, updated_at = SYSUTCDATETIME() WHERE id = :candidate_id;"),
+            {"candidate_id": candidate_id},
+        )
+
+
 def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list[CandidateRecord], int]:
     query = text(
         f"""
@@ -265,6 +348,7 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
           AND (:owner_user_id IS NULL OR c.primary_owner_user_id = :owner_user_id)
           AND (:sourced_by_user_id IS NULL OR c.created_by_user_id = :sourced_by_user_id)
           AND (:tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL})
+          AND (:include_archived = 1 OR NOT {ARCHIVED_FOR_TENANT_SQL})
           AND (
             :requisition_id IS NULL
             OR EXISTS (
@@ -325,6 +409,7 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
                 "tenant_id": filters.tenant_id,
                 "requisition_id": filters.requisition_id,
                 "search": filters.search,
+                "include_archived": 1 if filters.include_archived else 0,
                 "offset": (filters.page - 1) * filters.page_size,
                 "page_size": filters.page_size,
             },

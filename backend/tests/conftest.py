@@ -69,6 +69,25 @@ def _stage_buckets_without_db(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_archives_without_db(monkeypatch):
+    """Unit tests run on MagicMock engines: no candidate is archived there.
+    A real Engine always asks dbo.candidate_archives (Phase 4.4)."""
+    from sqlalchemy.engine import Engine
+
+    from app.services import candidates as candidate_service
+
+    original = candidate_service.find_open_candidate_archive
+
+    def resolved(engine, candidate_id, tenant_id):
+        if isinstance(engine, Engine):
+            return original(engine, candidate_id, tenant_id)
+        return None
+
+    monkeypatch.setattr(candidate_service, "find_open_candidate_archive", resolved)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _rate_limits_off(monkeypatch):
     """The suite signs in hundreds of times from one client; rate limits are
     exercised explicitly in test_auth_protection.py, which turns them on."""

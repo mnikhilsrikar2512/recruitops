@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 from sqlalchemy import Engine
 
-from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions
+from fastapi import HTTPException
+
+from app.api.deps import caller_has_permission, caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions
 from app.schemas.candidate import (
+    ArchiveRequest,
     CandidateCreate,
     CandidateFootprintResponse,
     CandidateDocumentCreate,
@@ -20,6 +23,8 @@ from app.schemas.candidate import (
     CandidateUpdate,
 )
 from app.services.candidates import (
+    archive_candidate_service,
+    restore_candidate_service,
     create_candidate_document_service,
     create_candidate_duplicate_decision_service,
     create_candidate_service,
@@ -47,11 +52,15 @@ def list_candidates_endpoint(
     duplicate_state: str | None = Query(default=None),
     owner_user_id: int | None = Query(default=None, ge=1),
     sourced_by_user_id: int | None = Query(default=None, ge=1),
+    include_archived: bool = Query(default=False, description="Also list archived candidates (needs candidate.delete.soft)"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     engine: Engine = Depends(get_engine),
 ) -> CandidateListResponse:
+    if include_archived and not caller_has_permission(engine, auth_context, "candidate.delete.soft"):
+        raise HTTPException(status_code=403, detail="Missing required permission: candidate.delete.soft")
     filters = CandidateListFilters(
+        include_archived=include_archived,
         search=search,
         requisition_id=requisition_id,
         source_type=source_type,
@@ -81,7 +90,33 @@ def get_candidate_detail_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
-    return get_candidate_detail_service(engine, candidate_id, auth_context)
+    return get_candidate_detail_service(
+        engine,
+        candidate_id,
+        auth_context,
+        include_archived=caller_has_permission(engine, auth_context, "candidate.delete.soft"),
+    )
+
+
+@router.post("/{candidate_id}/archive", response_model=CandidateResponse)
+def archive_candidate_endpoint(
+    payload: ArchiveRequest,
+    auth_context: AuthContext = Depends(require_permissions("candidate.delete.soft")),
+    candidate_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> CandidateResponse:
+    """Phase 4.4 (D-07): hide the candidate from your company's lists and
+    links. Nothing is deleted; restore brings it back."""
+    return archive_candidate_service(engine, candidate_id, payload.reason, auth_context)
+
+
+@router.post("/{candidate_id}/restore", response_model=CandidateResponse)
+def restore_candidate_endpoint(
+    auth_context: AuthContext = Depends(require_permissions("candidate.delete.soft")),
+    candidate_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> CandidateResponse:
+    return restore_candidate_service(engine, candidate_id, auth_context)
 
 
 @router.get("/{candidate_id}/footprint", response_model=CandidateFootprintResponse)

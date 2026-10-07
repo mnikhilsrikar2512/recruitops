@@ -57,6 +57,8 @@ def _assert_client_and_contacts(
     client = find_client_by_id(engine, client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client was not found")
+    if getattr(client, "archived_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This client is archived; restore it first")
     if client.location_id != location_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

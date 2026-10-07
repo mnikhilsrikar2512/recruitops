@@ -40,6 +40,9 @@ class CandidateListFilters(BaseModel):
     duplicate_state: CandidateDuplicateState | None = None
     owner_user_id: int | None = Field(default=None, ge=1)
     sourced_by_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.4: archived candidates are left out unless asked for (and the
+    # caller holds candidate.delete.soft).
+    include_archived: bool = False
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -272,6 +275,9 @@ class CandidateResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: int = 1
+    # Phase 4.4: set when the caller's company archived this candidate.
+    archived_at: datetime | None = None
+    archive_reason: str | None = None
 
 
 class CandidateListItemResponse(BaseModel):
@@ -338,3 +344,16 @@ class CandidateOwnerReassignmentResponse(BaseModel):
     active_application_count: int
     review_required: bool
     reason: str
+
+
+class ArchiveRequest(BaseModel):
+    """Phase 4.4: archive a candidate or client (reason is kept in history)."""
+    reason: str = Field(min_length=3, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 3:
+            raise ValueError("Give a reason of at least 3 characters")
+        return normalized
