@@ -1,6 +1,9 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from decimal import Decimal
+
+from app.repositories.offer_settings import get_offer_approval_threshold
 from app.repositories.offers import create_offer, find_offer_by_application_id, list_offers, update_offer_decision
 from app.repositories.pipeline import find_pipeline_application_by_id
 from app.repositories.users import find_user_by_id
@@ -42,6 +45,18 @@ def get_offer_detail_service(
     return OfferResponse.model_validate(offer)
 
 
+def offer_requires_approval(engine: Engine, location_id: int, payload: OfferCreate) -> bool:
+    """Phase 4.8 (D-06): the offer's total (CTC + signing bonus) above the
+    company's threshold needs approval; at or below it is approved now.
+    Default threshold 0: every paid offer needs approval. An offer with no
+    amount yet always goes to approval (nothing to compare)."""
+    if payload.offered_ctc is None:
+        return True
+    total = Decimal(payload.offered_ctc) + Decimal(payload.signing_bonus or 0)
+    threshold = get_offer_approval_threshold(engine, scope.tenant_of_office(engine, location_id))
+    return total > threshold
+
+
 def create_offer_service(
     engine: Engine,
     payload: OfferCreate,
@@ -65,7 +80,13 @@ def create_offer_service(
         actor_user_id = auth_context.user.id
     if actor_user_id is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Requested by user is required")
-    created = create_offer(engine, payload, location_id=application.location_id, actor_user_id=actor_user_id)
+    created = create_offer(
+        engine,
+        payload,
+        location_id=application.location_id,
+        actor_user_id=actor_user_id,
+        requires_approval=offer_requires_approval(engine, application.location_id, payload),
+    )
     return OfferResponse.model_validate(created)
 
 

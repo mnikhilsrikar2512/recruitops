@@ -9,6 +9,13 @@ from app.schemas.settings import (
     CompanyProfileResponse,
     CompanyProfileUpdate,
 )
+from decimal import Decimal
+
+from fastapi import HTTPException
+
+from app.repositories.audit import insert_audit_log
+from app.repositories.offer_settings import get_offer_approval_threshold, set_offer_approval_threshold
+from app.schemas.settings import OfferApprovalSettings
 from app.schemas.stage_buckets import StageBucketMapResponse, StageBucketResponse, StageBucketUpdate
 from app.services.stage_buckets import (
     get_stage_bucket_map_service,
@@ -100,3 +107,36 @@ def reset_stage_bucket_endpoint(
 ) -> StageBucketResponse:
     """Drop the company's own mapping; the platform default applies again."""
     return reset_stage_bucket_service(engine, stage, auth)
+
+
+# ---- Offer approval threshold (Phase 4.8, D-06) ------------------------
+@router.get("/offer-approval", response_model=OfferApprovalSettings)
+def get_offer_approval_endpoint(
+    auth: object = Depends(require_permissions("settings.read")),
+    engine: Engine = Depends(get_engine),
+) -> OfferApprovalSettings:
+    return OfferApprovalSettings(threshold=float(get_offer_approval_threshold(engine, caller_tenant_id(auth))))
+
+
+@router.put("/offer-approval", response_model=OfferApprovalSettings)
+def set_offer_approval_endpoint(
+    payload: OfferApprovalSettings,
+    auth: object = Depends(require_permissions("settings.update")),
+    engine: Engine = Depends(get_engine),
+) -> OfferApprovalSettings:
+    tenant_id = caller_tenant_id(auth)
+    if tenant_id is None:
+        raise HTTPException(status_code=400, detail="The offer threshold belongs to a company; sign in as a company user")
+    before = get_offer_approval_threshold(engine, tenant_id)
+    set_offer_approval_threshold(engine, tenant_id, Decimal(str(payload.threshold)))
+    insert_audit_log(
+        engine,
+        actor_user_id=auth.user.id,
+        location_id=auth.user.location_id,
+        entity_type="tenant",
+        entity_id=int(tenant_id),
+        action_type="settings.offer_threshold.set",
+        old_values={"threshold": float(before)},
+        new_values={"threshold": payload.threshold},
+    )
+    return OfferApprovalSettings(threshold=float(get_offer_approval_threshold(engine, tenant_id)))

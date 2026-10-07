@@ -68,3 +68,10 @@ class CompanyLogoUpdate(BaseModel):
 
 class CompanyLogoResponse(BaseModel):
     logo_url: str | None
+
+
+class OfferApprovalSettings(BaseModel):
+    """Phase 4.8 (D-06): offers whose total (CTC + signing bonus) is above
+    this amount need approval; at or below it they are approved straight
+    away. 0 = every paid offer needs approval."""
+    threshold: float = Field(ge=0, le=1_000_000_000_000)

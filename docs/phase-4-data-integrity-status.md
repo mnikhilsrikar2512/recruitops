@@ -121,3 +121,24 @@ Built on work that was already in the tree but not committed (migration 018, `ve
   - Restore brings records back.
   - Audit rows and archive history are written.
 - **Not in scope:** a "show archived" toggle on the list pages (the API already supports it), and user and company soft delete. Users already have deactivation; company deletion belongs to Phase 5 privacy.
+
+**Fourth verify run (`bd01926`):** 490 passed, smoke 52/52, sweeps 105/105. 019 applied to dev.
+
+## 4.8 Offer approval threshold (D-06) — built
+
+- **Migration `020_offer_threshold.sql`** adds `tenants.offer_approval_threshold DECIMAL(18,2) NOT NULL DEFAULT 0` with a CHECK that it is 0 or more.
+- **The rule** (`offers.offer_requires_approval`):
+  - Total = CTC + signing bonus.
+  - Total above the threshold: the offer goes to `pending-approval` and an `offer-approval` request is created.
+  - Total at or below the threshold: the offer goes straight to `approved` and no approval request is created.
+  - An offer with no amount yet always goes to approval.
+  - The default of 0 sends every paid offer to approval, which is today's behaviour, so nothing changes until a company sets an amount.
+- **API:** `GET /settings/offer-approval` (`settings.read`) and `PUT /settings/offer-approval` (`settings.update`; audited as `settings.offer_threshold.set`). Company Settings has a new **Offer approvals** section to set it.
+- **One amount, any currency:** the threshold is compared with the offer total whatever the offer's currency. Per-currency thresholds can come later if a company works in several currencies.
+- **Tests:**
+  - Unit tests in `test_offer_workflows.py::test_offer_threshold_rule` cover the boundaries.
+  - The exit gate is `tests/test_offer_threshold_db.py`:
+    - At the threshold, the offer is approved directly.
+    - Above it, the offer goes to approval.
+    - With the threshold at 0, every offer goes to approval.
+    - A negative threshold is rejected.

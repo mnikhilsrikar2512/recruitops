@@ -142,14 +142,23 @@ def find_offer_by_application_id(engine: Engine, application_id: int) -> OfferRe
     return OfferRecord(**row) if row else None
 
 
-def create_offer(engine: Engine, payload: OfferCreate, *, location_id: int, actor_user_id: int) -> OfferRecord:
+def create_offer(
+    engine: Engine,
+    payload: OfferCreate,
+    *,
+    location_id: int,
+    actor_user_id: int,
+    requires_approval: bool = True,
+) -> OfferRecord:
+    """Phase 4.8: above the company threshold the offer waits for approval
+    (an approval_requests row); at or below it the offer is approved now."""
     update_query = text(
         """
         UPDATE dbo.candidate_applications
         SET
           version = version + 1,
           current_stage = CASE WHEN LOWER(current_stage) LIKE N'%offer%' THEN current_stage ELSE N'offer' END,
-          offer_status = N'pending-approval',
+          offer_status = CASE WHEN :requires_approval = 1 THEN N'pending-approval' ELSE N'approved' END,
           offered_ctc = :offered_ctc,
           offer_currency = :offer_currency,
           signing_bonus = :signing_bonus,
@@ -186,19 +195,20 @@ def create_offer(engine: Engine, payload: OfferCreate, *, location_id: int, acto
         );
         """
     )
-    values = payload.model_dump()
+    values = {**payload.model_dump(), "requires_approval": 1 if requires_approval else 0}
     with engine.begin() as connection:
         connection.execute(update_query, values)
-        connection.execute(
-            approval_query,
-            {
-                "location_id": location_id,
-                "candidate_application_id": payload.candidate_application_id,
-                "requested_by_user_id": payload.requested_by_user_id or actor_user_id,
-                "assigned_to_user_id": payload.assigned_to_user_id,
-                "offer_notes": payload.offer_notes,
-            },
-        )
+        if requires_approval:
+            connection.execute(
+                approval_query,
+                {
+                    "location_id": location_id,
+                    "candidate_application_id": payload.candidate_application_id,
+                    "requested_by_user_id": payload.requested_by_user_id or actor_user_id,
+                    "assigned_to_user_id": payload.assigned_to_user_id,
+                    "offer_notes": payload.offer_notes,
+                },
+            )
     created = find_offer_by_application_id(engine, payload.candidate_application_id)
     if created is None:
         raise RuntimeError("Created offer could not be reloaded")
