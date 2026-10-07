@@ -16,6 +16,8 @@ def test_operational_error_returns_service_unavailable() -> None:
     response = client.get("/test-db-unavailable")
 
     assert response.status_code == 503
+    message = "Database is currently unavailable. Please restore SQL Server connectivity and try again."
     assert response.json() == {
-        "detail": "Database is currently unavailable. Please restore SQL Server connectivity and try again."
+        "detail": message,
+        "error": {"code": "DATABASE_UNAVAILABLE", "message": message, "field_errors": []},
     }

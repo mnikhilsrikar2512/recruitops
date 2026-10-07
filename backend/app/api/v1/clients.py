@@ -4,6 +4,8 @@ from sqlalchemy import Engine
 from fastapi import HTTPException
 
 from app.api.deps import (
+    sort_clause,
+    reject_unknown_query_params,
     caller_has_permission,
     caller_tenant_id,
     get_current_auth_context,
@@ -40,6 +42,9 @@ from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
+# Phase 4.9: fields the list can be sorted by (?sort=field or -field).
+_CLIENTS_SORT = {"client_name": "client_name", "status": "status", "created_at": "created_at", "updated_at": "updated_at"}
+
 _scope_client = require_record_in_location(
     "client_id",
     lambda engine, client_id: get_client_detail_service(engine, client_id).location_id,
@@ -47,7 +52,7 @@ _scope_client = require_record_in_location(
 )
 
 
-@router.get("/", response_model=ClientListResponse)
+@router.get("/", response_model=ClientListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_clients_endpoint(
     _auth: object = Depends(require_permissions("client.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
@@ -58,6 +63,7 @@ def list_clients_endpoint(
     business_source_owner_user_id: int | None = Query(default=None, ge=1),
     search: str | None = Query(default=None),
     include_archived: bool = Query(default=False, description="Also list archived clients (needs client.delete.soft)"),
+    sort: str | None = Query(default=None, description="field or -field; comma-separated"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     engine: Engine = Depends(get_engine),
@@ -74,6 +80,7 @@ def list_clients_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.order_by = sort_clause(sort, _CLIENTS_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
     filters.tenant_id = caller_tenant_id(auth_context)
     return list_clients_service(engine, filters)
 

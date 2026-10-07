@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from sqlalchemy import Engine
 
-from app.api.deps import PERMISSION_ALIASES, get_current_auth_context, get_engine, require_permissions
+from app.api.deps import PERMISSION_ALIASES, get_current_auth_context, get_engine, require_permissions, reject_unknown_query_params
 from app.agents.registry import find_agent_by_id
 from app.core.config import settings
 from app.repositories.auth import list_resolved_permissions
@@ -87,7 +87,7 @@ def decide_agent_run_endpoint(
     return decide_agent_run_service(engine, auth_context, run_id, payload)
 
 
-@router.get("/runs", response_model=AgentRunListResponse)
+@router.get("/runs", response_model=AgentRunListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_agent_runs_endpoint(
     _auth: object = Depends(require_permissions("ai.use")),
     agent_id: str | None = Query(default=None, max_length=100),

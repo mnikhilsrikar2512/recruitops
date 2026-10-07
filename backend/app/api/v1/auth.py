@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine
+from app.api.deps import get_current_auth_context, get_engine, reject_unknown_query_params
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.tokens import REFRESH_COOKIE, REFRESH_COOKIE_PATH
@@ -176,7 +176,7 @@ def logout_endpoint(
     return logout_service(engine, auth_context)
 
 
-@router.get("/sessions", response_model=SessionListResponse)
+@router.get("/sessions", response_model=SessionListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_sessions_endpoint(
     auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),

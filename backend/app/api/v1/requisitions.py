@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    sort_clause,
+    reject_unknown_query_params,
     caller_tenant_id,
     get_current_auth_context,
     get_engine,
@@ -38,6 +40,9 @@ from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
+# Phase 4.9: fields the list can be sorted by (?sort=field or -field).
+_REQUISITIONS_SORT = {"title": "title", "status": "status", "priority": "priority", "target_closure_date": "target_close_date", "openings_count": "open_positions", "created_at": "created_at", "updated_at": "updated_at"}
+
 _scope_requisition = require_record_in_location(
     "requisition_id",
     lambda engine, requisition_id: get_requisition_detail_service(engine, requisition_id).location_id,
@@ -45,7 +50,7 @@ _scope_requisition = require_record_in_location(
 )
 
 
-@router.get("/", response_model=RequisitionListResponse)
+@router.get("/", response_model=RequisitionListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_requisitions_endpoint(
     _auth: object = Depends(require_permissions("requisition.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
@@ -59,6 +64,7 @@ def list_requisitions_endpoint(
     due_date_from: str | None = Query(default=None),
     due_date_to: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    sort: str | None = Query(default=None, description="field or -field; comma-separated"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     engine: Engine = Depends(get_engine),
@@ -76,6 +82,7 @@ def list_requisitions_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.order_by = sort_clause(sort, _REQUISITIONS_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
     filters.tenant_id = caller_tenant_id(auth_context)
     return list_requisitions_service(engine, filters)
 

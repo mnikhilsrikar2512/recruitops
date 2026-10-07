@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions, reject_unknown_query_params
 from app.schemas.interview import InterviewCreate, InterviewFeedbackUpdate, InterviewListFilters, InterviewListResponse, InterviewResponse
 from app.services.auth import AuthContext
 from app.services.interviews import create_interview_service, get_interview_detail_service, list_interviews_service, update_interview_feedback_service
@@ -10,7 +10,7 @@ from app.services import scope
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
 
-@router.get("/", response_model=InterviewListResponse)
+@router.get("/", response_model=InterviewListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_interviews_endpoint(
     _auth: object = Depends(require_permissions("interview.read")),
     _scope: object = Depends(require_location_scope("location_id")),

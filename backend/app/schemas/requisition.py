@@ -34,6 +34,8 @@ class RequisitionListFilters(BaseModel):
     due_date_from: str | None = None
     due_date_to: str | None = None
     search: str | None = Field(default=None, min_length=1, max_length=200)
+    # Phase 4.9: safe ORDER BY body built from ?sort= via an allowlist (api layer).
+    order_by: str = "updated_at DESC, id DESC"
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 

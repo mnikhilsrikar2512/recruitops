@@ -211,7 +211,7 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered_requisitions
-        ORDER BY updated_at DESC, id DESC
+        ORDER BY {filters.order_by}
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY;
         """
     )

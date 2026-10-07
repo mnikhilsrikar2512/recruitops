@@ -396,7 +396,7 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered_candidates
-        ORDER BY updated_at DESC, id DESC
+        ORDER BY {filters.order_by}
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY;
         """
     )

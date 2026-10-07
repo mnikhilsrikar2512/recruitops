@@ -271,3 +271,51 @@ def require_record_in_location(
         return auth_context
 
     return dependency
+
+
+# ---- PRD §9.0 list conventions (Phase 4.9) ------------------------------
+def reject_unknown_query_params(request: Request) -> None:
+    """List endpoints refuse query parameters they do not support (400
+    UNSUPPORTED_FILTER) instead of silently ignoring them, so a typo or a
+    filter the API never had cannot return a misleadingly unfiltered list."""
+    from fastapi.dependencies.utils import get_flat_dependant
+
+    from app.core.errors import ApiError
+
+    route = request.scope.get("route")
+    dependant = getattr(route, "dependant", None)
+    if dependant is None:
+        return
+    allowed = {param.alias for param in get_flat_dependant(dependant).query_params}
+    unknown = sorted(key for key in request.query_params.keys() if key not in allowed)
+    if unknown:
+        raise ApiError(
+            status.HTTP_400_BAD_REQUEST,
+            "UNSUPPORTED_FILTER",
+            f"Unsupported query parameter(s): {', '.join(unknown)}. Supported: {', '.join(sorted(allowed)) or 'none'}",
+            field_errors=[{"field": key, "message": "not supported on this list"} for key in unknown],
+        )
+
+
+def sort_clause(sort: str | None, allowed: dict[str, str], default: str) -> str:
+    """``sort=field`` / ``sort=-field`` → a safe ORDER BY body from an
+    allowlist (column expressions never come from the client). Unknown
+    fields → 400 UNSUPPORTED_SORT."""
+    from app.core.errors import ApiError
+
+    if not sort:
+        return default
+    parts: list[str] = []
+    for raw in sort.split(","):
+        token = raw.strip()
+        descending = token.startswith("-")
+        field = token.lstrip("-+")
+        if field not in allowed:
+            raise ApiError(
+                status.HTTP_400_BAD_REQUEST,
+                "UNSUPPORTED_SORT",
+                f"Cannot sort by '{field}'. Sortable fields: {', '.join(sorted(allowed))}",
+                field_errors=[{"field": "sort", "message": f"unsupported field {field}"}],
+            )
+        parts.append(f"{allowed[field]} {'DESC' if descending else 'ASC'}")
+    return ", ".join(parts)

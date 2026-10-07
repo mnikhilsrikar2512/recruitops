@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    reject_unknown_query_params,
     caller_tenant_id,
     get_current_auth_context,
     get_engine,
@@ -52,7 +53,7 @@ def _editable_role(
         raise HTTPException(status_code=403, detail="System roles are read-only")
 
 
-@router.get("/", response_model=RoleListResponse)
+@router.get("/", response_model=RoleListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_roles_endpoint(
     _auth: object = Depends(require_permissions("role.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),

@@ -127,7 +127,10 @@ function apiErrorFromBody(status, body) {
   if (typeof detail === "string" && detail) message = detail;
   else if (errors.length) message = String(errors[0]);
   else message = `Request failed (HTTP ${status})`;
-  return new ApiError(status, message, errors, body);
+  const apiError = new ApiError(status, message, errors, body);
+  /* PRD §9.0 stable error code (e.g. STALE_WRITE, UNSUPPORTED_FILTER). */
+  apiError.code = body && body.error && body.error.code ? body.error.code : null;
+  return apiError;
 }
 
 /* 401 handling is pluggable so Phase 3 (JWT refresh) can swap in
@@ -312,7 +315,7 @@ async function apiRequest(path, options = {}) {
         }
         unauthorizedHandler(error);
       }
-      if (response.status === 409 && payload?.code === "stale_write") {
+      if (response.status === 409 && (payload?.error?.code === "STALE_WRITE" || payload?.code === "stale_write")) {
         if (versionKey && Number.isInteger(payload.current_version)) recordVersions.delete(versionKey);
         showStaleWriteDialog(payload.detail);
       }

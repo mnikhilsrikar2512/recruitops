@@ -3,7 +3,7 @@ from sqlalchemy import Engine
 
 from fastapi import HTTPException
 
-from app.api.deps import caller_has_permission, caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions
+from app.api.deps import caller_has_permission, caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions, reject_unknown_query_params, sort_clause
 from app.schemas.candidate import (
     ArchiveRequest,
     CandidateCreate,
@@ -42,8 +42,11 @@ from app.services import scope
 
 router = APIRouter()
 
+# Phase 4.9: fields the list can be sorted by (?sort=field or -field).
+_CANDIDATES_SORT = {"full_name": "full_name", "created_at": "created_at", "updated_at": "updated_at", "total_experience_years": "total_experience_years", "notice_period_days": "notice_period_days"}
 
-@router.get("/", response_model=CandidateListResponse)
+
+@router.get("/", response_model=CandidateListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_candidates_endpoint(
     auth_context: AuthContext = Depends(require_permissions("candidate.read")),
     search: str | None = Query(default=None),
@@ -53,6 +56,7 @@ def list_candidates_endpoint(
     owner_user_id: int | None = Query(default=None, ge=1),
     sourced_by_user_id: int | None = Query(default=None, ge=1),
     include_archived: bool = Query(default=False, description="Also list archived candidates (needs candidate.delete.soft)"),
+    sort: str | None = Query(default=None, description="field or -field; comma-separated"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     engine: Engine = Depends(get_engine),
@@ -70,6 +74,7 @@ def list_candidates_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.order_by = sort_clause(sort, _CANDIDATES_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
     filters.tenant_id = caller_tenant_id(auth_context)
     return list_candidates_service(engine, filters, auth_context)
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_permissions, reject_unknown_query_params
 from app.services import scope
 from app.services.auth import AuthContext
 from app.schemas.location import (
@@ -21,7 +21,7 @@ from app.services.locations import (
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
 
-@router.get("/", response_model=LocationListResponse)
+@router.get("/", response_model=LocationListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_locations_endpoint(
     _auth: object = Depends(require_permissions("location.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),

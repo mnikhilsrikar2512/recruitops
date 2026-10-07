@@ -98,7 +98,7 @@ def _map_client_contact(row: RowMapping) -> ClientContactRecord:
 
 def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[ClientRecord], int]:
     query = text(
-        """
+        f"""
         WITH filtered_clients AS (
           SELECT
             c.id,
@@ -141,7 +141,7 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
         )
         SELECT *
         FROM filtered_clients
-        ORDER BY updated_at DESC, id DESC
+        ORDER BY {filters.order_by}
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY;
         """
     )

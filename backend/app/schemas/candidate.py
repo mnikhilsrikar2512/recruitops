@@ -43,6 +43,8 @@ class CandidateListFilters(BaseModel):
     # Phase 4.4: archived candidates are left out unless asked for (and the
     # caller holds candidate.delete.soft).
     include_archived: bool = False
+    # Phase 4.9: safe ORDER BY body built from ?sort= via an allowlist (api layer).
+    order_by: str = "updated_at DESC, id DESC"
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 

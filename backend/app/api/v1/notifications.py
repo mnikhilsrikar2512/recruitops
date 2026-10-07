@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_permissions
+from app.api.deps import get_current_auth_context, get_engine, require_permissions, reject_unknown_query_params
 from app.schemas.notification import (
     MarkAllNotificationsReadResponse,
     NotificationListFilters,
@@ -22,7 +22,7 @@ from app.services.notifications import (
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
 
-@router.get("/", response_model=NotificationListResponse)
+@router.get("/", response_model=NotificationListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_notifications_endpoint(
     _auth: object = Depends(require_permissions("notification.read")),
     status: str | None = Query(default=None),

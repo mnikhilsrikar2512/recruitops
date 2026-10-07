@@ -189,3 +189,23 @@ The repository's `find_duplicate_matches` now sorts matches into two tiers:
 - **Tests:**
   - Unit tests in `tests/test_duplicate_tiers.py` cover name normalisation, phone digits, cross-company redaction and the suggestion cut-off.
   - `tests/test_duplicate_tiers_db.py` runs the full set of cases against a real database.
+
+**Seventh verify run (`7140859`):** 499 passed, smoke 52/52, sweeps 105/105.
+
+## 4.9 API contract sweep — built
+
+- **Error contract (PRD §9.0).** Every error is now `{"detail": msg, "error": {"code", "message", "field_errors"}}` (`app/core/errors.py`).
+  - Handlers cover:
+    - every `HTTPException`, including the router's own 404/405;
+    - validation errors, with `field_errors` per field;
+    - stale writes (`STALE_WRITE`, with the fresh row as before);
+    - integrity errors (`DATA_CONFLICT`);
+    - database errors (`DATABASE_ERROR`, logged) and `DATABASE_UNAVAILABLE`.
+  - Codes default from the status (`NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR`, `RATE_LIMITED`, …). `ApiError` carries explicit codes.
+  - `detail` is kept with the same message, so the frontend and existing tests are unaffected. `ApiError.code` is now available in the frontend.
+- **Unsupported filters → 400 `UNSUPPORTED_FILTER`.** All 16 list endpoints refuse query parameters they don't declare (`reject_unknown_query_params`). The error lists the parameters that are supported.
+  - A static test scans every list URL in the frontend and live smoke and fails if one sends a parameter the API doesn't accept.
+- **Sorting.** `?sort=field` / `-field` (comma-separated) works on candidates, clients and requisitions. It is built from an allowlist (`sort_clause`), so column names never come from the client, and an unknown field returns 400 `UNSUPPORTED_SORT`. Other lists don't take `sort` yet; on those, `?sort=` is refused as an unsupported filter rather than silently ignored.
+- **Pagination.** Every list already takes `page` and `page_size` (max 100) and returns `meta.total`. Defaults are 20 on most lists; the PRD says 25, and that change is left alone so pages don't shift under the current UI.
+- **Foreign-tenant IDs in responses.** Already covered by the Phase 2 isolation suites (`test_tenant_isolation_db.py`, `test_company_isolation_db.py`). 4.7 closed the one known leak, contact details in duplicate matches.
+- **Not done:** cursor pagination for notifications and audit logs (the audit log viewer is Phase 5.4), and `sort` on the other 13 lists.

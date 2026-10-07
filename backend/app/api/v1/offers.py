@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions, reject_unknown_query_params
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters, OfferListResponse, OfferResponse
 from app.services.auth import AuthContext
 from app.services.offers import create_offer_service, get_offer_detail_service, list_offers_service, update_offer_decision_service
@@ -10,7 +10,7 @@ from app.services import scope
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
 
-@router.get("/", response_model=OfferListResponse)
+@router.get("/", response_model=OfferListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_offers_endpoint(
     _auth: object = Depends(require_permissions("offer.read")),
     _scope: object = Depends(require_location_scope("location_id")),

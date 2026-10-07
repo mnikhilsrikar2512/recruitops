@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    reject_unknown_query_params,
     caller_tenant_id,
     get_current_auth_context,
     get_engine,
@@ -35,7 +36,7 @@ _scope_approval = require_record_in_location(
 )
 
 
-@router.get("/", response_model=ApprovalListResponse)
+@router.get("/", response_model=ApprovalListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_approvals_endpoint(
     _auth: object = Depends(require_permissions("approval.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),

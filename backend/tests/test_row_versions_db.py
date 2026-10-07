@@ -44,7 +44,7 @@ def test_second_candidate_edit_gets_409_with_fresh_row(client, admin, seeded):
     second = client.patch(f"/api/v1{path}", json={"current_company": "Edit Two", "version": loaded}, headers=admin["headers"])
     assert second.status_code == 409, second.text
     body = second.json()
-    assert body["code"] == "stale_write"
+    assert body["error"]["code"] == "STALE_WRITE"
     assert body["current_version"] == loaded + 1
     assert body["current"]["version"] == loaded + 1
 

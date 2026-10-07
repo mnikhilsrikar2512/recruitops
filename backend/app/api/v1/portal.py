@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_permissions, reject_unknown_query_params
 from app.schemas.portal import (
     PortalAccountCreate,
     PortalAccountListFilters,
@@ -51,7 +51,7 @@ def _scope_account(
         raise HTTPException(status_code=404, detail="Portal account was not found")
 
 
-@router.get("/", response_model=PortalAccountListResponse)
+@router.get("/", response_model=PortalAccountListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_portal_accounts_endpoint(
     _auth: object = Depends(require_permissions("portal.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
@@ -133,7 +133,7 @@ def update_portal_account_endpoint(
     return update_portal_account_service(engine, portal_account_id, payload)
 
 
-@router.get("/{portal_account_id}/slots", response_model=PortalSlotListResponse)
+@router.get("/{portal_account_id}/slots", response_model=PortalSlotListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_portal_slots_endpoint(
     portal_account_id: int = Path(..., ge=1),
     _account_scope: object = Depends(_scope_account),

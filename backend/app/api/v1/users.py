@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    reject_unknown_query_params,
     caller_tenant_id,
     get_current_auth_context,
     get_engine,
@@ -58,7 +59,7 @@ _scope_user = require_record_in_location(
 )
 
 
-@router.get("/", response_model=UserListResponse)
+@router.get("/", response_model=UserListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_users_endpoint(
     _auth: object = Depends(require_permissions("user.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
