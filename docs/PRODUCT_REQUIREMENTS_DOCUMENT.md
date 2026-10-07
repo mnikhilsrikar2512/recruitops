@@ -102,7 +102,7 @@ Every code follows `module.action` (or `module.subaction`). This is the source o
 | `candidate.read` / `.write` | Candidate profiles, detail, upload | ○/○ | ●/● | ●/● |
 | `candidate.duplicate.decide` | Duplicate-check decision | ○ | ● | ● |
 | `pipeline.read.summary` | Pipeline board view (was `pipeline.board.read`) | ○ | ● | ● |
-| `pipeline.stage.reopen` | Reopen a rejected/withdrawn application (planned; not yet granted by any route) | ○ | ● | ○ |
+| `pipeline.stage.reopen` | Reopen a rejected, withdrawn or joined application (`POST /pipeline/applications/{id}/reopen`, reason required) | ○ | ● | ○ |
 | `pipeline.stage.move` | Stage-move action | ○ | ● | ● |
 | `interview.write` / `offer.write` | Schedule interview / create offer | ○/○ | ●/● | ●/○ |
 | `interview.feedback.write` | Submit interview feedback | ○ | ● | ● |

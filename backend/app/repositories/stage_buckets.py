@@ -10,14 +10,9 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
-METRIC_BUCKETS: tuple[str, ...] = (
-    "sourced", "screened", "submitted", "interview", "offer", "joined", "rejected", "withdrawn",
-)
+from app.core.stage_buckets import BUCKET_ORDER, stage_key  # noqa: F401  (re-exported)
 
-
-def stage_key(label: str) -> str:
-    """Python twin of dbo.fn_stage_key: lower-case, '-' for spaces and '_'."""
-    return label.strip().replace("_", "-").replace(" ", "-").lower()
+METRIC_BUCKETS: tuple[str, ...] = tuple(BUCKET_ORDER)
 
 
 @dataclass

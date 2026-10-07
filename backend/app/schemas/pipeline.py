@@ -38,6 +38,19 @@ class PipelineStageMove(BaseModel):
         return _normalize_text(value)
 
 
+class PipelineReopen(BaseModel):
+    to_stage: str = Field(min_length=1, max_length=50)
+    reason: str = Field(min_length=3, max_length=1000)
+
+    @field_validator("to_stage", "reason")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        normalized = _normalize_text(value)
+        if normalized is None:
+            raise ValueError("must not be blank")
+        return normalized
+
+
 class PipelineBoardItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

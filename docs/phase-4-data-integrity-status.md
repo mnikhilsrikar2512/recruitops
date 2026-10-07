@@ -55,3 +55,22 @@ Order of work: the parts that need nothing from outside first (4.5 → 4.6 → 4
 **Left for later:**
 - Overlay inheritance, materialised `requisition_pipeline_stages`, and scorecards (spec P2).
 - Scalar-function cost in the view, to be revisited in the Phase 6 load test.
+
+**First verify run (`17b97fa`):** 475 passed, 2 failed. Source Effectiveness returned 500 because SQL Server does not allow a subquery inside an aggregate. Fixed by joining `vw_application_metric_state` instead.
+
+## 4.6 Terminal-state guard + reopen — built
+
+- **Rules read buckets, not labels.** `move_pipeline_stage_service` resolves the current and target buckets: from the template stage's `metric_bucket` when it has one, otherwise from `dbo.fn_application_stage_bucket`. All rules below apply to companies' own stage names too.
+- **Closed applications stay closed.** An application whose status or bucket is joined, rejected or withdrawn cannot move again. The move is refused with 409 and a "reopen it first" message.
+- **Moving back needs a reason.** A backward move without `notes` is refused with 409. The order comes from the template stage order when there is one, otherwise from the bucket order. With a note, the move is allowed and the note is written to history. Closing moves (reject, withdraw, join) never count as backward.
+- **Withdrawing needs a reason** (422 without one), as rejecting already did.
+- The offer-tracking toggle check now uses the `offer` bucket instead of looking for "offer" in the stage name.
+- **Reopen:** `POST /pipeline/applications/{id}/reopen` with `{to_stage, reason}` and permission `pipeline.stage.reopen`.
+  - Only closed applications can be reopened, and only into an open stage.
+  - The application status goes back to `active` and the rejection fields are cleared.
+  - A new history row is added with `source_type = 'reopen'`; old history rows are never changed.
+  - The action is audited as `pipeline.reopen`.
+- **Migration `017_pipeline_reopen.sql`** adds the permission code and grants it once to every role holding both `pipeline.stage.move` and `requisition.update`, which are the manager-shaped roles. Recruiters and the Admin template do not get it. The PRD §3.2 row is updated.
+- **Unit tests without a database** resolve buckets through the Python copy of the stage map (`app/core/stage_buckets.py`, via a conftest shim). `tests/test_stage_buckets_twin.py` fails if that copy drifts from the 016 seed.
+- **Tests:** `tests/test_pipeline_lifecycle_db.py` covers backward moves needing a reason, withdraw as a closed state, the reopen rules, history rows and the audit entry.
+- **Still to do in the UI:** a Reopen button on the application view. The API is ready; the button lands with the 4.3 conflict dialog work.

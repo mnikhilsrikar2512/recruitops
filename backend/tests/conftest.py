@@ -47,6 +47,28 @@ def _stub_admin_grants(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _stage_buckets_without_db(monkeypatch):
+    """Stage-move unit tests pass a bare engine object; resolve stage buckets
+    with the Python twin of the SQL resolver there (app/core/stage_buckets.py,
+    kept in step by tests/test_stage_buckets_twin.py). A real Engine always
+    uses the database resolver."""
+    from sqlalchemy.engine import Engine
+
+    from app.core.stage_buckets import bucket_for_label
+    from app.services import pipeline as pipeline_service
+
+    original = pipeline_service.resolve_application_stage_bucket
+
+    def resolved(engine, application_id, stage):
+        if isinstance(engine, Engine):
+            return original(engine, application_id, stage)
+        return bucket_for_label(stage)
+
+    monkeypatch.setattr(pipeline_service, "resolve_application_stage_bucket", resolved)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _rate_limits_off(monkeypatch):
     """The suite signs in hundreds of times from one client; rate limits are
     exercised explicitly in test_auth_protection.py, which turns them on."""

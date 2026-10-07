@@ -262,13 +262,15 @@ def get_source_effectiveness(
             COUNT(DISTINCT c.id) AS candidates,
             COUNT(DISTINCT CASE
                 WHEN ca.application_status IN (N'joined', N'hired')
-                  OR ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
+                  OR ms.current_bucket = N'joined'
                   OR ca.offer_status IN (N'accepted', N'joined')
                 THEN c.id
             END) AS hired
         FROM dbo.candidates AS c
         LEFT JOIN dbo.candidate_applications AS ca
             ON ca.candidate_id = c.id
+        LEFT JOIN dbo.vw_application_metric_state AS ms
+            ON ms.application_id = ca.id
         WHERE c.status = N'active'
           AND (
             (:is_admin = 1 AND (:actor_tenant_id IS NULL
@@ -342,12 +344,13 @@ def get_report_dataset(
                 COUNT(c.id) AS candidates,
                 SUM(CASE
                     WHEN ca.application_status IN (N'joined', N'hired')
-                      OR ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
+                      OR ms.current_bucket = N'joined'
                       OR ca.offer_status IN (N'accepted', N'joined')
                     THEN 1 ELSE 0
                 END) AS hired
             FROM dbo.candidates AS c
             LEFT JOIN dbo.candidate_applications AS ca ON ca.candidate_id = c.id
+            LEFT JOIN dbo.vw_application_metric_state AS ms ON ms.application_id = ca.id
             WHERE c.status = N'active'
               AND (
                 (:is_admin = 1 AND (:actor_tenant_id IS NULL

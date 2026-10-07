@@ -84,6 +84,7 @@ class PipelineTemplateStageRecord:
     stage_order: int
     stage_type: str
     allows_rejection: bool
+    metric_bucket: str | None = None
 
 
 def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[PipelineBoardRecord]:
@@ -238,7 +239,8 @@ def find_pipeline_template_stage_for_application(
           stage_code,
           stage_order,
           stage_type,
-          allows_rejection
+          allows_rejection,
+          metric_bucket
         FROM dbo.pipeline_template_stages
         WHERE pipeline_template_id = :template_id
           AND stage_code = :stage_code;
@@ -250,6 +252,64 @@ def find_pipeline_template_stage_for_application(
             {"template_id": template_id, "stage_code": stage_code},
         ).mappings().first()
     return PipelineTemplateStageRecord(**row) if row else None
+
+
+def resolve_application_stage_bucket(engine: Engine, application_id: int, stage: str) -> str:
+    """Metric bucket of ``stage`` for this application (dbo.fn_application_stage_bucket:
+    template stage -> company map -> platform map -> name)."""
+    with engine.connect() as connection:
+        return connection.execute(
+            text("SELECT dbo.fn_application_stage_bucket(:application_id, :stage);"),
+            {"application_id": application_id, "stage": stage},
+        ).scalar_one()
+
+
+def reopen_application(
+    engine: Engine, application_id: int, to_stage: str, reason: str, user_id: int
+) -> tuple[str, PipelineApplicationDetailRecord]:
+    before = find_pipeline_application_by_id(engine, application_id)
+    if before is None:
+        raise RuntimeError("Pipeline application could not be reloaded")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                UPDATE dbo.candidate_applications
+                SET current_stage = :to_stage,
+                    application_status = N'active',
+                    stage_reason = :reason,
+                    rejection_side = N'none',
+                    rejection_reason = NULL,
+                    rejection_stage = NULL,
+                    stage_updated_at = SYSUTCDATETIME(),
+                    updated_at = SYSUTCDATETIME()
+                WHERE id = :application_id;
+                """
+            ),
+            {"application_id": application_id, "to_stage": to_stage, "reason": reason},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO dbo.candidate_stage_history (
+                  candidate_application_id, from_stage, to_stage, change_reason,
+                  changed_by_user_id, changed_at, source_type
+                )
+                VALUES (:application_id, :from_stage, :to_stage, :reason, :user_id, SYSUTCDATETIME(), N'reopen');
+                """
+            ),
+            {
+                "application_id": application_id,
+                "from_stage": before.current_stage,
+                "to_stage": to_stage,
+                "reason": reason,
+                "user_id": user_id,
+            },
+        )
+    after = find_pipeline_application_by_id(engine, application_id)
+    if after is None:
+        raise RuntimeError("Reopened pipeline application could not be reloaded")
+    return before.current_stage, after
 
 
 def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineStageMove) -> tuple[str, PipelineApplicationDetailRecord]:

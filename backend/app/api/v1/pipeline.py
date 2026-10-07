@@ -7,6 +7,7 @@ from app.schemas.pipeline import (
     PipelineBoardFilters,
     PipelineBoardItemResponse,
     PipelineHistoryItemResponse,
+    PipelineReopen,
     PipelineStageMove,
     PipelineStageMoveResponse,
 )
@@ -15,6 +16,7 @@ from app.services.pipeline import (
     get_pipeline_history_service,
     list_pipeline_board_service,
     move_pipeline_stage_service,
+    reopen_pipeline_application_service,
 )
 from app.services.auth import AuthContext
 from app.services import scope
@@ -75,3 +77,15 @@ def get_pipeline_history_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> list[PipelineHistoryItemResponse]:
     return get_pipeline_history_service(engine, application_id, auth_context)
+
+
+@router.post("/applications/{application_id}/reopen", response_model=PipelineStageMoveResponse)
+def reopen_pipeline_application_endpoint(
+    payload: PipelineReopen,
+    _auth: object = Depends(require_permissions("pipeline.stage.reopen")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    application_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> PipelineStageMoveResponse:
+    """Bring a rejected, withdrawn or joined application back to an open stage."""
+    return reopen_pipeline_application_service(engine, application_id, payload, auth_context)
