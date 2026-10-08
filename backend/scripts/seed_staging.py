@@ -295,6 +295,11 @@ def main() -> None:
         for account in accounts:
             for email in account.values():
                 login(client, email, PASSWORD)
+    # Phase 5.1: seeded personas have accepted the current (placeholder) legal
+    # texts, so the acceptance page doesn't stop the browser sweeps.
+    from app.repositories.legal import seed_accept_current_for_all_users
+
+    seed_accept_current_for_all_users(engine)
 
     print("\nStaging personas (password: $STAGING_PASSWORD, default shown in seed_staging.py):")
     print(f"  CI admin (CI Company)  {ADMIN[0]}")

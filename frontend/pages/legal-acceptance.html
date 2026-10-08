@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Review and accept — RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+<body class="bg-background text-on-background antialiased" data-route-id="legal-acceptance" data-route-kind="auth" data-route-title="Review and accept" data-route-section="Legal">
+  <main id="main-content" class="mx-auto max-w-3xl px-4 py-10">
+    <a href="../index.html" class="inline-flex items-center gap-2 font-bold text-on-surface no-underline mb-6"><span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-on-primary">R</span> RecruitOps</a>
+    <h1 class="text-2xl font-bold text-on-surface">Before you continue</h1>
+    <p class="mt-2 text-[14px] text-text-muted" id="legal-intro">Please read and accept the documents below. We keep a record of the version you accepted and when.</p>
+    <form id="legal-form" class="mt-6 flex flex-col gap-4"></form>
+    <p id="legal-message" role="alert" class="hidden mt-3 rounded-lg px-3 py-2 text-[13px]"></p>
+  </main>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+  <script src="../shared/renderers.js?v=1790668771"></script>
+  <script src="../shared/api-client.js?v=1790668771"></script>
+  <script src="../shared/ui-utils.js?v=1790668771"></script>
+  <script src="../shared/routing.js?v=1790668771"></script>
+  <script src="../shared/app.js?v=1790668771"></script>
+  <script>
+  (function () {
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    /* Small, safe Markdown subset: headings, bullets, paragraphs (text is escaped first). */
+    function md(text) {
+      var out = [], list = false;
+      String(text || "").split(/\r?\n/).forEach(function (line) {
+        var t = esc(line);
+        if (/^\s*[-*] /.test(line)) { if (!list) { out.push('<ul class="list-disc pl-6 my-2">'); list = true; } out.push("<li>" + t.replace(/^\s*[-*] /, "") + "</li>"); return; }
+        if (list) { out.push("</ul>"); list = false; }
+        if (/^### /.test(line)) out.push('<h4 class="mt-4 font-semibold">' + t.slice(4) + "</h4>");
+        else if (/^## /.test(line)) out.push('<h3 class="mt-5 text-lg font-bold">' + t.slice(3) + "</h3>");
+        else if (/^# /.test(line)) out.push('<h2 class="mt-5 text-xl font-bold">' + t.slice(2) + "</h2>");
+        else if (t.trim()) out.push('<p class="my-2 leading-relaxed">' + t + "</p>");
+      });
+      if (list) out.push("</ul>");
+      return out.join("");
+    }
+    var NAMES = { tos: "Terms of Service", privacy: "Privacy Policy", dpa: "Data Processing Addendum" };
+    function placeholderBanner() { return '<p class="rounded-lg border border-border bg-highlight-soft px-3 py-2 text-[13px] font-semibold" role="note">DRAFT — NOT LEGAL TEXT. This is a placeholder until the final wording is published.</p>'; }
+
+    var form = document.getElementById("legal-form"), message = document.getElementById("legal-message");
+    var next = new URLSearchParams(location.search).get("next") || "home.html";
+    if (!/^[a-z0-9-]+\.html(\?[^#]*)?$/i.test(next)) next = "home.html";
+    function fail(t) { message.textContent = t; message.classList.remove("hidden"); message.style.background = "#FBECEA"; message.style.color = "#8A2E22"; }
+    function done() { try { sessionStorage.removeItem("recruitops-legal-ok"); } catch (e) {} location.href = next; }
+    Promise.all([apiRequest("/legal/acceptances"), apiRequest("/legal/documents")]).then(function (res) {
+      var status = res[0], docs = {};
+      (res[1].items || []).forEach(function (d) { docs[d.doc_type] = d; });
+      if (!status.pending.length) { done(); return; }
+      form.innerHTML = status.pending.map(function (type) {
+        var d = docs[type] || {}, item = (status.items || []).filter(function (i) { return i.doc_type === type; })[0] || {};
+        var again = item.accepted_version ? " (updated from version " + esc(item.accepted_version) + ")" : "";
+        var who = type === "dpa" ? "I accept this on behalf of my company" : "I have read and accept";
+        return '<section class="rounded-xl border border-border bg-surface p-4"><h2 class="text-lg font-bold">' + esc(d.title || NAMES[type]) + ' <span class="text-[12px] font-normal text-text-muted">version ' + esc(d.version) + again + '</span></h2>' +
+          (d.is_placeholder ? placeholderBanner() : "") +
+          '<div class="mt-2 max-h-64 overflow-y-auto rounded-lg border border-border bg-surface-alt p-3 text-[13px]" tabindex="0" aria-label="' + esc(d.title) + ' text">' + md(d.body) + '</div>' +
+          '<label class="mt-3 flex items-start gap-2 text-[14px]"><input type="checkbox" required data-accept="' + esc(type) + '" data-version="' + esc(d.version) + '" class="mt-1 h-4 w-4"/> <span>' + who + " the " + esc(d.title || NAMES[type]) + " (version " + esc(d.version) + ').</span></label></section>';
+      }).join("") + '<div class="flex gap-3"><button type="submit" class="rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Accept and continue</button><a href="login.html?loggedOut=true" data-logout-link="true" class="rounded-lg border border-border px-5 py-2">Sign out</a></div>';
+      if (status.company_pending && status.company_pending.length) {
+        document.getElementById("legal-intro").insertAdjacentHTML("afterend", '<p class="mt-2 text-[13px] text-text-muted">Your company admin still needs to accept the Data Processing Addendum.</p>');
+      }
+    }).catch(function (error) { fail((error && error.detail) || "Couldn't load the documents."); });
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var boxes = Array.prototype.slice.call(form.querySelectorAll("[data-accept]"));
+      if (boxes.some(function (b) { return !b.checked; })) { fail("Tick each box to accept, or sign out."); return; }
+      try {
+        for (var i = 0; i < boxes.length; i++) {
+          await apiRequest("/legal/acceptances", { method: "POST", body: JSON.stringify({ doc_type: boxes[i].dataset.accept, version: Number(boxes[i].dataset.version) }) });
+        }
+        done();
+      } catch (error) { fail((error && error.detail) || "Couldn't record your acceptance. Reload and try again."); }
+    });
+  })();
+  </script>
+</body>
+</html>

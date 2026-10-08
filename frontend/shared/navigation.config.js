@@ -440,6 +440,15 @@ const NAV_ENTRIES = [
     category: "admin",
   },
   {
+    id: "audit-log-viewer",
+    file: "audit-log-viewer.html",
+    label: "Audit Log",
+    icon: "fact_check",
+    description: "Who did what, and when, across your company.",
+    permissions: ["audit_log.read"],
+    category: "admin",
+  },
+  {
     id: "work-assignment",
     file: "work-assignment.html",
     label: "Work Assignment",

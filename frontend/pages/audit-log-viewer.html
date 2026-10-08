@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Audit Log - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+  <body class="bg-background text-on-background antialiased" data-route-id="audit-log-viewer" data-route-kind="app" data-route-title="Audit Log" data-route-section="Administration">
+  
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <a href="../index.html" class="sidebar-brand" title="Return to frontend index">
+          <div class="sidebar-mark">R</div>
+          <div class="sidebar-brand-copy">
+            <div class="sidebar-brand-name">RecruitOps</div>
+            <div class="sidebar-brand-meta">Recruitment OS</div>
+          </div>
+        </a>
+        <a href="candidate-review-drawer.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Open the candidate workspace to add or refine a profile."><span class="material-symbols-outlined text-[18px]">person_add</span><span class="sidebar-cta-copy">Add Candidate</span></a>
+        <nav class="sidebar-nav" aria-label="Primary navigation" data-nav-root></nav>
+        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" data-mobile-nav-open class="inline-flex rounded-full border border-border bg-surface p-2 text-on-surface lg:hidden" aria-label="Open mobile navigation">
+              <span class="material-symbols-outlined text-[18px]">menu</span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Administration</p>
+              <p class="truncate text-sm font-semibold text-on-surface" data-shell-page-title>Audit Log</p>
+            </div>
+          </div>
+          <div class="topbar-search hidden md:block" data-topbar-search-host>
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-muted">search</span>
+            <label class="sr-only" for="topbar-search">Search within RecruitOps</label>
+            <input id="topbar-search" data-global-search type="text" placeholder="Search within RecruitOps..." aria-label="Search within RecruitOps" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="topbar-action rounded-full border border-border bg-surface p-2 text-on-surface" data-route="notifications-center.html" aria-label="Review notifications" title="Open Notifications Center">
+              <span class="material-symbols-outlined text-[18px]">notifications</span>
+            </button>
+            <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
+              <span class="material-symbols-outlined text-[18px]">help</span>
+            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
+              BN
+            </button>
+          </div>
+        </header>
+        
+    <dialog id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+      <div class="mobile-nav-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">RecruitOps</p>
+            <h2 class="mt-1 text-lg font-bold text-on-surface">Navigation</h2>
+          </div>
+          <button type="button" data-mobile-nav-close class="rounded-full border border-border p-2 text-on-surface" aria-label="Close mobile navigation">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="space-y-4" data-mobile-nav-root>
+          <details class="nav-group"
+          <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+        
+        </div>
+      </div>
+    </dialog>
+    
+        <main id="main-content" tabindex="-1" class="app-canvas">
+          <div class="page-stack">
+    
+    <section class="shell-card">
+      <div class="workspace-surface">
+        <div>
+          <h2 class="font-headline-lg text-headline-lg text-on-surface">Audit Log</h2>
+          <p class="font-body-sm text-body-sm text-text-muted mt-1">Who did what, and when, across your company: sign-ins and sessions, two-step verification, settings, user and role changes, stage moves, archives, privacy requests and legal acceptances.</p>
+        </div>
+        <form id="audit-filters" class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <label class="text-[12px] text-text-muted">What changed<select id="f-entity" class="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[13px]"><option value="">Everything</option></select></label>
+          <label class="text-[12px] text-text-muted">Action<select id="f-action" class="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[13px]"><option value="">Any action</option></select></label>
+          <label class="text-[12px] text-text-muted">From<input id="f-from" type="date" class="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[13px]"/></label>
+          <label class="text-[12px] text-text-muted">To<input id="f-to" type="date" class="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[13px]"/></label>
+          <div class="flex gap-2"><button type="submit" class="rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-on-primary">Filter</button><button type="reset" class="rounded-lg border border-border px-3 py-2 text-[13px]">Clear</button></div>
+        </form>
+        <p class="hidden mt-3 rounded-lg px-3 py-2 text-[13px]" role="alert" id="audit-message"></p>
+        <div class="mt-4 bg-surface border border-border rounded-lg shadow-sm overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-alt border-b border-border">
+              <tr>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">When</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Who</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Action</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Record</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Office</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold"><span class="sr-only">Details</span></th>
+              </tr>
+            </thead>
+            <tbody id="audit-rows" class="font-data-tabular text-data-tabular text-on-surface divide-y divide-border">
+              <tr><td class="px-4 py-3" colspan="6">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3 flex items-center justify-between text-[13px] text-text-muted">
+          <span id="audit-count" role="status"></span>
+          <div class="flex gap-2"><button type="button" id="audit-prev" class="rounded-lg border border-border px-3 py-1">Previous</button><button type="button" id="audit-next" class="rounded-lg border border-border px-3 py-1">Next</button></div>
+        </div>
+      </div>
+    </section>
+    <dialog id="audit-detail" class="rounded-xl border border-border p-0 w-full max-w-2xl" aria-labelledby="audit-detail-title">
+      <div class="p-5">
+        <div class="flex items-start justify-between gap-3"><h2 id="audit-detail-title" class="text-lg font-bold text-on-surface">Audit event</h2><button type="button" data-close class="rounded-full border border-border p-1" aria-label="Close"><span class="material-symbols-outlined text-[18px]">close</span></button></div>
+        <div id="audit-detail-body" class="mt-3 text-[13px]"></div>
+      </div>
+    </dialog>
+    
+  
+          </div>
+        </main>
+      </div>
+    </div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    
+    <script src="../shared/renderers.js?v=1790668771"></script>
+    <script src="../shared/api-client.js?v=1790668771"></script>
+    <script src="../shared/ui-utils.js?v=1790668771"></script>
+    <script src="../shared/tables.js?v=1790668771"></script>
+    <script src="../shared/forms.js?v=1790668771"></script>
+    <script src="../shared/sidebar.js?v=1790668771"></script>
+    <script src="../shared/pipeline.js?v=1790668771"></script>
+    <script src="../shared/routing.js?v=1790668771"></script>
+
+  <script src="../shared/navigation.config.js?v=1790668771"></script>
+    <script src="../shared/navigation.js?v=1790668771"></script>
+    <script src="../shared/app.js?v=1790668771"></script>
+
+  <script>
+  (function () {
+    var rows = document.getElementById("audit-rows");
+    var message = document.getElementById("audit-message");
+    var count = document.getElementById("audit-count");
+    var form = document.getElementById("audit-filters");
+    var dialog = document.getElementById("audit-detail");
+    var page = 1, pageSize = 50, total = 0;
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    function when(v) { try { return new Date(v).toLocaleString(); } catch (e) { return v; } }
+    function humanise(code) { return String(code || "").replace(/[._]/g, " "); }
+    function fail(text) { message.textContent = text; message.classList.remove("hidden"); message.style.background = "#FBECEA"; message.style.color = "#8A2E22"; }
+    function query() {
+      var p = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      var e = document.getElementById("f-entity").value, a = document.getElementById("f-action").value;
+      var f = document.getElementById("f-from").value, t = document.getElementById("f-to").value;
+      if (e) p.set("entity_type", e); if (a) p.set("action_type", a); if (f) p.set("date_from", f); if (t) p.set("date_to", t);
+      return p.toString();
+    }
+    async function facets() {
+      try {
+        var data = await apiRequest("/audit-logs/facets");
+        document.getElementById("f-entity").insertAdjacentHTML("beforeend", (data.entity_types || []).map(function (x) { return '<option value="' + esc(x) + '">' + esc(humanise(x)) + "</option>"; }).join(""));
+        document.getElementById("f-action").insertAdjacentHTML("beforeend", (data.action_types || []).map(function (x) { return '<option value="' + esc(x) + '">' + esc(humanise(x)) + "</option>"; }).join(""));
+      } catch (e) { /* filters stay at "everything" */ }
+    }
+    async function load() {
+      try {
+        var data = await apiRequest("/audit-logs/?" + query());
+        total = (data.meta && data.meta.total) || 0;
+        var items = data.items || [];
+        rows.innerHTML = items.length ? items.map(function (r) {
+          return '<tr class="h-table-row"><td class="px-4 py-2 whitespace-nowrap">' + esc(when(r.created_at)) + '</td><td class="px-4 py-2">' + esc(r.actor_name || ("User " + r.actor_user_id)) + '</td><td class="px-4 py-2">' + esc(humanise(r.action_type)) + '</td><td class="px-4 py-2">' + esc(humanise(r.entity_type)) + " #" + esc(r.entity_id) + '</td><td class="px-4 py-2 text-text-muted">' + esc(r.location_name || "—") + '</td><td class="px-4 py-2 text-right"><button type="button" data-audit-id="' + esc(r.id) + '" class="rounded-lg border border-border px-3 py-1 text-[12px]">Details</button></td></tr>';
+        }).join("") : '<tr><td class="px-4 py-3" colspan="6">No audit events match these filters.</td></tr>';
+        var first = total ? (page - 1) * pageSize + 1 : 0;
+        count.textContent = total ? ("Showing " + first + "–" + Math.min(page * pageSize, total) + " of " + total) : "";
+        document.getElementById("audit-prev").disabled = page <= 1;
+        document.getElementById("audit-next").disabled = page * pageSize >= total;
+      } catch (error) {
+        rows.innerHTML = '<tr><td class="px-4 py-3" colspan="6">' + esc((error && error.detail) || "Couldn't load the audit log.") + "</td></tr>";
+      }
+    }
+    function values(v) {
+      if (v == null) return '<span class="text-text-muted">—</span>';
+      return '<pre class="whitespace-pre-wrap break-words rounded bg-surface-alt p-2 text-[12px]">' + esc(typeof v === "string" ? v : JSON.stringify(v, null, 2)) + "</pre>";
+    }
+    rows.addEventListener("click", async function (event) {
+      var button = event.target.closest("[data-audit-id]");
+      if (!button) return;
+      try {
+        var r = await apiRequest("/audit-logs/" + button.dataset.auditId);
+        document.getElementById("audit-detail-body").innerHTML =
+          '<dl class="grid grid-cols-3 gap-x-3 gap-y-1"><dt class="text-text-muted">When</dt><dd class="col-span-2">' + esc(when(r.created_at)) + '</dd><dt class="text-text-muted">Who</dt><dd class="col-span-2">' + esc(r.actor_name || "") + " " + esc(r.actor_email ? "(" + r.actor_email + ")" : "") + '</dd><dt class="text-text-muted">Action</dt><dd class="col-span-2">' + esc(r.action_type) + '</dd><dt class="text-text-muted">Record</dt><dd class="col-span-2">' + esc(r.entity_type) + " #" + esc(r.entity_id) + '</dd><dt class="text-text-muted">From</dt><dd class="col-span-2">' + esc(r.ip_address || "—") + "</dd></dl>" +
+          '<h3 class="mt-3 font-semibold">Before</h3>' + values(r.old_values) + '<h3 class="mt-3 font-semibold">After</h3>' + values(r.new_values);
+        if (dialog.showModal) dialog.showModal();
+      } catch (error) { fail((error && error.detail) || "Couldn't load that event."); }
+    });
+    dialog.querySelector("[data-close]").addEventListener("click", function () { dialog.close(); });
+    form.addEventListener("submit", function (event) { event.preventDefault(); page = 1; load(); });
+    form.addEventListener("reset", function () { setTimeout(function () { page = 1; load(); }, 0); });
+    document.getElementById("audit-prev").addEventListener("click", function () { if (page > 1) { page--; load(); } });
+    document.getElementById("audit-next").addEventListener("click", function () { if (page * pageSize < total) { page++; load(); } });
+    facets();
+    load();
+  })();
+  </script>
+</body>
+</html>

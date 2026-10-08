@@ -486,6 +486,9 @@ def main() -> None:
 
     seed_display_ids(engine, location_id)
     verify_seed(engine)
+    from app.repositories.legal import seed_accept_current_for_all_users  # Phase 5.1
+
+    seed_accept_current_for_all_users(engine)
     print("CI seed complete: permissions, admin role/user (ci.admin@recruitops-test.com / admin123), Head Office location, requisition/candidate pair, portal account")
 
 

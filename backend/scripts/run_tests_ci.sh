@@ -102,7 +102,7 @@ if [ "$SKIP_DOCKER" != "1" ]; then
 
     # Migrations newer than the schema dump (005/006 are in schema.sql;
     # 007 is covered by seed_ci.py). Same list as scripts/create_staging_db.py.
-    for migration in 008_display_ids.sql 009_branch_offer_toggle.sql 010_tenants.sql 011_admin_seed.sql 012_tenant_settings.sql 013_jwt_sessions.sql 014_login_lockout.sql 015_mfa.sql 016_metric_buckets.sql 017_pipeline_reopen.sql 018_row_versions.sql 019_soft_delete.sql 020_offer_threshold.sql 021_file_pipeline.sql 022_signing_bonus_policy.sql 023_withdraw_reasons.sql 024_requisition_holds.sql 025_client_stage_lists.sql; do
+    for migration in 008_display_ids.sql 009_branch_offer_toggle.sql 010_tenants.sql 011_admin_seed.sql 012_tenant_settings.sql 013_jwt_sessions.sql 014_login_lockout.sql 015_mfa.sql 016_metric_buckets.sql 017_pipeline_reopen.sql 018_row_versions.sql 019_soft_delete.sql 020_offer_threshold.sql 021_file_pipeline.sql 022_signing_bonus_policy.sql 023_withdraw_reasons.sql 024_requisition_holds.sql 025_client_stage_lists.sql 026_legal.sql; do
       echo "→ applying migration $migration…"
       if ! run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DB_NAME" -b \
         -i /dev/stdin < "$BACKEND_DIR/../scripts/$migration" >/tmp/migration_apply.log 2>&1; then

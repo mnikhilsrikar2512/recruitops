@@ -24,6 +24,7 @@ TABLE_TENANCY: dict[str, str] = {
     "stage_bucket_map": "tenant",  # NULL = platform default label map (016)
     "candidate_archives": "tenant",  # an archive hides a shared candidate from ONE company (019)
     "upload_quarantine": "tenant",  # uploads that failed the malware scan (021)
+    "legal_acceptances": "tenant",  # who accepted which legal version (026)
     "pipeline_templates": "tenant",  # company default + one list per client (025)
     # ---- through an office --------------------------------------------
     "agent_runs": "office:location_id",
@@ -92,4 +93,5 @@ TABLE_TENANCY: dict[str, str] = {
     "role_template_permissions": "shared:system role templates",
     "backend_sql_executions": "shared:migration bookkeeping",
     "metric_buckets": "shared:the fixed reporting bucket enum (016)",
+    "legal_documents": "shared:platform Terms/Privacy/DPA texts (026)",
 }
