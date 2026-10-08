@@ -2797,10 +2797,11 @@ function renderRequisitionHoldPanel(surface, requisition) {
       ],
       onSubmit: async (values, close) => {
         if (values.reason_code === "other" && !values.note.trim()) throw new Error("Add a short note when the reason is Other.");
-        await apiRequest(`/requisitions/${requisition.id}/hold`, { method: "POST", body: JSON.stringify({
+        const holdBody = JSON.stringify({
           reason_code: values.reason_code, note: values.note.trim() || null,
           expected_resume_date: values.expected_resume_date || null, version: requisition.version,
-        }) });
+        });
+        await apiRequest(`/requisitions/${requisition.id}/hold`, { method: "POST", body: holdBody });
         close();
         showToast("Requisition on hold", requisition.title);
         loadRequisitionDetail();
