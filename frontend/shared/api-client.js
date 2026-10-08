@@ -27,6 +27,7 @@ const PUBLIC_ROUTES = new Set([
   "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup",
   "onboarding-pipeline-stage-builder", "onboarding-add-custom-stage-overlay",
   "onboarding-hiring-teams", "onboarding-integrations", "onboarding-success-launch",
+  "legal",
 ]);
 
 
@@ -59,6 +60,7 @@ function writeSession(session) {
     localStorage.setItem("recruitops-session", JSON.stringify(session));
   } else {
     localStorage.removeItem("recruitops-session");
+    try { sessionStorage.removeItem("recruitops-legal-ok"); } catch { /* ignore */ }
   }
 }
 
@@ -738,6 +740,7 @@ const SIDEBAR_PERMISSION_MAP = {
   "business-titles.html": ["settings.read"],
   "visibility-rules.html": ["settings.read", "role.read"],
   "stage-bucket-map.html": ["settings.read"],
+  "audit-log-viewer.html": ["audit_log.read"],
   "work-assignment.html": ["assignment.read", "requisition.assign"],
   "portal-accounts.html": ["portal.read"],
   "approvals-inbox.html": ["approval.read"],
@@ -879,6 +882,7 @@ async function handleLoginOnce(form) {
 
 /* Shared by password sign-in and the MFA challenge page. */
 async function finishSignIn(data, email) {
+    try { sessionStorage.removeItem("recruitops-legal-ok"); } catch { /* ignore */ }
     writeSession({
       token: data.token || data.access_token,
       user_id: data.user?.id || data.user_id,
@@ -6405,6 +6409,26 @@ async function completeOnboarding() {
    PAGE BOOT & ROUTING
    ═══════════════════════════════════════════════════════════════ */
 
+/* Phase 5.1: a signed-in user who still owes an acceptance (a new Terms or
+   Privacy version, or the company DPA for an admin) goes to the acceptance
+   page first. Checked once per 30 minutes per tab. */
+async function enforceLegalAcceptance(route) {
+  if (route === "legal-acceptance" || route === "legal") return true;
+  try {
+    const okAt = Number(sessionStorage.getItem("recruitops-legal-ok") || 0);
+    if (okAt && Date.now() - okAt < 30 * 60 * 1000) return true;
+  } catch { /* storage unavailable: just ask the API */ }
+  const status = await apiRequest("/legal/acceptances").catch(() => null);
+  if (!status) return true; /* the API is unreachable; the page will say so */
+  if (Array.isArray(status.pending) && status.pending.length) {
+    const here = (window.location.pathname.split("/").pop() || "home.html") + window.location.search;
+    window.location.href = pageHref(`legal-acceptance.html?next=${encodeURIComponent(here)}`);
+    return false;
+  }
+  try { sessionStorage.setItem("recruitops-legal-ok", String(Date.now())); } catch { /* ignore */ }
+  return true;
+}
+
 async function bootPage() {
   if (!LIVE_API_ENABLED) {
     hidePageLoader();
@@ -6424,6 +6448,7 @@ async function bootPage() {
   if (RecruitOpsLive.session?.token && !PUBLIC_ROUTES.has(route)) {
     await syncUserPermissions();
     if (!RecruitOpsLive.session?.token) return; /* 401: handler is redirecting */
+    if (!(await enforceLegalAcceptance(route))) return;
   }
 
   const loaders = {

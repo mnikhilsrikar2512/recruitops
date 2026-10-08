@@ -238,6 +238,11 @@ function special(method, pathname, body) {
       primary_location: { id: 1, location_code: "BLR", location_name: "Bengaluru", offers_enabled: true },
     }];
   }
+  /* Phase 5.1: the personas have accepted the current legal versions, so the
+     acceptance gate lets every page through during the sweeps. */
+  if (method === "GET" && pathname === "/api/v1/legal/acceptances") {
+    return [200, { items: [], pending: [], company_pending: [] }];
+  }
   if (method === "GET" && pathname === "/api/v1/permissions/me") {
     return [200, { user_id: 1, role_code: p.role_code, permissions: p.permissions }];
   }

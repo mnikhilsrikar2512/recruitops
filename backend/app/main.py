@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -60,11 +61,26 @@ def _sqlalchemy_error_response(request: Request, exc: SQLAlchemyError) -> JSONRe
     )
 
 
+# Phase 5.1: real production (not staging) must not run on placeholder
+# legal text. Staging keeps the placeholders on purpose.
+LIVE_ENVS = {"production", "prod"}
+
+
+@asynccontextmanager
+async def _live_lifespan(_app: FastAPI):
+    from app.db.session import create_db_engine
+    from app.services.legal import assert_no_placeholders_for_live
+
+    assert_no_placeholders_for_live(create_db_engine())
+    yield
+
+
 def create_application() -> FastAPI:
     config_errors = validate_settings(settings)
     if config_errors:
         raise RuntimeError("Refusing to start with unsafe configuration: " + "; ".join(config_errors))
     application = FastAPI(
+        lifespan=_live_lifespan if settings.app_env.strip().lower() in LIVE_ENVS else None,
         title=settings.app_name,
         version=settings.app_version,
         docs_url="/docs",

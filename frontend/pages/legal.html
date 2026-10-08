@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Legal — RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+<body class="bg-background text-on-background antialiased" data-route-id="legal" data-route-kind="auth" data-route-title="Legal" data-route-section="Legal">
+  <main id="main-content" class="mx-auto max-w-3xl px-4 py-10">
+    <a href="../index.html" class="inline-flex items-center gap-2 font-bold text-on-surface no-underline mb-6"><span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-on-primary">R</span> RecruitOps</a>
+    <h1 class="text-2xl font-bold text-on-surface">Legal</h1>
+    <nav class="mt-4 flex flex-wrap gap-2" aria-label="Legal documents" id="legal-tabs"></nav>
+    <article id="legal-doc" class="mt-6 rounded-xl border border-border bg-surface p-6 text-[14px] text-on-surface"><p>Loading…</p></article>
+  </main>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+  <script src="../shared/renderers.js?v=1790668771"></script>
+  <script src="../shared/api-client.js?v=1790668771"></script>
+  <script src="../shared/ui-utils.js?v=1790668771"></script>
+  <script src="../shared/tables.js?v=1790668771"></script>
+  <script src="../shared/forms.js?v=1790668771"></script>
+  <script src="../shared/sidebar.js?v=1790668771"></script>
+  <script src="../shared/pipeline.js?v=1790668771"></script>
+  <script src="../shared/routing.js?v=1790668771"></script>
+  <script src="../shared/app.js?v=1790668771"></script>
+  <script>
+  (function () {
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    /* Small, safe Markdown subset: headings, bullets, paragraphs (text is escaped first). */
+    function md(text) {
+      var out = [], list = false;
+      String(text || "").split(/\r?\n/).forEach(function (line) {
+        var t = esc(line);
+        if (/^\s*[-*] /.test(line)) { if (!list) { out.push('<ul class="list-disc pl-6 my-2">'); list = true; } out.push("<li>" + t.replace(/^\s*[-*] /, "") + "</li>"); return; }
+        if (list) { out.push("</ul>"); list = false; }
+        if (/^### /.test(line)) out.push('<h4 class="mt-4 font-semibold">' + t.slice(4) + "</h4>");
+        else if (/^## /.test(line)) out.push('<h3 class="mt-5 text-lg font-bold">' + t.slice(3) + "</h3>");
+        else if (/^# /.test(line)) out.push('<h2 class="mt-5 text-xl font-bold">' + t.slice(2) + "</h2>");
+        else if (t.trim()) out.push('<p class="my-2 leading-relaxed">' + t + "</p>");
+      });
+      if (list) out.push("</ul>");
+      return out.join("");
+    }
+    var NAMES = { tos: "Terms of Service", privacy: "Privacy Policy", dpa: "Data Processing Addendum" };
+    function placeholderBanner() { return '<p class="rounded-lg border border-border bg-highlight-soft px-3 py-2 text-[13px] font-semibold" role="note">DRAFT — NOT LEGAL TEXT. This is a placeholder until the final wording is published.</p>'; }
+
+    var tabs = document.getElementById("legal-tabs"), doc = document.getElementById("legal-doc");
+    var wanted = new URLSearchParams(location.search).get("doc") || "tos";
+    function show(items, type) {
+      var d = items.filter(function (x) { return x.doc_type === type; })[0] || items[0];
+      if (!d) { doc.innerHTML = "<p>No documents are published yet.</p>"; return; }
+      tabs.innerHTML = items.map(function (x) { return '<a href="legal.html?doc=' + x.doc_type + '" class="rounded-full border border-border px-3 py-1 text-[13px] ' + (x.doc_type === d.doc_type ? "bg-primary text-on-primary" : "bg-surface") + '"' + (x.doc_type === d.doc_type ? ' aria-current="page"' : "") + ">" + esc(NAMES[x.doc_type] || x.title) + "</a>"; }).join("");
+      doc.innerHTML = (d.is_placeholder ? placeholderBanner() : "") + '<h2 class="mt-3 text-xl font-bold">' + esc(d.title) + '</h2><p class="text-[12px] text-text-muted">Version ' + esc(d.version) + " · in force since " + esc(String(d.effective_at).slice(0, 10)) + "</p>" + md(d.body);
+    }
+    apiRequest("/legal/documents").then(function (data) { show(data.items || [], wanted); })
+      .catch(function () { doc.innerHTML = "<p>Couldn't load the documents. Try again shortly.</p>"; });
+  })();
+  </script>
+</body>
+</html>

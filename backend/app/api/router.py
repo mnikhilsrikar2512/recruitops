@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     approvals,
     agents,
+    audit_logs,
     auth,
     candidates,
     clients,
@@ -10,6 +11,7 @@ from app.api.v1 import (
     dashboards,
     files,
     interviews,
+    legal,
     locations,
     master_data,
     meetings,
@@ -52,3 +54,5 @@ api_router.include_router(master_data.router, prefix="/master-data", tags=["mast
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
+api_router.include_router(legal.router, prefix="/legal", tags=["legal"])
+api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])

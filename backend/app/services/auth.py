@@ -356,10 +356,29 @@ def revoke_own_session_service(engine: Engine, auth_context: AuthContext, sessio
     if session_id not in owned:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session was not found")
     revoke_session(engine, session_id, "user-revoked")
+    _audit_session(engine, auth_context, "session.revoked", {"session_id": session_id})
 
 
 def revoke_other_sessions_service(engine: Engine, auth_context: AuthContext) -> int:
-    return revoke_user_sessions(engine, auth_context.user.id, "user-revoked-others", except_session_id=auth_context.session_id)
+    count = revoke_user_sessions(engine, auth_context.user.id, "user-revoked-others", except_session_id=auth_context.session_id)
+    _audit_session(engine, auth_context, "session.revoked_others", {"count": count})
+    return count
+
+
+def _audit_session(engine: Engine, auth_context: AuthContext, action: str, values: dict) -> None:
+    """Phase 5.4: session revocations are audited (never blocks the revoke)."""
+    try:
+        insert_audit_log(
+            engine,
+            actor_user_id=auth_context.user.id,
+            location_id=auth_context.user.location_id,
+            entity_type="user",
+            entity_id=auth_context.user.id,
+            action_type=action,
+            new_values=values,
+        )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def get_current_session_service(engine: Engine, auth_context: AuthContext) -> CurrentSessionResponse:

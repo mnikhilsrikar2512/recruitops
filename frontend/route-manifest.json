@@ -1,8 +1,8 @@
 {
  "generated_at_unix": 1789682101,
- "primary_route_count": 78,
+ "primary_route_count": 81,
  "overlay_route_count": 22,
- "total_route_count": 100,
+ "total_route_count": 103,
  "primary_routes": [
   {
    "file": "login.html",
@@ -1479,6 +1479,44 @@
     {
      "label": "Users",
      "href": "user-management.html"
+    }
+   ]
+  },
+  {
+   "file": "audit-log-viewer.html",
+   "route_id": "audit-log-viewer",
+   "kind": "app",
+   "title": "Audit Log",
+   "section": "Administration",
+   "subtitle": "Who did what, and when, across your company.",
+   "source": "audit_log",
+   "nav": "audit-log-viewer.html",
+   "links": []
+  },
+  {
+   "file": "legal.html",
+   "route_id": "legal",
+   "kind": "auth",
+   "title": "Legal",
+   "section": "Legal",
+   "subtitle": "Terms of Service, Privacy Policy and Data Processing Addendum in force.",
+   "source": "legal",
+   "nav": null,
+   "links": []
+  },
+  {
+   "file": "legal-acceptance.html",
+   "route_id": "legal-acceptance",
+   "kind": "auth",
+   "title": "Review and accept",
+   "section": "Legal",
+   "subtitle": "Accept the current Terms, Privacy Policy and (admins) DPA.",
+   "source": "legal_acceptance",
+   "nav": null,
+   "links": [
+    {
+     "label": "Legal",
+     "href": "legal.html"
     }
    ]
   }
