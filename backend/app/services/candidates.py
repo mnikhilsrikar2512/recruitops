@@ -1,7 +1,13 @@
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Engine
+from app.repositories.versioning import StaleWriteConflict
 
 from app.repositories.candidates import (
+    find_candidate_document_by_id,
+    archive_candidate,
+    count_open_applications_in_tenant,
+    find_open_candidate_archive,
+    restore_candidate,
     count_candidate_applications_for_requisition,
     count_active_candidate_applications,
     create_candidate,
@@ -21,6 +27,7 @@ from app.repositories.audit import insert_audit_log
 from app.repositories.requisitions import find_requisition_by_id
 from app.repositories.users import find_user_by_id
 from app.schemas.candidate import (
+    FileLinkResponse,
     CandidateFootprintEntry,
     CandidateFootprintResponse,
     CandidateCreate,
@@ -41,7 +48,11 @@ from app.schemas.candidate import (
 )
 from app.schemas.notification import NotificationCreate
 from app.schemas.pagination import PaginationMeta
-from app.core.storage import save_candidate_document
+from app.core.config import settings
+from app.core.file_storage import get_storage
+from app.repositories.uploads import find_idempotent_document, remember_idempotent_document
+from app.services.uploads import ingest, read_capped
+from app.services import scope
 from app.services.auth import AuthContext
 from app.services.notifications import create_notification_service
 
@@ -55,7 +66,8 @@ def _assert_user_exists(engine: Engine, user_id: int | None, label: str) -> None
 
 
 def _can_access_candidate(candidate: CandidateResponse, auth_context: AuthContext) -> bool:
-    if auth_context.user.role_code == "admin":
+    # Company boundary is enforced first in get_candidate_detail_service.
+    if scope.is_company_wide(auth_context):
         return True
 
     actor_id = auth_context.user.id
@@ -90,7 +102,7 @@ def _tenant_scoped_candidate_response(
     only tie is a global-record grant (e.g. they sourced the candidate for
     tenant A) must not see tenant B's application summaries.
     """
-    if auth_context.user.role_code == "admin":
+    if scope.is_company_wide(auth_context):
         return candidate
     actor_id = auth_context.user.id
     actor_location_id = auth_context.user.location_id
@@ -132,15 +144,20 @@ def get_candidate_footprint_service(
     footprint's value is precisely that it crosses tenant lines, so it is
     gated on the admin ROLE (not a permission that can be granted) and never
     carries tenant-private fields."""
-    if auth_context is None or auth_context.user.role_code != "admin":
+    if auth_context is None or not scope.is_company_wide(auth_context):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Candidate footprint is restricted to administrator oversight",
         )
     candidate = find_candidate_by_id(engine, candidate_id)
-    if not candidate:
+    if not candidate or not scope.candidate_in_tenant(engine, candidate_id, scope.tenant_id_of(auth_context)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
-    entries = get_candidate_footprint(engine, candidate_id)
+    # D-04: the footprint never crosses company lines.
+    offices = scope.company_office_ids(engine, auth_context)
+    entries = [
+        entry for entry in get_candidate_footprint(engine, candidate_id)
+        if offices is None or entry.branch_id in offices
+    ]
     return CandidateFootprintResponse(
         candidate_id=candidate.id,
         candidate_code=candidate.candidate_code,
@@ -155,7 +172,7 @@ def list_candidates_service(
     filters: CandidateListFilters,
     auth_context: AuthContext | None = None,
 ) -> CandidateListResponse:
-    if auth_context and auth_context.user.role_code != "admin" and filters.owner_user_id is None:
+    if auth_context and not scope.is_company_wide(auth_context) and filters.owner_user_id is None:
         filters = filters.model_copy(update={"owner_user_id": auth_context.user.id})
     items, total = list_candidates(engine, filters)
     response_items = [
@@ -222,6 +239,7 @@ def get_candidate_detail_service(
     engine: Engine,
     candidate_id: int,
     auth_context: AuthContext | None = None,
+    include_archived: bool = False,
 ) -> CandidateResponse:
     candidate = find_candidate_by_id(engine, candidate_id)
     if not candidate:
@@ -256,10 +274,28 @@ def get_candidate_detail_service(
         applications=applications,
         created_at=candidate.created_at,
         updated_at=candidate.updated_at,
+        version=getattr(candidate, "version", 1) or 1,
     )
     if auth_context:
+        # Another company's candidate is indistinguishable from a missing one.
+        if not scope.candidate_in_tenant(engine, candidate_id, scope.tenant_id_of(auth_context)):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
         _assert_candidate_access(response, auth_context)
         response = _tenant_scoped_candidate_response(response, auth_context)
+        # Phase 4.4: archived for this company -> gone, unless the caller
+        # may archive/restore (then it is shown, marked archived).
+        archive = find_open_candidate_archive(engine, candidate_id, scope.tenant_id_of(auth_context))
+        if archive is not None:
+            if not include_archived:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
+            response = response.model_copy(
+                update={"archived_at": archive.archived_at, "archive_reason": archive.archive_reason}
+            )
+        offices = scope.company_office_ids(engine, auth_context)
+        if offices is not None:
+            own = [a for a in response.applications if a.location_id in offices]
+            if len(own) != len(response.applications):
+                response = response.model_copy(update={"applications": own})
     return response
 
 
@@ -277,7 +313,11 @@ def update_candidate_service(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
     _assert_user_exists(engine, payload.primary_owner_user_id, "Primary owner user")
     _assert_user_exists(engine, payload.sourced_by_user_id, "Sourced by user")
-    update_candidate(engine, candidate_id, payload)
+    try:
+        update_candidate(engine, candidate_id, payload)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_candidate_detail_service(engine, candidate_id, auth_context)
+        raise
     return get_candidate_detail_service(engine, candidate_id, auth_context)
 
 
@@ -306,7 +346,11 @@ async def upload_candidate_document_service(
     file: UploadFile,
     document_type: str,
     auth_context: AuthContext | None = None,
+    idempotency_key: str | None = None,
 ) -> CandidateDocumentResponse:
+    """Phase 4.1/4.2: sniff + allowlist + size cap + quarantine + malware scan,
+    then store under the company's prefix. A retried upload carrying the same
+    Idempotency-Key returns the first result instead of a second copy."""
     if auth_context:
         get_candidate_detail_service(engine, candidate_id, auth_context)
     else:
@@ -314,16 +358,58 @@ async def upload_candidate_document_service(
         if not candidate_record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
 
-    file_name, file_path = await save_candidate_document(candidate_id, file)
     uploaded_by_user_id = auth_context.user.id if auth_context else None
+    key = (idempotency_key or "").strip()[:100] or None
+    if key and uploaded_by_user_id is not None:
+        previous = find_idempotent_document(engine, uploaded_by_user_id, key, "candidate", candidate_id)
+        if previous is not None:
+            return CandidateDocumentResponse.model_validate(find_candidate_document_by_id(engine, int(previous)))
+
+    purpose = "resume" if document_type == "resume" else "document"
+    content = await read_capped(file, purpose)
+    stored = ingest(
+        engine,
+        content=content,
+        file_name=file.filename or "",
+        purpose=purpose,
+        tenant_id=scope.tenant_id_of(auth_context) if auth_context else None,
+        area="candidates",
+        entity_type="candidate",
+        entity_id=candidate_id,
+        actor_user_id=uploaded_by_user_id,
+        actor_location_id=auth_context.user.location_id if auth_context else None,
+    )
     payload = CandidateDocumentCreate(
         document_type=document_type,
-        file_name=file_name,
-        file_path=file_path,
+        file_name=stored.file_name,
+        file_path=stored.storage_key,
         uploaded_by_user_id=uploaded_by_user_id,
     )
-    created = create_candidate_document(engine, candidate_id, payload)
+    created = create_candidate_document(engine, candidate_id, payload, stored)
+    if key and uploaded_by_user_id is not None:
+        remember_idempotent_document(engine, uploaded_by_user_id, key, "candidate", candidate_id, int(created.id))
     return CandidateDocumentResponse.model_validate(created)
+
+
+def candidate_document_link_service(
+    engine: Engine, candidate_id: int, document_id: int, auth_context: AuthContext
+) -> FileLinkResponse:
+    """Phase 4.1: a link is issued only after the caller passed the same
+    access checks as reading the candidate, only for a clean scanned file,
+    and only for a short time."""
+    get_candidate_detail_service(engine, candidate_id, auth_context)
+    try:
+        document = find_candidate_document_by_id(engine, document_id)
+    except RuntimeError:
+        document = None
+    if document is None or int(document.candidate_id) != int(candidate_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document was not found")
+    if not document.storage_key or document.scan_status != "clean":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This document has no checked file to download")
+    ttl = settings.file_link_ttl_seconds
+    url = get_storage().link(document.storage_key, document.file_name, document.content_type or "application/octet-stream", ttl)
+    return FileLinkResponse(url=url, expires_in_seconds=ttl, file_name=document.file_name,
+                            content_type=document.content_type or "application/octet-stream")
 
 
 def get_candidate_duplicate_check_service(
@@ -337,8 +423,12 @@ def get_candidate_duplicate_check_service(
         candidate = find_candidate_by_id(engine, candidate_id)
         if not candidate:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate was not found")
-    matches = find_duplicate_matches(engine, candidate_id)
-    duplicate_state = "in-review" if matches else "cleared"
+    matches = find_duplicate_matches(
+        engine, candidate_id, scope.tenant_id_of(auth_context) if auth_context else None
+    )
+    # Phase 4.7: only exact (e-mail/phone) matches flag the candidate;
+    # similar-name suggestions are hints and never block.
+    duplicate_state = "in-review" if any(m.match_tier == "exact" for m in matches) else "cleared"
     update_candidate_duplicate_state(engine, candidate_id, duplicate_state)
     return CandidateDuplicateCheckResponse(candidate_id=candidate_id, duplicate_state=duplicate_state, matches=matches)
 
@@ -549,3 +639,56 @@ def reassign_candidate_owner_service(
         review_required=review_required,
         reason=payload.reason,
     )
+
+
+def _require_company(auth_context: AuthContext) -> int:
+    tenant_id = scope.tenant_id_of(auth_context)
+    if tenant_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archiving belongs to a company; sign in as a company user")
+    return int(tenant_id)
+
+
+def archive_candidate_service(engine: Engine, candidate_id: int, reason: str, auth_context: AuthContext) -> CandidateResponse:
+    """Phase 4.4 (D-07): hide a candidate from this company. Nothing is
+    deleted; other companies working the same person are not affected."""
+    tenant_id = _require_company(auth_context)
+    get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+    if find_open_candidate_archive(engine, candidate_id, tenant_id) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate is already archived")
+    open_applications = count_open_applications_in_tenant(engine, candidate_id, tenant_id)
+    if open_applications:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Candidate has {open_applications} open application(s); close or withdraw them before archiving",
+        )
+    archive_candidate(engine, candidate_id, tenant_id, auth_context.user.id, reason)
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="candidate",
+        entity_id=candidate_id,
+        action_type="candidate.archive",
+        new_values={"tenant_id": tenant_id, "reason": reason},
+    )
+    return get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+
+
+def restore_candidate_service(engine: Engine, candidate_id: int, auth_context: AuthContext) -> CandidateResponse:
+    tenant_id = _require_company(auth_context)
+    archive = find_open_candidate_archive(engine, candidate_id, tenant_id)
+    if archive is None:
+        get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate is not archived")
+    get_candidate_detail_service(engine, candidate_id, auth_context, include_archived=True)
+    restore_candidate(engine, archive.id, candidate_id, auth_context.user.id)
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="candidate",
+        entity_id=candidate_id,
+        action_type="candidate.restore",
+        old_values={"archived_at": archive.archived_at, "reason": archive.archive_reason},
+    )
+    return get_candidate_detail_service(engine, candidate_id, auth_context)

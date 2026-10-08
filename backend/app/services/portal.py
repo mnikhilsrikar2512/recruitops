@@ -211,11 +211,13 @@ def portal_availability_service(
     platform: str | None,
     branch_id: int | None,
     usage_date: str | None,
+    tenant_id: int | None = None,
 ) -> PortalAvailabilityResponse:
     filters = PortalAvailabilityFilters(
         platform=platform,
         branch_id=branch_id,
         usage_date=_parse_date(usage_date),
+        tenant_id=tenant_id,
     )
     return PortalAvailabilityResponse(
         items=portal_repo.list_portal_availability(engine, filters)
@@ -223,10 +225,10 @@ def portal_availability_service(
 
 
 def portal_usage_summary_service(
-    engine: Engine, weeks_back: int = 6
+    engine: Engine, weeks_back: int = 6, tenant_id: int | None = None
 ) -> PortalWeeklyUsageResponse:
     """Booked hours per platform per week for the analytics dashboard report."""
-    rows = portal_repo.summarize_portal_usage_by_week(engine, weeks_back)
+    rows = portal_repo.summarize_portal_usage_by_week(engine, weeks_back, tenant_id)
 
     week_starts: list[date] = []
     by_platform: dict[str, dict[date, int]] = {}

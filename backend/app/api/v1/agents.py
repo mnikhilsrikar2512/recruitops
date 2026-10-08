@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from sqlalchemy import Engine
 
-from app.api.deps import PERMISSION_ALIASES, get_current_auth_context, get_engine, require_permissions
+from app.api.deps import PERMISSION_ALIASES, get_current_auth_context, get_engine, require_permissions, reject_unknown_query_params
 from app.agents.registry import find_agent_by_id
 from app.core.config import settings
 from app.repositories.auth import list_resolved_permissions
@@ -34,18 +34,20 @@ def _has_agent_resolved_permission(resolved_permissions: set[str], code: str) ->
     return any(alias in resolved_permissions for alias in aliases)
 
 
+def _resolved_permissions(engine: Engine, auth_context: AuthContext) -> set[str]:
+    return set(list_resolved_permissions(engine, auth_context.user.id))
+
+
 def _require_agent_run_permission(
     request: Request,
     auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> AuthContext:
-    if auth_context.user.role_code == "admin":
-        return auth_context
     agent_id = request.path_params.get("agent_id")
     spec = find_agent_by_id(agent_id)
     if spec is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent was not found")
-    resolved = set(list_resolved_permissions(engine, auth_context.user.id))
+    resolved = _resolved_permissions(engine, auth_context)
     if not _has_agent_resolved_permission(resolved, "ai.use") or not _has_agent_resolved_permission(
         resolved, spec.required_permission
     ):
@@ -85,7 +87,7 @@ def decide_agent_run_endpoint(
     return decide_agent_run_service(engine, auth_context, run_id, payload)
 
 
-@router.get("/runs", response_model=AgentRunListResponse)
+@router.get("/runs", response_model=AgentRunListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_agent_runs_endpoint(
     _auth: object = Depends(require_permissions("ai.use")),
     agent_id: str | None = Query(default=None, max_length=100),

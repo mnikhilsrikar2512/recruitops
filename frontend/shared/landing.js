@@ -13,7 +13,7 @@
   const home = isRoot ? "index.html" : "../index.html";
   const currentPage = path.split("/").pop().replace(".html", "") || "index";
   const routeKind = document.body?.dataset.routeKind || "";
-  const AUTH_PAGES = new Set(["login", "forgot-password", "reset-password", "password-setup"]);
+  const AUTH_PAGES = new Set(["login", "forgot-password", "reset-password", "password-setup", "mfa-challenge"]);
   if (routeKind === "auth" || AUTH_PAGES.has(currentPage)) {
     return;
   }

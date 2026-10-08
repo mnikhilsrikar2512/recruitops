@@ -25,6 +25,8 @@ def _normalize_code(value: str | None) -> str | None:
 
 
 class InterviewListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     candidate_application_id: int | None = Field(default=None, ge=1)
     location_id: int | None = Field(default=None, ge=1)
     interviewer_user_id: int | None = Field(default=None, ge=1)

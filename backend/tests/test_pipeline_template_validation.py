@@ -122,7 +122,7 @@ def templated_application(client: TestClient):
 
     with engine.begin() as connection:
         connection.execute(
-            text("DELETE FROM dbo.candidate_stage_history WHERE candidate_application_id = :application_id"),
+            text("EXEC sp_set_session_context N'recruitops.history_maintenance', 1; DELETE FROM dbo.candidate_stage_history WHERE candidate_application_id = :application_id; EXEC sp_set_session_context N'recruitops.history_maintenance', NULL;"),
             {"application_id": application_id},
         )
         connection.execute(

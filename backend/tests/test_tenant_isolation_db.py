@@ -95,9 +95,15 @@ class TenantIsolationFixtures:
         for label in ("A", "B"):
             branch_id = self._scalar(
                 """
-                INSERT INTO dbo.branches (name, code, location, status, offers_enabled)
+                INSERT INTO dbo.branches (name, code, location, status, offers_enabled, tenant_id)
                 OUTPUT INSERTED.id
-                VALUES (:name, :code, :location, N'active', 1);
+                VALUES (:name, :code, :location, N'active', 1,
+                        -- offices of the seed admin's company (010_tenants)
+                        COALESCE(
+                          (SELECT TOP 1 u.tenant_id FROM dbo.users AS u
+                           WHERE u.email IN (N'admin@executiveconnection.com', N'ci.admin@recruitops-test.com')
+                           ORDER BY u.id),
+                          (SELECT t.id FROM dbo.tenants AS t WHERE t.slug = N'default')));
                 """,
                 name=f"TenantISO {label} {self.suffix}",
                 code=f"TISO{label}{self.suffix[:4]}",
@@ -331,10 +337,12 @@ class TenantIsolationFixtures:
         # statements run individually and failures are recorded, not silent.
         statements = [
             ("candidate_stage_history", """
+                EXEC sp_set_session_context N'recruitops.history_maintenance', 1;
                 DELETE FROM dbo.candidate_stage_history
                 WHERE candidate_application_id IN (
                   SELECT id FROM dbo.candidate_applications WHERE candidate_id IN (
-                    SELECT id FROM dbo.candidates WHERE email LIKE :candidate_email));"""),
+                    SELECT id FROM dbo.candidates WHERE email LIKE :candidate_email));
+                EXEC sp_set_session_context N'recruitops.history_maintenance', NULL;"""),
             ("candidate_applications", """
                 DELETE FROM dbo.candidate_applications
                 WHERE candidate_id IN (

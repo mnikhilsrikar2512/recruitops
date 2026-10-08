@@ -23,6 +23,7 @@ import urllib.request
 ADMIN = ("ci.admin@recruitops-test.com", "admin123")
 TENANT_A = ("manager@northwind-staging.example.com", "recruiter@northwind-staging.example.com")
 TENANT_B = ("manager@contoso-staging.example.com", "recruiter@contoso-staging.example.com")
+COMPANY_ADMINS = ("admin@northwind-staging.example.com", "admin@contoso-staging.example.com")
 
 results: list[tuple[str, bool, str]] = []
 
@@ -113,6 +114,27 @@ def main() -> int:
     status, perms, _ = rec_a.call("GET", "/permissions/me")
     check("1.5 /permissions/me returns grants", status == 200 and perms.get("permissions"), str(status))
 
+    print("── Stage 1b: tokens (Phase 3.1–3.2)")
+
+    def refresh_cookie(headers: dict) -> str:
+        raw = next((v for k, v in headers.items() if k.lower() == "set-cookie"), "") or ""
+        return raw.split("ro_refresh=", 1)[1].split(";", 1)[0] if "ro_refresh=" in raw else ""
+
+    rt = Api(base)
+    status, payload, headers = rt.call("POST", "/auth/login", {"email": TENANT_A[1], "password": opts.password})
+    set_cookie = next((v for k, v in headers.items() if k.lower() == "set-cookie"), "") or ""
+    first = refresh_cookie(headers)
+    check("1.6 login: JWT access token + HttpOnly refresh cookie",
+          status == 200 and str(payload.get("token", "")).count(".") == 2 and first and "httponly" in set_cookie.lower(),
+          set_cookie[:80])
+    status, payload, headers = rt.call("POST", "/auth/refresh", headers={"Cookie": f"ro_refresh={first}"})
+    second = refresh_cookie(headers)
+    check("1.7 refresh rotates the token", status == 200 and payload.get("token") and second and second != first, str(status))
+    status, _, _ = rt.call("POST", "/auth/refresh", headers={"Cookie": f"ro_refresh={first}"})
+    check("1.8 replayed refresh token → 401", status == 401, str(status))
+    status, _, _ = rt.call("POST", "/auth/refresh", headers={"Cookie": f"ro_refresh={second}"})
+    check("1.8 replay revokes the whole sign-in", status == 401, str(status))
+
     print("── Stage 2: tenant isolation")
     status, reqs_a, _ = rec_a.call("GET", "/requisitions/?page_size=100")
     status_b, reqs_b, _ = rec_b.call("GET", "/requisitions/?page_size=100")
@@ -135,6 +157,51 @@ def main() -> int:
     status, board_a, _ = rec_a.call("GET", "/pipeline/board")
     names_a = {r.get("candidate_name") for r in items(board_a)}
     check("2.2 pipeline board isolated", status == 200 and not ({"Farhan Qureshi", "Sneha Reddy", "Vivek Sharma"} & names_a), str(names_a))
+
+    print("── Stage 2b: company isolation (company admins, Phase 2)")
+    adm_a, adm_b = Api(base), Api(base)
+    check("2.3 company A admin login", adm_a.login(COMPANY_ADMINS[0], opts.password))
+    check("2.3 company B admin login", adm_b.login(COMPANY_ADMINS[1], opts.password))
+    if adm_a.token and adm_b.token:
+        status, appr, _ = adm_a.call("GET", "/approvals/?page_size=100")
+        titles = {a.get("title") or "" for a in items(appr)}
+        check("2.3 company admin A sees company A's approvals", status == 200 and any("Senior Backend Engineer" in t for t in titles), str(titles))
+        check("2.3 company admin A sees none of company B's approvals",
+              not any("Supply Chain Planner" in t or "Store Operations Lead" in t for t in titles), str(titles))
+        status, appr_b, _ = adm_b.call("GET", "/approvals/?page_size=100")
+        b_approval = next(iter(items(appr_b)), {}).get("id")
+        if b_approval:
+            status, payload, _ = adm_a.call("GET", f"/approvals/{b_approval}")
+            check("2.3 company admin A reading B's approval by id → 404", status == 404 and not leaks(payload), str(status))
+        status, locs, _ = adm_a.call("GET", "/locations/?page_size=100")
+        codes = {loc.get("location_code") for loc in items(locs)}
+        check("2.3 company admin A's offices are company A's only", status == 200 and "STGA" in codes and "STGB" not in codes, str(codes))
+        status, users, _ = adm_a.call("GET", "/users/?page_size=100")
+        emails = {u.get("email") for u in items(users)}
+        check("2.3 company admin A's users exclude company B",
+              status == 200 and not any("contoso-staging" in (e or "") for e in emails), str(sorted(emails))[:200])
+        a_office = next((loc.get("id") for loc in items(locs) if loc.get("location_code") == "STGA"), None)
+        status, roles, _ = adm_b.call("GET", "/roles/?page_size=100")
+        b_role = next((r.get("id") for r in items(roles) if r.get("code") == "recruiter-stgb"), None)
+        if a_office and b_role:
+            status, payload, _ = adm_b.call("POST", "/users/", {
+                "full_name": "Cross Company", "email": f"cross.{int(time.time())}@contoso-staging.example.com",
+                "employee_code": f"X{int(time.time())}", "primary_location_id": a_office, "primary_role_id": b_role})
+            check("2.3 company admin B cannot place a user in company A's office → 404", status == 404, f"{status} {payload}")
+    if adm_a.token:
+        print("── Stage 2c: Admin is the control plane, by grant (D-03, plan 2.5)")
+        status, perms, _ = adm_a.call("GET", "/permissions/me")
+        check("2.4 company admin holds scope.company", status == 200 and "scope.company" in perms.get("permissions", []), str(status))
+        for path in ("/users/", "/roles/", "/locations/", "/approvals/", "/reports/time-to-fill"):
+            status, _, _ = adm_a.call("GET", path)
+            check(f"2.4 company admin passes control-plane {path} → 200", status == 200, str(status))
+        for path in ("/candidates/", "/requisitions/", "/clients/", "/pipeline/board"):
+            status, _, _ = adm_a.call("GET", path)
+            check(f"2.4 company admin denied execution {path} → 403", status == 403, str(status))
+    status, reqs, _ = admin.call("GET", "/requisitions/?page_size=100")
+    titles = {r.get("title") for r in items(reqs)}
+    check("2.3 CI company admin sees neither staging company",
+          status == 200 and not ({"Senior Backend Engineer", "Supply Chain Planner"} & titles), str(titles))
 
     print("── Stage 3: RBAC")
     status, _, _ = rec_a.call("GET", "/users/")

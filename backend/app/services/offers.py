@@ -1,12 +1,16 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from decimal import Decimal
+
+from app.repositories.offer_settings import find_requisition_budget_for_application, get_offer_approval_threshold
 from app.repositories.offers import create_offer, find_offer_by_application_id, list_offers, update_offer_decision
 from app.repositories.pipeline import find_pipeline_application_by_id
 from app.repositories.users import find_user_by_id
 from app.repositories.display_ids import find_branch_by_id
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters, OfferListResponse, OfferResponse
 from app.schemas.pagination import PaginationMeta
+from app.services import scope
 from app.services.auth import AuthContext
 from app.services.pipeline import _assert_pipeline_application_access
 
@@ -16,7 +20,7 @@ def list_offers_service(
     filters: OfferListFilters,
     auth_context: AuthContext | None = None,
 ) -> OfferListResponse:
-    if auth_context and auth_context.user.role_code != "admin" and filters.location_id is None:
+    if auth_context and not scope.is_company_wide(auth_context) and filters.location_id is None:
         filters = filters.model_copy(update={"location_id": auth_context.user.location_id})
     items, total = list_offers(engine, filters)
     return OfferListResponse(
@@ -37,8 +41,32 @@ def get_offer_detail_service(
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
-        _assert_pipeline_application_access(application, auth_context)
+        _assert_pipeline_application_access(application, auth_context, engine)
     return OfferResponse.model_validate(offer)
+
+
+def offer_requires_approval(engine: Engine, location_id: int, payload: OfferCreate) -> bool:
+    """Phase 4.8 (D-06, revised): which offers need approval.
+
+    The offer total is CTC + signing bonus.
+    1. No amount yet -> approval (nothing to compare).
+    2. The requisition has a max budget -> the budget decides: at or under
+       it the offer is approved now, over it needs approval. An offer in a
+       different currency from the budget needs approval (it can't be
+       compared safely).
+    3. No budget on the requisition -> the company threshold decides
+       (default 0 = every paid offer needs approval).
+    """
+    if payload.offered_ctc is None:
+        return True
+    total = Decimal(payload.offered_ctc) + Decimal(payload.signing_bonus or 0)
+    budget_max, budget_currency = find_requisition_budget_for_application(engine, payload.candidate_application_id)
+    if budget_max is not None and budget_max > 0:
+        if budget_currency and payload.offer_currency and budget_currency.strip().upper() != payload.offer_currency.upper():
+            return True
+        return total > budget_max
+    threshold = get_offer_approval_threshold(engine, scope.tenant_of_office(engine, location_id))
+    return total > threshold
 
 
 def create_offer_service(
@@ -50,7 +78,7 @@ def create_offer_service(
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
-        _assert_pipeline_application_access(application, auth_context)
+        _assert_pipeline_application_access(application, auth_context, engine)
     branch = find_branch_by_id(engine, application.location_id)
     if branch is not None and branch.offers_enabled is False:
         raise HTTPException(
@@ -64,7 +92,13 @@ def create_offer_service(
         actor_user_id = auth_context.user.id
     if actor_user_id is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Requested by user is required")
-    created = create_offer(engine, payload, location_id=application.location_id, actor_user_id=actor_user_id)
+    created = create_offer(
+        engine,
+        payload,
+        location_id=application.location_id,
+        actor_user_id=actor_user_id,
+        requires_approval=offer_requires_approval(engine, application.location_id, payload),
+    )
     return OfferResponse.model_validate(created)
 
 

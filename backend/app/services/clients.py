@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from app.repositories.audit import insert_audit_log
 from app.repositories.clients import (
+    count_open_requisitions_for_client,
+    set_client_archived,
     create_client,
     create_client_contact,
     find_client_by_code,
@@ -79,11 +82,53 @@ def create_client_service(engine: Engine, payload: ClientCreate) -> ClientRespon
     return ClientResponse.model_validate(created)
 
 
-def get_client_detail_service(engine: Engine, client_id: int) -> ClientResponse:
+def get_client_detail_service(engine: Engine, client_id: int, include_archived: bool = True) -> ClientResponse:
+    """include_archived=False hides an archived client (Phase 4.4); the API
+    passes it from the caller's client.delete.soft grant."""
     client = find_client_by_id(engine, client_id)
-    if not client:
+    if not client or (not include_archived and getattr(client, "archived_at", None) is not None):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client was not found")
     return ClientResponse.model_validate(client)
+
+
+def archive_client_service(engine: Engine, client_id: int, reason: str, auth_context) -> ClientResponse:
+    client = get_client_detail_service(engine, client_id)
+    if client.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Client is already archived")
+    open_requisitions = count_open_requisitions_for_client(engine, client_id)
+    if open_requisitions:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Client has {open_requisitions} open requisition(s); close them before archiving",
+        )
+    set_client_archived(engine, client_id, auth_context.user.id, reason)
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=client.location_id,
+        entity_type="client",
+        entity_id=client_id,
+        action_type="client.archive",
+        new_values={"reason": reason},
+    )
+    return get_client_detail_service(engine, client_id)
+
+
+def restore_client_service(engine: Engine, client_id: int, auth_context) -> ClientResponse:
+    client = get_client_detail_service(engine, client_id)
+    if client.archived_at is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Client is not archived")
+    set_client_archived(engine, client_id, None, None)
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=client.location_id,
+        entity_type="client",
+        entity_id=client_id,
+        action_type="client.restore",
+        old_values={"archived_at": client.archived_at, "reason": client.archive_reason},
+    )
+    return get_client_detail_service(engine, client_id)
 
 
 def update_client_service(engine: Engine, client_id: int, payload: ClientUpdate) -> ClientResponse:

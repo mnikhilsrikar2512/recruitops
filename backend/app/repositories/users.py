@@ -95,6 +95,7 @@ def list_users(engine: Engine, filters: UserListFilters) -> tuple[list[UserRecor
         WITH filtered_users AS (
           {_user_select_sql()}
           WHERE (:location_id IS NULL OR ubr.branch_id = :location_id)
+          AND (:tenant_id IS NULL OR u.tenant_id = :tenant_id)
           AND (:role_id IS NULL OR u.default_role_id = :role_id)
           AND (:status IS NULL OR u.status = :status)
           AND (
@@ -117,6 +118,7 @@ def list_users(engine: Engine, filters: UserListFilters) -> tuple[list[UserRecor
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "role_id": filters.role_id,
                 "status": filters.status,
                 "search": filters.search,
@@ -187,18 +189,21 @@ def role_exists(engine: Engine, role_id: int) -> bool:
     return row is not None
 
 
-def count_active_admins(engine: Engine) -> int:
-    """Number of active users holding the fixed admin role."""
+def count_active_admins(engine: Engine, same_company_as_user_id: int | None = None) -> int:
+    """Number of active users holding the fixed admin role — within the
+    company of ``same_company_as_user_id`` when given (each company must
+    keep at least one admin)."""
     query = text(
         """
         SELECT COUNT(*) AS admin_count
         FROM dbo.users AS u
         INNER JOIN dbo.roles AS r ON r.id = u.default_role_id
-        WHERE r.code = N'admin' AND u.status = N'active';
+        WHERE r.code = N'admin' AND u.status = N'active'
+          AND (:user_id IS NULL OR u.tenant_id = (SELECT su.tenant_id FROM dbo.users AS su WHERE su.id = :user_id));
         """
     )
     with engine.connect() as connection:
-        return int(connection.execute(query).scalar_one())
+        return int(connection.execute(query, {"user_id": same_company_as_user_id}).scalar_one())
 
 
 def count_user_active_requisitions(engine: Engine, user_id: int) -> int:
@@ -267,7 +272,8 @@ def create_user(engine: Engine, payload: UserCreate, password_hash: str) -> User
           status,
           default_role_id,
           hierarchy_level,
-          reporting_manager_user_id
+          reporting_manager_user_id,
+          tenant_id
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -281,7 +287,8 @@ def create_user(engine: Engine, payload: UserCreate, password_hash: str) -> User
           :status,
           :primary_role_id,
           :hierarchy_level,
-          :reporting_manager_user_id
+          :reporting_manager_user_id,
+          (SELECT b.tenant_id FROM dbo.branches AS b WHERE b.id = :primary_location_id)
         );
         """
     )
@@ -318,6 +325,7 @@ def create_user(engine: Engine, payload: UserCreate, password_hash: str) -> User
                 "primary_role_id": payload.primary_role_id,
                 "hierarchy_level": "recruiter",
                 "reporting_manager_user_id": payload.reporting_manager_user_id,
+                "primary_location_id": payload.primary_location_id,
             },
         ).scalar_one()
         connection.execute(
@@ -477,6 +485,7 @@ def transfer_active_user_work_and_deactivate(
                     """
                     UPDATE dbo.requisitions
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id;
@@ -489,6 +498,7 @@ def transfer_active_user_work_and_deactivate(
                     """
                     UPDATE dbo.candidates
                     SET
+                      version = version + 1,
                       primary_owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE primary_owner_user_id = :user_id
@@ -502,6 +512,7 @@ def transfer_active_user_work_and_deactivate(
                     """
                     UPDATE dbo.candidate_applications
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id
@@ -594,6 +605,7 @@ def transfer_active_user_work_and_move(
                     """
                     UPDATE dbo.requisitions
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id;
@@ -606,6 +618,7 @@ def transfer_active_user_work_and_move(
                     """
                     UPDATE dbo.candidates
                     SET
+                      version = version + 1,
                       primary_owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE primary_owner_user_id = :user_id
@@ -619,6 +632,7 @@ def transfer_active_user_work_and_move(
                     """
                     UPDATE dbo.candidate_applications
                     SET
+                      version = version + 1,
                       owner_user_id = :transfer_to_user_id,
                       updated_at = SYSUTCDATETIME()
                     WHERE owner_user_id = :user_id

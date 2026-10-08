@@ -147,6 +147,7 @@ def list_meetings(engine: Engine, filters: MeetingListFilters) -> tuple[list[Mee
         WITH filtered_meetings AS (
           {_meeting_select_sql()}
           WHERE (:location_id IS NULL OR m.location_id = :location_id)
+          AND (:tenant_id IS NULL OR m.location_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:client_id IS NULL OR m.client_id = :client_id OR m.end_client_id = :client_id)
           AND (:meeting_owner_user_id IS NULL OR m.meeting_owner_user_id = :meeting_owner_user_id)
           AND (:attendance_status IS NULL OR m.attendance_status = :attendance_status)
@@ -163,6 +164,7 @@ def list_meetings(engine: Engine, filters: MeetingListFilters) -> tuple[list[Mee
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "client_id": filters.client_id,
                 "meeting_owner_user_id": filters.meeting_owner_user_id,
                 "attendance_status": filters.attendance_status,

@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    reject_unknown_query_params,
+    caller_tenant_id,
     get_current_auth_context,
     get_engine,
     pinned_location_id,
@@ -23,6 +25,7 @@ from app.services.approval import (
     list_approvals_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -33,7 +36,7 @@ _scope_approval = require_record_in_location(
 )
 
 
-@router.get("/", response_model=ApprovalListResponse)
+@router.get("/", response_model=ApprovalListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_approvals_endpoint(
     _auth: object = Depends(require_permissions("approval.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
@@ -57,6 +60,7 @@ def list_approvals_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_approvals_service(engine, filters)
 
 
@@ -65,8 +69,10 @@ def create_approval_endpoint(
     payload: ApprovalCreate,
     _auth: object = Depends(require_permissions("approval.create")),
     _scope: object = Depends(require_location_scope("location_id")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> ApprovalResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_approval_service(engine, payload)
 
 
@@ -86,6 +92,8 @@ def decide_approval_endpoint(
     payload: ApprovalDecision = ...,
     _auth: object = Depends(require_permissions("approval.decide")),
     _in_scope: object = Depends(_scope_approval),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> ApprovalResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return decide_approval_service(engine, approval_id, payload)

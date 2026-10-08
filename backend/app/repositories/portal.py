@@ -143,6 +143,7 @@ def list_portal_accounts(
 ) -> tuple[list[PortalAccountRecord], int]:
     base_where = """
         WHERE (:status IS NULL OR pa.status = :status)
+        AND (:tenant_id IS NULL OR pa.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
         AND (:platform IS NULL OR pa.platform_name LIKE '%' + :platform + '%')
         AND (:ownership_type IS NULL OR pa.ownership_type = :ownership_type)
         AND (
@@ -165,6 +166,7 @@ def list_portal_accounts(
     )
     params = {
         "status": filters.status,
+        "tenant_id": filters.tenant_id,
         "platform": filters.platform,
         "ownership_type": filters.ownership_type,
         "search": filters.search,
@@ -406,7 +408,7 @@ def delete_portal_slot(engine: Engine, portal_account_id: int, slot_id: int) -> 
 
 
 def summarize_portal_usage_by_week(
-    engine: Engine, weeks_back: int = 6
+    engine: Engine, weeks_back: int = 6, tenant_id: int | None = None
 ) -> list[dict[str, object]]:
     """Booked minutes per platform per ISO week (Monday-start), recent weeks.
 
@@ -426,6 +428,7 @@ def summarize_portal_usage_by_week(
         FROM dbo.portal_account_slots AS s
         JOIN dbo.portal_accounts AS pa ON pa.id = s.portal_account_id
         WHERE s.status <> 'cancelled'
+        AND (:tenant_id IS NULL OR pa.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
         AND s.usage_date >= DATEADD(WEEK, -:weeks_back, CAST(GETDATE() AS date))
         GROUP BY pa.platform_name,
                  DATEADD(
@@ -437,7 +440,7 @@ def summarize_portal_usage_by_week(
         """
     )
     with engine.connect() as connection:
-        rows = connection.execute(query, {"weeks_back": weeks_back}).mappings().all()
+        rows = connection.execute(query, {"weeks_back": weeks_back, "tenant_id": tenant_id}).mappings().all()
 
     return [
         {
@@ -477,6 +480,7 @@ def list_portal_availability(
         WHERE pa.status = 'active'
         AND (:platform IS NULL OR pa.platform_name LIKE '%' + :platform + '%')
         AND (:branch_id IS NULL OR pa.branch_id = :branch_id)
+        AND (:tenant_id IS NULL OR pa.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
         GROUP BY pa.id, pa.platform_name, pa.account_name, b.name,
                  pa.is_shared, pa.has_full_access, pa.daily_usage_limit_hours
         ORDER BY pa.platform_name, pa.account_name;
@@ -488,6 +492,7 @@ def list_portal_availability(
             {
                 "platform": filters.platform,
                 "branch_id": filters.branch_id,
+                "tenant_id": filters.tenant_id,
                 "usage_date": filters.usage_date,
             },
         ).mappings().all()

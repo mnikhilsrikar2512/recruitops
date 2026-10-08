@@ -2,7 +2,7 @@
 that powers the custom report builder.
 
 All queries aggregate live operational tables. Read endpoints are guarded by
-the ``report.read`` permission; Admin bypasses via role_code.
+the ``report.read`` permission; company-wide callers (scope.company) see every office of their own company.
 """
 from __future__ import annotations
 
@@ -71,15 +71,24 @@ class ClientSummaryRecord:
     avg_days_to_fill: float | None
 
 
+# Phase 4.5: reports never match raw stage labels. "Joined" is the metric
+# bucket (scripts/016_metric_buckets.sql): history rows carry to_bucket
+# snapshotted at insert, and dbo.vw_application_metric_state resolves the
+# bucket of an application's current stage. A company's custom label
+# ("Onboarding", "Start Date Confirmed") counts once it maps to 'joined'.
+
+
 def _location_scope_clause(is_admin: bool) -> str:
     """Requisitions are location-bound via branch_id."""
-    return "" if is_admin else "AND r.branch_id = :actor_location_id"
+    # Company-wide callers see every office of THEIR company, never others.
+    return "AND (:actor_tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))" if is_admin else "AND r.branch_id = :actor_location_id"
 
 
 def get_time_to_fill_summary(
     engine: Engine,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> TimeToFillSummaryRecord:
     """Time-to-fill per closed/filled requisition, computed in SQL from
     requisition created_at to the joined application's stage-updated time
@@ -105,7 +114,7 @@ def get_time_to_fill_summary(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE r.status IN (N'closed', N'filled')
@@ -124,7 +133,7 @@ def get_time_to_fill_summary(
     with engine.connect() as connection:
         row = connection.execute(
             query,
-            {"actor_location_id": actor_location_id},
+            {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id},
         ).mappings().first()
 
     if row is None or row["filled_count"] == 0:
@@ -141,7 +150,7 @@ def get_time_to_fill_summary(
             INNER JOIN dbo.candidate_applications AS ca
                 ON ca.id = h.candidate_application_id
             WHERE ca.requisition_id = r.id
-              AND h.to_stage IN (N'joined', N'hired')
+              AND h.to_bucket = N'joined'
             ORDER BY h.changed_at ASC
         ) AS join_hist
         WHERE r.status IN (N'closed', N'filled')
@@ -152,10 +161,10 @@ def get_time_to_fill_summary(
     )
     with engine.connect() as connection:
         fastest_name = connection.execute(
-            names_query, {"actor_location_id": actor_location_id, "days": row["fastest_days"]}
+            names_query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "days": row["fastest_days"]}
         ).scalar_one_or_none()
         slowest_name = connection.execute(
-            names_query, {"actor_location_id": actor_location_id, "days": row["slowest_days"]}
+            names_query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "days": row["slowest_days"]}
         ).scalar_one_or_none()
 
     return TimeToFillSummaryRecord(
@@ -174,6 +183,7 @@ def get_time_to_fill_breakdown(
     group_by: str,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[TimeToFillBreakdownRecord]:
     """Average days-to-fill grouped by department_name (or seniority bucket
     derived from the requisition title)."""
@@ -207,7 +217,7 @@ def get_time_to_fill_breakdown(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE r.status IN (N'closed', N'filled')
@@ -225,7 +235,7 @@ def get_time_to_fill_breakdown(
         """
     )
     with engine.connect() as connection:
-        rows = connection.execute(query, {"actor_location_id": actor_location_id}).mappings().all()
+        rows = connection.execute(query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id}).mappings().all()
     return [
         TimeToFillBreakdownRecord(
             key=str(row["key"]),
@@ -241,6 +251,7 @@ def get_source_effectiveness(
     engine: Engine,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[SourceEffectivenessRowRecord]:
     """Candidates grouped by source; hired = candidates owning an application
     that is joined/hired or carries an accepted/joined offer status."""
@@ -251,16 +262,20 @@ def get_source_effectiveness(
             COUNT(DISTINCT c.id) AS candidates,
             COUNT(DISTINCT CASE
                 WHEN ca.application_status IN (N'joined', N'hired')
-                  OR ca.current_stage IN (N'joined', N'hired')
+                  OR ms.current_bucket = N'joined'
                   OR ca.offer_status IN (N'accepted', N'joined')
                 THEN c.id
             END) AS hired
         FROM dbo.candidates AS c
         LEFT JOIN dbo.candidate_applications AS ca
             ON ca.candidate_id = c.id
+        LEFT JOIN dbo.vw_application_metric_state AS ms
+            ON ms.application_id = ca.id
         WHERE c.status = N'active'
           AND (
-            :is_admin = 1
+            (:is_admin = 1 AND (:actor_tenant_id IS NULL
+              OR c.created_by_user_id IN (SELECT tu.id FROM dbo.users AS tu WHERE tu.tenant_id = :actor_tenant_id)
+              OR ca.requisition_id IN (SELECT r.id FROM dbo.requisitions AS r WHERE r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))))
             OR c.created_by_user_id IN (
                 SELECT u.id FROM dbo.users AS u WHERE u.location_id = :actor_location_id
             )
@@ -273,7 +288,7 @@ def get_source_effectiveness(
         """
     )
     with engine.connect() as connection:
-        rows = connection.execute(query, {"actor_location_id": actor_location_id, "is_admin": 1 if is_admin else 0}).mappings().all()
+        rows = connection.execute(query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "is_admin": 1 if is_admin else 0}).mappings().all()
     return [
         SourceEffectivenessRowRecord(
             source=str(row["source"]),
@@ -289,6 +304,7 @@ def get_report_dataset(
     dataset: str,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> ReportDatasetRowRecord:
     """Flat rows for the custom report builder's Generate Now action."""
     scope = _location_scope_clause(is_admin)
@@ -313,7 +329,7 @@ def get_report_dataset(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE r.status IN (N'closed', N'filled')
@@ -328,15 +344,18 @@ def get_report_dataset(
                 COUNT(c.id) AS candidates,
                 SUM(CASE
                     WHEN ca.application_status IN (N'joined', N'hired')
-                      OR ca.current_stage IN (N'joined', N'hired')
+                      OR ms.current_bucket = N'joined'
                       OR ca.offer_status IN (N'accepted', N'joined')
                     THEN 1 ELSE 0
                 END) AS hired
             FROM dbo.candidates AS c
             LEFT JOIN dbo.candidate_applications AS ca ON ca.candidate_id = c.id
+            LEFT JOIN dbo.vw_application_metric_state AS ms ON ms.application_id = ca.id
             WHERE c.status = N'active'
               AND (
-                :is_admin = 1
+                (:is_admin = 1 AND (:actor_tenant_id IS NULL
+                  OR c.created_by_user_id IN (SELECT tu.id FROM dbo.users AS tu WHERE tu.tenant_id = :actor_tenant_id)
+                  OR ca.requisition_id IN (SELECT r.id FROM dbo.requisitions AS r WHERE r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))))
                 OR c.created_by_user_id IN (
                     SELECT u.id FROM dbo.users AS u WHERE u.location_id = :actor_location_id
                 )
@@ -402,7 +421,7 @@ def get_report_dataset(
                 INNER JOIN dbo.candidate_applications AS ca
                     ON ca.id = h.candidate_application_id
                 WHERE ca.requisition_id = r.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS join_hist
             WHERE 1 = 1
@@ -430,7 +449,7 @@ def get_report_dataset(
 
     with engine.connect() as connection:
         rows = connection.execute(
-            query, {"actor_location_id": actor_location_id, "is_admin": 1 if is_admin else 0}
+            query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id, "is_admin": 1 if is_admin else 0}
         ).mappings().all()
 
     # datetime/date objects are not JSON-serializable; stringify them.
@@ -481,7 +500,7 @@ _PLACEMENT_SELECT = """
         SELECT TOP (1) h.changed_at
         FROM dbo.candidate_stage_history AS h
         WHERE h.candidate_application_id = ca.id
-          AND h.to_stage IN (N'joined', N'hired')
+          AND h.to_bucket = N'joined'
         ORDER BY h.changed_at ASC
     ) AS jh
 """
@@ -493,12 +512,13 @@ def get_placements(
     period_to,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[PlacementRecord]:
-    scope = "" if is_admin else "AND r.branch_id = :actor_location_id"
+    scope = _location_scope_clause(is_admin)
     query = text(
         f"""
         {_PLACEMENT_SELECT}
-        WHERE ca.current_stage IN (N'joined', N'hired')
+        WHERE ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
           AND jh.changed_at >= :period_from
           AND jh.changed_at < DATEADD(DAY, 1, :period_to)
           {scope}
@@ -508,7 +528,7 @@ def get_placements(
     params = {
         "period_from": period_from,
         "period_to": period_to,
-        "actor_location_id": actor_location_id,
+        "actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id,
     }
     with engine.connect() as connection:
         rows = connection.execute(query, params).mappings().all()
@@ -538,8 +558,13 @@ def get_client_summary(
     period_to,
     actor_location_id: int | None,
     is_admin: bool,
+    actor_tenant_id: int | None = None,
 ) -> list[ClientSummaryRecord]:
-    scope = "" if is_admin else "WHERE cc.branch_id = :actor_location_id"
+    scope = (
+        "WHERE (:actor_tenant_id IS NULL OR cc.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :actor_tenant_id))"
+        if is_admin
+        else "WHERE cc.branch_id = :actor_location_id"
+    )
     query = text(
         f"""
         SELECT
@@ -573,11 +598,11 @@ def get_client_summary(
                 SELECT TOP (1) h.changed_at
                 FROM dbo.candidate_stage_history AS h
                 WHERE h.candidate_application_id = ca.id
-                  AND h.to_stage IN (N'joined', N'hired')
+                  AND h.to_bucket = N'joined'
                 ORDER BY h.changed_at ASC
             ) AS jh
             WHERE r.client_company_id = cc.id
-              AND ca.current_stage IN (N'joined', N'hired')
+              AND ca.id IN (SELECT ms.application_id FROM dbo.vw_application_metric_state AS ms WHERE ms.current_bucket = N'joined')
               AND jh.changed_at >= :period_from
               AND jh.changed_at < DATEADD(DAY, 1, :period_to)
         ) AS pl
@@ -588,7 +613,7 @@ def get_client_summary(
     params = {
         "period_from": period_from,
         "period_to": period_to,
-        "actor_location_id": actor_location_id,
+        "actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id,
     }
     with engine.connect() as connection:
         rows = connection.execute(query, params).mappings().all()

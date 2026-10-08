@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    reject_unknown_query_params,
+    caller_tenant_id,
     get_current_auth_context,
     get_engine,
     pinned_location_id,
@@ -30,9 +32,25 @@ from app.services.users import (
     reset_user_credentials_service,
     update_user_service,
 )
+from app.services import scope
 from app.services.auth import AuthContext
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
+
+
+def _assert_assignments_in_company(
+    engine: Engine,
+    auth_context: AuthContext,
+    location_id: int | None,
+    role_id: int | None,
+    manager_user_id: int | None,
+) -> None:
+    """Users can only be placed on the caller's reachable offices, given the
+    company's own (or shared system) roles, and report to a colleague."""
+    if location_id is not None:
+        scope.assert_office_reachable(engine, auth_context, location_id, "Location was not found")
+    scope.assert_role_usable(engine, auth_context, role_id)
+    scope.assert_user_in_tenant(engine, auth_context, manager_user_id, "Reporting manager was not found")
 
 _scope_user = require_record_in_location(
     "user_id",
@@ -41,7 +59,7 @@ _scope_user = require_record_in_location(
 )
 
 
-@router.get("/", response_model=UserListResponse)
+@router.get("/", response_model=UserListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_users_endpoint(
     _auth: object = Depends(require_permissions("user.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
@@ -61,6 +79,7 @@ def list_users_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_users_service(engine, filters)
 
 
@@ -68,8 +87,10 @@ def list_users_endpoint(
 def create_user_endpoint(
     payload: UserCreate,
     _auth: object = Depends(require_permissions("user.create")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> UserResponse:
+    _assert_assignments_in_company(engine, auth_context, payload.primary_location_id, payload.primary_role_id, payload.reporting_manager_user_id)
     return create_user_service(engine, payload)
 
 
@@ -88,9 +109,11 @@ def update_user_endpoint(
     payload: UserUpdate,
     _auth: object = Depends(require_permissions("user.update")),
     _in_scope: object = Depends(_scope_user),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> UserResponse:
+    _assert_assignments_in_company(engine, auth_context, payload.primary_location_id, payload.primary_role_id, payload.reporting_manager_user_id)
     return update_user_service(engine, user_id, payload)
 
 
@@ -126,4 +149,5 @@ def move_user_endpoint(
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> UserMoveResponse:
+    _assert_assignments_in_company(engine, auth_context, payload.new_primary_location_id, payload.new_primary_role_id, None)
     return move_user_service(engine, user_id, payload, auth_context)

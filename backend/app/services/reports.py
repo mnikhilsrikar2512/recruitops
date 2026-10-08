@@ -31,6 +31,7 @@ from app.schemas.reports import (
     TimeToFillReportResponse,
     TimeToFillSummary,
 )
+from app.services import scope
 from app.services.auth import AuthContext
 
 
@@ -58,11 +59,12 @@ def _resolve_period(from_str: str | None, to_str: str | None) -> tuple[date, dat
 
 
 def get_time_to_fill_report_service(engine: Engine, auth_context: AuthContext) -> TimeToFillReportResponse:
-    is_admin = auth_context.user.role_code == "admin"
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
     location_id = auth_context.user.location_id
-    summary = get_time_to_fill_summary(engine, location_id, is_admin)
-    by_department = get_time_to_fill_breakdown(engine, "department", location_id, is_admin)
-    by_seniority = get_time_to_fill_breakdown(engine, "seniority", location_id, is_admin)
+    summary = get_time_to_fill_summary(engine, location_id, is_admin, tenant_id)
+    by_department = get_time_to_fill_breakdown(engine, "department", location_id, is_admin, tenant_id)
+    by_seniority = get_time_to_fill_breakdown(engine, "seniority", location_id, is_admin, tenant_id)
 
     within_sla_percent = (
         round((summary.within_sla / summary.filled_count) * 100, 1)
@@ -88,8 +90,9 @@ def get_time_to_fill_report_service(engine: Engine, auth_context: AuthContext) -
 def get_source_effectiveness_report_service(
     engine: Engine, auth_context: AuthContext
 ) -> SourceEffectivenessReportResponse:
-    is_admin = auth_context.user.role_code == "admin"
-    rows = get_source_effectiveness(engine, auth_context.user.location_id, is_admin)
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
+    rows = get_source_effectiveness(engine, auth_context.user.location_id, is_admin, tenant_id)
 
     total_candidates = sum(row.candidates for row in rows)
     converted = [
@@ -202,8 +205,9 @@ def get_report_dataset_service(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown report dataset: {dataset}",
         )
-    is_admin = auth_context.user.role_code == "admin"
-    record = get_report_dataset(engine, dataset, auth_context.user.location_id, is_admin)
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
+    record = get_report_dataset(engine, dataset, auth_context.user.location_id, is_admin, tenant_id)
     return ReportDatasetResponse(dimensions=[dimension], rows=record.rows)
 
 
@@ -214,9 +218,10 @@ def get_placements_report_service(
     period_to: str | None,
 ) -> PlacementsReportResponse:
     start, end = _resolve_period(period_from, period_to)
-    is_admin = auth_context.user.role_code == "admin"
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
     records = get_placements(
-        engine, start, end, auth_context.user.location_id, is_admin
+        engine, start, end, auth_context.user.location_id, is_admin, tenant_id
     )
     total_ctc = sum(r.ctc or 0 for r in records) or None
     total_revenue = round(sum(r.revenue for r in records), 2)
@@ -269,9 +274,10 @@ def get_client_summary_report_service(
     period_to: str | None,
 ) -> ClientSummaryReportResponse:
     start, end = _resolve_period(period_from, period_to)
-    is_admin = auth_context.user.role_code == "admin"
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
     records = get_client_summary(
-        engine, start, end, auth_context.user.location_id, is_admin
+        engine, start, end, auth_context.user.location_id, is_admin, tenant_id
     )
     currency = get_dominant_currency(engine)
     return ClientSummaryReportResponse(

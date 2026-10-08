@@ -56,6 +56,7 @@ def list_locations(engine: Engine, filters: LocationListFilters) -> tuple[list[L
           LEFT JOIN dbo.users AS u
             ON u.id = l.manager_user_id
           WHERE (:status IS NULL OR l.status = :status)
+          AND (:tenant_id IS NULL OR l.tenant_id = :tenant_id)
           AND (
             :search IS NULL
             OR l.name LIKE '%' + :search + '%'
@@ -77,6 +78,7 @@ def list_locations(engine: Engine, filters: LocationListFilters) -> tuple[list[L
             query,
             {
                 "status": filters.status,
+                "tenant_id": filters.tenant_id,
                 "search": filters.search,
                 "offset": (filters.page - 1) * filters.page_size,
                 "page_size": filters.page_size,
@@ -115,7 +117,8 @@ def find_location_by_id(engine: Engine, location_id: int) -> LocationRecord | No
     return _map_location(row) if row else None
 
 
-def find_location_by_code(engine: Engine, location_code: str) -> LocationRecord | None:
+def find_location_by_code(engine: Engine, location_code: str, tenant_id: int | None = None) -> LocationRecord | None:
+    """Office codes are unique per company (010_tenants)."""
     query = text(
         """
         SELECT TOP 1
@@ -132,12 +135,13 @@ def find_location_by_code(engine: Engine, location_code: str) -> LocationRecord 
         FROM dbo.branches AS l
         LEFT JOIN dbo.users AS u
           ON u.id = l.manager_user_id
-        WHERE l.code = :location_code;
+        WHERE l.code = :location_code
+          AND (:tenant_id IS NULL OR l.tenant_id = :tenant_id);
         """
     )
 
     with engine.connect() as connection:
-        row = connection.execute(query, {"location_code": location_code}).mappings().first()
+        row = connection.execute(query, {"location_code": location_code, "tenant_id": tenant_id}).mappings().first()
 
     return _map_location(row) if row else None
 
@@ -157,7 +161,8 @@ def user_exists(engine: Engine, user_id: int) -> bool:
     return row is not None
 
 
-def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
+def create_location(engine: Engine, payload: LocationCreate, tenant_id: int | None = None) -> LocationRecord:
+    # tenant_id None only in legacy/unit contexts: fall back to the default company.
     query = text(
         """
         INSERT INTO dbo.branches (
@@ -167,7 +172,8 @@ def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
           address,
           status,
           manager_user_id,
-          offers_enabled
+          offers_enabled,
+          tenant_id
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -177,8 +183,24 @@ def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
           :address,
           :status,
           :location_head_user_id,
-          CASE WHEN :has_offers_enabled = 1 THEN :offers_enabled ELSE 1 END
+          CASE WHEN :has_offers_enabled = 1 THEN :offers_enabled ELSE 1 END,
+          COALESCE(:tenant_id, (SELECT t.id FROM dbo.tenants AS t WHERE t.slug = N'default'))
         );
+        """
+    )
+    # dbo.branches and dbo.locations are parallel tables and the code assumes
+    # branch id == location id (several FKs point at dbo.locations), so every
+    # new office is mirrored with the same id.
+    mirror_query = text(
+        """
+        IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
+        BEGIN
+          SET IDENTITY_INSERT dbo.locations ON;
+          INSERT INTO dbo.locations (id, name, code, location, address, status, location_head_user_id, tenant_id)
+          SELECT b.id, b.name, b.code, b.location, b.address, b.status, b.manager_user_id, b.tenant_id
+          FROM dbo.branches AS b WHERE b.id = :id;
+          SET IDENTITY_INSERT dbo.locations OFF;
+        END
         """
     )
 
@@ -193,9 +215,11 @@ def create_location(engine: Engine, payload: LocationCreate) -> LocationRecord:
               "location_head_user_id": payload.location_head_user_id,
               "has_offers_enabled": 1 if "offers_enabled" in payload.model_fields_set else 0,
               "offers_enabled": payload.offers_enabled,
+              "tenant_id": tenant_id,
             },
         )
         location_id = result.scalar_one()
+        connection.execute(mirror_query, {"id": int(location_id)})
 
     created = find_location_by_id(engine, int(location_id))
     if created is None:
@@ -242,6 +266,19 @@ def update_location(engine: Engine, location_id: int, payload: LocationUpdate) -
                 "has_offers_enabled": 1 if "offers_enabled" in payload.model_fields_set else 0,
                 "offers_enabled": payload.offers_enabled,
             },
+        )
+        # keep the dbo.locations mirror in step (same id)
+        connection.execute(
+            text(
+                """
+                UPDATE l SET l.name = b.name, l.location = b.location, l.address = b.address,
+                       l.status = b.status, l.location_head_user_id = b.manager_user_id,
+                       l.updated_at = SYSUTCDATETIME()
+                FROM dbo.locations AS l INNER JOIN dbo.branches AS b ON b.id = l.id
+                WHERE l.id = :location_id;
+                """
+            ),
+            {"location_id": location_id},
         )
 
     updated = find_location_by_id(engine, location_id)

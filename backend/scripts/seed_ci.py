@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text  # noqa: E402
 
+from app.core.rbac import ADMIN_PERMISSION_CODES, split_code  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.session import create_db_engine  # noqa: E402
 
@@ -167,8 +168,8 @@ def seed_display_ids(engine, location_id: int) -> None:
                 """
                 SET NOCOUNT ON;
                 IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HYD01')
-                    INSERT INTO dbo.branches (name, code, location, status)
-                    VALUES (N'Hyderabad', N'HYD01', N'Hyderabad', N'active');
+                    INSERT INTO dbo.branches (name, code, location, status, tenant_id)
+                    VALUES (N'Hyderabad', N'HYD01', N'Hyderabad', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
                 SELECT id FROM dbo.branches WHERE code = N'HYD01';
                 """
             )
@@ -200,6 +201,18 @@ def seed_display_ids(engine, location_id: int) -> None:
 def main() -> None:
     engine = create_db_engine()
     with engine.begin() as connection:
+        # Company (tenant, 010_tenants.sql): the CI database is one company.
+        if connection.execute(text("SELECT OBJECT_ID(N'dbo.tenants')")).scalar() is None:
+            raise SystemExit("dbo.tenants is missing — apply scripts/010_tenants.sql before seeding")
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (SELECT 1 FROM dbo.tenants WHERE slug = N'default')
+                    INSERT INTO dbo.tenants (slug, display_name, status)
+                    VALUES (N'default', N'CI Company', N'active');
+                """
+            )
+        )
         # Location: user creation validates primary_location_id against
         # dbo.branches (see location_exists), so the branch IS the location row.
         location_id = connection.execute(
@@ -207,9 +220,9 @@ def main() -> None:
                 """
                 IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HO')
                 BEGIN
-                    INSERT INTO dbo.branches (name, code, location, status)
+                    INSERT INTO dbo.branches (name, code, location, status, tenant_id)
                     OUTPUT INSERTED.id
-                    VALUES (N'Head Office', N'HO', N'Head Office', N'active');
+                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
                 END
                 ELSE
                 BEGIN
@@ -224,8 +237,8 @@ def main() -> None:
             text(
                 """
                 IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE code = N'HO')
-                    INSERT INTO dbo.locations (name, code, location, status)
-                    VALUES (N'Head Office', N'HO', N'Head Office', N'active');
+                    INSERT INTO dbo.locations (name, code, location, status, tenant_id)
+                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
                 """
             )
         )
@@ -261,7 +274,40 @@ def main() -> None:
             )
         ).scalar_one()
 
-        # Grant every permission to admin
+        # Admin template = the control plane only (D-03, app/core/rbac.py).
+        for code in ADMIN_PERMISSION_CODES:
+            module_name, action_name = split_code(code)
+            connection.execute(
+                text(
+                    """
+                    IF NOT EXISTS (SELECT 1 FROM dbo.permissions WHERE code = :code)
+                        INSERT INTO dbo.permissions (code, module_name, action_name, description, is_sensitive)
+                        VALUES (:code, :module, :action, :code, 0);
+                    INSERT INTO dbo.role_permissions (role_id, permission_id)
+                    SELECT :role_id, p.id FROM dbo.permissions AS p
+                    WHERE p.code = :code
+                      AND NOT EXISTS (SELECT 1 FROM dbo.role_permissions AS rp
+                                      WHERE rp.role_id = :role_id AND rp.permission_id = p.id);
+                    """
+                ),
+                {"code": code, "module": module_name, "action": action_name, "role_id": role_id},
+            )
+
+        # The CI admin also recruits: a CI-company role holding EVERY code, so
+        # the DB-backed tests can drive execution routes as this user. (An
+        # admin who also recruits holds an execution role — PRD §3.1.)
+        full_role_id = connection.execute(
+            text(
+                """
+                SET NOCOUNT ON;
+                IF NOT EXISTS (SELECT 1 FROM dbo.roles WHERE code = N'ci-full-access')
+                    INSERT INTO dbo.roles (name, code, description, is_system_role, status, tenant_id)
+                    VALUES (N'CI Full Access', N'ci-full-access', N'CI only: every permission', 0, N'active',
+                            (SELECT id FROM dbo.tenants WHERE slug = N'default'));
+                SELECT id FROM dbo.roles WHERE code = N'ci-full-access';
+                """
+            )
+        ).scalar_one()
         connection.execute(
             text(
                 """
@@ -273,7 +319,7 @@ def main() -> None:
                 )
                 """
             ),
-            {"role_id": role_id},
+            {"role_id": full_role_id},
         )
 
         # Admin user
@@ -286,12 +332,12 @@ def main() -> None:
                     INSERT INTO dbo.users (
                         full_name, email, password_hash, password_setup_status,
                         force_password_change_on_first_login, status,
-                        default_role_id, hierarchy_level, location_id
+                        default_role_id, hierarchy_level, location_id, tenant_id
                     )
                     OUTPUT INSERTED.id
                     VALUES (
                         N'Admin', N'ci.admin@recruitops-test.com', :password_hash, N'active',
-                        0, N'active', :role_id, N'L5', :location_id
+                        0, N'active', :role_id, N'L5', :location_id, (SELECT id FROM dbo.tenants WHERE slug = N'default')
                     );
                 END
                 ELSE
@@ -319,6 +365,21 @@ def main() -> None:
             {"location_id": location_id, "role_id": role_id},
         )
 
+        # Second (non-primary) office role for the CI admin: CI Full Access.
+        connection.execute(
+            text(
+                """
+                DECLARE @uid BIGINT = (SELECT id FROM dbo.users WHERE email = N'ci.admin@recruitops-test.com');
+                IF NOT EXISTS (SELECT 1 FROM dbo.user_branch_roles WHERE user_id = @uid AND role_id = :role_id)
+                    INSERT INTO dbo.user_branch_roles (
+                        user_id, branch_id, role_id, is_primary, status, start_date
+                    )
+                    VALUES (@uid, :location_id, :role_id, 0, N'active', CAST(SYSUTCDATETIME() AS DATE));
+                """
+            ),
+            {"location_id": location_id, "role_id": full_role_id},
+        )
+
         # Client id=1 — requisition creation reads clients from dbo.client_companies
         # (branch_id IS the location reference), so seed there.
         connection.execute(
@@ -342,11 +403,11 @@ def main() -> None:
                     INSERT INTO dbo.users (
                         full_name, email, password_hash, password_setup_status,
                         force_password_change_on_first_login, status,
-                        default_role_id, hierarchy_level, location_id
+                        default_role_id, hierarchy_level, location_id, tenant_id
                     )
                     VALUES (
                         N'Admin', N'ci.admin@recruitops-test.com', :password_hash, N'active',
-                        0, N'active', :role_id, N'L5', :location_id
+                        0, N'active', :role_id, N'L5', :location_id, (SELECT id FROM dbo.tenants WHERE slug = N'default')
                     )
                 """
             ),
@@ -412,12 +473,12 @@ def main() -> None:
                 )
                     INSERT INTO dbo.company_entities (
                         display_name, legal_name, company_code, company_type_code,
-                        hq_city, country_name, support_email, website_url, is_primary, status
+                        hq_city, country_name, support_email, website_url, is_primary, status, tenant_id
                     )
                     VALUES (
                         N'RecruitOps Demo', N'RecruitOps Demo Pvt Ltd', N'RCI', N'recruitment-agency',
                         N'Hyderabad', N'India', N'hello@recruitops-demo.test', N'https://recruitops-demo.test',
-                        1, N'active'
+                        1, N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default')
                     );
                 """
             ),

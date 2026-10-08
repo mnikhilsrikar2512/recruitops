@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import RowMapping
 
+from app.services.scope import CANDIDATE_IN_TENANT_SQL
+
 from app.repositories.display_ids import ENTITY_CANDIDATE, allocate_display_id
+from app.repositories.versioning import check_version
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDocumentCreate,
@@ -47,6 +50,7 @@ class CandidateRecord:
     updated_at: object
     applications_count: int = 0
     linked_requisition_titles: list[str] | None = None
+    version: int = 1
 
 
 @dataclass
@@ -100,6 +104,11 @@ class CandidateDocumentRecord:
     verified_at: object
     created_at: object
     updated_at: object
+    storage_key: str | None = None
+    content_type: str | None = None
+    size_bytes: int | None = None
+    sha256: str | None = None
+    scan_status: str | None = None
 
 
 @dataclass
@@ -113,6 +122,8 @@ class CandidateDuplicateMatchRecord:
     duplicate_state: str
     match_score: int
     match_reasons: list[str]
+    match_tier: str = "exact"
+    in_your_company: bool = True
 
 
 @dataclass
@@ -168,6 +179,7 @@ def _candidate_select_sql() -> str:
           c.finalized_at,
           c.created_at,
           c.updated_at,
+          c.version,
           COUNT(ca.id) AS applications_count
         FROM dbo.candidates AS c
         LEFT JOIN dbo.branches AS cb
@@ -212,6 +224,7 @@ def _map_candidate(row: RowMapping, linked_requisition_titles: list[str] | None 
         updated_at=row["updated_at"],
         applications_count=row.get("applications_count", 0) or 0,
         linked_requisition_titles=linked_requisition_titles or [],
+        version=int(row.get("version", 1) or 1),
     )
 
 
@@ -249,6 +262,89 @@ def _parse_social_profiles(value: str | None) -> list[dict]:
     return parsed if isinstance(parsed, list) else []
 
 
+# Phase 4.4: an archive belongs to one company (dbo.candidate_archives).
+# NULL tenant (platform scope) treats any open archive as archived.
+ARCHIVED_FOR_TENANT_SQL = (
+    "EXISTS (SELECT 1 FROM dbo.candidate_archives AS arc WHERE arc.candidate_id = c.id "
+    "AND arc.restored_at IS NULL AND (:tenant_id IS NULL OR arc.tenant_id = :tenant_id))"
+)
+
+
+@dataclass
+class CandidateArchiveRecord:
+    id: int
+    tenant_id: int
+    candidate_id: int
+    archived_at: object
+    archived_by_user_id: int
+    archive_reason: str
+
+
+def find_open_candidate_archive(engine: Engine, candidate_id: int, tenant_id: int | None) -> CandidateArchiveRecord | None:
+    query = text(
+        """
+        SELECT TOP 1 id, tenant_id, candidate_id, archived_at, archived_by_user_id, archive_reason
+        FROM dbo.candidate_archives
+        WHERE candidate_id = :candidate_id AND restored_at IS NULL
+          AND (:tenant_id IS NULL OR tenant_id = :tenant_id)
+        ORDER BY archived_at DESC;
+        """
+    )
+    with engine.connect() as connection:
+        row = connection.execute(query, {"candidate_id": candidate_id, "tenant_id": tenant_id}).mappings().first()
+    return CandidateArchiveRecord(**row) if row else None
+
+
+def count_open_applications_in_tenant(engine: Engine, candidate_id: int, tenant_id: int) -> int:
+    query = text(
+        """
+        SELECT COUNT(*)
+        FROM dbo.candidate_applications AS ca
+        INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
+        INNER JOIN dbo.branches AS b ON b.id = r.branch_id
+        WHERE ca.candidate_id = :candidate_id AND b.tenant_id = :tenant_id
+          AND ca.application_status = N'active';
+        """
+    )
+    with engine.connect() as connection:
+        return int(connection.execute(query, {"candidate_id": candidate_id, "tenant_id": tenant_id}).scalar_one())
+
+
+def archive_candidate(engine: Engine, candidate_id: int, tenant_id: int, user_id: int, reason: str) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO dbo.candidate_archives (tenant_id, candidate_id, archived_by_user_id, archive_reason)
+                VALUES (:tenant_id, :candidate_id, :user_id, :reason);
+                """
+            ),
+            {"tenant_id": tenant_id, "candidate_id": candidate_id, "user_id": user_id, "reason": reason},
+        )
+        connection.execute(
+            text("UPDATE dbo.candidates SET version = version + 1, updated_at = SYSUTCDATETIME() WHERE id = :candidate_id;"),
+            {"candidate_id": candidate_id},
+        )
+
+
+def restore_candidate(engine: Engine, archive_id: int, candidate_id: int, user_id: int) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                UPDATE dbo.candidate_archives
+                SET restored_at = SYSUTCDATETIME(), restored_by_user_id = :user_id
+                WHERE id = :archive_id AND restored_at IS NULL;
+                """
+            ),
+            {"archive_id": archive_id, "user_id": user_id},
+        )
+        connection.execute(
+            text("UPDATE dbo.candidates SET version = version + 1, updated_at = SYSUTCDATETIME() WHERE id = :candidate_id;"),
+            {"candidate_id": candidate_id},
+        )
+
+
 def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list[CandidateRecord], int]:
     query = text(
         f"""
@@ -258,6 +354,8 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
           AND (:duplicate_state IS NULL OR c.duplicate_check_status = :duplicate_state)
           AND (:owner_user_id IS NULL OR c.primary_owner_user_id = :owner_user_id)
           AND (:sourced_by_user_id IS NULL OR c.created_by_user_id = :sourced_by_user_id)
+          AND (:tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL})
+          AND (:include_archived = 1 OR NOT {ARCHIVED_FOR_TENANT_SQL})
           AND (
             :requisition_id IS NULL
             OR EXISTS (
@@ -298,11 +396,12 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
             c.resume_uploaded_at,
             c.finalized_at,
             c.created_at,
-            c.updated_at
+            c.updated_at,
+            c.version
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered_candidates
-        ORDER BY updated_at DESC, id DESC
+        ORDER BY {filters.order_by}
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY;
         """
     )
@@ -314,8 +413,10 @@ def list_candidates(engine: Engine, filters: CandidateListFilters) -> tuple[list
                 "duplicate_state": filters.duplicate_state,
                 "owner_user_id": filters.owner_user_id,
                 "sourced_by_user_id": filters.sourced_by_user_id,
+                "tenant_id": filters.tenant_id,
                 "requisition_id": filters.requisition_id,
                 "search": filters.search,
+                "include_archived": 1 if filters.include_archived else 0,
                 "offset": (filters.page - 1) * filters.page_size,
                 "page_size": filters.page_size,
             },
@@ -355,7 +456,8 @@ def find_candidate_by_id(engine: Engine, candidate_id: int) -> CandidateRecord |
             c.resume_uploaded_at,
             c.finalized_at,
             c.created_at,
-            c.updated_at
+            c.updated_at,
+            c.version
         ) AS selected_candidates;
         """
     )
@@ -585,6 +687,7 @@ def update_candidate(engine: Engine, candidate_id: int, payload: CandidateUpdate
         """
         UPDATE dbo.candidates
         SET
+          version = version + 1,
           full_name = COALESCE(:full_name, full_name),
           email = CASE WHEN :has_email = 1 THEN :email ELSE email END,
           phone = CASE WHEN :has_phone = 1 THEN :phone ELSE phone END,
@@ -599,6 +702,7 @@ def update_candidate(engine: Engine, candidate_id: int, payload: CandidateUpdate
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "candidates", candidate_id, getattr(payload, "version", None))
         connection.execute(
             query,
             {
@@ -633,7 +737,11 @@ def update_candidate(engine: Engine, candidate_id: int, payload: CandidateUpdate
     return updated
 
 
-def create_candidate_document(engine: Engine, candidate_id: int, payload: CandidateDocumentCreate) -> CandidateDocumentRecord:
+def create_candidate_document(
+    engine: Engine, candidate_id: int, payload: CandidateDocumentCreate, stored: object | None = None
+) -> CandidateDocumentRecord:
+    """``stored`` (app.services.uploads.StoredFile) is set for files that went
+    through the Phase 4.2 pipeline; only those can ever be linked."""
     query = text(
         """
         INSERT INTO dbo.candidate_documents (
@@ -642,7 +750,13 @@ def create_candidate_document(engine: Engine, candidate_id: int, payload: Candid
           file_name,
           file_path,
           verification_status,
-          uploaded_by_user_id
+          uploaded_by_user_id,
+          storage_key,
+          content_type,
+          size_bytes,
+          sha256,
+          scan_status,
+          scanned_at
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -651,7 +765,13 @@ def create_candidate_document(engine: Engine, candidate_id: int, payload: Candid
           :file_name,
           :file_path,
           :verification_status,
-          :uploaded_by_user_id
+          :uploaded_by_user_id,
+          :storage_key,
+          :content_type,
+          :size_bytes,
+          :sha256,
+          :scan_status,
+          :scanned_at
         );
         """
     )
@@ -665,6 +785,12 @@ def create_candidate_document(engine: Engine, candidate_id: int, payload: Candid
                 "file_path": payload.file_path,
                 "verification_status": payload.verification_status,
                 "uploaded_by_user_id": payload.uploaded_by_user_id,
+                "storage_key": getattr(stored, "storage_key", None),
+                "content_type": getattr(stored, "content_type", None),
+                "size_bytes": getattr(stored, "size_bytes", None),
+                "sha256": getattr(stored, "sha256", None),
+                "scan_status": getattr(stored, "scan_status", None),
+                "scanned_at": getattr(stored, "scanned_at", None),
             },
         ).scalar_one()
     return find_candidate_document_by_id(engine, int(document_id))
@@ -684,7 +810,12 @@ def find_candidate_document_by_id(engine: Engine, document_id: int) -> Candidate
           verified_by_user_id,
           verified_at,
           created_at,
-          updated_at
+          updated_at,
+          storage_key,
+          content_type,
+          size_bytes,
+          sha256,
+          scan_status
         FROM dbo.candidate_documents
         WHERE id = :document_id;
         """
@@ -696,49 +827,132 @@ def find_candidate_document_by_id(engine: Engine, document_id: int) -> Candidate
     return CandidateDocumentRecord(**row)
 
 
-def find_duplicate_matches(engine: Engine, candidate_id: int) -> list[CandidateDuplicateMatchRecord]:
-    query = text(
-        """
+_PHONE_DIGITS_SQL = (
+    "RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({col}, N' ', N''), N'-', N''), N'+', N''),"
+    " N'(', N''), N')', N''), N'.', N''), 10)"
+)
+
+
+def _normalized_name(value: str | None) -> str:
+    return " ".join(sorted("".join(ch if ch.isalnum() else " " for ch in (value or "").lower()).split()))
+
+
+def _name_similarity(left: str | None, right: str | None) -> float:
+    from difflib import SequenceMatcher
+
+    a, b = _normalized_name(left), _normalized_name(right)
+    if not a or not b:
+        return 0.0
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _phone_digits(value: str | None) -> str:
+    digits = "".join(ch for ch in (value or "") if ch.isdigit())
+    return digits[-10:]
+
+
+def find_duplicate_matches(
+    engine: Engine, candidate_id: int, tenant_id: int | None = None
+) -> list[CandidateDuplicateMatchRecord]:
+    """Phase 4.7 — two tiers.
+
+    exact      same e-mail (case-insensitive) or same phone (last 10 digits).
+               Auto-flags the candidate for review. Searched across every
+               company (candidates are shared identity records), but a match
+               outside the caller's company comes back without contact
+               details or employer — only that a profile exists.
+    suggested  similar name (>= 0.85 after normalising) AND the same
+               location, inside the caller's company only. Shown as a hint;
+               never changes the candidate's duplicate state.
+    A same-name match with no shared location is not reported at all.
+    """
+    phone_current = _PHONE_DIGITS_SQL.format(col="cur.phone")
+    phone_existing = _PHONE_DIGITS_SQL.format(col="c.phone")
+    in_tenant = f"CASE WHEN :tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL} THEN 1 ELSE 0 END"
+    exact_query = text(
+        f"""
         SELECT
-          existing.id AS matched_candidate_id,
-          existing.full_name AS matched_candidate_name,
-          existing.email,
-          existing.phone,
-          CAST(NULL AS NVARCHAR(150)) AS current_company,
-          CAST(NULL AS NVARCHAR(150)) AS current_designation,
-          existing.duplicate_check_status AS duplicate_state,
-          current_candidate.email AS current_email,
-          current_candidate.phone AS current_phone,
-          current_candidate.full_name AS current_name
-        FROM dbo.candidates AS current_candidate
-        INNER JOIN dbo.candidates AS existing
-          ON existing.id <> current_candidate.id
+          c.id AS matched_candidate_id,
+          c.full_name AS matched_candidate_name,
+          c.email,
+          c.phone,
+          c.current_company,
+          c.current_designation,
+          c.duplicate_check_status AS duplicate_state,
+          CASE WHEN cur.email IS NOT NULL AND LOWER(LTRIM(RTRIM(c.email))) = LOWER(LTRIM(RTRIM(cur.email))) THEN 1 ELSE 0 END AS email_match,
+          CASE WHEN LEN({phone_current}) >= 7 AND {phone_existing} = {phone_current} THEN 1 ELSE 0 END AS phone_match,
+          {in_tenant} AS in_tenant
+        FROM dbo.candidates AS cur
+        INNER JOIN dbo.candidates AS c
+          ON c.id <> cur.id
          AND (
-           (current_candidate.email IS NOT NULL AND existing.email = current_candidate.email)
-           OR (current_candidate.phone IS NOT NULL AND existing.phone = current_candidate.phone)
-           OR (
-             current_candidate.full_name = existing.full_name
-           )
+           (cur.email IS NOT NULL AND LTRIM(RTRIM(cur.email)) <> N'' AND LOWER(LTRIM(RTRIM(c.email))) = LOWER(LTRIM(RTRIM(cur.email))))
+           OR (cur.phone IS NOT NULL AND LEN({phone_current}) >= 7 AND {phone_existing} = {phone_current})
          )
-        WHERE current_candidate.id = :candidate_id
-        ORDER BY existing.updated_at DESC, existing.id DESC;
+        WHERE cur.id = :candidate_id
+        ORDER BY c.updated_at DESC, c.id DESC;
         """
     )
+    fuzzy_query = text(
+        f"""
+        SELECT TOP (200)
+          c.id AS matched_candidate_id,
+          c.full_name AS matched_candidate_name,
+          c.email,
+          c.phone,
+          c.current_company,
+          c.current_designation,
+          c.duplicate_check_status AS duplicate_state,
+          cur.full_name AS current_name
+        FROM dbo.candidates AS cur
+        INNER JOIN dbo.candidates AS c
+          ON c.id <> cur.id
+         AND DIFFERENCE(c.full_name, cur.full_name) >= 3
+         AND LOWER(LTRIM(RTRIM(COALESCE(c.current_location, c.preferred_location_text))))
+             = LOWER(LTRIM(RTRIM(COALESCE(cur.current_location, cur.preferred_location_text))))
+        WHERE cur.id = :candidate_id
+          AND COALESCE(cur.current_location, cur.preferred_location_text) IS NOT NULL
+          AND (:tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL})
+        ORDER BY c.updated_at DESC, c.id DESC;
+        """
+    )
+    params = {"candidate_id": candidate_id, "tenant_id": tenant_id}
     with engine.connect() as connection:
-        rows = connection.execute(query, {"candidate_id": candidate_id}).mappings().all()
+        exact_rows = connection.execute(exact_query, params).mappings().all()
+        fuzzy_rows = connection.execute(fuzzy_query, params).mappings().all()
+
     matches: list[CandidateDuplicateMatchRecord] = []
-    for row in rows:
-        reasons: list[str] = []
-        score = 40
-        if row["email"] and row["current_email"] and row["email"] == row["current_email"]:
+    seen: set[int] = set()
+    for row in exact_rows:
+        reasons = []
+        if row["email_match"]:
             reasons.append("email_match")
-            score += 35
-        if row["phone"] and row["current_phone"] and row["phone"] == row["current_phone"]:
+        if row["phone_match"]:
             reasons.append("phone_match")
-            score += 35
-        if row["matched_candidate_name"] == row["current_name"]:
-            reasons.append("name_match")
-            score += 15
+        score = 100 if len(reasons) == 2 else (95 if "email_match" in reasons else 90)
+        visible = bool(row["in_tenant"])
+        seen.add(int(row["matched_candidate_id"]))
+        matches.append(
+            CandidateDuplicateMatchRecord(
+                matched_candidate_id=row["matched_candidate_id"],
+                matched_candidate_name=row["matched_candidate_name"],
+                email=row["email"] if visible else None,
+                phone=row["phone"] if visible else None,
+                current_company=row["current_company"] if visible else None,
+                current_designation=row["current_designation"] if visible else None,
+                duplicate_state=row["duplicate_state"],
+                match_score=score,
+                match_reasons=reasons,
+                match_tier="exact",
+                in_your_company=visible,
+            )
+        )
+    for row in fuzzy_rows:
+        if int(row["matched_candidate_id"]) in seen:
+            continue
+        similarity = _name_similarity(row["matched_candidate_name"], row["current_name"])
+        if similarity < 0.85:
+            continue
         matches.append(
             CandidateDuplicateMatchRecord(
                 matched_candidate_id=row["matched_candidate_id"],
@@ -748,8 +962,10 @@ def find_duplicate_matches(engine: Engine, candidate_id: int) -> list[CandidateD
                 current_company=row["current_company"],
                 current_designation=row["current_designation"],
                 duplicate_state=row["duplicate_state"],
-                match_score=min(score, 100),
-                match_reasons=reasons,
+                match_score=min(79, int(round(similarity * 80))),
+                match_reasons=["similar_name", "same_location"],
+                match_tier="suggested",
+                in_your_company=True,
             )
         )
     return matches
@@ -759,7 +975,7 @@ def update_candidate_duplicate_state(engine: Engine, candidate_id: int, duplicat
     query = text(
         """
         UPDATE dbo.candidates
-        SET duplicate_check_status = :duplicate_state,
+        SET version = version + 1, duplicate_check_status = :duplicate_state,
             intake_stage = CASE
               WHEN :duplicate_state = N'in-review' THEN N'duplicate-review'
               WHEN :duplicate_state IN (N'cleared', N'merged') THEN N'ready-to-save'
@@ -877,6 +1093,7 @@ def finalize_candidate_into_requisition(engine: Engine, candidate_id: int, paylo
                 """
                 UPDATE dbo.candidates
                 SET
+                  version = version + 1,
                   profile_status = N'active',
                   intake_stage = N'finalized',
                   finalized_at = SYSUTCDATETIME(),

@@ -14,6 +14,7 @@ from app.schemas.dashboard import (
     MyWorkDashboardResponse,
     RoleDashboardResponse,
 )
+from app.services import scope
 from app.services.auth import AuthContext
 
 
@@ -22,7 +23,8 @@ def get_role_dashboard_service(engine: Engine, auth_context: AuthContext) -> Rol
         engine,
         actor_user_id=auth_context.user.id,
         actor_location_id=auth_context.user.location_id,
-        is_admin=auth_context.user.role_code == "admin",
+        is_admin=scope.is_company_wide(auth_context),
+        tenant_id=scope.tenant_id_of(auth_context),
     )
     return RoleDashboardResponse(
         role_code=auth_context.user.role_code,
@@ -51,7 +53,10 @@ def get_location_summary_service(
     location_id: int | None,
 ) -> LocationSummaryResponse:
     resolved_location_id = location_id
-    if auth_context.user.role_code != "admin":
+    if scope.is_company_wide(auth_context):
+        if resolved_location_id is not None and not scope.can_reach_office(engine, auth_context, resolved_location_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location summary was not found")
+    else:
         if auth_context.user.location_id is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Location summary is not allowed")
         if resolved_location_id is None:
@@ -79,10 +84,10 @@ def get_location_summary_service(
 
 
 def get_company_summary_service(engine: Engine, auth_context: AuthContext) -> CompanySummaryResponse:
-    if auth_context.user.role_code != "admin":
+    if not scope.is_company_wide(auth_context):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company summary is not allowed")
 
-    items = list_company_location_summaries(engine)
+    items = list_company_location_summaries(engine, scope.tenant_id_of(auth_context))
     return CompanySummaryResponse(
         total_locations=len(items),
         total_open_requisitions=sum(item.open_requisitions for item in items),

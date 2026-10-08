@@ -22,7 +22,7 @@ const RecruitOpsLive = { session: null };
 const LIVE_API_ENABLED = true;
 const API_BASE = "/api/v1";
 const PUBLIC_ROUTES = new Set([
-  "index", "login", "landing", "forgot-password", "reset-password",
+  "index", "login", "landing", "forgot-password", "reset-password", "mfa-challenge",
   "password-setup", "product-tour", "use-cases", "onboarding-welcome",
   "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup",
   "onboarding-pipeline-stage-builder", "onboarding-add-custom-stage-overlay",
@@ -127,7 +127,10 @@ function apiErrorFromBody(status, body) {
   if (typeof detail === "string" && detail) message = detail;
   else if (errors.length) message = String(errors[0]);
   else message = `Request failed (HTTP ${status})`;
-  return new ApiError(status, message, errors, body);
+  const apiError = new ApiError(status, message, errors, body);
+  /* PRD §9.0 stable error code (e.g. STALE_WRITE, UNSUPPORTED_FILTER). */
+  apiError.code = body && body.error && body.error.code ? body.error.code : null;
+  return apiError;
 }
 
 /* 401 handling is pluggable so Phase 3 (JWT refresh) can swap in
@@ -142,8 +145,98 @@ function defaultUnauthorizedHandler() {
 }
 let unauthorizedHandler = defaultUnauthorizedHandler;
 
+/* One refresh at a time: parallel 401s share the same attempt (a refresh
+   token is single-use, so two concurrent refreshes would look like theft). */
+let refreshInFlight = null;
+function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const root = cachedApiRoot || "/api/v1";
+      const response = await fetch(apiUrl("/auth/refresh", root), {
+        method: "POST", credentials: "include", headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return false;
+      const body = await response.json();
+      const session = RecruitOpsLive.session || readSession();
+      if (!session || !body?.token) return false;
+      session.token = body.token;
+      session.access_expires_at = body.access_expires_at;
+      writeSession(session);
+      RecruitOpsLive.session = session;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setTimeout(() => { refreshInFlight = null; }, 0);
+    }
+  })();
+  return refreshInFlight;
+}
+
 function setUnauthorizedHandler(handler) {
   unauthorizedHandler = typeof handler === "function" ? handler : defaultUnauthorizedHandler;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 4.3 — optimistic locking. Detail reads of a candidate,
+   requisition or pipeline application remember the record's version; the
+   edits below carry it, and a 409 "stale_write" (someone else saved first)
+   opens a reload dialog instead of silently overwriting their change.
+   ═══════════════════════════════════════════════════════════════ */
+const recordVersions = new Map();
+const VERSIONED_READ = /^\/(candidates|requisitions|pipeline\/applications)\/(\d+)\/?(?:\?.*)?$/;
+const VERSIONED_WRITES = [
+  { method: "PATCH", pattern: /^\/(candidates)\/(\d+)\/?$/ },
+  { method: "PATCH", pattern: /^\/(requisitions)\/(\d+)(?:\/status)?\/?$/ },
+  { method: "PATCH", pattern: /^\/(pipeline\/applications)\/(\d+)\/stage\/?$/ },
+  { method: "POST", pattern: /^\/(pipeline\/applications)\/(\d+)\/reopen\/?$/ },
+];
+
+function versionedWriteKey(path, method) {
+  const verb = String(method || "GET").toUpperCase();
+  for (const rule of VERSIONED_WRITES) {
+    const match = rule.method === verb && String(path).match(rule.pattern);
+    if (match) return `${match[1]}/${match[2]}`;
+  }
+  return null;
+}
+
+function rememberRecordVersion(path, payload) {
+  const match = String(path).match(VERSIONED_READ);
+  if (match && payload && Number.isInteger(payload.version)) recordVersions.set(`${match[1]}/${match[2]}`, payload.version);
+}
+
+function withRecordVersion(body, key) {
+  if (!key || !recordVersions.has(key) || typeof body !== "string") return body;
+  try {
+    const parsed = JSON.parse(body);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || parsed.version != null) return body;
+    return JSON.stringify({ ...parsed, version: recordVersions.get(key) });
+  } catch { return body; }
+}
+
+function showStaleWriteDialog(message) {
+  if (typeof document === "undefined" || document.getElementById("stale-write-dialog")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "stale-write-dialog";
+  overlay.setAttribute("role", "alertdialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "stale-write-title");
+  overlay.className = "fixed inset-0 z-[10000] flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm";
+  overlay.innerHTML = `<div class="bg-surface rounded-xl border border-border shadow-2xl p-6 max-w-md w-full mx-4">
+    <h2 id="stale-write-title" class="text-lg font-bold text-on-surface">This record changed</h2>
+    <p class="mt-2 text-sm text-text-muted"></p>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="button" data-stale-close class="rounded-lg border border-border bg-surface px-4 py-2 text-sm">Keep my screen</button>
+      <button type="button" data-stale-reload class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Reload latest</button>
+    </div></div>`;
+  overlay.querySelector("p").textContent = message
+    || "Someone else saved this record after you opened it. Reload to see the latest version, then make your change again.";
+  overlay.querySelector("[data-stale-close]").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("[data-stale-reload]").addEventListener("click", () => window.location.reload());
+  document.body.appendChild(overlay);
+  overlay.querySelector("[data-stale-reload]").focus();
 }
 
 /**
@@ -160,6 +253,16 @@ function setUnauthorizedHandler(handler) {
  */
 async function apiRequest(path, options = {}) {
   const session = RecruitOpsLive.session || readSession();
+  /* Phase 4.2: uploads carry an Idempotency-Key so a retried upload (e.g.
+     after a token refresh) returns the first result, not a second copy.
+     Stored on options so the retry reuses the same key. */
+  if (typeof FormData !== "undefined" && options.body instanceof FormData
+      && String(options.method || "GET").toUpperCase() === "POST"
+      && !(options.headers && options.headers["Idempotency-Key"])) {
+    const key = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    options.headers = { ...(options.headers || {}), "Idempotency-Key": key };
+  }
   const headers = { Accept: "application/json", ...options.headers };
   if (session?.token) headers["Authorization"] = `Bearer ${session.token}`;
   let body = options.body;
@@ -168,8 +271,14 @@ async function apiRequest(path, options = {}) {
       && !(typeof Blob !== "undefined" && body instanceof Blob)) {
     body = JSON.stringify(body);
   }
+  const versionKey = versionedWriteKey(path, options.method);
+  body = withRecordVersion(body, versionKey);
   if (typeof body === "string" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  const init = { ...options, headers, body };
+  /* "include": the refresh-token cookie must also reach the API when it is
+     served from another origin (dev :8000); CORS allows credentials only for
+     the exact allowlisted origins. */
+  const { _retried, ...fetchOptions } = options;
+  const init = { credentials: "include", ...fetchOptions, headers, body };
 
   const roots = cachedApiRoot ? [cachedApiRoot] : apiRootCandidates();
   let lastError = null;
@@ -206,8 +315,27 @@ async function apiRequest(path, options = {}) {
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
       const error = apiErrorFromBody(response.status, payload);
-      if (response.status === 401) unauthorizedHandler(error);
+      if (response.status === 401) {
+        /* Phase 3.9: an expired access token is renewed once from the
+           HttpOnly refresh cookie and the call retried; if that fails the
+           sign-in is over (clear session → login). */
+        if (!options._retried && session?.token && !/^\/auth\/(login|refresh)\b/.test(path)
+            && await refreshAccessToken()) {
+          return apiRequest(path, { ...options, _retried: true });
+        }
+        unauthorizedHandler(error);
+      }
+      if (response.status === 409 && (payload?.error?.code === "STALE_WRITE" || payload?.code === "stale_write")) {
+        if (versionKey && Number.isInteger(payload.current_version)) recordVersions.delete(versionKey);
+        showStaleWriteDialog(payload.detail);
+      }
       throw error;
+    }
+    if (versionKey) {
+      if (payload && Number.isInteger(payload.version)) recordVersions.set(versionKey, payload.version);
+      else recordVersions.delete(versionKey);
+    } else if (String(init.method || "GET").toUpperCase() === "GET") {
+      rememberRecordVersion(path, payload);
     }
     return payload ?? {};
   }
@@ -510,14 +638,13 @@ function wireAgentsWorkbenchFilters() {
 }
 
 function hasPermission(permissionCode) {
-  if (isAdmin()) return true;
+  /* No role-code bypass (plan 2.5): admins hold grants like everyone. */
   const perms = userPermissions();
   if (!perms.length) return false;
   return perms.includes(permissionCode);
 }
 
 function hasAnyPermission(...codes) {
-  if (isAdmin()) return true;
   return codes.some((code) => hasPermission(code));
 }
 
@@ -610,6 +737,7 @@ const SIDEBAR_PERMISSION_MAP = {
   "role-permissions-editor.html": ["role.permissions.assign"],
   "business-titles.html": ["settings.read"],
   "visibility-rules.html": ["settings.read", "role.read"],
+  "stage-bucket-map.html": ["settings.read"],
   "work-assignment.html": ["assignment.read", "requisition.assign"],
   "portal-accounts.html": ["portal.read"],
   "approvals-inbox.html": ["approval.read"],
@@ -632,7 +760,6 @@ const SIDEBAR_PERMISSION_MAP = {
 };
 
 function enforceSidebarRBAC() {
-  if (isAdmin()) return; /* Admin sees everything */
   document.querySelectorAll(".sidebar-nav a.nav-link, .sidebar-nav .sidebar-cta-link").forEach((link) => {
     const href = link.getAttribute("href") || "";
     const page = href.split("/").pop();
@@ -657,7 +784,7 @@ function enforceSidebarRBAC() {
     }
   });
   /* RBAC: Enforce on action buttons by label text */
-  if (!isAdmin()) {
+  {
     const actionPermMap = {
       "Add Client": "client.create",
       "Create Requisition": "requisition.create",
@@ -738,6 +865,20 @@ async function handleLoginOnce(form) {
 
   try {
     const data = await apiRequest("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    if (data.mfa_required) {
+      /* Phase 3.6: password accepted — the authenticator code comes next. */
+      try { sessionStorage.setItem("recruitops-mfa", JSON.stringify({ token: data.mfa_token, email })); } catch { /* private mode */ }
+      window.location.href = pageHref("mfa-challenge.html");
+      return;
+    }
+    await finishSignIn(data, email);
+  } catch (error) {
+    signInFailed(error, overlay, submitBtn);
+  }
+}
+
+/* Shared by password sign-in and the MFA challenge page. */
+async function finishSignIn(data, email) {
     writeSession({
       token: data.token || data.access_token,
       user_id: data.user?.id || data.user_id,
@@ -760,12 +901,18 @@ async function handleLoginOnce(form) {
     /* Check if onboarding has been completed — if not, redirect to onboarding flow */
     const onboardingComplete = localStorage.getItem("recruitops-onboarding-complete");
     const isFirstLogin = data.session?.force_password_change_on_first_login;
-    if (!onboardingComplete && isFirstLogin) {
+    if (data.mfa_enrollment_required) {
+      window.location.href = pageHref("mfa-enroll.html"); /* D-09: Admins enrol first */
+    } else if (!onboardingComplete && isFirstLogin) {
       window.location.href = pageHref("onboarding-welcome.html");
     } else {
       window.location.href = pageHref("home.html");
     }
-  } catch (error) {
+}
+
+function signInFailed(error, overlay, submitBtn) {
+  const passwordInput = document.getElementById("password");
+  {
     if (overlay) {
       overlay.classList.add("hidden");
       overlay.hidden = true;
@@ -852,7 +999,7 @@ function handleFormSubmit(form) {
     "onboarding-hiring-teams": submitOnboardingTeam,
   };
   /* RBAC: Check form submission permissions */
-  if (!isAdmin()) {
+  {
     const formPermMap = {
       "contact-form-dialog": "client.contact.create",
       "requisition-intake": "requisition.create",
@@ -944,7 +1091,19 @@ async function submitRequisition() {
   const skillsRaw = document.getElementById("req-skills")?.value || firstValueOf(["must_have_skills"], [/must have/i, /required skills/i]);
   const niceSkillsRaw = firstValueOf(["good_to_have_skills"], [/good to have/i, /nice to have/i]);
   const jobDesc = document.getElementById("job-description")?.value || firstValueOf(["job_description"], [/job description/i, /description/i]) || "To be updated";
+  /* Phase 4.8: the role's pay range decides which offers need approval. */
+  const numberOrNull = (value) => (value === undefined || value === null || String(value).trim() === "" ? null : Number(value));
+  const budgetMin = numberOrNull(document.getElementById("budget-min")?.value);
+  const budgetMax = numberOrNull(document.getElementById("budget-max")?.value);
+  const budgetCurrency = (document.getElementById("budget-currency")?.value || "").trim().toUpperCase() || null;
+  if (budgetMin != null && budgetMax != null && budgetMin > budgetMax) {
+    showLiveError(new Error("The budget's lower amount can't be more than the upper amount.")); return;
+  }
+  const budgetFields = document.getElementById("budget-max")
+    ? { budget_min: budgetMin, budget_max: budgetMax, currency_code: budgetCurrency }
+    : {};
   const createPayload = {
+    ...budgetFields,
     title,
     client_id: clientId,
     location_id: locationId,
@@ -959,6 +1118,7 @@ async function submitRequisition() {
     good_to_have_skills: splitSkillList(niceSkillsRaw),
   };
   const updatePayload = {
+    ...budgetFields,
     title: title || undefined,
     openings_count: openings,
     target_closure_date: targetDate,
@@ -1133,6 +1293,9 @@ async function loadRequisitionIntake() {
       set("req-skills", (req.must_have_skills || []).join(", "));
       set("client_id", req.client_id);
       set("location_id", req.location_id);
+      set("budget-min", req.budget_min);
+      set("budget-max", req.budget_max);
+      set("budget-currency", req.currency_code);
       if (req.work_mode) document.querySelectorAll('input[name="work-mode"]').forEach((radio) => { radio.checked = radio.value === req.work_mode; });
     }
   }
@@ -1583,7 +1746,7 @@ async function openClientDialog(clientId, refresh) {
   /* Owners must belong to the client's location (location-integrity rule), so
      fetch staff filtered to a location — the server caps pages at 100 and a
      location-scoped list is always complete. Re-fetched as location changes. */
-  const canReadUsers = isAdmin() || hasPermission("user.read");
+  const canReadUsers = hasPermission("user.read");
   const users = canReadUsers && session?.location_id
     ? await apiRequest(`/users/?page_size=100&location_id=${session.location_id}`).catch(() => ({ items: [] }))
     : { items: [] };
@@ -2212,6 +2375,56 @@ async function loadClients() {
   });
 }
 
+/* Phase 4.4 (D-07): archive / restore control on a detail page. Shown only
+   to callers holding <entity>.delete.soft; archived records show a banner. */
+function renderArchiveControl({ kind, record, resourcePath, permission, anchor }) {
+  if (!record || !anchor || document.querySelector("[data-archive-control]")) return;
+  const label = kind === "client" ? "client" : "candidate";
+  const box = document.createElement("div");
+  box.dataset.archiveControl = "true";
+  box.className = "mt-3 flex flex-wrap items-center gap-2 text-[13px]";
+  const archived = Boolean(record.archived_at);
+  const canManage = typeof hasPermission === "function" && hasPermission(permission);
+  if (!archived && !canManage) return;
+  if (archived) {
+    const banner = document.createElement("span");
+    banner.className = "rounded-lg bg-warning-bg px-3 py-1 font-semibold text-on-surface";
+    banner.textContent = `Archived ${typeof formatWhen === "function" ? (formatWhen(record.archived_at) || "") : ""}${record.archive_reason ? ` — ${record.archive_reason}` : ""}`;
+    box.appendChild(banner);
+  }
+  if (canManage) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rounded-lg border border-border bg-surface px-3 py-1 hover:bg-highlight-soft";
+    button.textContent = archived ? `Restore ${label}` : `Archive ${label}`;
+    const reasonWrap = document.createElement("span");
+    reasonWrap.hidden = true;
+    reasonWrap.innerHTML = `<label class="sr-only" for="archive-reason">Reason for archiving</label>
+      <input id="archive-reason" type="text" maxlength="500" placeholder="Why archive? (kept in history)" class="rounded-lg border border-border px-2 py-1 text-[13px]" />
+      <button type="button" data-archive-confirm class="rounded-lg bg-primary px-3 py-1 font-semibold text-on-primary">Confirm archive</button>`;
+    button.addEventListener("click", async () => {
+      if (!archived) { reasonWrap.hidden = false; reasonWrap.querySelector("input").focus(); return; }
+      try {
+        await apiRequest(`${resourcePath}/restore`, { method: "POST" });
+        showLiveSuccess?.(`${label[0].toUpperCase()}${label.slice(1)} restored`, record.full_name || record.client_name || "");
+        window.location.reload();
+      } catch (error) { showLiveError?.(error); }
+    });
+    reasonWrap.querySelector("[data-archive-confirm]").addEventListener("click", async () => {
+      const reason = reasonWrap.querySelector("input").value.trim();
+      if (reason.length < 3) { showLiveError?.(new Error("Give a reason of at least 3 characters.")); return; }
+      try {
+        await apiRequest(`${resourcePath}/archive`, { method: "POST", body: { reason } });
+        showLiveSuccess?.(`${label[0].toUpperCase()}${label.slice(1)} archived`, "Hidden from lists; you can restore it here.");
+        window.location.reload();
+      } catch (error) { showLiveError?.(error); }
+    });
+    box.appendChild(button);
+    box.appendChild(reasonWrap);
+  }
+  anchor.insertAdjacentElement("afterend", box);
+}
+
 async function loadClientDetail() {
   const client = await detailFromRoute(["client_id", "id"], "/clients/?page_size=1", (id) => `/clients/${id}`);
   if (!client) return;
@@ -2220,6 +2433,10 @@ async function loadClientDetail() {
   setApiField("open_requisitions", "—");
   setApiField("priority_roles", "—");
   setApiField("last_activity", formatWhen(client.updated_at) || "—");
+  renderArchiveControl({
+    kind: "client", record: client, resourcePath: `/clients/${client.id}`, permission: "client.delete.soft",
+    anchor: document.querySelector("[data-client-detail] h1") || surface?.querySelector("h1, h2"),
+  });
 }
 
 
@@ -2376,7 +2593,7 @@ let workAssignmentReqId = null;
 
 async function loadWorkAssignment() {
   workAssignmentReqId = queryInt("requisition_id") || workAssignmentReqId;
-  const canManageAssignments = isAdmin() || hasAnyPermission("assignment.create", "assignment.update");
+  const canManageAssignments = hasAnyPermission("assignment.create", "assignment.update");
   const [requisitions, users] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] })),
@@ -2619,6 +2836,10 @@ async function loadCandidateDetail() {
       `Run the AI resume screener for ${candidate.full_name || "this candidate"}`,
     );
   }
+  renderArchiveControl({
+    kind: "candidate", record: candidate, resourcePath: `/candidates/${candidate.id}`, permission: "candidate.delete.soft",
+    anchor: candidateNameHost?.parentElement || candidateNameHost,
+  });
 }
 
 async function loadCandidateReviewDrawer() {
@@ -2701,8 +2922,8 @@ function portalOwnershipChip(ownershipType, ownedByName) {
 async function loadPortalAccounts() {
   const surface = document.querySelector("[data-live-portal-accounts]");
   if (!surface) return;
-  const canManage = isAdmin() || hasAnyPermission("portal.create", "portal.update");
-  const canBookSlots = isAdmin() || hasAnyPermission("portal.assign_slot");
+  const canManage = hasAnyPermission("portal.create", "portal.update");
+  const canBookSlots = hasAnyPermission("portal.assign_slot");
 
   const [payload, locations] = await Promise.all([
     apiRequest("/portal-accounts/?page_size=100").catch(() => ({ items: [] })),
@@ -3137,7 +3358,7 @@ async function loadDailyUpdates() {
    date input, and the recent-updates list. Never touches the form fields.
    Users without daily_update.create_main get a read-only view (no submit controls). */
 async function loadDailyUpdateSubmission() {
-  const canSubmit = isAdmin() || hasPermission("daily_update.create_main");
+  const canSubmit = hasPermission("daily_update.create_main");
   const [requisitions, updates] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
@@ -3722,7 +3943,7 @@ async function loadReportLetterhead() {
     const img = document.querySelector("#lh-logo");
     const fallback = document.querySelector("#lh-logo-fallback");
     if (img) {
-      img.src = `/api/v1/settings/logo?t=${Date.now()}`;
+      img.src = `/api/v1/settings/logo?v=${profile.id}&t=${Date.now()}`;
       img.classList.remove("hidden");
       if (fallback) fallback.classList.add("hidden");
     }
@@ -3918,7 +4139,7 @@ async function fetchAndRenderReport() {
 /* Letterhead editor — company profile fields + logo, edited inline from the
    report viewer. Admin-gated: only shown when the actor has settings.update. */
 function openLetterheadDialog(onSaved) {
-  const canEdit = isAdmin() || hasPermission("settings.update");
+  const canEdit = hasPermission("settings.update");
   if (!canEdit) {
     showToast("Not permitted", "Only admins can change the company letterhead.");
     return;
@@ -5492,7 +5713,7 @@ function bindLiveApiInteractions() {
 
     /* RBAC: Check data-rbac-require on clicked buttons */
     const rbacTarget = target?.closest("[data-rbac-require]");
-    if (rbacTarget && !isAdmin()) {
+    if (rbacTarget) {
       const required = rbacTarget.dataset.rbacRequire.split(",");
       if (!hasAnyPermission(...required)) {
         event.preventDefault();
@@ -6127,7 +6348,7 @@ async function bootPage() {
   /* RBAC: Block access to unauthorized pages. The gate map now lives in
      navigation.config.js (NAV_PAGE_PERMISSIONS) — this file no longer
      duplicates it. Deep-link gating behavior is unchanged. */
-  if (!isAdmin() && !PUBLIC_ROUTES.has(route)) {
+  if (!PUBLIC_ROUTES.has(route)) {
     const pagePermMap = (window.NAV_CONFIG && window.NAV_CONFIG.pagePermissions) || {};
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {

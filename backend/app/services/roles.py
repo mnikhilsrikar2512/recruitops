@@ -1,12 +1,12 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
 
+from app.core.rbac import ADMIN_PERMISSION_CODES
 from app.repositories.roles import (
     count_permissions_by_codes,
     create_role,
     find_role_by_code,
     find_role_by_id,
-    list_all_permission_codes,
     list_permission_catalog,
     list_permission_codes_for_role,
     list_roles,
@@ -72,15 +72,15 @@ def get_role_permissions_service(engine: Engine, role_id: int) -> RolePermission
     )
 
 
-def create_role_service(engine: Engine, payload: RoleCreate) -> RoleResponse:
-    existing = find_role_by_code(engine, payload.code)
+def create_role_service(engine: Engine, payload: RoleCreate, tenant_id: int | None = None) -> RoleResponse:
+    existing = find_role_by_code(engine, payload.code, tenant_id)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Role code already exists",
         )
 
-    created = create_role(engine, payload)
+    created = create_role(engine, payload, tenant_id)
     if created is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -120,15 +120,12 @@ def assign_role_permissions_service(
             detail="Role was not found",
         )
 
-    # The admin role is the anchor of the permission bypass — stripping its
-    # permission rows corrupts seeds and any code that reads them, even though
-    # role_code-based bypass keeps working. Keep it all-access by definition.
-    if existing.code == "admin" and set(payload.permission_codes) != set(
-        list_all_permission_codes(engine)
-    ):
+    # The Admin template is fixed by decision D-03 (app/core/rbac.py,
+    # scripts/011_admin_seed.sql); changing it is a migration, not an API call.
+    if existing.code == "admin" and set(payload.permission_codes) != set(ADMIN_PERMISSION_CODES):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="The admin role must keep full access; its permissions cannot be changed",
+            detail="The Admin role's permissions are fixed (control plane, D-03) and cannot be changed",
         )
 
     permission_count = count_permissions_by_codes(engine, payload.permission_codes)

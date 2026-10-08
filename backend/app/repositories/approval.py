@@ -101,6 +101,7 @@ def list_approvals(engine: Engine, filters: ApprovalListFilters) -> tuple[list[A
         WITH filtered_approvals AS (
           {_approval_select_sql()}
           WHERE (:location_id IS NULL OR a.location_id = :location_id)
+          AND (:tenant_id IS NULL OR a.location_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:approval_type IS NULL OR a.approval_type = :approval_type)
           AND (:status IS NULL OR a.status = :status)
           AND (:priority IS NULL OR a.priority = :priority)
@@ -120,6 +121,7 @@ def list_approvals(engine: Engine, filters: ApprovalListFilters) -> tuple[list[A
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "approval_type": filters.approval_type,
                 "status": filters.status,
                 "priority": filters.priority,

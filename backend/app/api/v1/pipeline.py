@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_location_scope, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_location_scope, require_permissions
 from app.schemas.pipeline import (
     PipelineApplicationDetailResponse,
     PipelineBoardFilters,
     PipelineBoardItemResponse,
     PipelineHistoryItemResponse,
+    PipelineReopen,
     PipelineStageMove,
     PipelineStageMoveResponse,
 )
@@ -15,8 +16,10 @@ from app.services.pipeline import (
     get_pipeline_history_service,
     list_pipeline_board_service,
     move_pipeline_stage_service,
+    reopen_pipeline_application_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -40,6 +43,7 @@ def list_pipeline_board_endpoint(
         stage=stage,
         location_id=location_id,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_pipeline_board_service(engine, filters, auth_context)
 
 
@@ -61,6 +65,7 @@ def move_pipeline_stage_endpoint(
     application_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> PipelineStageMoveResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return move_pipeline_stage_service(engine, application_id, payload, auth_context)
 
 
@@ -72,3 +77,15 @@ def get_pipeline_history_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> list[PipelineHistoryItemResponse]:
     return get_pipeline_history_service(engine, application_id, auth_context)
+
+
+@router.post("/applications/{application_id}/reopen", response_model=PipelineStageMoveResponse)
+def reopen_pipeline_application_endpoint(
+    payload: PipelineReopen,
+    _auth: object = Depends(require_permissions("pipeline.stage.reopen")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    application_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> PipelineStageMoveResponse:
+    """Bring a rejected, withdrawn or joined application back to an open stage."""
+    return reopen_pipeline_application_service(engine, application_id, payload, auth_context)

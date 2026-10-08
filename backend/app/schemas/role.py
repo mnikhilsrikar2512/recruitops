@@ -9,6 +9,8 @@ RoleStatus = Literal["active", "inactive"]
 
 
 class RoleListFilters(BaseModel):
+    # Set from the caller, never from the client.
+    tenant_id: int | None = None
     status: RoleStatus | None = None
     search: str | None = Field(default=None, min_length=1, max_length=100)
     page: int = Field(default=1, ge=1)

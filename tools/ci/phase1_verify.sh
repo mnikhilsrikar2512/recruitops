@@ -44,6 +44,9 @@ else
   printf '\n%s\n' "${SUMMARY[@]}"; exit 1
 fi
 export DB_NAME="$STAGING_DB"
+# The verification signs in many personas from 127.0.0.1 within a minute;
+# rate limits themselves are proven by backend/tests/test_auth_protection.py.
+export RATE_LIMIT_ENABLED=false
 
 echo "→ 3/6 baseline seed + backend tests"
 $PY scripts/seed_ci.py >"$LOGS/seed_ci.log" 2>&1 || record FAIL "seed_ci (see $LOGS/seed_ci.log)"
@@ -95,7 +98,7 @@ backend/.venv/bin/python tools/ci/live_smoke.py --base "$BASE" --password "$STAG
 [ "${PIPESTATUS[0]}" = "0" ] && record PASS "live smoke ($(tail -1 "$LOGS/live_smoke.log"))" \
   || record FAIL "live smoke ($(tail -1 "$LOGS/live_smoke.log")) — see $LOGS/live_smoke.log"
 backend/.venv/bin/python frontend/tests/page_sweep.py --base "$BASE" --live \
-  --email ci.admin@recruitops-test.com --password admin123 --persona admin \
+  --email admin@northwind-staging.example.com --password "$STAGING_PASSWORD" --persona admin \
   >"$LOGS/sweep_admin.log" 2>&1 \
   && record PASS "browser sweep admin ($(tail -1 "$LOGS/sweep_admin.log"))" \
   || record FAIL "browser sweep admin ($(tail -1 "$LOGS/sweep_admin.log")) — see $LOGS/sweep_admin.log"

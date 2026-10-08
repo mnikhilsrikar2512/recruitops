@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
+from app.repositories.versioning import check_version
 from app.schemas.offer import OfferCreate, OfferDecisionUpdate, OfferListFilters
 
 
@@ -92,6 +93,7 @@ def _offer_select_sql() -> str:
 def list_offers(engine: Engine, filters: OfferListFilters) -> tuple[list[OfferRecord], int]:
     where = [
         "(:location_id IS NULL OR location_id = :location_id)",
+        "(:tenant_id IS NULL OR location_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))",
         "(:requisition_id IS NULL OR requisition_id = :requisition_id)",
         "(:status IS NULL OR offer_status = :status)",
         "(offer_created_at IS NOT NULL OR LOWER(current_stage) LIKE N'%offer%' OR application_status = N'joined' OR approval_request_id IS NOT NULL)",
@@ -113,6 +115,7 @@ def list_offers(engine: Engine, filters: OfferListFilters) -> tuple[list[OfferRe
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "requisition_id": filters.requisition_id,
                 "status": filters.status,
                 "offset": (filters.page - 1) * filters.page_size,
@@ -139,13 +142,23 @@ def find_offer_by_application_id(engine: Engine, application_id: int) -> OfferRe
     return OfferRecord(**row) if row else None
 
 
-def create_offer(engine: Engine, payload: OfferCreate, *, location_id: int, actor_user_id: int) -> OfferRecord:
+def create_offer(
+    engine: Engine,
+    payload: OfferCreate,
+    *,
+    location_id: int,
+    actor_user_id: int,
+    requires_approval: bool = True,
+) -> OfferRecord:
+    """Phase 4.8: above the company threshold the offer waits for approval
+    (an approval_requests row); at or below it the offer is approved now."""
     update_query = text(
         """
         UPDATE dbo.candidate_applications
         SET
+          version = version + 1,
           current_stage = CASE WHEN LOWER(current_stage) LIKE N'%offer%' THEN current_stage ELSE N'offer' END,
-          offer_status = N'pending-approval',
+          offer_status = CASE WHEN :requires_approval = 1 THEN N'pending-approval' ELSE N'approved' END,
           offered_ctc = :offered_ctc,
           offer_currency = :offer_currency,
           signing_bonus = :signing_bonus,
@@ -159,7 +172,7 @@ def create_offer(engine: Engine, payload: OfferCreate, *, location_id: int, acto
     approval_query = text(
         """
         INSERT INTO dbo.approval_requests (
-          location_id,
+          branch_id,
           request_type,
           source_type,
           source_id,
@@ -182,19 +195,20 @@ def create_offer(engine: Engine, payload: OfferCreate, *, location_id: int, acto
         );
         """
     )
-    values = payload.model_dump()
+    values = {**payload.model_dump(), "requires_approval": 1 if requires_approval else 0}
     with engine.begin() as connection:
         connection.execute(update_query, values)
-        connection.execute(
-            approval_query,
-            {
-                "location_id": location_id,
-                "candidate_application_id": payload.candidate_application_id,
-                "requested_by_user_id": payload.requested_by_user_id or actor_user_id,
-                "assigned_to_user_id": payload.assigned_to_user_id,
-                "offer_notes": payload.offer_notes,
-            },
-        )
+        if requires_approval:
+            connection.execute(
+                approval_query,
+                {
+                    "location_id": location_id,
+                    "candidate_application_id": payload.candidate_application_id,
+                    "requested_by_user_id": payload.requested_by_user_id or actor_user_id,
+                    "assigned_to_user_id": payload.assigned_to_user_id,
+                    "offer_notes": payload.offer_notes,
+                },
+            )
     created = find_offer_by_application_id(engine, payload.candidate_application_id)
     if created is None:
         raise RuntimeError("Created offer could not be reloaded")
@@ -208,6 +222,7 @@ def update_offer_decision(engine: Engine, application_id: int, payload: OfferDec
         """
         UPDATE dbo.candidate_applications
         SET
+          version = version + 1,
           offer_status = :offer_status,
           application_status = CASE WHEN :is_accepted = 1 THEN N'joined' ELSE application_status END,
           expected_joining_date = COALESCE(:expected_joining_date, expected_joining_date),
@@ -240,6 +255,7 @@ def update_offer_decision(engine: Engine, application_id: int, payload: OfferDec
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "candidate_applications", application_id, getattr(payload, "version", None))
         connection.execute(
             update_query,
             {

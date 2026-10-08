@@ -25,11 +25,16 @@ from app.repositories.agents import (
 )
 from app.repositories.audit import insert_audit_log
 from app.schemas.agent import AgentRunDecisionRequest, AgentRunRequest
+from app.services import scope
 from app.services.auth import AuthContext
 
 
-def _is_admin(auth_context: AuthContext) -> bool:
-    return auth_context.user.role_code == "admin"
+def _same_company(engine: Engine, auth_context: AuthContext, user_id: int | None) -> bool:
+    try:
+        scope.assert_user_in_tenant(engine, auth_context, user_id, "Agent run was not found")
+    except HTTPException:
+        return False
+    return True
 
 
 def run_agent(
@@ -83,7 +88,10 @@ def _collect_input(
 ) -> tuple[dict, dict]:
     ctx = auth_context.user
     location_id = ctx.location_id
-    is_admin = _is_admin(auth_context)
+    # Company-wide callers read every office of THEIR company; every tool also
+    # gets the company id and refuses anything outside it.
+    is_admin = scope.is_company_wide(auth_context)
+    tenant_id = scope.tenant_id_of(auth_context)
     context: dict = {}
     input_refs: dict = {}
 
@@ -99,6 +107,7 @@ def _collect_input(
             candidate_id=payload.candidate_id,
             location_id=location_id,
             is_admin=is_admin,
+            tenant_id=tenant_id,
         )
         candidate["resume"] = tools.read_candidate_resume(
             engine=engine,
@@ -113,6 +122,7 @@ def _collect_input(
                 requisition_id=payload.requisition_id,
                 location_id=location_id,
                 is_admin=is_admin,
+            tenant_id=tenant_id,
             )
         if payload.resume_document_id:
             input_refs["resume_document_id"] = payload.resume_document_id
@@ -122,6 +132,7 @@ def _collect_input(
                 candidate_id=payload.candidate_id,
                 location_id=location_id,
                 is_admin=is_admin,
+            tenant_id=tenant_id,
             )
         return context, input_refs
 
@@ -134,6 +145,7 @@ def _collect_input(
             user_id=ctx.id,
             location_id=location_id,
             is_admin=is_admin,
+            tenant_id=tenant_id,
             max_items=payload.max_items,
         )
         context["actions"] = tools.read_workflow_queue(
@@ -142,6 +154,7 @@ def _collect_input(
             actor_location_id=location_id,
             actor_role_code=ctx.role_code,
             is_admin=is_admin,
+            tenant_id=tenant_id,
             max_items=payload.max_items,
         )
         return context, input_refs
@@ -170,7 +183,9 @@ def decide_agent_run(
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent run was not found")
 
-    if not _is_admin(auth_context) and run.actor_user_id != auth_context.user.id:
+    if run.actor_user_id != auth_context.user.id and not (
+        scope.is_company_wide(auth_context) and _same_company(engine, auth_context, run.actor_user_id)
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Agent run access is not allowed",

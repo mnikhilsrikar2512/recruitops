@@ -32,12 +32,19 @@ class SocialProfileInput(BaseModel):
 
 
 class CandidateListFilters(BaseModel):
+    # Set from the caller, never from the client.
+    tenant_id: int | None = None
     search: str | None = Field(default=None, min_length=1, max_length=200)
     requisition_id: int | None = Field(default=None, ge=1)
     source_type: str | None = Field(default=None, min_length=1, max_length=50)
     duplicate_state: CandidateDuplicateState | None = None
     owner_user_id: int | None = Field(default=None, ge=1)
     sourced_by_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.4: archived candidates are left out unless asked for (and the
+    # caller holds candidate.delete.soft).
+    include_archived: bool = False
+    # Phase 4.9: safe ORDER BY body built from ?sort= via an allowlist (api layer).
+    order_by: str = "updated_at DESC, id DESC"
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -89,6 +96,8 @@ class CandidateUpdate(BaseModel):
     social_profiles: list[SocialProfileInput] | None = None
     sourced_by_user_id: int | None = Field(default=None, ge=1)
     primary_owner_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.3: the version the client loaded; a stale one answers 409.
+    version: int | None = Field(default=None, ge=1)
 
     @field_validator("full_name", "phone", "source_type", "source_detail", "current_company", "current_designation")
     @classmethod
@@ -104,7 +113,7 @@ class CandidateUpdate(BaseModel):
 
     @model_validator(mode="after")
     def ensure_any_field_present(self) -> "CandidateUpdate":
-        if not self.model_fields_set:
+        if not (self.model_fields_set - {"version"}):
             raise ValueError("At least one field must be provided")
         return self
 
@@ -178,6 +187,10 @@ class CandidateDocumentResponse(BaseModel):
     verified_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    # Phase 4.2: set for uploads that went through sniff + scan.
+    content_type: str | None = None
+    size_bytes: int | None = None
+    scan_status: str | None = None
 
 
 class CandidateDuplicateMatchResponse(BaseModel):
@@ -192,6 +205,11 @@ class CandidateDuplicateMatchResponse(BaseModel):
     duplicate_state: str
     match_score: int
     match_reasons: list[str]
+    # Phase 4.7: "exact" (same e-mail/phone, flags for review) or "suggested"
+    # (similar name + same location, a hint only).
+    match_tier: str = "exact"
+    # False for an exact match in another company: contact details withheld.
+    in_your_company: bool = True
 
 
 class CandidateDuplicateReviewCaseResponse(BaseModel):
@@ -267,6 +285,10 @@ class CandidateResponse(BaseModel):
     applications: list[CandidateApplicationSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+    version: int = 1
+    # Phase 4.4: set when the caller's company archived this candidate.
+    archived_at: datetime | None = None
+    archive_reason: str | None = None
 
 
 class CandidateListItemResponse(BaseModel):
@@ -333,3 +355,24 @@ class CandidateOwnerReassignmentResponse(BaseModel):
     active_application_count: int
     review_required: bool
     reason: str
+
+
+class ArchiveRequest(BaseModel):
+    """Phase 4.4: archive a candidate or client (reason is kept in history)."""
+    reason: str = Field(min_length=3, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 3:
+            raise ValueError("Give a reason of at least 3 characters")
+        return normalized
+
+
+class FileLinkResponse(BaseModel):
+    """Phase 4.1: a short-lived download link, issued only after access checks."""
+    url: str
+    expires_in_seconds: int
+    file_name: str
+    content_type: str

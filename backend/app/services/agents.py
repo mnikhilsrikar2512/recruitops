@@ -18,21 +18,20 @@ from app.schemas.pagination import PaginationMeta
 from app.services.auth import AuthContext
 
 
-def _is_admin(auth_context: AuthContext) -> bool:
-    return auth_context.user.role_code == "admin"
+def _resolved_permissions(engine: Engine, auth_context: AuthContext) -> set[str]:
+    return set(list_resolved_permissions(engine, auth_context.user.id))
 
 
 def _guard_agent_permission(engine: Engine, auth_context: AuthContext, agent_id: str) -> None:
     spec = find_agent_by_id(agent_id)
     if spec is None:
         return
-    if _is_admin(auth_context):
-        return
+    # No role-code bypass (plan 2.5): admins pass by grant like everyone.
     # Resolve through PERMISSION_ALIASES exactly like require_permissions
     # does at the API layer, so both guards always reach the same verdict
     # (a legacy alias granted via role seed must not pass one guard and
     # fail the other).
-    resolved = set(list_resolved_permissions(engine, auth_context.user.id))
+    resolved = _resolved_permissions(engine, auth_context)
     aliases = PERMISSION_ALIASES.get(spec.required_permission, (spec.required_permission,))
     if not any(alias in resolved for alias in aliases):
         raise HTTPException(

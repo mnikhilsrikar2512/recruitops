@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
+from app.repositories.versioning import StaleWriteConflict
 
 from app.repositories.clients import find_client_by_id, list_client_contacts
 from app.repositories.audit import insert_audit_log
@@ -56,6 +57,8 @@ def _assert_client_and_contacts(
     client = find_client_by_id(engine, client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client was not found")
+    if getattr(client, "archived_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This client is archived; restore it first")
     if client.location_id != location_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -144,7 +147,11 @@ def update_requisition_service(engine: Engine, requisition_id: int, payload: Req
         _assert_user_in_location(engine, payload.primary_owner_user_id, existing.location_id, "Primary owner user")
     if payload.delivery_owner_user_id:
         _assert_user_in_location(engine, payload.delivery_owner_user_id, existing.location_id, "Delivery owner user")
-    updated = update_requisition(engine, requisition_id, payload)
+    try:
+        updated = update_requisition(engine, requisition_id, payload)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_requisition_detail_service(engine, requisition_id)
+        raise
     return RequisitionResponse.model_validate(updated)
 
 
@@ -157,7 +164,11 @@ def update_requisition_status_service(
     existing = find_requisition_by_id(engine, requisition_id)
     if not existing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
-    updated = update_requisition_status(engine, requisition_id, payload)
+    try:
+        updated = update_requisition_status(engine, requisition_id, payload)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_requisition_detail_service(engine, requisition_id)
+        raise
     if getattr(existing, "primary_owner_user_id", None):
         try:
             create_notification_service(

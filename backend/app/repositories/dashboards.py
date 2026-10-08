@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
+from app.services.scope import CANDIDATE_IN_TENANT_SQL
+
 
 @dataclass
 class RoleDashboardRecord:
@@ -38,15 +40,18 @@ def get_role_dashboard_counts(
     actor_user_id: int,
     actor_location_id: int | None,
     is_admin: bool,
+    tenant_id: int | None = None,
 ) -> RoleDashboardRecord:
+    # is_admin widens to every office — of the caller's company only.
     query = text(
-        """
+        f"""
         SELECT
           (
             SELECT COUNT(*)
             FROM dbo.requisitions AS r
             WHERE r.status IN (N'draft', N'open', N'on-hold')
             AND (:is_admin = 1 OR r.branch_id = :actor_location_id)
+            AND (:tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           ) AS open_requisitions,
           (
             SELECT COUNT(*)
@@ -58,6 +63,7 @@ def get_role_dashboard_counts(
               OR c.created_by_user_id = :actor_user_id
               OR c.primary_owner_user_id = :actor_user_id
             )
+            AND (:tenant_id IS NULL OR {CANDIDATE_IN_TENANT_SQL})
           ) AS active_candidates,
           (
             SELECT COUNT(*)
@@ -70,6 +76,7 @@ def get_role_dashboard_counts(
               OR r.branch_id = :actor_location_id
               OR ca.owner_user_id = :actor_user_id
             )
+            AND (:tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           ) AS active_applications,
           (
             SELECT COUNT(*)
@@ -79,6 +86,7 @@ def get_role_dashboard_counts(
               OR du.branch_id = :actor_location_id
               OR du.submitted_by_user_id = :actor_user_id
             )
+            AND (:tenant_id IS NULL OR du.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           ) AS pending_daily_updates;
         """
     )
@@ -89,6 +97,7 @@ def get_role_dashboard_counts(
                 "actor_user_id": actor_user_id,
                 "actor_location_id": actor_location_id,
                 "is_admin": 1 if is_admin else 0,
+                "tenant_id": tenant_id,
             },
         ).mappings().one()
     return RoleDashboardRecord(**row)
@@ -161,11 +170,9 @@ def get_location_summary_counts(engine: Engine, location_id: int) -> LocationSum
           ) AS active_applications,
           (
             SELECT COUNT(*)
-            FROM dbo.candidate_applications AS ca
-            INNER JOIN dbo.requisitions AS r
-              ON r.id = ca.requisition_id
-            WHERE r.branch_id = l.id
-            AND ca.current_stage IN (N'submitted', N'submitted_to_client', N'client-review')
+            FROM dbo.vw_application_metric_state AS ms
+            WHERE ms.branch_id = l.id
+            AND ms.current_bucket = N'submitted'
           ) AS submitted_profiles,
           (
             SELECT COUNT(*)
@@ -191,7 +198,7 @@ def get_location_summary_counts(engine: Engine, location_id: int) -> LocationSum
     return LocationSummaryRecord(**row)
 
 
-def list_company_location_summaries(engine: Engine) -> list[LocationSummaryRecord]:
+def list_company_location_summaries(engine: Engine, tenant_id: int | None = None) -> list[LocationSummaryRecord]:
     query = text(
         """
         SELECT
@@ -226,11 +233,9 @@ def list_company_location_summaries(engine: Engine) -> list[LocationSummaryRecor
           ) AS active_applications,
           (
             SELECT COUNT(*)
-            FROM dbo.candidate_applications AS ca
-            INNER JOIN dbo.requisitions AS r
-              ON r.id = ca.requisition_id
-            WHERE r.branch_id = l.id
-            AND ca.current_stage IN (N'submitted', N'submitted_to_client', N'client-review')
+            FROM dbo.vw_application_metric_state AS ms
+            WHERE ms.branch_id = l.id
+            AND ms.current_bucket = N'submitted'
           ) AS submitted_profiles,
           (
             SELECT COUNT(*)
@@ -246,9 +251,10 @@ def list_company_location_summaries(engine: Engine) -> list[LocationSummaryRecor
             AND ca.application_status = N'joined'
           ) AS joined_applications
         FROM dbo.branches AS l
+        WHERE (:tenant_id IS NULL OR l.tenant_id = :tenant_id)
         ORDER BY l.name ASC, l.id ASC;
         """
     )
     with engine.connect() as connection:
-        rows = connection.execute(query).mappings().all()
+        rows = connection.execute(query, {"tenant_id": tenant_id}).mappings().all()
     return [LocationSummaryRecord(**row) for row in rows]

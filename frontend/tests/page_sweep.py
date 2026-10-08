@@ -24,7 +24,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 PAGES = Path(__file__).resolve().parent.parent / "pages"
-PUBLIC = {"login", "landing", "forgot-password", "reset-password", "password-setup", "use-cases",
+PUBLIC = {"login", "landing", "forgot-password", "reset-password", "password-setup", "use-cases", "mfa-challenge",
           "not-found", "access-denied", "product-tour"}
 
 # Core module pages must show rows that came from the API (Phase 1 exit gate).
@@ -37,6 +37,19 @@ LIVE_DATA_CHECKS = {
     "pipeline-board": "[data-application-id], [data-pipeline-candidate-card]",
     "notifications-center": "[data-notification-id]",
     "user-management": "tbody tr:not([hidden]):not([data-generated-empty-state])",
+}
+
+# Pages the Admin (control plane, D-03) must reach by grant. Every other page
+# may show Access Denied for the admin persona; the "full" persona (every
+# code) must never be denied anything.
+ADMIN_PAGES = {
+    "location-management", "location-dashboard", "user-management", "user-detail",
+    "role-management", "role-permissions-editor", "role-dashboard", "business-titles",
+    "visibility-rules", "stage-bucket-map", "work-assignment", "portal-accounts", "approvals-inbox",
+    "notifications-center", "notification-detail-panel", "analytics-dashboard",
+    "company-dashboard", "user-performance-reports", "team-workload", "reports",
+    "custom-report-builder", "report-viewer", "time-to-fill-report", "source-effectiveness",
+    "sla-tracker", "tenant-setup",
 }
 
 # Third-party assets are stubbed so the sweep is hermetic and fast.
@@ -147,8 +160,10 @@ def main() -> int:
             final = page.url.split("/")[-1]
             live = None
             denied = page.locator("text=Access Denied").count() > 0 or final.startswith("access-denied")
-            if denied and opts.persona == "admin" and name not in PUBLIC:
-                errors.append("admin persona was denied this page")
+            if denied and name not in PUBLIC and (
+                opts.persona == "full" or (opts.persona == "admin" and name in ADMIN_PAGES)
+            ):
+                errors.append(f"{opts.persona} persona was denied this page")
             if name in LIVE_DATA_CHECKS and not errors and not denied:
                 live = page.locator(LIVE_DATA_CHECKS[name]).count()
                 if live < 1:

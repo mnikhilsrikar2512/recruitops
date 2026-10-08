@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Path, Query, UploadFile
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_any_permission, require_permissions
+from fastapi import HTTPException
+
+from app.api.deps import caller_has_permission, caller_tenant_id, get_current_auth_context, get_engine, require_any_permission, require_permissions, reject_unknown_query_params, sort_clause
 from app.schemas.candidate import (
+    FileLinkResponse,
+    ArchiveRequest,
     CandidateCreate,
     CandidateFootprintResponse,
     CandidateDocumentCreate,
@@ -20,6 +24,9 @@ from app.schemas.candidate import (
     CandidateUpdate,
 )
 from app.services.candidates import (
+    candidate_document_link_service,
+    archive_candidate_service,
+    restore_candidate_service,
     create_candidate_document_service,
     create_candidate_duplicate_decision_service,
     create_candidate_service,
@@ -33,11 +40,15 @@ from app.services.candidates import (
     upload_candidate_document_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter()
 
+# Phase 4.9: fields the list can be sorted by (?sort=field or -field).
+_CANDIDATES_SORT = {"full_name": "full_name", "created_at": "created_at", "updated_at": "updated_at", "total_experience_years": "total_experience_years", "notice_period_days": "notice_period_days"}
 
-@router.get("/", response_model=CandidateListResponse)
+
+@router.get("/", response_model=CandidateListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_candidates_endpoint(
     auth_context: AuthContext = Depends(require_permissions("candidate.read")),
     search: str | None = Query(default=None),
@@ -46,11 +57,16 @@ def list_candidates_endpoint(
     duplicate_state: str | None = Query(default=None),
     owner_user_id: int | None = Query(default=None, ge=1),
     sourced_by_user_id: int | None = Query(default=None, ge=1),
+    include_archived: bool = Query(default=False, description="Also list archived candidates (needs candidate.delete.soft)"),
+    sort: str | None = Query(default=None, description="field or -field; comma-separated"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     engine: Engine = Depends(get_engine),
 ) -> CandidateListResponse:
+    if include_archived and not caller_has_permission(engine, auth_context, "candidate.delete.soft"):
+        raise HTTPException(status_code=403, detail="Missing required permission: candidate.delete.soft")
     filters = CandidateListFilters(
+        include_archived=include_archived,
         search=search,
         requisition_id=requisition_id,
         source_type=source_type,
@@ -60,6 +76,8 @@ def list_candidates_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.order_by = sort_clause(sort, _CANDIDATES_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_candidates_service(engine, filters, auth_context)
 
 
@@ -69,6 +87,7 @@ def create_candidate_endpoint(
     auth_context: AuthContext = Depends(require_permissions("candidate.create")),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_candidate_service(engine, payload)
 
 
@@ -78,7 +97,33 @@ def get_candidate_detail_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
-    return get_candidate_detail_service(engine, candidate_id, auth_context)
+    return get_candidate_detail_service(
+        engine,
+        candidate_id,
+        auth_context,
+        include_archived=caller_has_permission(engine, auth_context, "candidate.delete.soft"),
+    )
+
+
+@router.post("/{candidate_id}/archive", response_model=CandidateResponse)
+def archive_candidate_endpoint(
+    payload: ArchiveRequest,
+    auth_context: AuthContext = Depends(require_permissions("candidate.delete.soft")),
+    candidate_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> CandidateResponse:
+    """Phase 4.4 (D-07): hide the candidate from your company's lists and
+    links. Nothing is deleted; restore brings it back."""
+    return archive_candidate_service(engine, candidate_id, payload.reason, auth_context)
+
+
+@router.post("/{candidate_id}/restore", response_model=CandidateResponse)
+def restore_candidate_endpoint(
+    auth_context: AuthContext = Depends(require_permissions("candidate.delete.soft")),
+    candidate_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> CandidateResponse:
+    return restore_candidate_service(engine, candidate_id, auth_context)
 
 
 @router.get("/{candidate_id}/footprint", response_model=CandidateFootprintResponse)
@@ -103,6 +148,7 @@ def update_candidate_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_candidate_service(engine, candidate_id, payload, auth_context)
 
 
@@ -113,6 +159,7 @@ def create_candidate_document_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDocumentResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_candidate_document_service(engine, candidate_id, payload, auth_context)
 
 
@@ -123,8 +170,24 @@ async def upload_candidate_document_endpoint(
     auth_context: AuthContext = Depends(require_permissions("candidate.resume.upload")),
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=100),
 ) -> CandidateDocumentResponse:
-    return await upload_candidate_document_service(engine, candidate_id, file, document_type, auth_context)
+    """Phase 4.2: the file is type-sniffed, size-capped and malware-scanned
+    before it is stored. Send an Idempotency-Key to make retries safe."""
+    extra = {"idempotency_key": idempotency_key} if idempotency_key else {}
+    return await upload_candidate_document_service(engine, candidate_id, file, document_type, auth_context, **extra)
+
+
+@router.get("/{candidate_id}/documents/{document_id}/link", response_model=FileLinkResponse)
+def candidate_document_link_endpoint(
+    auth_context: AuthContext = Depends(require_permissions("candidate.read")),
+    candidate_id: int = Path(..., ge=1),
+    document_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> FileLinkResponse:
+    """A short-lived download link (FILE_LINK_TTL_SECONDS), issued only after
+    the same access checks as reading the candidate."""
+    return candidate_document_link_service(engine, candidate_id, document_id, auth_context)
 
 
 @router.get("/{candidate_id}/duplicate-check", response_model=CandidateDuplicateCheckResponse)
@@ -149,6 +212,7 @@ def create_candidate_duplicate_decision_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateDuplicateReviewCaseResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return create_candidate_duplicate_decision_service(engine, candidate_id, payload, auth_context)
 
 
@@ -159,6 +223,7 @@ def finalize_candidate_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateFinalizeResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return finalize_candidate_service(engine, candidate_id, payload, auth_context)
 
 
@@ -169,6 +234,7 @@ def create_candidate_application_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateFinalizeResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return finalize_candidate_service(engine, candidate_id, payload, auth_context)
 
 
@@ -179,4 +245,5 @@ def reassign_candidate_owner_endpoint(
     candidate_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> CandidateOwnerReassignmentResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return reassign_candidate_owner_service(engine, candidate_id, payload, auth_context)

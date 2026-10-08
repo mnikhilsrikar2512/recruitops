@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
-from app.api.deps import get_current_auth_context, get_engine, require_permissions
+from app.api.deps import caller_tenant_id, get_current_auth_context, get_engine, require_permissions
 from app.schemas.workflow_action import (
     OverlaySubmissionCreate,
     WorkflowActionEventCreate,
@@ -13,6 +13,7 @@ from app.schemas.workflow_action import (
     WorkflowActionStatus,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 from app.services.workflow_actions import (
     list_workflow_actions_service,
     nudge_workflow_action_service,
@@ -42,6 +43,7 @@ def list_workflow_actions_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_workflow_actions_service(engine, auth_context, filters)
 
 
@@ -52,6 +54,7 @@ def submit_overlay_endpoint(
     auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> WorkflowActionEventResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return submit_overlay_service(engine, auth_context, payload)
 
 
@@ -63,6 +66,7 @@ def run_workflow_action_endpoint(
     action_item_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> WorkflowActionEventResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return run_workflow_action_service(engine, auth_context, action_item_id, payload)
 
 
@@ -74,6 +78,7 @@ def resolve_workflow_action_endpoint(
     action_item_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> WorkflowActionEventResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return resolve_workflow_action_service(engine, auth_context, action_item_id, payload)
 
 
@@ -85,4 +90,5 @@ def nudge_workflow_action_endpoint(
     action_item_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> WorkflowActionEventResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return nudge_workflow_action_service(engine, auth_context, action_item_id, payload)

@@ -64,6 +64,7 @@ def list_daily_updates(engine: Engine, filters: DailyUpdateListFilters) -> tuple
         WITH filtered_updates AS (
           {_daily_update_select_sql()}
           WHERE (:location_id IS NULL OR du.branch_id = :location_id)
+          AND (:tenant_id IS NULL OR du.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:user_id IS NULL OR du.submitted_by_user_id = :user_id)
           AND (:update_date IS NULL OR du.update_date = :update_date)
         )
@@ -78,6 +79,7 @@ def list_daily_updates(engine: Engine, filters: DailyUpdateListFilters) -> tuple
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "user_id": filters.user_id,
                 "requisition_id": filters.requisition_id,
                 "update_date": filters.update_date,

@@ -16,6 +16,8 @@ def _normalize_text(value: str | None) -> str | None:
 
 
 class DailyUpdateListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     user_id: int | None = Field(default=None, ge=1)
     requisition_id: int | None = Field(default=None, ge=1)

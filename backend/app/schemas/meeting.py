@@ -40,6 +40,8 @@ def _normalize_meeting_type_code(value: str | None) -> str | None:
 
 
 class MeetingListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     client_id: int | None = Field(default=None, ge=1)
     meeting_owner_user_id: int | None = Field(default=None, ge=1)

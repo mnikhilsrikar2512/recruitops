@@ -49,7 +49,7 @@ jobs:
       - name: Assert production config guardrails (AI flag off, no wildcard CORS)
         run: .venv/bin/python -m pytest tests/test_config_safety.py -q
       - name: Tests (throwaway SQL Server → schema → seed → pytest)
-        run: DB_PORT=1433 ./scripts/run_tests_ci.sh
+        run: DB_PORT=1433 bash ./scripts/run_tests_ci.sh
 
   frontend:
     name: Frontend gates (contract + browser)

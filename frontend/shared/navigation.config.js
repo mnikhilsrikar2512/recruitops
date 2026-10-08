@@ -431,6 +431,15 @@ const NAV_ENTRIES = [
     category: "admin",
   },
   {
+    id: "stage-bucket-map",
+    file: "stage-bucket-map.html",
+    label: "Stage Bucket Map",
+    icon: "account_tree",
+    description: "How each pipeline stage is counted in reports.",
+    permissions: ["settings.read"],
+    category: "admin",
+  },
+  {
     id: "work-assignment",
     file: "work-assignment.html",
     label: "Work Assignment",
@@ -544,6 +553,15 @@ const NAV_ENTRIES = [
 
   /* ── Account & Settings ──────────────────────────────────────── */
   {
+    id: "tenant-setup",
+    file: "tenant-setup.html",
+    label: "Company Settings",
+    icon: "domain",
+    description: "Company profile, logo and letterhead.",
+    permissions: ["settings.read"], /* PRD §3.1: tenant Settings (Admin) */
+    category: "account",
+  },
+  {
     id: "my-profile",
     file: "my-profile.html",
     label: "My Profile",
@@ -575,8 +593,11 @@ const NAV_PAGE_PERMISSIONS = {
   "role-permissions-editor": ["role.permissions.assign"],
   "role-dashboard": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr", "dashboard.view_admin"],
   "business-titles": ["settings.read"],
+  "tenant-setup": ["settings.read"],
   "visibility-rules": ["settings.read"],
+  "stage-bucket-map": ["settings.read"],
   "work-assignment": ["assignment.read", "requisition.read"],
+  "assignment-history-drawer": ["requisition.read"],
   "portal-accounts": ["portal.read"],
   "approvals-inbox": ["approval.read"],
   "client-directory": ["client.read"],
@@ -585,6 +606,7 @@ const NAV_PAGE_PERMISSIONS = {
   "candidate-profiles": ["candidate.read"],
   "candidate-detail": ["candidate.read"],
   "candidate-review-drawer": ["candidate.create"],
+  "duplicate-warning-modal": ["candidate.read"],
   "pipeline-board": ["pipeline.read.summary"],
   "application-detail-drawer": ["pipeline.read.detail"],
   "stage-move-dialog": ["pipeline.stage.move"],

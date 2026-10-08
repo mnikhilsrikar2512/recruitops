@@ -25,10 +25,22 @@ def mock(base, path):
         return json.loads(r.read() or b"{}")
 
 
-def session(persona="admin"):
+def session(persona="full"):
     return {"token": f"mock-{persona}-token", "user_id": 1, "email": "asha@example.test", "user_name": "Asha Rao",
             "role": persona, "role_name": persona.title(), "role_code": persona, "location_id": 1,
             "location_name": "Bengaluru", "offers_enabled": True, "permissions": []}
+
+
+# Chromium rejects the cross-document View Transition promise ("Transition
+# was aborted because of invalid state") when a navigation starts while the
+# page is mid-transition — e.g. logout redirecting at once. It is the
+# browser's own internal promise, not app code, and the navigation still
+# completes; newer Chromium in CI surfaces it as a pageerror.
+_BENIGN_ERRORS = ("Transition was aborted because of invalid state",)
+
+
+def _benign(message: str) -> bool:
+    return any(marker in message for marker in _BENIGN_ERRORS)
 
 
 class Flow:
@@ -43,8 +55,8 @@ class Flow:
             status=200, content_type="application/javascript", body=TAILWIND_STUB if "tailwind" in r.request.url else ""))
         self.page: Page = self.context.new_page()
         self.errors: list[str] = []
-        self.page.on("pageerror", lambda e: self.errors.append(f"uncaught: {e}"))
-        mock(base, "/__mock/reset?persona=admin")
+        self.page.on("pageerror", lambda e: None if _benign(str(e)) else self.errors.append(f"uncaught: {e}"))
+        mock(base, "/__mock/reset?persona=full")
 
     def open(self, name):
         self.page.goto(f"{self.base}/pages/{name}", wait_until="networkidle")

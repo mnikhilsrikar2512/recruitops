@@ -92,6 +92,8 @@ class PortalAccountResponse(PortalAccountBase):
 
 
 class PortalAccountListFilters(BaseModel):
+    # Set from the caller, never from the client.
+    tenant_id: int | None = None
     status: str | None = None
     platform: str | None = None
     ownership_type: str | None = None
@@ -167,6 +169,8 @@ class PortalSlotListResponse(BaseModel):
 
 
 class PortalAvailabilityFilters(BaseModel):
+    # Set from the caller, never from the client.
+    tenant_id: int | None = None
     platform: str | None = None
     branch_id: int | None = Field(default=None, ge=1)
     usage_date: date | None = None

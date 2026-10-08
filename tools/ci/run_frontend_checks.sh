@@ -4,7 +4,7 @@
 #   2. Undefined globals    tools/ci/undef_check.js (no ReferenceErrors waiting to happen)
 #   3. API contract         tools/ci/api_contract_check.py (every apiRequest path exists)
 #   4. Static assets        tools/ci/static_assets_check.py
-#   5. Browser sweep        all pages × {admin, recruiter} against the contract mock
+#   5. Browser sweep        all pages × {admin, recruiter, full} against the contract mock
 #   6. UI flows             login, create client/requisition, approve, stage move, read, logout
 #
 # Needs: node 18+, python 3.12 with `playwright` (+ `playwright install chromium`),
@@ -27,6 +27,9 @@ python3 tools/ci/api_contract_check.py "$ROOT"
 echo "→ 4/6 static assets"
 python3 tools/ci/static_assets_check.py
 
+echo "→ backend admin-bypass gate (Phase 2.6)"
+python3 tools/ci/admin_bypass_gate.py
+
 OPENAPI="${OPENAPI:-$ROOT/frontend/tests/openapi.json}"
 if [ "${EXPORT_OPENAPI:-1}" = "1" ] && python3 -c "import fastapi" 2>/dev/null; then
   echo "→ exporting OpenAPI from the backend"
@@ -44,6 +47,9 @@ echo "→ 5/6 browser sweep (admin)"
 python3 frontend/tests/page_sweep.py --base "http://127.0.0.1:$PORT" --persona admin
 echo "→ 5/6 browser sweep (recruiter)"
 python3 frontend/tests/page_sweep.py --base "http://127.0.0.1:$PORT" --persona recruiter
+echo "→ 5/6 browser sweep (full access: every page must load with data)"
+python3 frontend/tests/page_sweep.py --base "http://127.0.0.1:$PORT" --persona full
+
 echo "→ 6/6 UI flows"
 python3 frontend/tests/flows.py --base "http://127.0.0.1:$PORT"
 echo "✓ frontend checks passed"

@@ -6,8 +6,10 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import Engine
 
+from app.core.rbac import COMPANY_SCOPE_CODE
 from app.db.session import create_db_engine
 from app.repositories.auth import list_resolved_permissions
+from app.services import scope
 from app.services.auth import AuthContext, get_auth_context_from_token
 
 http_bearer = HTTPBearer(auto_error=False)
@@ -120,7 +122,22 @@ def get_current_auth_context(
 ) -> AuthContext:
     if credentials is None or credentials.scheme.lower() != "bearer" or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required")
-    return get_auth_context_from_token(engine, credentials.credentials)
+    auth_context = get_auth_context_from_token(engine, credentials.credentials)
+    # Company-wide reach is a GRANT (scope.company), not a role code (plan 2.5).
+    auth_context.company_wide = COMPANY_SCOPE_CODE in resolved_permissions_for(engine, auth_context)
+    return auth_context
+
+
+def resolved_permissions_for(engine: Engine, auth_context: AuthContext) -> set[str]:
+    """The caller's granted permission codes (cached briefly). Every route
+    check goes through here — no role code bypasses it."""
+    return _get_cached_permissions(engine, auth_context.user.id)
+
+
+def caller_has_permission(engine: Engine, auth_context: AuthContext, code: str) -> bool:
+    """For routes whose behaviour (not access) depends on a grant, e.g.
+    whether archived records are visible (Phase 4.4)."""
+    return _has_permission(resolved_permissions_for(engine, auth_context), code)
 
 
 def require_permissions(*permission_codes: str) -> Callable[..., AuthContext]:
@@ -128,10 +145,7 @@ def require_permissions(*permission_codes: str) -> Callable[..., AuthContext]:
         auth_context: AuthContext = Depends(get_current_auth_context),
         engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
-
-        resolved_permissions = _get_cached_permissions(engine, auth_context.user.id)
+        resolved_permissions = resolved_permissions_for(engine, auth_context)
         missing_permissions = [
             code for code in permission_codes if not _has_permission(resolved_permissions, code)
         ]
@@ -150,10 +164,7 @@ def require_any_permission(*permission_codes: str) -> Callable[..., AuthContext]
         auth_context: AuthContext = Depends(get_current_auth_context),
         engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
-
-        resolved_permissions = _get_cached_permissions(engine, auth_context.user.id)
+        resolved_permissions = resolved_permissions_for(engine, auth_context)
         if any(_has_permission(resolved_permissions, code) for code in permission_codes):
             return auth_context
 
@@ -169,12 +180,11 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
     async def scope_dependency(
         request: Request,
         auth_context: AuthContext = Depends(get_current_auth_context),
+        engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
-
+        company_wide = scope.is_company_wide(auth_context)
         actor_location_id = auth_context.user.location_id
-        if actor_location_id is None:
+        if not company_wide and actor_location_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Location scope is not available for this user",
@@ -205,7 +215,9 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
         if not normalized_values:
             return auth_context
 
-        if any(value != actor_location_id for value in normalized_values):
+        # Company-wide users may name any office of THEIR company; everyone
+        # else only their own office. Another company's office is never allowed.
+        if any(not scope.can_reach_office(engine, auth_context, value) for value in normalized_values):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Location scope does not allow this action",
@@ -216,19 +228,25 @@ def require_location_scope(*field_names: str) -> Callable[..., AuthContext]:
     return scope_dependency
 
 
-# ── Row-level location (tenant) scoping ─────────────────────────────────────
-# Until Phase 2 adds tenant_id, a non-admin's tenant boundary is their primary
-# location. require_location_scope() only rejects an explicit foreign
-# location_id; these helpers close the two remaining gaps found by the live
-# smoke test: list endpoints called WITHOUT location_id, and direct-id routes.
+# ── Row-level company (tenant) and office scoping ───────────────────────────
+# Lists: non-company-wide users are pinned to their own office; every list is
+# additionally filtered to the caller's company (filters.tenant_id). Direct-id
+# routes: a record outside reach answers 404 so foreign ids can't be probed.
+# The rules themselves live in app/services/scope.py.
 
 
 def pinned_location_id(auth_context: AuthContext, requested: int | None) -> int | None:
-    """Effective list filter: admins keep what they asked for (None = all
-    locations); everyone else is pinned to their own location."""
-    if auth_context.user.role_code == "admin":
+    """Effective office filter: company-wide users keep what they asked for
+    (None = every office of their company, enforced by the tenant filter);
+    everyone else is pinned to their own office."""
+    if scope.is_company_wide(auth_context):
         return requested
     return auth_context.user.location_id
+
+
+def caller_tenant_id(auth_context: AuthContext) -> int | None:
+    """The company every list must be restricted to."""
+    return scope.tenant_id_of(auth_context)
 
 
 def require_record_in_location(
@@ -236,8 +254,9 @@ def require_record_in_location(
     load_location_id: Callable[[Engine, int], int | None],
     not_found_detail: str,
 ) -> Callable[..., AuthContext]:
-    """Dependency for direct-id routes: a record outside the caller's location
-    answers 404 (not 403) so ids in other tenants cannot be discovered.
+    """Dependency for direct-id routes: a record outside the caller's reach
+    (another office, or another company) answers 404 (not 403) so ids in
+    other companies cannot be discovered.
 
     ``load_location_id`` returns the record's location id and raises its own
     404 when the record does not exist."""
@@ -247,11 +266,85 @@ def require_record_in_location(
         auth_context: AuthContext = Depends(get_current_auth_context),
         engine: Engine = Depends(get_engine),
     ) -> AuthContext:
-        if auth_context.user.role_code == "admin":
-            return auth_context
         record_id = int(request.path_params[path_param])
-        if load_location_id(engine, record_id) != auth_context.user.location_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
+        scope.assert_office_reachable(engine, auth_context, load_location_id(engine, record_id), not_found_detail)
         return auth_context
 
     return dependency
+
+
+# ---- PRD §9.0 list conventions (Phase 4.9) ------------------------------
+def _endpoint_query_names(endpoint) -> frozenset[str]:
+    """Query parameter names an endpoint declares, read from its signature
+    (works on every FastAPI version: no routing internals)."""
+    import inspect
+
+    from fastapi import params as fastapi_params
+
+    cached = getattr(endpoint, "__query_names__", None)
+    if cached is not None:
+        return cached
+    names: set[str] = set()
+    for name, parameter in inspect.signature(endpoint).parameters.items():
+        default = parameter.default
+        if isinstance(default, fastapi_params.Query):
+            names.add(default.alias or name)
+        elif isinstance(default, (fastapi_params.Depends, fastapi_params.Path, fastapi_params.Body,
+                                  fastapi_params.Header, fastapi_params.Cookie)):
+            continue
+        elif parameter.annotation in (Request,) or name in {"request", "engine", "auth", "auth_context"}:
+            continue
+        elif default is not inspect.Parameter.empty or parameter.annotation in (int, str, bool, float):
+            names.add(name)  # plain scalar default = implicit query parameter
+    result = frozenset(names)
+    try:
+        endpoint.__query_names__ = result
+    except (AttributeError, TypeError):
+        pass
+    return result
+
+
+def reject_unknown_query_params(request: Request) -> None:
+    """List endpoints refuse query parameters they do not support (400
+    UNSUPPORTED_FILTER) instead of silently ignoring them, so a typo or a
+    filter the API never had cannot return a misleadingly unfiltered list.
+    Every list endpoint declares its filters in its own signature (Query),
+    including the ones its scope dependencies read (e.g. location_id)."""
+    from app.core.errors import ApiError
+
+    endpoint = request.scope.get("endpoint")
+    if endpoint is None:
+        return
+    allowed = _endpoint_query_names(endpoint)
+    unknown = sorted(key for key in request.query_params.keys() if key not in allowed)
+    if unknown:
+        raise ApiError(
+            status.HTTP_400_BAD_REQUEST,
+            "UNSUPPORTED_FILTER",
+            f"Unsupported query parameter(s): {', '.join(unknown)}. Supported: {', '.join(sorted(allowed)) or 'none'}",
+            field_errors=[{"field": key, "message": "not supported on this list"} for key in unknown],
+        )
+
+
+def sort_clause(sort: str | None, allowed: dict[str, str], default: str) -> str:
+    """``sort=field`` / ``sort=-field`` → a safe ORDER BY body from an
+    allowlist (column expressions never come from the client). Unknown
+    fields → 400 UNSUPPORTED_SORT."""
+    from app.core.errors import ApiError
+
+    if not sort:
+        return default
+    parts: list[str] = []
+    for raw in sort.split(","):
+        token = raw.strip()
+        descending = token.startswith("-")
+        field = token.lstrip("-+")
+        if field not in allowed:
+            raise ApiError(
+                status.HTTP_400_BAD_REQUEST,
+                "UNSUPPORTED_SORT",
+                f"Cannot sort by '{field}'. Sortable fields: {', '.join(sorted(allowed))}",
+                field_errors=[{"field": "sort", "message": f"unsupported field {field}"}],
+            )
+        parts.append(f"{allowed[field]} {'DESC' if descending else 'ASC'}")
+    return ", ".join(parts)

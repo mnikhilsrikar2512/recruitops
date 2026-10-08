@@ -74,6 +74,7 @@ def list_interviews(engine: Engine, filters: InterviewListFilters) -> tuple[list
     where = [
         "(:candidate_application_id IS NULL OR candidate_application_id = :candidate_application_id)",
         "(:location_id IS NULL OR location_id = :location_id)",
+        "(:tenant_id IS NULL OR location_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))",
         "(:interviewer_user_id IS NULL OR interviewer_user_id = :interviewer_user_id)",
         "(:status IS NULL OR status = :status)",
     ]
@@ -96,6 +97,7 @@ def list_interviews(engine: Engine, filters: InterviewListFilters) -> tuple[list
             {
                 "candidate_application_id": filters.candidate_application_id,
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "interviewer_user_id": filters.interviewer_user_id,
                 "status": filters.status,
                 "offset": offset,

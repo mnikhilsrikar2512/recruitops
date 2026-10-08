@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.repositories.audit import insert_audit_log
 from app.repositories.notifications import create_notification
@@ -21,11 +21,34 @@ from app.schemas.workflow_action import (
     WorkflowActionQueueResponse,
     WorkflowActionResolveRequest,
 )
+from app.services import scope
 from app.services.auth import AuthContext
 
 
-def _assert_action_access(auth_context: AuthContext, location_id: int | None, assigned_user_id: int | None) -> None:
-    if auth_context.user.role_code == "admin":
+def _user_in_tenant(engine: Engine, user_id: int, tenant_id: int) -> bool:
+    with engine.connect() as connection:
+        return connection.execute(
+            text("SELECT 1 FROM dbo.users WHERE id = :user_id AND tenant_id = :tenant_id"),
+            {"user_id": user_id, "tenant_id": tenant_id},
+        ).first() is not None
+
+
+def _assert_action_access(
+    auth_context: AuthContext,
+    location_id: int | None,
+    assigned_user_id: int | None,
+    engine: Engine | None = None,
+) -> None:
+    # Company boundary first: another company's item is "not found".
+    if engine is not None:
+        tenant_id = scope.tenant_id_of(auth_context)
+        if location_id is not None:
+            in_company = scope.office_in_tenant(engine, location_id, tenant_id)
+        else:
+            in_company = assigned_user_id is None or tenant_id is None or _user_in_tenant(engine, assigned_user_id, tenant_id)
+        if not in_company:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow action was not found")
+    if scope.is_company_wide(auth_context):
         return
     if assigned_user_id == auth_context.user.id:
         return
@@ -41,7 +64,7 @@ def list_workflow_actions_service(
     auth_context: AuthContext,
     filters: WorkflowActionQueueFilters,
 ) -> WorkflowActionQueueResponse:
-    if auth_context.user.role_code != "admin":
+    if not scope.is_company_wide(auth_context):
         if filters.location_id and filters.location_id != auth_context.user.location_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Location scope does not allow this action")
         if filters.location_id is None:
@@ -52,7 +75,7 @@ def list_workflow_actions_service(
         actor_user_id=auth_context.user.id,
         actor_location_id=auth_context.user.location_id,
         actor_role_code=auth_context.user.role_code,
-        is_admin=auth_context.user.role_code == "admin",
+        is_admin=scope.is_company_wide(auth_context),
         filters=filters,
     )
     return WorkflowActionQueueResponse(
@@ -70,7 +93,7 @@ def run_workflow_action_service(
     action_item = find_workflow_action_item(engine, action_item_id)
     if action_item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow action was not found")
-    _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id)
+    _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id, engine)
 
     event_status = "completed" if payload.action_type in {"view", "do_now", "review", "schedule"} else "submitted"
     event = create_workflow_action_event(
@@ -107,7 +130,7 @@ def resolve_workflow_action_service(
     action_item = find_workflow_action_item(engine, action_item_id)
     if action_item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow action was not found")
-    _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id)
+    _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id, engine)
 
     updated = update_workflow_action_status(engine, action_item_id=action_item.id, status="resolved")
     event = create_workflow_action_event(
@@ -143,7 +166,7 @@ def nudge_workflow_action_service(
     action_item = find_workflow_action_item(engine, action_item_id)
     if action_item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow action was not found")
-    _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id)
+    _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id, engine)
 
     target_user_id = payload.target_user_id or action_item.assigned_user_id or auth_context.user.id
     message = payload.message or (
@@ -197,7 +220,7 @@ def submit_overlay_service(
         action_item = find_workflow_action_item(engine, payload.action_item_id)
         if action_item is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow action was not found")
-        _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id)
+        _assert_action_access(auth_context, action_item.location_id, action_item.assigned_user_id, engine)
 
     event = create_overlay_submission_event(engine, payload=payload, actor_user_id=auth_context.user.id)
     insert_audit_log(

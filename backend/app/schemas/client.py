@@ -10,11 +10,17 @@ ClientContactStatus = Literal["active", "inactive"]
 
 
 class ClientListFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     location_id: int | None = Field(default=None, ge=1)
     status: ClientStatus | None = None
     client_owner_user_id: int | None = Field(default=None, ge=1)
     business_source_owner_user_id: int | None = Field(default=None, ge=1)
     search: str | None = Field(default=None, min_length=1, max_length=200)
+    # Phase 4.4: archived clients are left out unless asked for.
+    include_archived: bool = False
+    # Phase 4.9: safe ORDER BY body built from ?sort= via an allowlist (api layer).
+    order_by: str = "updated_at DESC, id DESC"
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -157,6 +163,8 @@ class ClientResponse(BaseModel):
     created_by_user_id: int | None
     created_at: datetime
     updated_at: datetime
+    archived_at: datetime | None = None
+    archive_reason: str | None = None
 
 
 class ClientListResponse(BaseModel):

@@ -55,11 +55,11 @@ const ADMIN_SIDEBAR_BASE = new Set([
   "role-dashboard", "company-dashboard", "location-dashboard",
   "notifications-center", "approvals-inbox",
   "user-management", "location-management", "role-management", "role-permissions-editor",
-  "business-titles", "visibility-rules", "work-assignment", "portal-accounts",
-  "analytics-dashboard", "reports", "custom-report-builder", "pipeline-analytics",
+  "business-titles", "visibility-rules", "stage-bucket-map", "work-assignment", "portal-accounts",
+  "analytics-dashboard", "reports", "custom-report-builder",
   "time-to-fill-report", "source-effectiveness", "sla-tracker",
   "user-performance-reports", "team-workload",
-  "my-profile", "support-workspace",
+  "my-profile", "support-workspace", "tenant-setup",
 ]);
 const ADMIN_EXECUTION_GRANT_CODES = ["client.read", "requisition.read", "candidate.read", "daily_update.read"];
 

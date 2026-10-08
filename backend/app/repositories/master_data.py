@@ -30,6 +30,7 @@ class MasterDataValueRecord:
     is_active: bool
     created_at: object
     updated_at: object
+    tenant_id: int | None = None
 
 
 def _map_category(row: RowMapping) -> MasterDataCategoryRecord:
@@ -55,6 +56,7 @@ def _map_value(row: RowMapping) -> MasterDataValueRecord:
         is_active=row["is_active"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        tenant_id=row.get("tenant_id"),
     )
 
 
@@ -89,14 +91,17 @@ def list_values_by_category(
     category_id: int,
     page: int = 1,
     page_size: int = 50,
+    tenant_id: int | None = None,
 ) -> tuple[list[MasterDataValueRecord], int]:
+    """A company's own values (tenant_id); templates when tenant_id is None."""
     query = text(
         """
         WITH filtered AS (
           SELECT id, category_id, code, name, description, sort_order, is_active,
-                 created_at, updated_at
+                 created_at, updated_at, tenant_id
           FROM dbo.master_data_values
           WHERE category_id = :category_id
+          AND ((:tenant_id IS NULL AND tenant_id IS NULL) OR tenant_id = :tenant_id)
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered
@@ -109,6 +114,7 @@ def list_values_by_category(
             query,
             {
                 "category_id": category_id,
+                "tenant_id": tenant_id,
                 "offset": (page - 1) * page_size,
                 "page_size": page_size,
             },
@@ -117,17 +123,22 @@ def list_values_by_category(
     return [_map_value(row) for row in rows], total
 
 
-def find_value_by_code(engine: Engine, category_id: int, code: str) -> MasterDataValueRecord | None:
+def find_value_by_code(
+    engine: Engine, category_id: int, code: str, tenant_id: int | None = None
+) -> MasterDataValueRecord | None:
     query = text(
         """
         SELECT TOP 1 id, category_id, code, name, description, sort_order, is_active,
-               created_at, updated_at
+               created_at, updated_at, tenant_id
         FROM dbo.master_data_values
-        WHERE category_id = :category_id AND code = :code;
+        WHERE category_id = :category_id AND code = :code
+        AND ((:tenant_id IS NULL AND tenant_id IS NULL) OR tenant_id = :tenant_id);
         """
     )
     with engine.connect() as connection:
-        row = connection.execute(query, {"category_id": category_id, "code": code}).mappings().first()
+        row = connection.execute(
+            query, {"category_id": category_id, "code": code, "tenant_id": tenant_id}
+        ).mappings().first()
     return _map_value(row) if row else None
 
 
@@ -135,7 +146,7 @@ def find_value_by_id(engine: Engine, value_id: int) -> MasterDataValueRecord | N
     query = text(
         """
         SELECT TOP 1 id, category_id, code, name, description, sort_order, is_active,
-               created_at, updated_at
+               created_at, updated_at, tenant_id
         FROM dbo.master_data_values
         WHERE id = :value_id;
         """
@@ -145,12 +156,14 @@ def find_value_by_id(engine: Engine, value_id: int) -> MasterDataValueRecord | N
     return _map_value(row) if row else None
 
 
-def create_value(engine: Engine, category_id: int, payload: MasterDataValueCreate) -> MasterDataValueRecord:
+def create_value(
+    engine: Engine, category_id: int, payload: MasterDataValueCreate, tenant_id: int | None = None
+) -> MasterDataValueRecord:
     query = text(
         """
-        INSERT INTO dbo.master_data_values (category_id, code, name, description, sort_order, is_active)
+        INSERT INTO dbo.master_data_values (category_id, code, name, description, sort_order, is_active, tenant_id)
         OUTPUT INSERTED.id
-        VALUES (:category_id, :code, :name, :description, :sort_order, :is_active);
+        VALUES (:category_id, :code, :name, :description, :sort_order, :is_active, :tenant_id);
         """
     )
     with engine.begin() as connection:
@@ -163,6 +176,7 @@ def create_value(engine: Engine, category_id: int, payload: MasterDataValueCreat
                 "description": payload.description,
                 "sort_order": payload.sort_order,
                 "is_active": payload.is_active,
+                "tenant_id": tenant_id,
             },
         )
         value_id = result.scalar_one()
@@ -214,3 +228,25 @@ def update_value(
     if updated is None:
         raise RuntimeError("Updated master data value could not be reloaded")
     return updated
+
+
+def copy_templates_for_tenant(engine: Engine, category_id: int, tenant_id: int) -> None:
+    """First time a company opens a list it gets its own copy of the shared
+    templates (tenant_id NULL), which it can then edit freely."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                IF NOT EXISTS (SELECT 1 FROM dbo.master_data_values WHERE category_id = :category_id AND tenant_id = :tenant_id)
+                    INSERT INTO dbo.master_data_values (
+                        category_id, code, name, description, sort_order, parent_value_id, is_active,
+                        numeric_value_int, numeric_value_decimal, text_value, metadata_json, tenant_id
+                    )
+                    SELECT category_id, code, name, description, sort_order, NULL, is_active,
+                           numeric_value_int, numeric_value_decimal, text_value, metadata_json, :tenant_id
+                    FROM dbo.master_data_values
+                    WHERE category_id = :category_id AND tenant_id IS NULL;
+                """
+            ),
+            {"category_id": category_id, "tenant_id": tenant_id},
+        )

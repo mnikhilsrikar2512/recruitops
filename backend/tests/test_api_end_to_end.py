@@ -360,19 +360,19 @@ class TestFileUploadEndpoint:
 
 
 class TestFileServeEndpoint:
-    """GET /api/v1/files/{path}"""
+    """Phase 4.1: files are served only through signed links."""
 
-    def test_serve_file_requires_auth(self):
-        _, client = _make_app(auth_ctx=None)
-
-        resp = client.get("/api/v1/files/uploads/test.pdf")
-        assert resp.status_code in (401, 403)
-
-    def test_serve_file_not_found_returns_404(self):
+    def test_plain_file_paths_are_never_served(self):
         _, client = _make_app(_auth_ctx())
 
-        resp = client.get("/api/v1/files/nonexistent.pdf")
+        resp = client.get("/api/v1/files/uploads/test.pdf")
         assert resp.status_code == 404
+
+    def test_forged_signed_link_is_refused(self):
+        _, client = _make_app(auth_ctx=None)
+
+        resp = client.get("/api/v1/files/signed/not-a-real-signed-token")
+        assert resp.status_code == 403
 
 
 # ===========================================================================
@@ -396,6 +396,7 @@ class TestLoginEndpoint:
         assert resp.status_code == 401
 
     def test_login_valid_credentials_returns_200(self, monkeypatch):
+        monkeypatch.setattr("app.services.auth.find_mfa", lambda engine, user_id: None)
         from app.core.security import sha256_hex
         correct_hash = f"sha256:{sha256_hex('correctpass')}"
         monkeypatch.setattr(
@@ -531,7 +532,9 @@ class TestRouteRegistration:
         from app.main import app
         paths = app.openapi()["paths"]
 
-        assert "/api/v1/files/{file_path}" in paths
+        # Phase 4.1: only signed links are served; the raw path route is gone.
+        assert "/api/v1/files/signed/{token}" in paths
+        assert "/api/v1/files/{file_path}" not in paths
 
     def test_auth_routes_registered(self):
         from app.main import app

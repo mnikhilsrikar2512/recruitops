@@ -27,6 +27,8 @@ def _normalize_text(value: str | None) -> str | None:
 
 
 class WorkflowActionQueueFilters(BaseModel):
+    # Company the list is restricted to; set from the caller, never from the client.
+    tenant_id: int | None = None
     status: WorkflowActionStatus | None = "open"
     source: str | None = Field(default=None, min_length=1, max_length=80)
     location_id: int | None = Field(default=None, ge=1)

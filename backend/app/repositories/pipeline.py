@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
+from app.repositories.versioning import check_version
 from app.schemas.pipeline import PipelineBoardFilters, PipelineStageMove
 
 
@@ -62,6 +63,7 @@ class PipelineApplicationDetailRecord:
     expected_joining_date: object
     applied_at: object
     updated_at: object
+    version: int = 1
 
 
 @dataclass
@@ -84,6 +86,7 @@ class PipelineTemplateStageRecord:
     stage_order: int
     stage_type: str
     allows_rejection: bool
+    metric_bucket: str | None = None
 
 
 def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[PipelineBoardRecord]:
@@ -125,6 +128,7 @@ def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[P
         AND (:sourced_by_user_id IS NULL OR c.created_by_user_id = :sourced_by_user_id)
         AND (:stage IS NULL OR ca.current_stage = :stage)
         AND (:location_id IS NULL OR r.branch_id = :location_id)
+        AND (:tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
         ORDER BY ca.stage_updated_at DESC, ca.id DESC;
         """
     )
@@ -137,6 +141,7 @@ def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[P
                 "sourced_by_user_id": filters.sourced_by_user_id,
                 "stage": filters.stage,
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
             },
         ).mappings().all()
     return [PipelineBoardRecord(**row) for row in rows]
@@ -175,7 +180,8 @@ def find_pipeline_application_by_id(engine: Engine, application_id: int) -> Pipe
           ca.updated_at AS last_activity_at,
           ca.expected_joining_date,
           ca.applied_at,
-          ca.updated_at
+          ca.updated_at,
+          ca.version
         FROM dbo.candidate_applications AS ca
         INNER JOIN dbo.candidates AS c
           ON c.id = ca.candidate_id
@@ -236,7 +242,8 @@ def find_pipeline_template_stage_for_application(
           stage_code,
           stage_order,
           stage_type,
-          allows_rejection
+          allows_rejection,
+          metric_bucket
         FROM dbo.pipeline_template_stages
         WHERE pipeline_template_id = :template_id
           AND stage_code = :stage_code;
@@ -250,6 +257,65 @@ def find_pipeline_template_stage_for_application(
     return PipelineTemplateStageRecord(**row) if row else None
 
 
+def resolve_application_stage_bucket(engine: Engine, application_id: int, stage: str) -> str:
+    """Metric bucket of ``stage`` for this application (dbo.fn_application_stage_bucket:
+    template stage -> company map -> platform map -> name)."""
+    with engine.connect() as connection:
+        return connection.execute(
+            text("SELECT dbo.fn_application_stage_bucket(:application_id, :stage);"),
+            {"application_id": application_id, "stage": stage},
+        ).scalar_one()
+
+
+def reopen_application(
+    engine: Engine, application_id: int, to_stage: str, reason: str, user_id: int, expected_version: int | None = None
+) -> tuple[str, PipelineApplicationDetailRecord]:
+    before = find_pipeline_application_by_id(engine, application_id)
+    if before is None:
+        raise RuntimeError("Pipeline application could not be reloaded")
+    with engine.begin() as connection:
+        check_version(connection, "candidate_applications", application_id, expected_version)
+        connection.execute(
+            text(
+                """
+                UPDATE dbo.candidate_applications
+                SET version = version + 1, current_stage = :to_stage,
+                    application_status = N'active',
+                    stage_reason = :reason,
+                    rejection_side = N'none',
+                    rejection_reason = NULL,
+                    rejection_stage = NULL,
+                    stage_updated_at = SYSUTCDATETIME(),
+                    updated_at = SYSUTCDATETIME()
+                WHERE id = :application_id;
+                """
+            ),
+            {"application_id": application_id, "to_stage": to_stage, "reason": reason},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO dbo.candidate_stage_history (
+                  candidate_application_id, from_stage, to_stage, change_reason,
+                  changed_by_user_id, changed_at, source_type
+                )
+                VALUES (:application_id, :from_stage, :to_stage, :reason, :user_id, SYSUTCDATETIME(), N'reopen');
+                """
+            ),
+            {
+                "application_id": application_id,
+                "from_stage": before.current_stage,
+                "to_stage": to_stage,
+                "reason": reason,
+                "user_id": user_id,
+            },
+        )
+    after = find_pipeline_application_by_id(engine, application_id)
+    if after is None:
+        raise RuntimeError("Reopened pipeline application could not be reloaded")
+    return before.current_stage, after
+
+
 def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineStageMove) -> tuple[str, PipelineApplicationDetailRecord]:
     before = find_pipeline_application_by_id(engine, application_id)
     if before is None:
@@ -258,6 +324,7 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
         """
         UPDATE dbo.candidate_applications
         SET
+          version = version + 1,
           current_stage = :to_stage,
           stage_reason = CASE WHEN :notes IS NOT NULL THEN :notes ELSE stage_reason END,
           rejection_reason = :rejection_reason,
@@ -271,9 +338,10 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
             ELSE rejection_side
           END,
           expected_joining_date = COALESCE(:joining_date, expected_joining_date),
-          application_status = CASE
-            WHEN :to_stage IN (N'rejected', N'client-rejected') THEN N'rejected'
-            WHEN :to_stage IN (N'joined', N'hired') THEN N'joined'
+          application_status = CASE dbo.fn_application_stage_bucket(:application_id, :to_stage)
+            WHEN N'rejected' THEN N'rejected'
+            WHEN N'withdrawn' THEN N'withdrawn'
+            WHEN N'joined' THEN N'joined'
             ELSE application_status
           END,
           stage_updated_at = SYSUTCDATETIME(),
@@ -304,6 +372,7 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "candidate_applications", application_id, getattr(payload, "version", None))
         connection.execute(
             query,
             {

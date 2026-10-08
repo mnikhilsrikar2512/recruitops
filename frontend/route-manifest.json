@@ -1,8 +1,8 @@
 {
  "generated_at_unix": 1789682101,
- "primary_route_count": 77,
+ "primary_route_count": 78,
  "overlay_route_count": 22,
- "total_route_count": 99,
+ "total_route_count": 100,
  "primary_routes": [
   {
    "file": "login.html",
@@ -1245,6 +1245,17 @@
    "subtitle": "Control what team members can see and access based on their role and assignments.",
    "source": "visibility_rules",
    "nav": "visibility-rules.html",
+   "links": []
+  },
+  {
+   "file": "stage-bucket-map.html",
+   "route_id": "stage-bucket-map",
+   "kind": "app",
+   "title": "Stage Bucket Map",
+   "section": "Administration",
+   "subtitle": "How each pipeline stage label is counted in reports.",
+   "source": "stage_bucket_map",
+   "nav": "stage-bucket-map.html",
    "links": []
   },
   {

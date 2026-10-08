@@ -18,6 +18,8 @@ import uuid
 
 import pytest
 
+from app.core.rbac import ADMIN_PERMISSION_CODES
+
 from tests.stubs import make_role_record, make_user_record
 from fastapi.testclient import TestClient
 
@@ -315,7 +317,7 @@ class TestLastAdminGuardUnit:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
         monkeypatch.setattr(
             users_service,
             "update_user",
@@ -343,7 +345,7 @@ class TestLastAdminGuardUnit:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 2)
         monkeypatch.setattr(
             users_service, "update_user", lambda engine, uid, payload, before: record
         )
@@ -413,7 +415,7 @@ class TestLastAdminDeactivateGuardUnit:
         monkeypatch.setattr(
             users_service, "find_user_by_id", lambda engine, user_id: record
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
 
         with pytest.raises(HTTPException) as excinfo:
             users_service.deactivate_user_service(
@@ -437,7 +439,7 @@ class TestLastAdminDeactivateGuardUnit:
         monkeypatch.setattr(
             users_service, "find_user_by_id", lambda engine, user_id: record
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 2)
         for count_fn in (
             "count_user_active_requisitions",
             "count_user_active_assignments",
@@ -474,8 +476,10 @@ class TestAdminRoleProtection:
             headers=rbac_chain["admin_headers"],
             json={"permission_codes": ["candidate.read"], "scope_rules": {}},
         )
-        assert response.status_code == 409, response.text
-        assert "full access" in response.json()["detail"]
+        # 409 = all-access guard; 403 = shared system role is read-only to companies (Phase 2)
+        assert response.status_code in (403, 409), response.text
+        detail = response.json()["detail"]
+        assert "read-only" in detail or "fixed" in detail, detail
 
     def test_admin_role_permissions_unchanged_after_attempt(self, client, rbac_chain):
         response = client.get(
@@ -487,7 +491,7 @@ class TestAdminRoleProtection:
 
 class TestAdminRoleProtectionUnit:
     """Unit coverage: guard fires exactly when the submitted set differs from
-    the full catalog, and passes through when it matches."""
+    the Admin template (D-03, app/core/rbac.py), and passes when it matches."""
 
     @staticmethod
     def _admin_role() -> object:
@@ -508,9 +512,6 @@ class TestAdminRoleProtectionUnit:
         monkeypatch.setattr(
             roles_service, "find_role_by_id", lambda engine, role_id: self._admin_role()
         )
-        monkeypatch.setattr(
-            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
-        )
 
         with pytest.raises(HTTPException) as excinfo:
             roles_service.assign_role_permissions_service(
@@ -521,18 +522,15 @@ class TestAdminRoleProtectionUnit:
                 ),
             )
         assert excinfo.value.status_code == 409
-        assert "full access" in excinfo.value.detail
+        assert "fixed" in excinfo.value.detail
 
-    def test_guard_passes_full_catalog(self, monkeypatch) -> None:
+    def test_guard_passes_the_admin_template(self, monkeypatch) -> None:
         from types import SimpleNamespace
 
         import app.services.roles as roles_service
 
         monkeypatch.setattr(
             roles_service, "find_role_by_id", lambda engine, role_id: self._admin_role()
-        )
-        monkeypatch.setattr(
-            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
         )
         monkeypatch.setattr(
             roles_service, "count_permissions_by_codes", lambda engine, codes: len(codes)
@@ -553,7 +551,7 @@ class TestAdminRoleProtectionUnit:
             engine=SimpleNamespace(),
             role_id=1,
             payload=roles_service.RolePermissionsUpdate(
-                permission_codes=["a.read", "b.read"], scope_rules={}
+                permission_codes=list(ADMIN_PERMISSION_CODES), scope_rules={}
             ),
         )
         assert response.permission_codes == ["a.read", "b.read"]
@@ -568,9 +566,6 @@ class TestAdminRoleProtectionUnit:
         role.is_system_role = False
         monkeypatch.setattr(
             roles_service, "find_role_by_id", lambda engine, role_id: role
-        )
-        monkeypatch.setattr(
-            roles_service, "list_all_permission_codes", lambda engine: ["a.read", "b.read"]
         )
         monkeypatch.setattr(
             roles_service, "count_permissions_by_codes", lambda engine, codes: len(codes)
@@ -628,7 +623,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: count)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: count)
         try:
             users_service.update_user_service(
                 engine=SimpleNamespace(), user_id=1, payload=payload
@@ -650,7 +645,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
 
         with pytest.raises(HTTPException) as excinfo:
             users_service.update_user_service(
@@ -673,7 +668,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 2)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 2)
         monkeypatch.setattr(
             users_service, "update_user", lambda engine, uid, payload, before: record
         )
@@ -701,7 +696,7 @@ class TestLastAdminPatchGuards:
         monkeypatch.setattr(
             users_service, "find_user_by_id", lambda engine, user_id: record
         )
-        monkeypatch.setattr(users_service, "count_active_admins", lambda engine: 1)
+        monkeypatch.setattr(users_service, "count_active_admins", lambda engine, *_: 1)
         monkeypatch.setattr(
             users_service, "_assert_user_references", lambda *args, **kwargs: None
         )

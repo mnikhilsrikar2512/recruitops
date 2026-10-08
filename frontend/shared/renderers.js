@@ -965,7 +965,7 @@ function renderNotificationsCommandCenter(items, meta) {
     if (slot) {
       /* AI Triage applies to the unread backlog; show it alongside
          Mark-all-read whenever there is something unread. */
-      const canTriage = typeof hasPermission === "function" && (isAdmin() || hasPermission("ai.agent.inbox_triage"));
+      const canTriage = typeof hasPermission === "function" && hasPermission("ai.agent.inbox_triage");
       slot.innerHTML = `${unreadTotal > 0 && canTriage
         ? `<button type="button" data-live-notifications-triage class="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-highlight-soft px-3 py-1.5 font-data-tabular text-data-tabular font-semibold text-primary hover:bg-primary hover:text-on-primary transition-colors shrink-0" aria-label="Start AI triage review of ${unreadTotal} unread notifications"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">smart_toy</span>AI Triage</button>`
         : ""}${unreadTotal > 0
@@ -2302,9 +2302,8 @@ function renderAgentsWorkbench(catalog, runs) {
   if (!surface) return false;
   const items = Array.isArray(catalog?.items) ? catalog.items : [];
   const runItems = Array.isArray(runs?.items) ? runs.items : [];
-  const adminUser = typeof isAdmin === "function" && isAdmin();
   const perms = typeof userPermissions === "function" ? userPermissions() : [];
-  const canRun = (agentId) => adminUser || perms.includes(`ai.agent.${agentId}`);
+  const canRun = (agentId) => perms.includes(`ai.agent.${agentId}`);
 
   updateAgentRunCounters(catalog, runs);
 

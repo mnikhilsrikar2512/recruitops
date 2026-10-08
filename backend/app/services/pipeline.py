@@ -1,6 +1,9 @@
 from fastapi import HTTPException, status
 from sqlalchemy import Engine
+from app.repositories.versioning import StaleWriteConflict
 
+from app.core.stage_buckets import BUCKET_LABELS, BUCKET_ORDER, TERMINAL_BUCKETS
+from app.repositories.audit import insert_audit_log
 from app.repositories.display_ids import find_branch_by_id
 from app.repositories.pipeline import (
     application_has_pipeline_template,
@@ -9,6 +12,8 @@ from app.repositories.pipeline import (
     list_pipeline_board,
     list_pipeline_history,
     move_pipeline_stage,
+    reopen_application,
+    resolve_application_stage_bucket,
 )
 from app.repositories.users import find_user_by_id
 from app.schemas.pipeline import (
@@ -16,19 +21,36 @@ from app.schemas.pipeline import (
     PipelineBoardFilters,
     PipelineBoardItemResponse,
     PipelineHistoryItemResponse,
+    PipelineReopen,
     PipelineStageMove,
     PipelineStageMoveResponse,
 )
 from app.schemas.notification import NotificationCreate
+from app.services import scope
 from app.services.auth import AuthContext
 from app.services.notifications import create_notification_service
+
+
+def _stage_bucket(engine: Engine, application_id: int, stage: str, definition: object | None) -> str:
+    """Bucket of a stage for this application: the template stage's own
+    bucket when it has one, else the database resolver (company map ->
+    platform map -> name)."""
+    bucket = getattr(definition, "metric_bucket", None) if definition is not None else None
+    return bucket or resolve_application_stage_bucket(engine, application_id, stage)
 
 
 def _can_access_pipeline_application(
     application: PipelineApplicationDetailResponse,
     auth_context: AuthContext,
+    engine: Engine | None = None,
 ) -> bool:
-    if auth_context.user.role_code == "admin":
+    # Company boundary first: an application on another company's office is
+    # never reachable, whatever role or contribution the caller has.
+    if engine is not None and not scope.office_in_tenant(
+        engine, application.location_id, scope.tenant_id_of(auth_context)
+    ):
+        return False
+    if scope.is_company_wide(auth_context):
         return True
 
     actor_id = auth_context.user.id
@@ -52,8 +74,13 @@ def _can_access_pipeline_application(
 def _assert_pipeline_application_access(
     application: PipelineApplicationDetailResponse,
     auth_context: AuthContext,
+    engine: Engine | None = None,
 ) -> None:
-    if _can_access_pipeline_application(application, auth_context):
+    if engine is not None and not scope.office_in_tenant(
+        engine, application.location_id, scope.tenant_id_of(auth_context)
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
+    if _can_access_pipeline_application(application, auth_context, engine):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Pipeline access is not allowed")
 
@@ -63,7 +90,7 @@ def list_pipeline_board_service(
     filters: PipelineBoardFilters,
     auth_context: AuthContext | None = None,
 ) -> list[PipelineBoardItemResponse]:
-    if auth_context and auth_context.user.role_code != "admin" and filters.location_id is None:
+    if auth_context and not scope.is_company_wide(auth_context) and filters.location_id is None:
         filters = filters.model_copy(update={"location_id": auth_context.user.location_id})
     items = list_pipeline_board(engine, filters)
     return [PipelineBoardItemResponse.model_validate(item) for item in items]
@@ -79,7 +106,7 @@ def get_pipeline_application_detail_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     response = PipelineApplicationDetailResponse.model_validate(application)
     if auth_context:
-        _assert_pipeline_application_access(response, auth_context)
+        _assert_pipeline_application_access(response, auth_context, engine)
     return response
 
 
@@ -116,33 +143,54 @@ def move_pipeline_stage_service(
             detail="Target stage does not belong to the active pipeline template",
         )
 
-    if current_stage_definition and target_stage_definition:
-        if target_stage_definition.stage_order < current_stage_definition.stage_order:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Backward stage movement is not allowed without an exception flow",
-            )
+    # Phase 4.6: rules read metric buckets, never raw labels, so a company's
+    # own stage names ("Onboarding", "Candidate Pulled Out") get the same
+    # guards as the baseline ones.
+    current_bucket = _stage_bucket(engine, application_id, application.current_stage, current_stage_definition)
+    target_bucket = _stage_bucket(engine, application_id, payload.to_stage, target_stage_definition)
+    notes = getattr(payload, "notes", None)
+    reason = notes or payload.rejection_reason
 
-    is_joined_state = application.application_status == "joined" or application.current_stage in {"joined", "hired"}
-    is_target_rejection = (
-        (target_stage_definition is not None and target_stage_definition.stage_type == "rejection")
-        or payload.to_stage in {"rejected", "client-rejected"}
-    )
-    is_target_joining = (
-        (target_stage_definition is not None and target_stage_definition.stage_type == "joining")
-        or payload.to_stage in {"joined", "hired"}
-    )
+    is_closed = application.application_status in TERMINAL_BUCKETS or current_bucket in TERMINAL_BUCKETS
+    if is_closed and payload.to_stage != application.current_stage:
+        closed_as = application.application_status if application.application_status in TERMINAL_BUCKETS else current_bucket
+        if closed_as == "joined":
+            detail = "Joined applications cannot move to another stage; reopen the application first"
+        else:
+            detail = f"This application is closed ({BUCKET_LABELS.get(closed_as, closed_as)}); reopen it before moving it"
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
-    if is_joined_state and payload.to_stage != application.current_stage:
+    # Closing moves (reject, withdraw, join) are never "backward".
+    is_backward = False
+    if target_bucket not in TERMINAL_BUCKETS:
+        if current_stage_definition and target_stage_definition:
+            is_backward = target_stage_definition.stage_order < current_stage_definition.stage_order
+        else:
+            is_backward = BUCKET_ORDER.get(target_bucket, 0) < BUCKET_ORDER.get(current_bucket, 0)
+    if is_backward and not notes:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Joined applications cannot move to another stage without a restore workflow",
+            detail="Backward stage movement needs a reason; add a note explaining why the candidate moves back",
         )
+
+    is_target_rejection = target_bucket == "rejected" or (
+        target_stage_definition is not None and target_stage_definition.stage_type == "rejection"
+    )
+    is_target_withdrawal = target_bucket == "withdrawn"
+    is_target_joining = target_bucket == "joined" or (
+        target_stage_definition is not None and target_stage_definition.stage_type == "joining"
+    )
 
     if is_target_rejection and not payload.rejection_reason:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Rejection reason is required for rejection stages",
+        )
+
+    if is_target_withdrawal and not reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A reason is required when a candidate withdraws",
         )
 
     if (
@@ -159,13 +207,9 @@ def move_pipeline_stage_service(
     # the offer stage as out of scope — candidates are handed off to the
     # client instead. Joins/starts remain reachable (they close the loop
     # without a tracked offer), as does rejection.
-    if not is_target_rejection and not is_target_joining:
+    if target_bucket == "offer" and not is_target_rejection and not is_target_joining:
         branch = find_branch_by_id(engine, application.location_id)
-        if branch is not None and branch.offers_enabled is False and (
-            (payload.to_stage or "").strip().lower() in {"offer", "offers"}
-            or "offer" in str(payload.to_stage or "").strip().lower()
-            or (target_stage_definition is not None and "offer" in str(target_stage_definition.stage_code or "").strip().lower())
-        ):
+        if branch is not None and branch.offers_enabled is False:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Offer stage is not tracked for this branch; hand off the candidate to the client instead",
@@ -177,7 +221,11 @@ def move_pipeline_stage_service(
             detail="Joining date is required for joining stages",
         )
 
-    from_stage, updated = move_pipeline_stage(engine, application_id, payload)
+    try:
+        from_stage, updated = move_pipeline_stage(engine, application_id, payload)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_pipeline_application_detail_service(engine, application_id, auth_context)
+        raise
 
     if updated.owner_user_id:
         try:
@@ -208,6 +256,7 @@ def move_pipeline_stage_service(
         to_stage=updated.current_stage,
         application_status=updated.application_status,
         stage_updated_at=updated.stage_updated_at,
+        version=getattr(updated, "version", None),
     )
 
 
@@ -224,3 +273,58 @@ def get_pipeline_history_service(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     items = list_pipeline_history(engine, application_id)
     return [PipelineHistoryItemResponse.model_validate(item) for item in items]
+
+
+def reopen_pipeline_application_service(
+    engine: Engine,
+    application_id: int,
+    payload: PipelineReopen,
+    auth_context: AuthContext,
+) -> PipelineStageMoveResponse:
+    """Phase 4.6: bring a Rejected / Withdrawn / Joined application back into
+    an open stage. Needs pipeline.stage.reopen and a reason; history stays
+    append-only (a new 'reopen' row), and the action is audited."""
+    application = get_pipeline_application_detail_service(engine, application_id, auth_context)
+    current_bucket = resolve_application_stage_bucket(engine, application_id, application.current_stage)
+    if application.application_status not in TERMINAL_BUCKETS and current_bucket not in TERMINAL_BUCKETS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only rejected, withdrawn or joined applications can be reopened",
+        )
+    target_definition = find_pipeline_template_stage_for_application(engine, application_id, payload.to_stage)
+    if application_has_pipeline_template(engine, application_id) and target_definition is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Target stage does not belong to the active pipeline template",
+        )
+    target_bucket = _stage_bucket(engine, application_id, payload.to_stage, target_definition)
+    if target_bucket in TERMINAL_BUCKETS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Reopen into an open stage (not Rejected, Withdrawn or Joined)",
+        )
+    try:
+        from_stage, updated = reopen_application(
+            engine, application_id, payload.to_stage, payload.reason, auth_context.user.id, payload.version
+        )
+    except StaleWriteConflict as conflict:
+        conflict.current = get_pipeline_application_detail_service(engine, application_id, auth_context)
+        raise
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=updated.location_id,
+        entity_type="candidate_application",
+        entity_id=application_id,
+        action_type="pipeline.reopen",
+        old_values={"stage": from_stage, "application_status": application.application_status},
+        new_values={"stage": updated.current_stage, "application_status": updated.application_status, "reason": payload.reason},
+    )
+    return PipelineStageMoveResponse(
+        application_id=application_id,
+        from_stage=from_stage,
+        to_stage=updated.current_stage,
+        application_status=updated.application_status,
+        stage_updated_at=updated.stage_updated_at,
+        version=getattr(updated, "version", None),
+    )

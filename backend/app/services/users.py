@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.security import hash_password, hash_session_token, random_secret
 
 from app.repositories.audit import insert_audit_log
+from app.repositories.auth import revoke_user_sessions
 from app.repositories.users import (
     count_active_admins,
     count_user_active_assignments,
@@ -144,7 +145,7 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
     if (
         existing.primary_role_code == "admin"
         and next_role_id != existing.primary_role_id
-        and count_active_admins(engine) <= 1
+        and count_active_admins(engine, user_id) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -160,7 +161,7 @@ def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> Us
         payload.status is not None
         and payload.status != "active"
         and existing.primary_role_code == "admin"
-        and count_active_admins(engine) <= 1
+        and count_active_admins(engine, user_id) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -265,7 +266,7 @@ def deactivate_user_service(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is already inactive")
     # Same lockout rule as the role-change guard: the workspace must always
     # keep at least one active admin account.
-    if existing.primary_role_code == "admin" and count_active_admins(engine) <= 1:
+    if existing.primary_role_code == "admin" and count_active_admins(engine, user_id) <= 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot deactivate the last active admin",
@@ -304,6 +305,12 @@ def deactivate_user_service(
         user_id=user_id,
         transfer_to_user_id=payload.transfer_to_user_id,
     )
+    # Admin force-revoke (plan 3.3): every sign-in of the deactivated user ends
+    # now. (Requests would already be refused by the user-status check.)
+    try:
+        revoke_user_sessions(engine, user_id, "user-deactivated")
+    except Exception:  # noqa: BLE001 — hygiene only; never blocks deactivation
+        pass
     try:
         create_notification_service(
             engine,
@@ -391,7 +398,7 @@ def move_user_service(
     if (
         role_changed
         and existing.primary_role_code == "admin"
-        and count_active_admins(engine) <= 1
+        and count_active_admins(engine, user_id) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

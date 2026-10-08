@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
+    reject_unknown_query_params,
+    caller_tenant_id,
     get_current_auth_context,
     get_engine,
     pinned_location_id,
@@ -21,6 +23,7 @@ from app.services.daily_updates import (
     list_daily_updates_service,
 )
 from app.services.auth import AuthContext
+from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -31,7 +34,7 @@ _scope_daily_update = require_record_in_location(
 )
 
 
-@router.get("/", response_model=DailyUpdateListResponse)
+@router.get("/", response_model=DailyUpdateListResponse, dependencies=[Depends(reject_unknown_query_params)])
 def list_daily_updates_endpoint(
     _auth: object = Depends(require_permissions("daily_update.read")),
     auth_context: AuthContext = Depends(get_current_auth_context),
@@ -52,6 +55,7 @@ def list_daily_updates_endpoint(
         page=page,
         page_size=page_size,
     )
+    filters.tenant_id = caller_tenant_id(auth_context)
     return list_daily_updates_service(engine, filters)
 
 
@@ -59,8 +63,10 @@ def list_daily_updates_endpoint(
 def create_daily_update_endpoint(
     payload: DailyUpdateCreate,
     auth: object = Depends(require_permissions("daily_update.create_main")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> DailyUpdateResponse:
+    scope.assert_payload_refs_in_company(engine, auth_context, payload)
     # The submitter is always the authenticated user — never trust a client-supplied id
     payload.submitted_by_user_id = auth.user.id
     return create_daily_update_service(engine, payload)

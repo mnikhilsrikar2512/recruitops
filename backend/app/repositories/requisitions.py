@@ -6,6 +6,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.engine import RowMapping
 
 from app.repositories.display_ids import ENTITY_REQUISITION, allocate_display_id
+from app.repositories.versioning import check_version
 from app.schemas.requisition import (
     RequisitionAssignmentCreate,
     RequisitionCreate,
@@ -47,6 +48,10 @@ class RequisitionRecord:
     updated_at: object
     must_have_skills: list[str]
     good_to_have_skills: list[str]
+    version: int = 1
+    budget_min: float | None = None
+    budget_max: float | None = None
+    currency_code: str | None = None
 
 
 @dataclass
@@ -95,7 +100,11 @@ def _requisition_select_sql() -> str:
           CAST(NULL AS NVARCHAR(50)) AS work_mode,
           CAST(NULL AS BIGINT) AS pipeline_template_id,
           r.created_at,
-          r.updated_at
+          r.updated_at,
+          r.version,
+          r.budget_min,
+          r.budget_max,
+          r.currency_code
         FROM dbo.requisitions AS r
         LEFT JOIN dbo.branches AS b
           ON b.id = r.branch_id
@@ -138,6 +147,10 @@ def _map_requisition(row: RowMapping, must_have_skills: list[str], good_to_have_
         updated_at=row["updated_at"],
         must_have_skills=must_have_skills,
         good_to_have_skills=good_to_have_skills,
+        version=int(row.get("version", 1) or 1),
+        budget_min=float(row["budget_min"]) if row.get("budget_min") is not None else None,
+        budget_max=float(row["budget_max"]) if row.get("budget_max") is not None else None,
+        currency_code=row.get("currency_code"),
     )
 
 
@@ -180,6 +193,7 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
         WITH filtered_requisitions AS (
           {_requisition_select_sql()}
           WHERE (:location_id IS NULL OR r.branch_id = :location_id)
+          AND (:tenant_id IS NULL OR r.branch_id IN (SELECT tb.id FROM dbo.branches AS tb WHERE tb.tenant_id = :tenant_id))
           AND (:client_id IS NULL OR r.client_company_id = :client_id)
           AND (:primary_owner_user_id IS NULL OR r.owner_user_id = :primary_owner_user_id)
           AND (:delivery_owner_user_id IS NULL OR :delivery_owner_user_id IS NOT NULL AND 1 = 0)
@@ -197,7 +211,7 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
         )
         SELECT *, COUNT(*) OVER() AS total_count
         FROM filtered_requisitions
-        ORDER BY updated_at DESC, id DESC
+        ORDER BY {filters.order_by}
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY;
         """
     )
@@ -206,6 +220,7 @@ def list_requisitions(engine: Engine, filters: RequisitionListFilters) -> tuple[
             query,
             {
                 "location_id": filters.location_id,
+                "tenant_id": filters.tenant_id,
                 "client_id": filters.client_id,
                 "primary_owner_user_id": filters.primary_owner_user_id,
                 "delivery_owner_user_id": filters.delivery_owner_user_id,
@@ -313,7 +328,10 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
           target_close_date,
           client_round_required,
           job_description,
-          important_notes
+          important_notes,
+          budget_min,
+          budget_max,
+          currency_code
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -329,7 +347,10 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
           :target_close_date,
           :client_round_required,
           :job_description,
-          :preferred_update_time_text
+          :preferred_update_time_text,
+          :budget_min,
+          :budget_max,
+          :currency_code
         );
         """
     )
@@ -357,6 +378,9 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
                 "employment_type": payload.employment_type,
                 "work_mode": payload.work_mode,
                 "pipeline_template_id": payload.stage_template_id,
+                "budget_min": payload.budget_min,
+                "budget_max": payload.budget_max,
+                "currency_code": payload.currency_code,
             },
         ).scalar_one()
         _replace_requisition_skills(connection, int(requisition_id), payload.must_have_skills, payload.good_to_have_skills)
@@ -374,6 +398,7 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
         """
         UPDATE dbo.requisitions
         SET
+          version = version + 1,
           title = COALESCE(:title, title),
           owner_user_id = COALESCE(:primary_owner_user_id, owner_user_id),
           open_positions = COALESCE(:open_positions, open_positions),
@@ -381,6 +406,9 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
           target_close_date = COALESCE(:target_close_date, target_close_date),
           client_round_required = COALESCE(:client_round_required, client_round_required),
           job_description = COALESCE(:job_description, job_description),
+          budget_min = CASE WHEN :has_budget_min = 1 THEN :budget_min ELSE budget_min END,
+          budget_max = CASE WHEN :has_budget_max = 1 THEN :budget_max ELSE budget_max END,
+          currency_code = CASE WHEN :has_currency_code = 1 THEN :currency_code ELSE currency_code END,
           important_notes = CASE
             WHEN :has_preferred_update_time_text = 1 THEN :preferred_update_time_text
             ELSE important_notes
@@ -390,6 +418,7 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "requisitions", requisition_id, getattr(payload, "version", None))
         connection.execute(
             query,
             {
@@ -415,6 +444,12 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
                 "preferred_update_time_text": payload.profile_update_window_text,
                 "client_round_required": payload.client_round_required,
                 "job_description": payload.job_description,
+                "has_budget_min": 1 if "budget_min" in payload.model_fields_set else 0,
+                "budget_min": payload.budget_min,
+                "has_budget_max": 1 if "budget_max" in payload.model_fields_set else 0,
+                "budget_max": payload.budget_max,
+                "has_currency_code": 1 if "currency_code" in payload.model_fields_set else 0,
+                "currency_code": payload.currency_code,
                 "has_pipeline_template_id": 1 if "stage_template_id" in payload.model_fields_set else 0,
                 "pipeline_template_id": payload.stage_template_id,
             },
@@ -434,12 +469,14 @@ def update_requisition_status(engine: Engine, requisition_id: int, payload: Requ
         """
         UPDATE dbo.requisitions
         SET
+          version = version + 1,
           status = :status,
           updated_at = SYSUTCDATETIME()
         WHERE id = :requisition_id;
         """
     )
     with engine.begin() as connection:
+        check_version(connection, "requisitions", requisition_id, getattr(payload, "version", None))
         connection.execute(query, {"requisition_id": requisition_id, "status": payload.status})
     updated = find_requisition_by_id(engine, requisition_id)
     if updated is None:
@@ -548,7 +585,7 @@ def create_requisition_assignment(
                 text(
                     """
                     UPDATE dbo.requisitions
-                    SET owner_user_id = :assigned_user_id, updated_at = SYSUTCDATETIME()
+                    SET version = version + 1, owner_user_id = :assigned_user_id, updated_at = SYSUTCDATETIME()
                     WHERE id = :requisition_id;
                     """
                 ),
