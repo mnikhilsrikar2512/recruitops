@@ -75,3 +75,7 @@ class OfferApprovalSettings(BaseModel):
     this amount need approval; at or below it they are approved straight
     away. 0 = every paid offer needs approval."""
     threshold: float = Field(ge=0, le=1_000_000_000_000)
+    # Phase 4.13: company signing-bonus switches (clients can override).
+    # Omitted on PUT = leave unchanged.
+    offers_signing_bonus: bool | None = None
+    bonus_counts_against_budget: bool | None = None

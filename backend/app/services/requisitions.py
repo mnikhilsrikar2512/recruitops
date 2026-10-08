@@ -17,6 +17,8 @@ from app.repositories.requisitions import (
     update_requisition,
     update_requisition_status,
 )
+from app.repositories.requisition_holds import find_open_hold, hold_impact, list_holds, put_on_hold, resume_from_hold
+from app.repositories.stage_lists import point_requisition_at_list
 from app.repositories.users import find_user_by_id
 from app.schemas.notification import NotificationCreate
 from app.schemas.pagination import PaginationMeta
@@ -29,9 +31,13 @@ from app.schemas.requisition import (
     RequisitionResponse,
     RequisitionOwnerReassignment,
     RequisitionOwnerReassignmentResponse,
+    RequisitionHoldCreate,
+    RequisitionHoldResponse,
+    RequisitionResume,
     RequisitionStatusUpdate,
     RequisitionUpdate,
 )
+from app.core.withdrawal import HOLD_REASON_LABELS
 from app.services.auth import AuthContext
 from app.services.notifications import create_notification_service
 
@@ -102,6 +108,14 @@ def create_requisition_service(engine: Engine, payload: RequisitionCreate) -> Re
     if payload.delivery_owner_user_id:
         _assert_user_in_location(engine, payload.delivery_owner_user_id, payload.location_id, "Delivery owner user")
     created = create_requisition(engine, payload)
+    # Phase 4.10: the requisition follows its client's stage list (or the
+    # company default); a per-requisition choice is not offered.
+    if isinstance(engine, Engine):
+        try:
+            point_requisition_at_list(engine, created.id)
+            created = find_requisition_by_id(engine, created.id) or created
+        except Exception:  # noqa: BLE001 - stage lists are optional; never block intake
+            pass
     try:
         create_notification_service(
             engine,
@@ -129,7 +143,16 @@ def get_requisition_detail_service(engine: Engine, requisition_id: int) -> Requi
     requisition = find_requisition_by_id(engine, requisition_id)
     if not requisition:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
-    return RequisitionResponse.model_validate(requisition)
+    response = RequisitionResponse.model_validate(requisition)
+    if response.status == "on-hold":
+        hold = find_open_hold(engine, requisition_id)
+        if hold:
+            response.active_hold = _hold_response(hold).model_dump(mode="json")
+    return response
+
+
+def _hold_response(row: dict) -> RequisitionHoldResponse:
+    return RequisitionHoldResponse(**row, reason_label=HOLD_REASON_LABELS.get(row["reason_code"], row["reason_code"]))
 
 
 def update_requisition_service(engine: Engine, requisition_id: int, payload: RequisitionUpdate) -> RequisitionResponse:
@@ -164,8 +187,20 @@ def update_requisition_status_service(
     existing = find_requisition_by_id(engine, requisition_id)
     if not existing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
+    actor_user_id = auth_context.user.id if auth_context else existing.primary_owner_user_id
     try:
-        updated = update_requisition_status(engine, requisition_id, payload)
+        # Phase 4.12: moving in or out of on-hold goes through the hold flow
+        # so the hold is recorded and the clocks pause.
+        if payload.status == "on-hold" and existing.status != "on-hold":
+            put_on_hold(engine, requisition_id, reason_code="other", reason_note=payload.reason,
+                        expected_resume_date=None, user_id=actor_user_id, version=payload.version)
+            updated = find_requisition_by_id(engine, requisition_id)
+        elif existing.status == "on-hold" and payload.status != "on-hold":
+            resume_from_hold(engine, requisition_id, user_id=actor_user_id, note=payload.reason,
+                             to_status=payload.status, version=payload.version)
+            updated = find_requisition_by_id(engine, requisition_id)
+        else:
+            updated = update_requisition_status(engine, requisition_id, payload)
     except StaleWriteConflict as conflict:
         conflict.current = get_requisition_detail_service(engine, requisition_id)
         raise
@@ -344,3 +379,104 @@ def reassign_requisition_owners_service(
         review_required=review_required,
         reason=payload.reason,
     )
+
+
+# ---- Phase 4.12 (D-4.12): client puts a requisition on hold -------------
+def hold_requisition_service(
+    engine: Engine,
+    requisition_id: int,
+    payload: RequisitionHoldCreate,
+    auth_context: AuthContext,
+) -> RequisitionResponse:
+    existing = find_requisition_by_id(engine, requisition_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
+    if existing.status == "on-hold":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This requisition is already on hold")
+    if existing.status in ("closed", "cancelled"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"A {existing.status} requisition can't be put on hold")
+    try:
+        put_on_hold(engine, requisition_id, reason_code=payload.reason_code, reason_note=payload.note,
+                    expected_resume_date=payload.expected_resume_date, user_id=auth_context.user.id,
+                    version=payload.version)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_requisition_detail_service(engine, requisition_id)
+        raise
+    impact = hold_impact(engine, requisition_id)
+    label = HOLD_REASON_LABELS.get(payload.reason_code, payload.reason_code)
+    recipients = set(impact["owner_user_ids"])
+    if existing.primary_owner_user_id:
+        recipients.add(existing.primary_owner_user_id)
+    interviews = impact["upcoming_interviews"]
+    for user_id in recipients:
+        try:
+            create_notification_service(
+                engine,
+                NotificationCreate(
+                    location_id=existing.location_id,
+                    user_id=user_id,
+                    event_type="requisition_on_hold",
+                    source_type="requisition",
+                    source_id=requisition_id,
+                    title="Requisition put on hold",
+                    message=(
+                        f"{existing.title} is on hold ({label}). Candidates stay where they are; "
+                        + (f"{interviews} scheduled interview(s) need you to tell the candidates or reschedule. "
+                           if interviews else "")
+                        + "You can still withdraw or reject a candidate."
+                    ),
+                    priority="high" if interviews else "normal",
+                    action_url=f"/requisitions/{requisition_id}",
+                ),
+            )
+        except Exception:
+            pass
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="requisition",
+        entity_id=requisition_id,
+        action_type="requisition.hold",
+        old_values={"status": existing.status},
+        new_values={"status": "on-hold", "reason_code": payload.reason_code, "note": payload.note,
+                    "expected_resume_date": str(payload.expected_resume_date) if payload.expected_resume_date else None,
+                    "active_candidates": impact["active_candidates"], "upcoming_interviews": interviews},
+    )
+    return get_requisition_detail_service(engine, requisition_id)
+
+
+def resume_requisition_service(
+    engine: Engine,
+    requisition_id: int,
+    payload: RequisitionResume,
+    auth_context: AuthContext,
+) -> RequisitionResponse:
+    existing = find_requisition_by_id(engine, requisition_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
+    if existing.status != "on-hold":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This requisition is not on hold")
+    try:
+        days = resume_from_hold(engine, requisition_id, user_id=auth_context.user.id, note=payload.note,
+                                to_status=None, version=payload.version)
+    except StaleWriteConflict as conflict:
+        conflict.current = get_requisition_detail_service(engine, requisition_id)
+        raise
+    insert_audit_log(
+        engine,
+        actor_user_id=auth_context.user.id,
+        location_id=auth_context.user.location_id,
+        entity_type="requisition",
+        entity_id=requisition_id,
+        action_type="requisition.resume",
+        old_values={"status": "on-hold"},
+        new_values={"hold_days": days, "note": payload.note},
+    )
+    return get_requisition_detail_service(engine, requisition_id)
+
+
+def list_requisition_holds_service(engine: Engine, requisition_id: int) -> list[RequisitionHoldResponse]:
+    if not find_requisition_by_id(engine, requisition_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
+    return [_hold_response(row) for row in list_holds(engine, requisition_id)]

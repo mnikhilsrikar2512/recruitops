@@ -142,6 +142,11 @@ def move_pipeline_stage_service(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Target stage does not belong to the active pipeline template",
         )
+    # Phase 4.10: store the client's own spelling of the stage.
+    if target_stage_definition is not None and getattr(target_stage_definition, "stage_name", None) \
+            and payload.to_stage != target_stage_definition.stage_name \
+            and target_stage_definition.stage_code != payload.to_stage:
+        payload = payload.model_copy(update={"to_stage": target_stage_definition.stage_name})
 
     # Phase 4.6: rules read metric buckets, never raw labels, so a company's
     # own stage names ("Onboarding", "Candidate Pulled Out") get the same
@@ -159,6 +164,19 @@ def move_pipeline_stage_service(
         else:
             detail = f"This application is closed ({BUCKET_LABELS.get(closed_as, closed_as)}); reopen it before moving it"
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+    # Phase 4.12 (D-4.12): a requisition on hold freezes its candidates.
+    # Withdrawing or rejecting is still allowed; everything else waits.
+    if (
+        getattr(application, "requisition_status", None) == "on-hold"
+        and payload.to_stage != application.current_stage
+        and target_bucket not in ("withdrawn", "rejected")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The requisition is on hold; candidates stay where they are until it resumes "
+            "(you can still withdraw or reject a candidate)",
+        )
 
     # Closing moves (reject, withdraw, join) are never "backward".
     is_backward = False
@@ -187,11 +205,24 @@ def move_pipeline_stage_service(
             detail="Rejection reason is required for rejection stages",
         )
 
-    if is_target_withdrawal and not reason:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="A reason is required when a candidate withdraws",
-        )
+    # Phase 4.11 (D-4.11): a withdrawal needs a reason code from the list;
+    # "no_reason_given" is a valid answer. A note alone (older clients)
+    # counts as "other". Only "other" needs the note.
+    if is_target_withdrawal:
+        withdrawal_reason = getattr(payload, "withdrawal_reason", None) or ("other" if reason else None)
+        if withdrawal_reason is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Pick why the candidate withdrew; choose 'No reason given' if they didn't say",
+            )
+        if withdrawal_reason == "other" and not reason:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Add a short note when the withdrawal reason is 'Other'",
+            )
+        payload = payload.model_copy(update={"withdrawal_reason": withdrawal_reason})
+    elif getattr(payload, "withdrawal_reason", None) is not None:
+        payload = payload.model_copy(update={"withdrawal_reason": None})
 
     if (
         is_target_rejection

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, text
 
+from app.core.withdrawal import WITHDRAWAL_REASON_LABELS
+
 from app.repositories.versioning import check_version
 from app.schemas.pipeline import PipelineBoardFilters, PipelineStageMove
 
@@ -64,6 +66,9 @@ class PipelineApplicationDetailRecord:
     applied_at: object
     updated_at: object
     version: int = 1
+    withdrawal_reason: str | None = None
+    offer_status: str | None = None
+    requisition_status: str | None = None
 
 
 @dataclass
@@ -87,6 +92,7 @@ class PipelineTemplateStageRecord:
     stage_type: str
     allows_rejection: bool
     metric_bucket: str | None = None
+    stage_name: str | None = None
 
 
 def list_pipeline_board(engine: Engine, filters: PipelineBoardFilters) -> list[PipelineBoardRecord]:
@@ -181,7 +187,10 @@ def find_pipeline_application_by_id(engine: Engine, application_id: int) -> Pipe
           ca.expected_joining_date,
           ca.applied_at,
           ca.updated_at,
-          ca.version
+          ca.version,
+          ca.withdrawal_reason,
+          ca.offer_status,
+          r.status AS requisition_status
         FROM dbo.candidate_applications AS ca
         INNER JOIN dbo.candidates AS c
           ON c.id = ca.candidate_id
@@ -243,10 +252,14 @@ def find_pipeline_template_stage_for_application(
           stage_order,
           stage_type,
           allows_rejection,
-          metric_bucket
+          metric_bucket,
+          stage_name
         FROM dbo.pipeline_template_stages
         WHERE pipeline_template_id = :template_id
-          AND stage_code = :stage_code;
+          AND (stage_code = :stage_code
+               OR dbo.fn_stage_key(stage_code) = dbo.fn_stage_key(:stage_code)
+               OR dbo.fn_stage_key(stage_name) = dbo.fn_stage_key(:stage_code))
+        ORDER BY CASE WHEN stage_code = :stage_code THEN 0 ELSE 1 END;
         """
     )
     with engine.connect() as connection:
@@ -338,6 +351,13 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
             ELSE rejection_side
           END,
           expected_joining_date = COALESCE(:joining_date, expected_joining_date),
+          withdrawal_reason = CASE WHEN dbo.fn_application_stage_bucket(:application_id, :to_stage) = N'withdrawn'
+            THEN :withdrawal_reason ELSE withdrawal_reason END,
+          withdrawn_at = CASE WHEN dbo.fn_application_stage_bucket(:application_id, :to_stage) = N'withdrawn'
+            THEN SYSUTCDATETIME() ELSE withdrawn_at END,
+          offer_status = CASE WHEN dbo.fn_application_stage_bucket(:application_id, :to_stage) = N'withdrawn'
+            AND offer_status IN (N'draft', N'pending-approval', N'approved', N'sent', N'accepted')
+            THEN N'withdrawn' ELSE offer_status END,
           application_status = CASE dbo.fn_application_stage_bucket(:application_id, :to_stage)
             WHEN N'rejected' THEN N'rejected'
             WHEN N'withdrawn' THEN N'withdrawn'
@@ -381,15 +401,30 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
                 "notes": payload.notes,
                 "rejection_reason": payload.rejection_reason,
                 "joining_date": payload.joining_date,
+                "withdrawal_reason": getattr(payload, "withdrawal_reason", None),
             },
         )
+        # Phase 4.11: a withdrawal closes any offer approval still waiting.
+        if getattr(payload, "withdrawal_reason", None):
+            connection.execute(
+                text(
+                    """
+                    UPDATE dbo.approval_requests
+                    SET status = N'cancelled', decision = N'withdrawn',
+                        decision_notes = N'Candidate withdrew', decided_at = SYSUTCDATETIME(),
+                        updated_at = SYSUTCDATETIME()
+                    WHERE request_type = N'offer-approval' AND source_id = :application_id AND status = N'pending';
+                    """
+                ),
+                {"application_id": application_id},
+            )
         connection.execute(
             history_query,
             {
                 "application_id": application_id,
                 "from_stage": before.current_stage,
                 "to_stage": payload.to_stage,
-                "change_reason": payload.notes or payload.rejection_reason,
+                "change_reason": _history_reason(payload),
                 "changed_by_user_id": payload.changed_by_user_id or before.owner_user_id,
             },
         )
@@ -397,6 +432,16 @@ def move_pipeline_stage(engine: Engine, application_id: int, payload: PipelineSt
     if after is None:
         raise RuntimeError("Updated pipeline application could not be reloaded")
     return before.current_stage, after
+
+
+
+def _history_reason(payload: PipelineStageMove) -> str | None:
+    code = getattr(payload, "withdrawal_reason", None)
+    note = payload.notes or payload.rejection_reason
+    if not code:
+        return note
+    label = WITHDRAWAL_REASON_LABELS.get(code, code)
+    return f"Withdrew: {label}" + (f" — {note}" if note else "")
 
 
 def list_pipeline_history(engine: Engine, application_id: int) -> list[PipelineHistoryRecord]:

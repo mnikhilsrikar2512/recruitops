@@ -18,6 +18,8 @@ from app.services.pipeline import (
     move_pipeline_stage_service,
     reopen_pipeline_application_service,
 )
+from app.schemas.stage_lists import StageListResponse
+from app.services.stage_lists import application_stage_options_service
 from app.services.auth import AuthContext
 from app.services import scope
 
@@ -55,6 +57,18 @@ def get_pipeline_application_detail_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> PipelineApplicationDetailResponse:
     return get_pipeline_application_detail_service(engine, application_id, auth_context)
+
+
+@router.get("/applications/{application_id}/stages", response_model=StageListResponse)
+def get_application_stage_options_endpoint(
+    _auth: object = Depends(require_permissions("pipeline.read.detail")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    application_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> StageListResponse:
+    """Phase 4.10: the stages this application can move to (its client's list)."""
+    get_pipeline_application_detail_service(engine, application_id, auth_context)
+    return application_stage_options_service(engine, application_id)
 
 
 @router.patch("/applications/{application_id}/stage", response_model=PipelineStageMoveResponse)

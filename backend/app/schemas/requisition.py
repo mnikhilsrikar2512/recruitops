@@ -1,9 +1,10 @@
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.withdrawal import HoldReason
 from app.schemas.pagination import PaginationMeta
 
 RequisitionStatus = Literal["draft", "open", "on-hold", "closed", "cancelled"]
@@ -217,6 +218,9 @@ class RequisitionResponse(BaseModel):
     budget_min: float | None = None
     budget_max: float | None = None
     currency_code: str | None = None
+    # Phase 4.12: the open hold (reason, who, since when) and paused days
+    active_hold: dict | None = None
+    hold_days_total: int = 0
 
 
 class RequisitionListResponse(BaseModel):
@@ -251,3 +255,50 @@ class RequisitionOwnerReassignmentResponse(BaseModel):
     active_application_count: int
     review_required: bool
     reason: str
+
+
+# ---- Phase 4.12: holds -------------------------------------------------
+class RequisitionHoldCreate(BaseModel):
+    reason_code: HoldReason
+    note: str | None = Field(default=None, max_length=1000)
+    expected_resume_date: date | None = None
+    version: int | None = Field(default=None, ge=1)
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str | None) -> str | None:
+        return _normalize_text(value)
+
+    @model_validator(mode="after")
+    def other_needs_note(self) -> "RequisitionHoldCreate":
+        if self.reason_code == "other" and not self.note:
+            raise ValueError("Add a short note when the hold reason is 'Other'")
+        return self
+
+
+class RequisitionResume(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+    version: int | None = Field(default=None, ge=1)
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str | None) -> str | None:
+        return _normalize_text(value)
+
+
+class RequisitionHoldResponse(BaseModel):
+    id: int
+    requisition_id: int
+    reason_code: str
+    reason_label: str
+    reason_note: str | None = None
+    previous_status: str
+    expected_resume_date: date | None = None
+    held_by_user_id: int
+    held_by_name: str | None = None
+    held_at: datetime
+    resumed_by_user_id: int | None = None
+    resumed_by_name: str | None = None
+    resumed_at: datetime | None = None
+    resume_note: str | None = None
+    hold_days: int | None = None

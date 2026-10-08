@@ -30,6 +30,8 @@ from app.schemas.reports import (
     TimeToFillBreakdown,
     TimeToFillReportResponse,
     TimeToFillSummary,
+    WithdrawalReasonRow,
+    WithdrawalReasonsReportResponse,
 )
 from app.services import scope
 from app.services.auth import AuthContext
@@ -304,3 +306,25 @@ def get_client_summary_report_service(
             revenue=round(sum(r.revenue for r in records), 2),
         ),
     )
+
+
+def get_withdrawal_reasons_report_service(engine: Engine, auth_context: AuthContext) -> WithdrawalReasonsReportResponse:
+    from app.core.withdrawal import WITHDRAWAL_REASON_LABELS
+    from app.repositories.reports import get_withdrawal_reason_counts
+
+    rows = get_withdrawal_reason_counts(
+        engine,
+        auth_context.user.location_id,
+        scope.is_company_wide(auth_context),
+        scope.tenant_id_of(auth_context),
+    )
+    items = [
+        WithdrawalReasonRow(
+            reason_code=row["reason_code"],
+            label=WITHDRAWAL_REASON_LABELS.get(row["reason_code"], row["reason_code"]),
+            withdrawn_count=int(row["withdrawn_count"] or 0),
+            after_offer_count=int(row["after_offer_count"] or 0),
+        )
+        for row in rows
+    ]
+    return WithdrawalReasonsReportResponse(total=sum(item.withdrawn_count for item in items), items=items)

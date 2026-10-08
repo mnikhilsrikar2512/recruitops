@@ -195,12 +195,12 @@ def test_update_offer_decision_accepts_and_sets_joining(monkeypatch) -> None:
     assert response.expected_joining_date == date(2026, 9, 15)
 
 
-def test_offer_threshold_rule(monkeypatch) -> None:
+def test_offer_threshold_rule() -> None:
     """Phase 4.8: the requisition's max budget decides when it has one;
     otherwise the company threshold (0 = every paid offer needs approval)."""
+    from app.repositories.offer_settings import OfferPolicy
     from app.services import offers as offers_service
 
-    monkeypatch.setattr(offers_service.scope, "tenant_of_office", lambda *args, **kwargs: 3)
     cases = [
         # (budget_max, budget_currency, company threshold, ctc, bonus, offer currency, needs approval)
         (None, None, Decimal("0"), Decimal("1"), None, "INR", True),
@@ -214,9 +214,36 @@ def test_offer_threshold_rule(monkeypatch) -> None:
         (Decimal("1200000"), "INR", Decimal("0"), None, None, "INR", True),
     ]
     for budget, budget_currency, threshold, ctc, bonus, currency, expected in cases:
-        monkeypatch.setattr(offers_service, "find_requisition_budget_for_application",
-                            lambda *a, _b=budget, _c=budget_currency, **k: (_b, _c))
-        monkeypatch.setattr(offers_service, "get_offer_approval_threshold", lambda *a, _t=threshold, **k: _t)
+        policy = OfferPolicy(budget_max=budget, currency_code=budget_currency, threshold=threshold)
         payload = OfferCreate(candidate_application_id=1, offered_ctc=ctc, signing_bonus=bonus,
                               offer_currency=currency, requested_by_user_id=7)
-        assert offers_service.offer_requires_approval(object(), 1, payload) is expected, (budget, threshold, ctc, bonus, currency)
+        assert offers_service.approval_needed(policy, payload) is expected, (budget, threshold, ctc, bonus, currency)
+
+
+def test_signing_bonus_only_counts_when_switched_on() -> None:
+    """Phase 4.13: with 'count bonus against budget' off, CTC alone is compared."""
+    from app.repositories.offer_settings import OfferPolicy
+    from app.services import offers as offers_service
+
+    payload = OfferCreate(candidate_application_id=1, offered_ctc=Decimal("1100000"), signing_bonus=Decimal("200000"),
+                          offer_currency="INR", requested_by_user_id=7)
+    counts = OfferPolicy(budget_max=Decimal("1200000"), currency_code="INR")
+    ctc_only = OfferPolicy(budget_max=Decimal("1200000"), currency_code="INR", bonus_counts_against_budget=False)
+    no_bonus = OfferPolicy(budget_max=Decimal("1200000"), currency_code="INR", signing_bonus_allowed=False)
+    assert offers_service.approval_needed(counts, payload) is True
+    assert offers_service.approval_needed(ctc_only, payload) is False
+    assert offers_service.approval_needed(no_bonus, payload) is False
+
+
+def test_offer_policy_client_overrides_company() -> None:
+    """Phase 4.13: internal hiring uses the company switches; client hiring
+    uses the client's, and a NULL client switch inherits the company's."""
+    from app.repositories.offer_settings import resolve_offer_policy
+
+    company = {"company_bonus": 0, "company_counts": 1, "offer_approval_threshold": 0}
+    internal = resolve_offer_policy({**company, "client_company_id": None, "client_bonus": 1, "client_counts": 0})
+    assert (internal.source, internal.signing_bonus_allowed, internal.bonus_counts_against_budget) == ("company", False, True)
+    client = resolve_offer_policy({**company, "client_company_id": 9, "client_bonus": 1, "client_counts": 0})
+    assert (client.source, client.signing_bonus_allowed, client.bonus_counts_against_budget) == ("client", True, False)
+    inherits = resolve_offer_policy({**company, "client_company_id": 9, "client_bonus": None, "client_counts": None})
+    assert (inherits.source, inherits.signing_bonus_allowed, inherits.bonus_counts_against_budget) == ("client", False, True)

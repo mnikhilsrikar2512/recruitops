@@ -57,6 +57,11 @@ def create_interview_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline application was not found")
     if auth_context:
         _assert_pipeline_application_access(application, auth_context, engine)
+    if getattr(application, "requisition_status", None) == "on-hold":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The requisition is on hold; schedule interviews when it resumes",
+        )
     if payload.interviewer_user_id and not find_user_by_id(engine, payload.interviewer_user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interviewer user was not found")
     created_by_user_id = payload.created_by_user_id

@@ -143,6 +143,8 @@ def flow_stage_move(browser, base):
     # target stage + rationale selects: pick the first real option in each
     for i in range(selects.count()):
         sel = selects.nth(i)
+        if not sel.is_visible():  # e.g. the withdrawal-reason field, shown only for a withdrawn target (4.11)
+            continue
         values = sel.evaluate("s => Array.from(s.options).map(o => o.value).filter(Boolean)")
         if values:
             sel.select_option(values[-1] if "rejected" not in values[-1] else values[0])

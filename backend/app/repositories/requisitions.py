@@ -52,6 +52,7 @@ class RequisitionRecord:
     budget_min: float | None = None
     budget_max: float | None = None
     currency_code: str | None = None
+    hold_days_total: int = 0
 
 
 @dataclass
@@ -98,13 +99,14 @@ def _requisition_select_sql() -> str:
           r.important_notes AS preferred_update_time_text,
           CAST(NULL AS NVARCHAR(50)) AS employment_type,
           CAST(NULL AS NVARCHAR(50)) AS work_mode,
-          CAST(NULL AS BIGINT) AS pipeline_template_id,
+          r.pipeline_template_id,
           r.created_at,
           r.updated_at,
           r.version,
           r.budget_min,
           r.budget_max,
-          r.currency_code
+          r.currency_code,
+          r.hold_days_total
         FROM dbo.requisitions AS r
         LEFT JOIN dbo.branches AS b
           ON b.id = r.branch_id
@@ -151,6 +153,7 @@ def _map_requisition(row: RowMapping, must_have_skills: list[str], good_to_have_
         budget_min=float(row["budget_min"]) if row.get("budget_min") is not None else None,
         budget_max=float(row["budget_max"]) if row.get("budget_max") is not None else None,
         currency_code=row.get("currency_code"),
+        hold_days_total=int(row.get("hold_days_total") or 0),
     )
 
 

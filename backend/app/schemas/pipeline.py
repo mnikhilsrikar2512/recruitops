@@ -2,6 +2,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.withdrawal import WithdrawalReason
+
 
 def _normalize_text(value: str | None) -> str | None:
     if value is None:
@@ -31,6 +33,8 @@ class PipelineStageMove(BaseModel):
     rejection_reason: str | None = Field(default=None, max_length=1000)
     joining_date: date | None = None
     changed_by_user_id: int | None = Field(default=None, ge=1)
+    # Phase 4.11: why the candidate withdrew ("no_reason_given" is fine).
+    withdrawal_reason: WithdrawalReason | None = None
     # Phase 4.3: the version the client loaded; a stale one answers 409.
     version: int | None = Field(default=None, ge=1)
 
@@ -113,6 +117,9 @@ class PipelineApplicationDetailResponse(BaseModel):
     applied_at: datetime
     updated_at: datetime
     version: int = 1
+    withdrawal_reason: str | None = None
+    offer_status: str | None = None
+    requisition_status: str | None = None
 
 
 class PipelineStageMoveResponse(BaseModel):
