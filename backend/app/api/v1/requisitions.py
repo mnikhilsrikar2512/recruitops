@@ -21,6 +21,9 @@ from app.schemas.requisition import (
     RequisitionResponse,
     RequisitionOwnerReassignment,
     RequisitionOwnerReassignmentResponse,
+    RequisitionHoldCreate,
+    RequisitionHoldResponse,
+    RequisitionResume,
     RequisitionStatusUpdate,
     RequisitionUpdate,
 )
@@ -28,6 +31,9 @@ from app.services.requisitions import (
     create_requisition_assignment_service,
     create_requisition_service,
     get_requisition_detail_service,
+    hold_requisition_service,
+    list_requisition_holds_service,
+    resume_requisition_service,
     list_requisition_assignments_service,
     list_requisitions_service,
     remove_requisition_assignment_service,
@@ -133,6 +139,42 @@ def update_requisition_status_endpoint(
 ) -> RequisitionResponse:
     scope.assert_payload_refs_in_company(engine, auth_context, payload)
     return update_requisition_status_service(engine, requisition_id, payload, auth_context)
+
+
+@router.post("/{requisition_id}/hold", response_model=RequisitionResponse)
+def hold_requisition_endpoint(
+    payload: RequisitionHoldCreate,
+    _auth: object = Depends(require_permissions("requisition.status.update")),
+    _in_scope: object = Depends(_scope_requisition),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    requisition_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> RequisitionResponse:
+    """Phase 4.12: put on hold with a reason; candidates freeze, clocks pause."""
+    return hold_requisition_service(engine, requisition_id, payload, auth_context)
+
+
+@router.post("/{requisition_id}/resume", response_model=RequisitionResponse)
+def resume_requisition_endpoint(
+    payload: RequisitionResume,
+    _auth: object = Depends(require_permissions("requisition.status.update")),
+    _in_scope: object = Depends(_scope_requisition),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    requisition_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> RequisitionResponse:
+    """Phase 4.12: back to the status it had; the target date moves out by the hold days."""
+    return resume_requisition_service(engine, requisition_id, payload, auth_context)
+
+
+@router.get("/{requisition_id}/holds", response_model=list[RequisitionHoldResponse])
+def list_requisition_holds_endpoint(
+    _auth: object = Depends(require_permissions("requisition.read")),
+    _in_scope: object = Depends(_scope_requisition),
+    requisition_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> list[RequisitionHoldResponse]:
+    return list_requisition_holds_service(engine, requisition_id)
 
 
 @router.get("/{requisition_id}/assignments", response_model=list[RequisitionAssignmentResponse])

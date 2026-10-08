@@ -33,6 +33,9 @@ class ClientRecord:
     updated_at: object
     archived_at: object = None
     archive_reason: str | None = None
+    # Phase 4.13: None = use the company setting
+    offers_signing_bonus: bool | None = None
+    bonus_counts_against_budget: bool | None = None
 
 
 @dataclass
@@ -74,7 +77,13 @@ def _map_client(row: RowMapping) -> ClientRecord:
         updated_at=row["updated_at"],
         archived_at=row.get("archived_at"),
         archive_reason=row.get("archive_reason"),
+        offers_signing_bonus=_tri(row.get("offers_signing_bonus")),
+        bonus_counts_against_budget=_tri(row.get("bonus_counts_against_budget")),
     )
+
+
+def _tri(value: object) -> bool | None:
+    return None if value is None else bool(value)
 
 
 def _map_client_contact(row: RowMapping) -> ClientContactRecord:
@@ -118,6 +127,8 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
             c.updated_at,
             c.archived_at,
             c.archive_reason,
+            c.offers_signing_bonus,
+            c.bonus_counts_against_budget,
             COUNT(*) OVER() AS total_count
           FROM dbo.client_companies AS c
           LEFT JOIN dbo.users AS source_owner
@@ -184,7 +195,9 @@ def _client_select_sql() -> str:
           c.created_at,
           c.updated_at,
           c.archived_at,
-          c.archive_reason
+          c.archive_reason,
+          c.offers_signing_bonus,
+          c.bonus_counts_against_budget
         FROM dbo.client_companies AS c
         LEFT JOIN dbo.users AS source_owner
           ON source_owner.id = c.account_manager_user_id
@@ -266,6 +279,8 @@ def update_client(engine: Engine, client_id: int, payload: ClientUpdate) -> Clie
           status = COALESCE(:status, status),
           notes = CASE WHEN :has_notes = 1 THEN :notes ELSE notes END,
           placement_fee_pct = CASE WHEN :has_fee = 1 THEN :placement_fee_pct ELSE placement_fee_pct END,
+          offers_signing_bonus = CASE WHEN :has_bonus = 1 THEN :offers_signing_bonus ELSE offers_signing_bonus END,
+          bonus_counts_against_budget = CASE WHEN :has_counts = 1 THEN :bonus_counts ELSE bonus_counts_against_budget END,
           updated_at = SYSUTCDATETIME()
         WHERE id = :client_id;
         """
@@ -285,6 +300,10 @@ def update_client(engine: Engine, client_id: int, payload: ClientUpdate) -> Clie
                 "notes": payload.notes,
                 "has_fee": 1 if "placement_fee_pct" in payload.model_fields_set else 0,
                 "placement_fee_pct": payload.placement_fee_pct,
+                "has_bonus": 1 if "offers_signing_bonus" in payload.model_fields_set else 0,
+                "offers_signing_bonus": None if payload.offers_signing_bonus is None else int(payload.offers_signing_bonus),
+                "has_counts": 1 if "bonus_counts_against_budget" in payload.model_fields_set else 0,
+                "bonus_counts": None if payload.bonus_counts_against_budget is None else int(payload.bonus_counts_against_budget),
             },
         )
     updated = find_client_by_id(engine, client_id)

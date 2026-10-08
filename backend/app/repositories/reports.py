@@ -102,11 +102,11 @@ def get_time_to_fill_summary(
                 r.title,
                 r.department_name,
                 r.sla_days,
-                DATEDIFF(
+                (DATEDIFF(
                     DAY,
                     r.created_at,
                     COALESCE(join_hist.changed_at, r.updated_at)
-                ) AS days
+                ) - r.hold_days_total) AS days
             FROM dbo.requisitions AS r
             OUTER APPLY (
                 SELECT TOP (1) h.changed_at
@@ -155,7 +155,7 @@ def get_time_to_fill_summary(
         ) AS join_hist
         WHERE r.status IN (N'closed', N'filled')
           {_location_scope_clause(is_admin)}
-          AND DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at)) = :days
+          AND (DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at)) - r.hold_days_total) = :days
         ORDER BY r.created_at ASC
         """
     )
@@ -205,11 +205,11 @@ def get_time_to_fill_breakdown(
         WITH fills AS (
             SELECT
                 {key_expr} AS bucket,
-                DATEDIFF(
+                (DATEDIFF(
                     DAY,
                     r.created_at,
                     COALESCE(join_hist.changed_at, r.updated_at)
-                ) AS days
+                ) - r.hold_days_total) AS days
             FROM dbo.requisitions AS r
             OUTER APPLY (
                 SELECT TOP (1) h.changed_at
@@ -315,10 +315,10 @@ def get_report_dataset(
             SELECT
                 r.title AS title,
                 COALESCE(NULLIF(r.department_name, N''), N'Unassigned') AS department,
-                DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at)) AS days_to_fill,
+                (DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at)) - r.hold_days_total) AS days_to_fill,
                 COALESCE(r.sla_days, 30) AS sla_days,
                 CASE
-                    WHEN DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at))
+                    WHEN (DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at)) - r.hold_days_total)
                          <= COALESCE(r.sla_days, 30) THEN N'within-sla'
                     ELSE N'breached'
                 END AS sla_status
@@ -407,8 +407,8 @@ def get_report_dataset(
                 COALESCE(r.sla_days, 30) AS sla_target_days,
                 CASE
                     WHEN r.status IN (N'closed', N'filled') THEN
-                        DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at))
-                    ELSE DATEDIFF(DAY, r.created_at, SYSUTCDATETIME())
+                        (DATEDIFF(DAY, r.created_at, COALESCE(join_hist.changed_at, r.updated_at)) - r.hold_days_total)
+                    ELSE (DATEDIFF(DAY, r.created_at, SYSUTCDATETIME()) - r.hold_days_total)
                 END AS current_days,
                 r.status AS status,
                 owner_u.full_name AS owner
@@ -487,8 +487,8 @@ _PLACEMENT_SELECT = """
             (ca.offered_ctc + ISNULL(ca.signing_bonus, 0))
             * ISNULL(cc.placement_fee_pct, 0) / 100.0, 2) AS FLOAT) AS revenue,
         CASE
-            WHEN DATEDIFF(DAY, r.created_at, jh.changed_at) < 0 THEN 0
-            ELSE DATEDIFF(DAY, r.created_at, jh.changed_at)
+            WHEN (DATEDIFF(DAY, r.created_at, jh.changed_at) - r.hold_days_total) < 0 THEN 0
+            ELSE (DATEDIFF(DAY, r.created_at, jh.changed_at) - r.hold_days_total)
         END AS days_to_fill
     FROM dbo.candidate_applications AS ca
     INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
@@ -589,8 +589,8 @@ def get_client_summary(
                 SUM(ca.offered_ctc + ISNULL(ca.signing_bonus, 0)) AS comp_total,
                 AVG(CAST(
                     CASE
-                        WHEN DATEDIFF(DAY, r.created_at, jh.changed_at) < 0 THEN 0
-                        ELSE DATEDIFF(DAY, r.created_at, jh.changed_at)
+                        WHEN (DATEDIFF(DAY, r.created_at, jh.changed_at) - r.hold_days_total) < 0 THEN 0
+                        ELSE (DATEDIFF(DAY, r.created_at, jh.changed_at) - r.hold_days_total)
                     END AS FLOAT)) AS avg_days_to_fill
             FROM dbo.candidate_applications AS ca
             INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
@@ -645,3 +645,33 @@ def get_dominant_currency(engine: Engine) -> str | None:
             )
         ).first()
     return row[0] if row else None
+
+
+# ---- Phase 4.11: why candidates withdraw -----------------------------------
+def get_withdrawal_reason_counts(
+    engine: Engine,
+    actor_location_id: int | None,
+    is_admin: bool,
+    actor_tenant_id: int | None = None,
+) -> list[dict]:
+    """Withdrawn applications grouped by reason code, and how many of them
+    had an offer on the table when they withdrew."""
+    query = text(
+        f"""
+        SELECT
+            COALESCE(ca.withdrawal_reason, N'no_reason_given') AS reason_code,
+            COUNT(*) AS withdrawn_count,
+            SUM(CASE WHEN ca.offer_status = N'withdrawn' THEN 1 ELSE 0 END) AS after_offer_count
+        FROM dbo.candidate_applications AS ca
+        INNER JOIN dbo.requisitions AS r ON r.id = ca.requisition_id
+        WHERE ca.application_status = N'withdrawn'
+          {_location_scope_clause(is_admin)}
+        GROUP BY COALESCE(ca.withdrawal_reason, N'no_reason_given')
+        ORDER BY COUNT(*) DESC;
+        """
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(
+            query, {"actor_location_id": actor_location_id, "actor_tenant_id": actor_tenant_id}
+        ).mappings().all()
+    return [dict(row) for row in rows]

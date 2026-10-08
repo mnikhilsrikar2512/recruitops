@@ -532,6 +532,11 @@ def finalize_candidate_service(
     requisition = find_requisition_by_id(engine, payload.requisition_id)
     if not requisition:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requisition was not found")
+    if getattr(requisition, "status", None) == "on-hold":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This requisition is on hold; new candidates can be added when it resumes",
+        )
     if count_candidate_applications_for_requisition(engine, candidate_id, payload.requisition_id) > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

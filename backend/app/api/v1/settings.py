@@ -14,8 +14,15 @@ from decimal import Decimal
 from fastapi import HTTPException
 
 from app.repositories.audit import insert_audit_log
-from app.repositories.offer_settings import get_offer_approval_threshold, set_offer_approval_threshold
+from app.repositories.offer_settings import (
+    get_company_bonus_switches,
+    get_offer_approval_threshold,
+    set_company_bonus_switches,
+    set_offer_approval_threshold,
+)
 from app.schemas.settings import OfferApprovalSettings
+from app.schemas.stage_lists import StageListOverview, StageListResponse, StageListUpdate
+from app.services.stage_lists import get_client_list_service, get_overview_service, save_list_service
 from app.schemas.stage_buckets import StageBucketMapResponse, StageBucketResponse, StageBucketUpdate
 from app.services.stage_buckets import (
     get_stage_bucket_map_service,
@@ -115,7 +122,16 @@ def get_offer_approval_endpoint(
     auth: object = Depends(require_permissions("settings.read")),
     engine: Engine = Depends(get_engine),
 ) -> OfferApprovalSettings:
-    return OfferApprovalSettings(threshold=float(get_offer_approval_threshold(engine, caller_tenant_id(auth))))
+    return _offer_settings(engine, caller_tenant_id(auth))
+
+
+def _offer_settings(engine: Engine, tenant_id: int | None) -> OfferApprovalSettings:
+    offers_bonus, counts = get_company_bonus_switches(engine, tenant_id)
+    return OfferApprovalSettings(
+        threshold=float(get_offer_approval_threshold(engine, tenant_id)),
+        offers_signing_bonus=offers_bonus,
+        bonus_counts_against_budget=counts,
+    )
 
 
 @router.put("/offer-approval", response_model=OfferApprovalSettings)
@@ -127,8 +143,15 @@ def set_offer_approval_endpoint(
     tenant_id = caller_tenant_id(auth)
     if tenant_id is None:
         raise HTTPException(status_code=400, detail="The offer threshold belongs to a company; sign in as a company user")
-    before = get_offer_approval_threshold(engine, tenant_id)
+    before = _offer_settings(engine, tenant_id)
     set_offer_approval_threshold(engine, tenant_id, Decimal(str(payload.threshold)))
+    set_company_bonus_switches(
+        engine,
+        tenant_id,
+        before.offers_signing_bonus if payload.offers_signing_bonus is None else payload.offers_signing_bonus,
+        before.bonus_counts_against_budget if payload.bonus_counts_against_budget is None else payload.bonus_counts_against_budget,
+    )
+    after = _offer_settings(engine, tenant_id)
     insert_audit_log(
         engine,
         actor_user_id=auth.user.id,
@@ -136,7 +159,54 @@ def set_offer_approval_endpoint(
         entity_type="tenant",
         entity_id=int(tenant_id),
         action_type="settings.offer_threshold.set",
-        old_values={"threshold": float(before)},
-        new_values={"threshold": payload.threshold},
+        old_values=before.model_dump(),
+        new_values=after.model_dump(),
     )
-    return OfferApprovalSettings(threshold=float(get_offer_approval_threshold(engine, tenant_id)))
+    return after
+
+
+# ---- Stage lists (Phase 4.10, D-4.10): company default + one per client --
+@router.get("/stage-lists", response_model=StageListOverview)
+def get_stage_lists_endpoint(
+    auth: object = Depends(require_permissions("settings.read")),
+    engine: Engine = Depends(get_engine),
+) -> StageListOverview:
+    return get_overview_service(engine, auth)
+
+
+@router.get("/stage-lists/company", response_model=StageListResponse)
+def get_company_stage_list_endpoint(
+    auth: object = Depends(require_permissions("settings.read")),
+    engine: Engine = Depends(get_engine),
+) -> StageListResponse:
+    return get_overview_service(engine, auth).company
+
+
+@router.put("/stage-lists/company", response_model=StageListResponse)
+def save_company_stage_list_endpoint(
+    payload: StageListUpdate,
+    auth: object = Depends(require_permissions("settings.update")),
+    engine: Engine = Depends(get_engine),
+) -> StageListResponse:
+    """Used for internal hiring and for clients without their own list."""
+    return save_list_service(engine, auth, payload, None)
+
+
+@router.get("/stage-lists/clients/{client_id}", response_model=StageListResponse)
+def get_client_stage_list_endpoint(
+    client_id: int,
+    auth: object = Depends(require_permissions("client.read")),
+    engine: Engine = Depends(get_engine),
+) -> StageListResponse:
+    return get_client_list_service(engine, auth, client_id)
+
+
+@router.put("/stage-lists/clients/{client_id}", response_model=StageListResponse)
+def save_client_stage_list_endpoint(
+    client_id: int,
+    payload: StageListUpdate,
+    auth: object = Depends(require_permissions("client.update")),
+    engine: Engine = Depends(get_engine),
+) -> StageListResponse:
+    """Every requisition for this client uses this list."""
+    return save_list_service(engine, auth, payload, client_id)

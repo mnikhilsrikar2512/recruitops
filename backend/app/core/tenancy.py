@@ -24,6 +24,7 @@ TABLE_TENANCY: dict[str, str] = {
     "stage_bucket_map": "tenant",  # NULL = platform default label map (016)
     "candidate_archives": "tenant",  # an archive hides a shared candidate from ONE company (019)
     "upload_quarantine": "tenant",  # uploads that failed the malware scan (021)
+    "pipeline_templates": "tenant",  # company default + one list per client (025)
     # ---- through an office --------------------------------------------
     "agent_runs": "office:location_id",
     "approvals": "office:location_id",
@@ -37,7 +38,6 @@ TABLE_TENANCY: dict[str, str] = {
     "display_id_sequences": "office:branch_id",
     "meetings": "office:location_id",
     "notifications": "user:user_id",
-    "pipeline_templates": "office:location_id",
     "portal_accounts": "office:branch_id",
     "recruiter_daily_updates": "office:branch_id",
     "report_locks": "office:branch_id",
@@ -58,6 +58,7 @@ TABLE_TENANCY: dict[str, str] = {
     "requisition_end_clients": "parent:requisition_id->requisitions",
     "requisition_screening_rules": "parent:requisition_id->requisitions",
     "requisition_skill_requirements": "parent:requisition_id->requisitions",
+    "requisition_holds": "parent:requisition_id->requisitions",  # 4.12 (024)
     "meeting_attendees": "parent:meeting_id->meetings",
     "pipeline_template_stages": "parent:pipeline_template_id->pipeline_templates",
     "portal_account_slots": "parent:portal_account_id->portal_accounts",

@@ -276,3 +276,79 @@ Decision D-4.1 (2026-10-08): files are stored through the S3 standard, so any S3
 
 - `test_file_serve_route_registered` still expected the removed `GET /files/{file_path}` route. It now checks that `/files/signed/{token}` exists and that the raw path route is gone.
 - GitHub CI's frontend gates failed `flow_logout` with "Transition was aborted because of invalid state". That is Chromium's own cross-document View Transition promise being rejected when logout navigates mid-transition. The browser sweep already ignored this message; the UI-flow runner now ignores it the same way (`_BENIGN_ERRORS`). The navigation itself completes and the flow's assertions still run.
+
+## 4.10–4.13 Real-world hiring changes (user review, 2026-10-08) — built, awaiting verify
+
+These came from reviewing the product overview. The decisions are D-4.10 to D-4.13 in `decisions-2026-10-06.md`.
+
+### 4.10 Each client has its own hiring stages (D-4.10: per client only)
+- **How a requisition gets its stage list:**
+  - A requisition for a client uses that client's stage list.
+  - Internal hiring, and clients without a list of their own, use the company default list.
+  - With neither, the built-in platform stages apply (today's behaviour).
+  - There is no per-requisition choice.
+- **Migration `025_client_stage_lists.sql`:**
+  - Adds `tenant_id`, `client_company_id` and `version` to `pipeline_templates`.
+  - Adds one active list per client and one company default per company.
+  - Tenancy for `pipeline_templates` is now `tenant`.
+- **API:**
+  - `GET /settings/stage-lists` lists every client and shows whether it has its own list.
+  - `GET|PUT /settings/stage-lists/company` reads and saves the company default (`settings.update` to save).
+  - `GET|PUT /settings/stage-lists/clients/{id}` reads and saves one client's list (`client.update` to save).
+  - `GET /pipeline/applications/{id}/stages` returns the stages that application can move to.
+- **Saving a list:**
+  - Missing closing stages (Joined, Rejected, Withdrawn) are added automatically.
+  - If active candidates sit in a stage the new list drops, the save returns 409 with `unmapped` and `allowed_targets`.
+  - The editor then asks where each of those stages goes and saves again with `remap`.
+  - Remapped moves are written to the stage history as `stage-list-change`.
+  - Requisitions governed by the list are pointed at it. The existing SQL bucket resolver is unchanged, so reports keep working.
+- **Moves:**
+  - A move must target a stage in the list, matched by name or code, ignoring case and spaces.
+  - The client's own spelling of the stage is the one stored.
+- **UI:**
+  - Stage editor on the client page and in Company settings (default list).
+  - The move dialog lists the client's stages.
+- **Test:** `test_client_stage_lists_db.py`.
+
+### 4.11 Withdrawals, including after an offer is approved (D-4.11)
+- **Reason:** a withdrawal needs a reason from a short list, and "No reason given" is a valid answer. A note is optional, except for "Other".
+- **Older clients:** a request that sends only a note counts as "Other".
+- **Effect on the offer:** an open offer (`draft`, `pending-approval`, `approved`, `sent` or `accepted`) becomes `withdrawn`, and a pending offer approval is cancelled.
+- **No new offer work:** offers can't be created or moved forward for a withdrawn or rejected application until it is reopened.
+- **Migration `023_withdraw_reasons.sql`:**
+  - Adds `candidate_applications.withdrawal_reason` and `withdrawn_at`.
+  - Existing withdrawals are backfilled as `no_reason_given`.
+- **Report:** `GET /reports/withdrawal-reasons` gives counts per reason and how many withdrew after an offer.
+
+### 4.12 Client puts a requisition on hold (D-4.12: freeze, keep everything)
+- **API:**
+  - `POST /requisitions/{id}/hold` takes a reason code, an optional note and an optional expected resume date.
+  - `POST /requisitions/{id}/resume` ends the hold.
+  - `GET /requisitions/{id}/holds` returns the hold history.
+  - The old `PATCH /status` to or from `on-hold` goes through the same flow (reason code "other").
+- **While on hold:**
+  - No stage moves, new candidates, offers or interviews.
+  - Withdrawing or rejecting a candidate is still allowed.
+  - Owners are notified. The notification is high priority when interviews are still scheduled, so the recruiter can tell the candidates.
+- **Clocks pause:**
+  - On resume, the hold's days are added to `requisitions.hold_days_total`, and the target close date moves out by the same number of days.
+  - Time-to-fill reports subtract `hold_days_total`.
+- **Migration `024_requisition_holds.sql`:**
+  - New `requisition_holds` table, with at most one open hold per requisition.
+  - Adds `requisitions.hold_days_total`.
+  - Requisitions already on hold get an open hold row.
+
+### 4.13 Signing bonus is optional, per company and per client (D-4.13)
+- **Two switches:**
+  - "We pay signing bonuses": when off, the field is hidden and a bonus is refused with 422.
+  - "Count the bonus against the budget": when off, the offer is compared on CTC alone.
+- **Which switches apply:**
+  - The company's switches apply when it hires for itself.
+  - A client's switches apply to its requisitions. A blank client switch uses the company's.
+- **Migration `022_signing_bonus_policy.sql`:**
+  - Adds the switches on `tenants` and `client_companies`.
+  - New companies start with bonus off and counts on; existing companies keep bonus on.
+- **API:**
+  - `GET /offers/policy/{application_id}` tells the offer form what applies.
+  - Company switches are set through `/settings/offer-approval`; client switches through `PATCH /clients/{id}`.
+- **UI:** switches in Company settings; a select on the client edit dialog; the offer form hides or annotates the bonus.

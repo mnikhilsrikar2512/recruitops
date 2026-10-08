@@ -10,6 +10,7 @@ from app.schemas.reports import (
     ReportDatasetResponse,
     SourceEffectivenessReportResponse,
     TimeToFillReportResponse,
+    WithdrawalReasonsReportResponse,
 )
 from app.services.auth import AuthContext
 from app.services.reports import (
@@ -19,6 +20,7 @@ from app.services.reports import (
     get_report_datasets_service,
     get_source_effectiveness_report_service,
     get_time_to_fill_report_service,
+    get_withdrawal_reasons_report_service,
 )
 
 router = APIRouter()
@@ -40,6 +42,16 @@ def source_effectiveness_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> SourceEffectivenessReportResponse:
     return get_source_effectiveness_report_service(engine, auth_context)
+
+
+@router.get("/withdrawal-reasons", response_model=WithdrawalReasonsReportResponse)
+def withdrawal_reasons_endpoint(
+    _auth: object = Depends(require_permissions("report.read")),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    engine: Engine = Depends(get_engine),
+) -> WithdrawalReasonsReportResponse:
+    """Phase 4.11: why candidates withdrew, incl. after an offer."""
+    return get_withdrawal_reasons_report_service(engine, auth_context)
 
 
 @router.get("/placements", response_model=PlacementsReportResponse)

@@ -117,3 +117,16 @@ class ClientSummaryReportResponse(BaseModel):
     currency: str | None
     rows: list[ClientSummaryRow]
     totals: ClientSummaryTotals
+
+
+class WithdrawalReasonRow(BaseModel):
+    reason_code: str
+    label: str
+    withdrawn_count: int
+    after_offer_count: int
+
+
+class WithdrawalReasonsReportResponse(BaseModel):
+    """Phase 4.11: why candidates drop out (incl. after an offer)."""
+    total: int
+    items: list[WithdrawalReasonRow]

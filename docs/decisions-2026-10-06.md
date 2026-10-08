@@ -21,3 +21,14 @@ Supersedes the "pending" and "adopted on recommendation" rows of
 | I-4 | Peak concurrent users | **Unknown.** | Plan for 100 concurrent; load-test at 3× = 300. |
 | I-7 | Legal text | **Lawyer, later.** | Engineering builds versioned acceptance with clearly marked placeholder text; launch blocked until final text. |
 | I-3 | Domain | **None yet.** | Placeholders `app.<domain>` / `staging.<domain>`; CORS/TLS close when bought. |
+
+## Added 2026-10-08 (product review)
+
+| ID | Decision |
+|---|---|
+| D-4.10 | Hiring stages are set **per client only**. Each client has one stage list, and all of its requisitions use it. Internal hiring, and clients without their own list, use the company default list. With neither, the platform stages apply. If candidates sit in a stage that a list change removes, they must be remapped. |
+| D-4.11 | A withdrawal reason comes from a fixed list, and **"No reason given" is valid**. A note is needed only for "Other". A withdrawal also withdraws any open offer and cancels any pending offer approval. |
+| D-4.12 | A client **hold freezes the requisition and keeps everything**. A reason is required. Stage moves, new candidates, offers and interviews are blocked, but withdrawing or rejecting a candidate is still allowed. The clocks pause: time-to-fill excludes hold days, and the target date moves out by them. Resuming restores the previous status. |
+| D-4.13 | **Signing bonus has two switches**, "pays bonus" and "counts against budget", set for the company and for each client. Internal hiring uses the company's switches. Client hiring uses the client's, falling back to the company's. |
+| I-2a | **Hosting target: Azure** (proposal, revises I-2; not final). Azure SQL, Container Apps (API, plus ClamAV as a sidecar), Blob Storage (needs an `AzureBlobStorage` adapter), Key Vault, Managed Identity, App Insights and Front Door. Region: Central India if the customers are mostly in India. Microsoft must be listed as a sub-processor in the DPA. |
+| I-7a | **Legal text (T&C, Privacy, DPA) is still not decided** (confirms I-7). Phase 5 builds versioned documents, acceptance tracking and re-acceptance, shipping with placeholders marked "DRAFT — NOT LEGAL TEXT". A go-live check blocks production while any placeholder is active. |

@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.pagination import PaginationMeta
 
-OfferStatus = Literal["draft", "pending-approval", "approved", "sent", "accepted", "declined", "cancelled"]
+OfferStatus = Literal["draft", "pending-approval", "approved", "sent", "accepted", "declined", "cancelled", "withdrawn"]
 
 
 def _normalize_text(value: str | None) -> str | None:
@@ -112,3 +112,14 @@ class OfferResponse(BaseModel):
 class OfferListResponse(BaseModel):
     items: list[OfferResponse]
     meta: PaginationMeta
+
+
+class OfferPolicyResponse(BaseModel):
+    """Phase 4.13: signing-bonus rules for one application's offer."""
+    application_id: int
+    signing_bonus_allowed: bool
+    bonus_counts_against_budget: bool
+    source: str  # "client" | "company"
+    client_company_id: int | None = None
+    budget_max: float | None = None
+    currency_code: str | None = None

@@ -70,6 +70,9 @@ class ClientUpdate(BaseModel):
     placement_fee_pct: float | None = Field(default=None, ge=0, le=100)
     status: ClientStatus | None = None
     notes: str | None = None
+    # Phase 4.13: true/false overrides the company; null = use the company setting
+    offers_signing_bonus: bool | None = None
+    bonus_counts_against_budget: bool | None = None
 
     @field_validator("client_name", "industry", "notes")
     @classmethod
@@ -165,6 +168,8 @@ class ClientResponse(BaseModel):
     updated_at: datetime
     archived_at: datetime | None = None
     archive_reason: str | None = None
+    offers_signing_bonus: bool | None = None
+    bonus_counts_against_budget: bool | None = None
 
 
 class ClientListResponse(BaseModel):

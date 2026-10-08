@@ -1331,7 +1331,151 @@ async function submitRequisitionStatus(button) {
     if (subtitle && application.candidate_name) {
       subtitle.textContent = `${application.candidate_name}${application.requisition_title ? " • " + application.requisition_title : ""}`;
     }
+    await applyClientStageOptions(applicationId, application.current_stage);
+    if (application.requisition_status === "on-hold") showHoldBanner(document.querySelector("[data-overlay-surface]"), "This requisition is on hold. You can still withdraw or reject the candidate; other moves wait until it resumes.");
   } catch (error) { showLiveError(error); }
+  mountWithdrawalReasonField();
+}
+
+/* Phase 4.10: the move targets are the client's own stage list. */
+async function applyClientStageOptions(applicationId, currentStage) {
+  const select = document.getElementById("to_stage") || document.querySelector("[data-stage-target-select]");
+  if (!select) return;
+  const list = await apiRequest(`/pipeline/applications/${applicationId}/stages`).catch(() => null);
+  if (!list?.stages?.length) return;
+  const offersOff = typeof branchOffersEnabled === "function" && !branchOffersEnabled();
+  const current = String(currentStage || "").trim().toLowerCase();
+  select.innerHTML = list.stages
+    .filter((stage) => stage.name.trim().toLowerCase() !== current && stage.code !== current)
+    .filter((stage) => !(offersOff && stage.bucket === "offer"))
+    .map((stage) => `<option value="${escapeHtml(stage.name)}" data-bucket="${escapeHtml(stage.bucket || "")}">${escapeHtml(stage.name)}</option>`)
+    .join("");
+  select.dispatchEvent(new Event("change"));
+}
+
+/* Phase 4.10: edit a stage list (company default or one client's).
+   Saving may answer 409 with candidates in removed stages: the editor then
+   asks where each of those stages goes and saves again with the remap. */
+const STAGE_BUCKET_CHOICES = [
+  ["sourced", "Sourced"], ["screened", "Screened"], ["submitted", "Submitted"], ["interview", "Interview"],
+  ["offer", "Offer"], ["joined", "Joined (closes)"], ["rejected", "Rejected (closes)"], ["withdrawn", "Withdrawn (closes)"],
+];
+
+function renderStageListEditor(host, { url, title, intro, canEdit }) {
+  if (!host) return;
+  host.innerHTML = `<div class="p-4 rounded-lg border border-border bg-surface" data-stage-list-editor>
+    <h2 class="m-0 font-headline-sm text-headline-sm font-semibold text-on-surface">${escapeHtml(title)}</h2>
+    <p class="m-0 mt-1 mb-3 text-[12px] text-text-muted" data-stage-list-source>${escapeHtml(intro)}</p>
+    <ol class="m-0 p-0 list-none flex flex-col gap-2" data-stage-rows></ol>
+    <div data-stage-remap class="mt-3" hidden></div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      ${canEdit ? '<button type="button" data-stage-add class="px-3 py-1.5 rounded-lg border border-border text-sm">Add stage</button><button type="button" data-stage-save class="px-3 py-1.5 rounded-lg bg-primary text-on-primary text-sm font-semibold">Save stages</button>' : ""}
+      <span role="status" data-stage-status class="text-[12px] text-text-muted self-center"></span>
+    </div></div>`;
+  const rows = host.querySelector("[data-stage-rows]");
+  const statusEl = host.querySelector("[data-stage-status]");
+  const remapHost = host.querySelector("[data-stage-remap]");
+  const bucketOptions = (value) => STAGE_BUCKET_CHOICES.map(([code, label]) => `<option value="${code}" ${code === value ? "selected" : ""}>${label}</option>`).join("");
+  const addRow = (stage = { name: "", bucket: "interview" }) => {
+    const li = document.createElement("li");
+    li.className = "flex flex-wrap items-center gap-2";
+    li.innerHTML = `<input aria-label="Stage name" data-stage-name value="${escapeHtml(stage.name)}" maxlength="100" class="flex-1 min-w-[160px] bg-surface-alt border border-border rounded px-2 py-1.5 text-sm" ${canEdit ? "" : "disabled"}/>
+      <select aria-label="Counts as" data-stage-bucket class="bg-surface-alt border border-border rounded px-2 py-1.5 text-sm" ${canEdit ? "" : "disabled"}>${bucketOptions(stage.bucket)}</select>
+      ${canEdit ? '<button type="button" data-stage-up aria-label="Move up" class="px-2 py-1 border border-border rounded text-xs">↑</button><button type="button" data-stage-remove aria-label="Remove stage" class="px-2 py-1 border border-border rounded text-xs">Remove</button>' : ""}`;
+    li.querySelector("[data-stage-up]")?.addEventListener("click", () => { if (li.previousElementSibling) rows.insertBefore(li, li.previousElementSibling); });
+    li.querySelector("[data-stage-remove]")?.addEventListener("click", () => li.remove());
+    rows.appendChild(li);
+  };
+  const collect = () => Array.from(rows.querySelectorAll("li")).map((li) => ({
+    name: li.querySelector("[data-stage-name]").value.trim(),
+    bucket: li.querySelector("[data-stage-bucket]").value,
+  })).filter((stage) => stage.name);
+  const load = async () => {
+    const list = await apiRequest(url).catch((error) => { statusEl.textContent = error?.message || "Couldn't load the stages."; return null; });
+    if (!list) return;
+    rows.innerHTML = "";
+    list.stages.forEach((stage) => addRow(stage));
+    const source = host.querySelector("[data-stage-list-source]");
+    if (list.source === "platform") source.textContent = `${intro} Showing the built-in stages; saving creates your own list.`;
+    else if (list.source === "company" && /clients\//.test(url)) source.textContent = `${intro} This client uses your company default today; saving gives it its own list.`;
+  };
+  const save = async (remap = {}) => {
+    statusEl.textContent = "Saving…";
+    try {
+      await apiRequest(url, { method: "PUT", body: JSON.stringify({ stages: collect(), remap }) });
+      remapHost.hidden = true;
+      remapHost.innerHTML = "";
+      statusEl.textContent = "Saved. Requisitions using this list follow it now.";
+      await load();
+    } catch (error) {
+      const detail = (error?.body && typeof error.body.detail === "object") ? error.body.detail : error?.detail;
+      if (error?.status === 409 && detail?.unmapped) {
+        statusEl.textContent = detail.message;
+        remapHost.hidden = false;
+        remapHost.innerHTML = detail.unmapped.map((item) => `<label class="flex flex-wrap items-center gap-2 text-sm mb-1"><span class="min-w-[180px]">${escapeHtml(item.stage)} <span class="text-text-muted">(${item.candidates} candidate${item.candidates === 1 ? "" : "s"})</span> →</span>
+          <select data-remap-from="${escapeHtml(item.stage)}" class="bg-surface-alt border border-border rounded px-2 py-1 text-sm">${detail.allowed_targets.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}</select></label>`).join("")
+          + '<button type="button" data-remap-save class="mt-2 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-sm font-semibold">Move them and save</button>';
+        remapHost.querySelector("[data-remap-save]").addEventListener("click", () => {
+          const mapping = {};
+          remapHost.querySelectorAll("[data-remap-from]").forEach((select) => { mapping[select.dataset.remapFrom] = select.value; });
+          save(mapping);
+        });
+      } else {
+        statusEl.textContent = (typeof detail === "string" && detail) || error?.message || "Couldn't save the stages.";
+      }
+    }
+  };
+  host.querySelector("[data-stage-add]")?.addEventListener("click", () => addRow());
+  host.querySelector("[data-stage-save]")?.addEventListener("click", () => save());
+  load();
+}
+
+/* Phase 4.11: why a candidate withdrew. "No reason given" is a valid pick. */
+const WITHDRAWAL_REASONS = [
+  ["no_reason_given", "No reason given"],
+  ["accepted_other_offer", "Accepted another offer"],
+  ["counter_offer", "Took a counter-offer"],
+  ["compensation", "Compensation"],
+  ["location_or_relocation", "Location / relocation"],
+  ["role_or_work_mismatch", "Role or work-mode mismatch"],
+  ["notice_period", "Notice period"],
+  ["personal_or_health", "Personal / health"],
+  ["not_responding", "Stopped responding"],
+  ["other", "Other (add a note)"],
+];
+
+function stageOptionIsWithdrawal(select) {
+  const option = select?.options?.[select.selectedIndex];
+  if (!option) return false;
+  if (option.dataset.bucket) return option.dataset.bucket === "withdrawn";
+  return /withdr|pulled.?out|dropped.?out/i.test(option.text || option.value || "");
+}
+
+function mountWithdrawalReasonField() {
+  const targetSelect = document.getElementById("to_stage") || document.querySelector("[data-stage-target-select]");
+  if (!targetSelect || document.getElementById("withdrawal_reason")) return;
+  const wrap = document.createElement("div");
+  wrap.className = "flex flex-col gap-1 mt-3";
+  wrap.dataset.withdrawalReasonField = "true";
+  wrap.innerHTML = `<label for="withdrawal_reason" class="font-label-caps text-label-caps text-on-surface uppercase">Why did the candidate withdraw?</label>
+    <select id="withdrawal_reason" class="w-full bg-surface-alt border border-border rounded-lg px-3 py-2 font-body-md text-body-md text-on-surface">
+      ${WITHDRAWAL_REASONS.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}
+    </select>
+    <p class="font-body-sm text-text-muted text-[12px]">Any open offer is withdrawn too. The note is optional unless you pick Other.</p>`;
+  (targetSelect.closest(".flex.flex-col") || targetSelect.parentElement).insertAdjacentElement("afterend", wrap);
+  const sync = () => { wrap.hidden = !stageOptionIsWithdrawal(targetSelect); };
+  targetSelect.addEventListener("change", sync);
+  sync();
+}
+
+function showHoldBanner(host, message) {
+  if (!host || host.querySelector("[data-hold-banner]")) return;
+  const banner = document.createElement("div");
+  banner.dataset.holdBanner = "true";
+  banner.setAttribute("role", "status");
+  banner.className = "m-3 rounded-lg border border-border bg-highlight-soft px-3 py-2 font-body-sm text-on-surface";
+  banner.textContent = message;
+  host.prepend(banner);
 }
 
 async function submitStageMove() {
@@ -1347,6 +1491,8 @@ async function submitStageMove() {
   /* The backend recognises rejection by the canonical lowercase code. */
   const targetStage = isRejection ? "rejected" : toStage;
   if (!applicationId || !toStage) { showLiveError(new Error("Application ID and target stage are required.")); return; }
+  const withdrawalReason = stageOptionIsWithdrawal(targetSelect) ? (document.getElementById("withdrawal_reason")?.value || "no_reason_given") : undefined;
+  if (withdrawalReason === "other" && !notes) { showLiveError(new Error("Add a short note when the reason is Other.")); return; }
   /* Mirror of the backend 409: branches with offer tracking off can't
      transition into an offer stage (sourcing-only flow). */
   if (typeof branchOffersEnabled === "function" && !branchOffersEnabled() && /offer/i.test(toStage)) {
@@ -1356,7 +1502,7 @@ async function submitStageMove() {
   try {
     await apiRequest(`/pipeline/applications/${applicationId}/stage`, {
       method: "PATCH",
-      body: { to_stage: targetStage, notes, rejection_reason: isRejection ? notes : undefined },
+      body: { to_stage: targetStage, notes, rejection_reason: isRejection ? notes : undefined, withdrawal_reason: withdrawalReason },
     });
     showLiveSuccess("Stage updated", toStage);
     afterOverlaySave("pipeline-board.html");
@@ -1773,6 +1919,8 @@ async function openClientDialog(clientId, refresh) {
       { name: "industry", label: "Industry", value: client?.industry || "", placeholder: "e.g. Technology" },
       { name: "status", label: "Status", type: "select", value: client?.status || "active", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
       { name: "placement_fee_pct", label: "Placement Fee %", type: "number", value: client?.placement_fee_pct ?? "", placeholder: "e.g. 8.33", step: "0.01", min: 0, max: 100, hint: "Used to compute revenue on the placements and client-summary reports." },
+      { name: "offers_signing_bonus", label: "Signing Bonus", type: "select", value: triToOption(client?.offers_signing_bonus), options: [{ value: "", label: "Use company setting" }, { value: "yes", label: "This client pays signing bonuses" }, { value: "no", label: "No signing bonus for this client" }] },
+      { name: "bonus_counts_against_budget", label: "Bonus vs Budget", type: "select", value: triToOption(client?.bonus_counts_against_budget), options: [{ value: "", label: "Use company setting" }, { value: "yes", label: "Count the bonus against the budget" }, { value: "no", label: "Compare CTC only" }], hint: "Offers for this client's requisitions follow these; blank uses your company settings." },
       { name: "notes", label: "Commercial Notes", value: client?.notes || "", placeholder: "Optional" },
     ] : [
       { name: "client_name", label: "Client Name", required: true, value: "", placeholder: "e.g. Acme Corp" },
@@ -1802,7 +1950,7 @@ async function openClientDialog(clientId, refresh) {
       const name = values.client_name.trim();
       if (!name) throw new Error("Client name is required.");
       if (isEdit) {
-        await apiRequest(`/clients/${clientId}`, { method: "PATCH", body: JSON.stringify({ client_name: name, industry: values.industry || null, status: values.status, notes: values.notes || null, placement_fee_pct: values.placement_fee_pct === "" ? null : intOrNull(values.placement_fee_pct) === null ? null : Number(values.placement_fee_pct) }) });
+        await apiRequest(`/clients/${clientId}`, { method: "PATCH", body: JSON.stringify({ client_name: name, industry: values.industry || null, status: values.status, notes: values.notes || null, placement_fee_pct: values.placement_fee_pct === "" ? null : intOrNull(values.placement_fee_pct) === null ? null : Number(values.placement_fee_pct), offers_signing_bonus: optionToTri(values.offers_signing_bonus), bonus_counts_against_budget: optionToTri(values.bonus_counts_against_budget) }) });
       } else {
         const chosenLocationId = intOrNull(values.location_id) || session?.location_id;
         const ownerId = intOrNull(values.client_owner_user_id) || session?.user_id;
@@ -2437,6 +2585,19 @@ async function loadClientDetail() {
     kind: "client", record: client, resourcePath: `/clients/${client.id}`, permission: "client.delete.soft",
     anchor: document.querySelector("[data-client-detail] h1") || surface?.querySelector("h1, h2"),
   });
+  let stageHost = document.getElementById("client-stage-list");
+  if (!stageHost && surface) {
+    stageHost = document.createElement("section");
+    stageHost.id = "client-stage-list";
+    stageHost.className = "m-4";
+    surface.appendChild(stageHost);
+  }
+  renderStageListEditor(stageHost, {
+    url: `/settings/stage-lists/clients/${client.id}`,
+    title: "Hiring stages for this client",
+    intro: "Every requisition for this client uses these stages.",
+    canEdit: hasPermission("client.update"),
+  });
 }
 
 
@@ -2579,6 +2740,73 @@ async function loadRequisitionDetail() {
     { label: "Target Close", value: formatWhen(requisition.target_closure_date).slice(0, 10), hint: "Target date" },
     { label: "Owners", value: 1, hint: requisition.primary_owner_name || "Primary owner" },
   ]);
+  renderRequisitionHoldPanel(surface, requisition);
+}
+
+/* Phase 4.12: a client can put a requisition on hold. Candidates freeze
+   (withdraw / reject still allowed), clocks pause, resume restores. */
+const HOLD_REASONS = [
+  ["client_budget", "Budget not released"],
+  ["hiring_freeze", "Hiring freeze"],
+  ["role_being_redefined", "Role being redefined"],
+  ["client_reorganisation", "Reorganisation"],
+  ["internal_candidate", "Considering an internal candidate"],
+  ["awaiting_client_approval", "Awaiting approval"],
+  ["client_unresponsive", "Client not responding"],
+  ["other", "Other (add a note)"],
+];
+
+function renderRequisitionHoldPanel(surface, requisition) {
+  if (!surface) return;
+  surface.querySelector("[data-hold-panel]")?.remove();
+  const canChange = typeof hasPermission === "function" && hasPermission("requisition.status.update");
+  const panel = document.createElement("div");
+  panel.dataset.holdPanel = "true";
+  panel.className = "mx-4 my-3 rounded-lg border border-border px-4 py-3 flex flex-wrap items-center gap-3 " + (requisition.status === "on-hold" ? "bg-highlight-soft" : "bg-surface");
+  const hold = requisition.active_hold;
+  if (requisition.status === "on-hold") {
+    const since = hold?.held_at ? formatWhen(hold.held_at).slice(0, 10) : "";
+    const expected = hold?.expected_resume_date ? ` · expected back ${escapeHtml(hold.expected_resume_date)}` : "";
+    panel.innerHTML = `<span class="material-symbols-outlined text-warning-text">pause_circle</span>
+      <div class="flex-1 min-w-[200px]"><p class="m-0 font-semibold text-on-surface">On hold${hold ? ": " + escapeHtml(hold.reason_label) : ""}</p>
+      <p class="m-0 text-[12px] text-text-muted">${since ? "Since " + escapeHtml(since) : ""}${hold?.held_by_name ? " by " + escapeHtml(hold.held_by_name) : ""}${expected}${hold?.reason_note ? " — " + escapeHtml(hold.reason_note) : ""}. Candidates stay where they are; you can still withdraw or reject.</p></div>
+      ${canChange ? '<button type="button" data-resume-requisition class="px-3 py-1.5 rounded-lg bg-primary text-on-primary text-sm font-semibold">Resume</button>' : ""}`;
+  } else if (["open", "draft"].includes(requisition.status) && canChange) {
+    panel.innerHTML = `<p class="m-0 flex-1 text-[12px] text-text-muted">Client paused this role? Put it on hold to freeze its candidates and pause the clock.${requisition.hold_days_total ? ` Paused so far: ${requisition.hold_days_total} day(s).` : ""}</p>
+      <button type="button" data-hold-requisition class="px-3 py-1.5 rounded-lg border border-border text-sm font-semibold">Put on hold</button>`;
+  } else {
+    return;
+  }
+  surface.prepend(panel);
+  panel.querySelector("[data-resume-requisition]")?.addEventListener("click", async () => {
+    try {
+      await apiRequest(`/requisitions/${requisition.id}/resume`, { method: "POST", body: JSON.stringify({ note: null, version: requisition.version }) });
+      showToast("Requisition resumed", requisition.title);
+      loadRequisitionDetail();
+    } catch (error) { showLiveError(error); }
+  });
+  panel.querySelector("[data-hold-requisition]")?.addEventListener("click", () => {
+    openEntityDialog({
+      id: "requisition-hold-overlay",
+      title: "Put requisition on hold",
+      submitLabel: "Put on hold",
+      fields: [
+        { name: "reason_code", label: "Reason", type: "select", value: "client_budget", options: HOLD_REASONS.map(([value, label]) => ({ value, label })) },
+        { name: "note", label: "Note", value: "", placeholder: "Optional (required for Other)" },
+        { name: "expected_resume_date", label: "Expected back (optional)", type: "date", value: "" },
+      ],
+      onSubmit: async (values, close) => {
+        if (values.reason_code === "other" && !values.note.trim()) throw new Error("Add a short note when the reason is Other.");
+        await apiRequest(`/requisitions/${requisition.id}/hold`, { method: "POST", body: JSON.stringify({
+          reason_code: values.reason_code, note: values.note.trim() || null,
+          expected_resume_date: values.expected_resume_date || null, version: requisition.version,
+        }) });
+        close();
+        showToast("Requisition on hold", requisition.title);
+        loadRequisitionDetail();
+      },
+    });
+  });
 }
 
 async function loadAssignmentHistoryDrawer() {
@@ -4612,6 +4840,10 @@ function syncCurrencySymbols() {
   });
 }
 
+/* Phase 4.13: client override selects — "" = use the company setting. */
+function triToOption(value) { return value === true ? "yes" : value === false ? "no" : ""; }
+function optionToTri(value) { return value === "yes" ? true : value === "no" ? false : null; }
+
 async function loadOfferCreateDialog() {
   /* The offer form uses position/department selects — populate from backend */
   const candidates = await apiRequest("/candidates/?page_size=50").catch(() => ({ items: [] }));
@@ -4628,6 +4860,31 @@ async function loadOfferCreateDialog() {
     if (el) el.value = requisitionId;
   }
   syncCurrencySymbols();
+  await applyOfferBonusPolicy(queryInt("application_id", "candidate_application_id"));
+}
+
+/* Phase 4.13: hide the signing-bonus field where the company (or, for client
+   hiring, the client) doesn't pay one; say when it doesn't count. */
+async function applyOfferBonusPolicy(applicationId) {
+  const input = document.getElementById("signing_bonus");
+  if (!input || !applicationId) return;
+  const policy = await apiRequest(`/offers/policy/${applicationId}`).catch(() => null);
+  if (!policy) return;
+  const field = input.closest(".flex.flex-col") || input.parentElement;
+  input.dataset.bonusAllowed = policy.signing_bonus_allowed ? "true" : "false";
+  if (!policy.signing_bonus_allowed) {
+    input.value = "";
+    if (field) field.hidden = true;
+    return;
+  }
+  if (field) field.hidden = false;
+  if (!policy.bonus_counts_against_budget && field && !field.querySelector("[data-bonus-hint]")) {
+    const hint = document.createElement("p");
+    hint.dataset.bonusHint = "true";
+    hint.className = "font-body-sm text-text-muted text-[12px]";
+    hint.textContent = `Not counted against the budget (${policy.source === "client" ? "client" : "company"} setting).`;
+    field.appendChild(hint);
+  }
 }
 
 
@@ -5529,7 +5786,8 @@ async function submitOfferCreate() {
   const requisitionId = intOrNull(queryInt("requisition_id")) || intOrNull(document.getElementById("requisition_id")?.value);
   const offeredCtc = parseMoneyInput(document.getElementById("base_salary")?.value);
   const currency = document.getElementById("currency")?.value || "USD";
-  const signingBonus = parseMoneyInput(document.getElementById("signing_bonus")?.value);
+  const bonusInput = document.getElementById("signing_bonus");
+  const signingBonus = bonusInput?.dataset?.bonusAllowed === "false" ? null : parseMoneyInput(bonusInput?.value);
   const startDate = document.getElementById("start_date")?.value || null;
   const notes = document.getElementById("notes")?.value || null;
   /* If we have candidate+requisition but no application_id, we need to find it */
