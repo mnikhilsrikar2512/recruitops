@@ -1,8 +1,8 @@
 {
  "generated_at_unix": 1789682101,
- "primary_route_count": 81,
+ "primary_route_count": 82,
  "overlay_route_count": 22,
- "total_route_count": 103,
+ "total_route_count": 104,
  "primary_routes": [
   {
    "file": "login.html",
@@ -1519,6 +1519,17 @@
      "href": "legal.html"
     }
    ]
+  },
+  {
+   "file": "data-export-delete-request.html",
+   "route_id": "data-export-delete-request",
+   "kind": "app",
+   "title": "Data Export/Delete Requests",
+   "section": "Administration",
+   "subtitle": "Export or delete the company's data; candidate requests from the candidate page.",
+   "source": "privacy_requests",
+   "nav": "data-export-delete-request.html",
+   "links": []
   }
  ],
  "overlay_routes": [

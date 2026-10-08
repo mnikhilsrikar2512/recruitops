@@ -449,6 +449,15 @@ const NAV_ENTRIES = [
     category: "admin",
   },
   {
+    id: "data-export-delete-request",
+    file: "data-export-delete-request.html",
+    label: "Data Export/Delete Requests",
+    icon: "shield_person",
+    description: "Export or delete your company's data.",
+    permissions: ["privacy_request.write"],
+    category: "admin",
+  },
+  {
     id: "work-assignment",
     file: "work-assignment.html",
     label: "Work Assignment",

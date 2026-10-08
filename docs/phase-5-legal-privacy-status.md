@@ -40,3 +40,38 @@ Decisions for this phase (2026-10-08) are D-5a to D-5c below; see `decisions-202
 - **New audit events:** `session.revoked` and `session.revoked_others`. Two-step verification changes and privacy requests are audited by their own flows.
 - **UI:** `audit-log-viewer.html`, under Admin → Audit Log, with filters, paging and a details dialog. It is in the PRD admin sidebar test.
 - **Test:** `test_legal_audit_db.py`.
+
+## 5.3 Privacy requests — built, awaiting verify
+- **Migration `027_privacy.sql`:**
+  - `privacy_requests` keeps the record of every request. User ids are plain numbers, not links to user rows, so the record survives a purge.
+  - `privacy_audit_hold` keeps a purged company's audit and legal-acceptance rows as JSON until their hold date.
+  - New columns `tenants.purged_at`, `tenants.audit_hold_days` (default 90) and `candidates.erased_at`.
+- **API (`privacy_request.write`, company admins):**
+  - `GET /privacy/requests` lists requests; `GET /privacy/requests/{id}` shows one.
+  - `POST /privacy/export-request` exports the whole company (202) and builds the zip in the background. Each table becomes one JSON file, with secrets dropped and AI run logs included, plus the stored files. The download works for 7 days.
+  - `POST /privacy/delete-request` asks for a whole-company delete. It needs a reason and the word "DELETE" typed to confirm. It creates a "privacy-delete" item in the Approvals inbox.
+  - The **second admin** approves in that inbox. The requester's own approval is refused (403), and the decider is always the signed-in user, never an id sent by the browser.
+  - When there is no other admin, the requester uses `POST /privacy/requests/{id}/confirm` with a two-step verification code.
+  - Once approved, the delete is **scheduled for 7 days later**. Until then, `POST /privacy/requests/{id}/cancel` stops it.
+  - `POST /privacy/requests/{id}/download` gives a 15-minute link to an export zip, and each download is audited.
+  - `POST /privacy/candidates/{id}/export` exports one candidate at once.
+  - `POST /privacy/candidates/{id}/erase` erases one candidate. The admin types the candidate's ID to confirm.
+- **Company purge (`app/services/tenant_purge.py`):** one database transaction, driven by the tenancy map and the database's own foreign keys.
+  1. Candidates that another company also works with are handed over to that company.
+  2. Every row the company owns is marked. Rows that must point to a marked row are marked too, and optional links to marked rows are cleared.
+  3. A safety net stops the purge if any marked row belongs to another company, or if a shared table would be touched.
+  4. Audit and legal rows are copied to the 90-day hold.
+  5. Rows are deleted children-first, then the company's files.
+  6. The company row stays as an "archived" tombstone.
+- **Candidate erasure (`app/services/candidate_erasure.py`):**
+  - **Removed:** name, contacts, pay and location; the resume and every document, including the stored files; parsed resume text; skills; duplicate-check snapshots; and the notes on that company's applications, interviews and stage history.
+  - **Kept:** the stages and dates, so reports still count correctly.
+  - A candidate another company also works with returns 409. That company must handle its own request, and this company can archive the candidate.
+- **Job runner:** `backend/scripts/run_privacy_jobs.py`, run hourly. It runs deletes that are past their 7 days, releases expired holds, and removes expired export zips.
+- **UI:**
+  - Admin → **Data Export/Delete Requests** (`data-export-delete-request.html`): export, delete, confirm, cancel and download.
+  - The candidate page has "Export their data" and "Erase candidate…" buttons.
+- **Test (`test_privacy_db.py`):**
+  - Two throw-away companies are built, exported and purged. Afterwards nothing owned by the purged company is left, the other company is unchanged, the shared candidate has been handed over, and the hold rows exist and are released after their date.
+  - The delete request needs a second admin and can be cancelled.
+  - A candidate is exported, downloaded and erased; a shared candidate is refused.

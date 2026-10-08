@@ -33,6 +33,7 @@ class StorageBackend(Protocol):
     def get(self, key: str) -> bytes: ...
     def delete(self, key: str) -> None: ...
     def exists(self, key: str) -> bool: ...
+    def delete_prefix(self, prefix: str) -> int: ...
     def link(self, key: str, file_name: str, content_type: str, ttl_seconds: int) -> str: ...
 
 
@@ -69,6 +70,17 @@ class LocalStorage:
 
     def exists(self, key: str) -> bool:
         return self._path(key).exists()
+
+    def delete_prefix(self, prefix: str) -> int:
+        """Remove every file under prefix (company purge). Returns the count."""
+        import shutil
+
+        base = self._path(prefix)
+        if not base.exists():
+            return 0
+        count = sum(1 for p in base.rglob("*") if p.is_file())
+        shutil.rmtree(base)
+        return count
 
     def link(self, key: str, file_name: str, content_type: str, ttl_seconds: int) -> str:
         token = issue_file_token(_safe_key(key), file_name, content_type, ttl_seconds)
@@ -110,6 +122,16 @@ class S3Storage:
             return True
         except Exception:
             return False
+
+    def delete_prefix(self, prefix: str) -> int:
+        count = 0
+        paginator = self.client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=_safe_key(prefix).rstrip("/") + "/"):
+            keys = [{"Key": item["Key"]} for item in page.get("Contents", [])]
+            for start in range(0, len(keys), 1000):
+                self.client.delete_objects(Bucket=self.bucket, Delete={"Objects": keys[start:start + 1000]})
+            count += len(keys)
+        return count
 
     def link(self, key: str, file_name: str, content_type: str, ttl_seconds: int) -> str:
         safe_name = file_name.replace('"', "")

@@ -55,7 +55,7 @@ const ADMIN_SIDEBAR_BASE = new Set([
   "role-dashboard", "company-dashboard", "location-dashboard",
   "notifications-center", "approvals-inbox",
   "user-management", "location-management", "role-management", "role-permissions-editor",
-  "business-titles", "visibility-rules", "stage-bucket-map", "audit-log-viewer", "work-assignment", "portal-accounts",
+  "business-titles", "visibility-rules", "stage-bucket-map", "audit-log-viewer", "data-export-delete-request", "work-assignment", "portal-accounts",
   "analytics-dashboard", "reports", "custom-report-builder",
   "time-to-fill-report", "source-effectiveness", "sla-tracker",
   "user-performance-reports", "team-workload",

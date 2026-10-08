@@ -11,7 +11,7 @@ from app.core.rbac import ADMIN_PERMISSION_CODES
 REPO = Path(__file__).resolve().parents[2]
 
 # PRD §3.1, mapped to page ids. Pages the PRD lists that are not built yet
-# (AI usage & policy, Data Export/Delete Requests) join this set
+# (AI usage & policy) join this set
 # when their pages ship. My Work appears only with an execution grant.
 PRD_ADMIN_SIDEBAR = {
     # Work / home
@@ -25,6 +25,8 @@ PRD_ADMIN_SIDEBAR = {
     "stage-bucket-map",
     # Audit Log (Phase 5.4)
     "audit-log-viewer",
+    # Data Export/Delete Requests (Phase 5.3)
+    "data-export-delete-request",
     # Reports (library + oversight views)
     "analytics-dashboard", "reports", "custom-report-builder", "time-to-fill-report",
     "source-effectiveness", "sla-tracker", "user-performance-reports", "team-workload",

@@ -20,6 +20,7 @@ from app.api.v1 import (
     permissions,
     pipeline,
     portal,
+    privacy,
     reports,
     requisitions,
     roles,
@@ -56,3 +57,4 @@ api_router.include_router(settings.router, prefix="/settings", tags=["settings"]
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
 api_router.include_router(legal.router, prefix="/legal", tags=["legal"])
 api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])
+api_router.include_router(privacy.router, prefix="/privacy", tags=["privacy"])

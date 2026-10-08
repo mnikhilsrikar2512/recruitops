@@ -741,6 +741,7 @@ const SIDEBAR_PERMISSION_MAP = {
   "visibility-rules.html": ["settings.read", "role.read"],
   "stage-bucket-map.html": ["settings.read"],
   "audit-log-viewer.html": ["audit_log.read"],
+  "data-export-delete-request.html": ["privacy_request.write"],
   "work-assignment.html": ["assignment.read", "requisition.assign"],
   "portal-accounts.html": ["portal.read"],
   "approvals-inbox.html": ["approval.read"],
@@ -3072,6 +3073,48 @@ async function loadCandidateDetail() {
   renderArchiveControl({
     kind: "candidate", record: candidate, resourcePath: `/candidates/${candidate.id}`, permission: "candidate.delete.soft",
     anchor: candidateNameHost?.parentElement || candidateNameHost,
+  });
+  renderCandidatePrivacyControl(candidate, candidateNameHost?.parentElement || candidateNameHost);
+}
+
+/* Phase 5.3: a candidate's own data request — export it, or erase it.
+   Admins only (privacy_request.write). */
+function renderCandidatePrivacyControl(candidate, anchor) {
+  if (!candidate || !anchor || document.querySelector("[data-privacy-control]")) return;
+  if (!(typeof hasPermission === "function" && hasPermission("privacy_request.write"))) return;
+  const box = document.createElement("div");
+  box.dataset.privacyControl = "true";
+  box.className = "mt-2 flex flex-wrap items-center gap-2 text-[13px]";
+  const code = candidate.candidate_code || String(candidate.id);
+  box.innerHTML = `<span class="text-text-muted">Candidate's data request:</span>
+    <button type="button" data-privacy-export class="rounded-lg border border-border bg-surface px-3 py-1 hover:bg-highlight-soft">Export their data</button>
+    <button type="button" data-privacy-erase class="rounded-lg border border-border bg-surface px-3 py-1 text-error hover:bg-highlight-soft">Erase candidate…</button>
+    <span data-privacy-erase-form hidden class="flex flex-wrap items-center gap-2">
+      <label class="sr-only" for="erase-confirm">Type ${escapeHtml(code)} to confirm</label>
+      <input id="erase-confirm" type="text" placeholder="Type ${escapeHtml(code)} to confirm" class="rounded-lg border border-border px-2 py-1 text-[13px]" />
+      <button type="button" data-privacy-erase-confirm class="rounded-lg bg-error px-3 py-1 font-semibold text-on-error">Erase permanently</button>
+      <span class="text-[12px] text-text-muted">Removes name, contacts, resume and files; pipeline counts stay.</span>
+    </span>`;
+  anchor.appendChild(box);
+  box.querySelector("[data-privacy-export]").addEventListener("click", async () => {
+    try {
+      const request = await apiRequest(`/privacy/candidates/${candidate.id}/export`, { method: "POST" });
+      const link = await apiRequest(`/privacy/requests/${request.id}/download`, { method: "POST" });
+      window.location.href = link.url;
+    } catch (error) { showLiveError(error); }
+  });
+  box.querySelector("[data-privacy-erase]").addEventListener("click", () => {
+    const form = box.querySelector("[data-privacy-erase-form]");
+    form.hidden = false;
+    form.querySelector("input").focus();
+  });
+  box.querySelector("[data-privacy-erase-confirm]").addEventListener("click", async () => {
+    const confirmText = box.querySelector("#erase-confirm").value.trim();
+    try {
+      await apiRequest(`/privacy/candidates/${candidate.id}/erase`, { method: "POST", body: JSON.stringify({ confirm: confirmText }) });
+      showLiveSuccess?.("Candidate erased", code);
+      window.location.reload();
+    } catch (error) { showLiveError(error); }
   });
 }
 

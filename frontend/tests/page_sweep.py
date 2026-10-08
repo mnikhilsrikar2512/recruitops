@@ -45,7 +45,7 @@ LIVE_DATA_CHECKS = {
 ADMIN_PAGES = {
     "location-management", "location-dashboard", "user-management", "user-detail",
     "role-management", "role-permissions-editor", "role-dashboard", "business-titles",
-    "visibility-rules", "stage-bucket-map", "audit-log-viewer", "work-assignment", "portal-accounts", "approvals-inbox",
+    "visibility-rules", "stage-bucket-map", "audit-log-viewer", "data-export-delete-request", "work-assignment", "portal-accounts", "approvals-inbox",
     "notifications-center", "notification-detail-panel", "analytics-dashboard",
     "company-dashboard", "user-performance-reports", "team-workload", "reports",
     "custom-report-builder", "report-viewer", "time-to-fill-report", "source-effectiveness",

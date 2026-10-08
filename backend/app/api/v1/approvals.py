@@ -96,4 +96,4 @@ def decide_approval_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> ApprovalResponse:
     scope.assert_payload_refs_in_company(engine, auth_context, payload)
-    return decide_approval_service(engine, approval_id, payload)
+    return decide_approval_service(engine, approval_id, payload, auth_context)
