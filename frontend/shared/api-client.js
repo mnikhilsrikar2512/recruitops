@@ -23,10 +23,7 @@ const LIVE_API_ENABLED = true;
 const API_BASE = "/api/v1";
 const PUBLIC_ROUTES = new Set([
   "index", "login", "landing", "forgot-password", "reset-password", "mfa-challenge",
-  "password-setup", "product-tour", "use-cases", "onboarding-welcome",
-  "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup",
-  "onboarding-pipeline-stage-builder", "onboarding-add-custom-stage-overlay",
-  "onboarding-hiring-teams", "onboarding-integrations", "onboarding-success-launch",
+  "password-setup", "product-tour", "use-cases",
   "legal", "signup", "signup-verify",
 ]);
 
@@ -65,7 +62,10 @@ function writeSession(session) {
 }
 
 function pageHref(name) {
-  return name.endsWith(".html") ? name : name + ".html";
+  /* "home" → "home.html"; a name that already has .html (with or without a
+     ?query or #hash after it) is used as is. */
+  const path = String(name).split(/[?#]/)[0];
+  return path.endsWith(".html") ? name : String(name).replace(path, `${path}.html`);
 }
 
 let cachedApiRoot = null;
@@ -903,13 +903,8 @@ async function finishSignIn(data, email) {
     if (typeof showAlertState === "function") {
       showAlertState({ bgClass: "bg-success-bg", textClass: "text-success-text", borderClass: "border-[#c5dac9]", icon: "check_circle", title: "Authenticated", message: "Redirecting to your workspace..." });
     }
-    /* Check if onboarding has been completed — if not, redirect to onboarding flow */
-    const onboardingComplete = localStorage.getItem("recruitops-onboarding-complete");
-    const isFirstLogin = data.session?.force_password_change_on_first_login;
     if (data.mfa_enrollment_required) {
       window.location.href = pageHref("mfa-enroll.html"); /* D-09: Admins enrol first */
-    } else if (!onboardingComplete && isFirstLogin) {
-      window.location.href = pageHref("onboarding-welcome.html");
     } else {
       window.location.href = pageHref("home.html");
     }
@@ -994,14 +989,11 @@ function handleFormSubmit(form) {
     "daily-updates-submission": submitDailyUpdate,
     "daily-updates-workspace": () => submitDailyUpdate({ stayOnPage: true, status: "submitted" }),
     "meeting-form-dialog": submitMeetingForm,
+    "follow-up-form-dialog": submitMeetingForm,
     "offer-create-dialog": submitOfferCreate,
     "link-to-requisition-dialog": submitLinkToRequisition,
     "stage-move-dialog": submitStageMove,
     "candidate-review-drawer": submitCandidate,
-    "onboarding-company-profile": submitOnboardingCompanyProfile,
-    "onboarding-locations": submitOnboardingLocation,
-    "onboarding-role-setup": submitOnboardingRole,
-    "onboarding-hiring-teams": submitOnboardingTeam,
   };
   /* RBAC: Check form submission permissions */
   {
@@ -1012,6 +1004,7 @@ function handleFormSubmit(form) {
       "daily-updates-submission": "daily_update.create_main",
       "daily-updates-workspace": "daily_update.create_main",
       "meeting-form-dialog": "meeting.create",
+      "follow-up-form-dialog": "meeting.create",
       "offer-create-dialog": "offer.create",
       "link-to-requisition-dialog": "candidate.link_requisition",
       "stage-move-dialog": "pipeline.stage.move",
@@ -1545,18 +1538,49 @@ async function submitCandidate() {
   } catch (error) { showLiveError(error); }
 }
 
-function loadResumeUploadReview() {
-  const input = document.querySelector("[data-live-resume-file-input]");
-  if (input) {
-    input.addEventListener("change", (e) => uploadCandidateResume(e.target));
-  }
+/* Upload documents to a candidate (POST /candidates/{id}/upload, multipart).
+   The API scans each file before it can be downloaded. */
+async function loadResumeUploadReview() {
+  const form = document.querySelector("[data-resume-upload-form]");
+  if (!form) return;
+  const candidates = await apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] }));
+  const preselect = queryInt("candidate_id");
+  fillSelect("resume-candidate", candidates.items || [], (c) => escapeLiveHtml(c.full_name || c.email || `Candidate ${c.id}`), (c) => c.id, preselect);
+  const errorEl = form.querySelector("[data-resume-upload-error]");
+  const results = document.querySelector("[data-resume-upload-results]");
+  let first = true;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const candidateId = intOrNull(form.querySelector("#resume-candidate").value);
+    const files = Array.from(form.querySelector("#resume-file").files || []);
+    const documentType = form.querySelector("#resume-document-type").value || "resume";
+    errorEl.textContent = "";
+    if (!candidateId) { errorEl.textContent = "Choose the candidate these files belong to."; return; }
+    if (!files.length) { errorEl.textContent = "Choose at least one file."; return; }
+    const submit = form.querySelector("[type=submit]");
+    submit.disabled = true;
+    const candidateName = form.querySelector("#resume-candidate").selectedOptions[0]?.textContent || "";
+    for (const file of files) {
+      const body = new FormData();
+      body.append("file", file);
+      let line;
+      try {
+        const saved = await apiRequest(`/candidates/${candidateId}/upload?document_type=${encodeURIComponent(documentType)}`, { method: "POST", body });
+        line = `<span class="font-semibold text-on-surface">${escapeLiveHtml(saved?.file_name || file.name)}</span> → ${escapeLiveHtml(candidateName)} <span class="text-text-muted">(${escapeLiveHtml(saved?.scan_status || "uploaded")})</span>`;
+      } catch (error) {
+        line = `<span class="font-semibold text-danger-text">${escapeLiveHtml(file.name)}</span> — ${escapeLiveHtml(error?.message || "upload failed")}`;
+      }
+      if (results) {
+        if (first) { results.innerHTML = ""; first = false; }
+        results.insertAdjacentHTML("afterbegin", `<li class="py-2 font-body-sm text-body-sm">${line}</li>`);
+      }
+    }
+    form.querySelector("#resume-file").value = "";
+    submit.disabled = false;
+  });
 }
 
-async function uploadCandidateResume(input) {
-  const file = input?.files?.[0];
-  if (!file) return;
-  showLiveSuccess("Resume uploaded", file.name);
-}function parseMoneyInput(value) {
+function parseMoneyInput(value) {
   if (!value) return null;
   const num = Number(String(value).replace(/[^0-9.]/g, ""));
   return Number.isNaN(num) ? null : num;
@@ -2089,9 +2113,31 @@ async function loadUserDetail() {
   const user = await detailFromRoute(["user_id", "id"], "/users/?page_size=1", (id) => `/users/${id}`);
   if (!user) return;
   setFirstText("[data-user-name]", user.full_name);
-  setFirstText("[data-user-email]", user.email);
-  setFirstText("[data-user-role]", user.role || "—");
-  setFirstText("[data-user-location]", user.location_name || "—");
+  setFirstText("[data-user-role]", user.primary_role_name || user.role || "—");
+  const label = (value) => String(value || "").replace(/[_-]/g, " ").replace(/^./, (c) => c.toUpperCase());
+  setApiField("status", label(user.status) || null);
+  setApiField("email", user.email);
+  setApiField("phone", user.phone);
+  setApiField("employee_code", user.employee_code);
+  setApiField("business_title", user.business_title);
+  setApiField("primary_location_name", user.primary_location_name);
+  setApiField("reporting_manager_name", user.reporting_manager_name);
+  setApiField("password_setup_status", user.password_setup_status ? label(user.password_setup_status) : null);
+  setApiField("created_at", user.created_at ? formatWhen(user.created_at) : null);
+  setApiField("updated_at", user.updated_at ? formatWhen(user.updated_at) : null);
+  if (hasPermission("user.update")) {
+    const edit = document.querySelector("[data-user-edit]");
+    if (edit && !edit.dataset.wired) {
+      edit.dataset.wired = "true";
+      edit.classList.remove("hidden");
+      edit.addEventListener("click", () => openUserDialog(user.id, loadUserDetail));
+    }
+    const deactivate = document.querySelector("[data-user-deactivate]");
+    if (deactivate && user.status !== "inactive") {
+      deactivate.href = `deactivate-user-dialog.html?user_id=${user.id}`;
+      deactivate.classList.remove("hidden");
+    }
+  }
 }
 
 function paintProfile(user, role, location) {
@@ -2222,12 +2268,52 @@ async function loadMyProfile() {
   }
 }
 
+/* Deactivate a user (POST /users/{id}/deactivate). When the person still
+   owns open work the API insists on a replacement and a confirmation; the
+   work moves to the replacement and their sign-ins end. */
 async function loadDeactivateUserDialog() {
-  const userId = queryInt("user_id");
-  if (userId) {
-    const user = await apiRequest(`/users/${userId}`).catch(() => null);
-    if (user) setFirstText("[data-user-name]", user.full_name);
+  const form = document.querySelector("[data-deactivate-form]");
+  const userId = queryInt("user_id", "id");
+  if (!form) return;
+  const user = userId ? await apiRequest(`/users/${userId}`).catch(() => null) : null;
+  if (!user) {
+    form.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">Open this from a user\'s page to deactivate them.</p>';
+    return;
   }
+  setFirstText("[data-user-name]", user.full_name);
+  setFirstText("[data-user-role]", [user.primary_role_name, user.primary_location_name].filter(Boolean).join(" · ") || "—");
+  const users = await apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] }));
+  const others = (users.items || []).filter((item) => item.id !== user.id);
+  fillSelect("transfer_to_user_id", others, (item) => escapeLiveHtml(item.full_name || item.email || `User ${item.id}`), (item) => item.id, null);
+  const errorEl = form.querySelector("[data-deactivate-error]");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const reason = form.querySelector("#deactivate_reason").value.trim();
+    const transfer = intOrNull(form.querySelector("#transfer_to_user_id").value);
+    const body = JSON.stringify({
+      reason,
+      transfer_to_user_id: transfer,
+      review_confirmed: form.querySelector("#review_confirmed").checked,
+      changed_by_user_id: currentUserId(),
+    });
+    errorEl.textContent = "";
+    if (!reason) { errorEl.textContent = "Add a reason. It is kept in the audit log."; return; }
+    const submit = form.querySelector("[type=submit]");
+    submit.disabled = true;
+    try {
+      await apiRequest(`/users/${user.id}/deactivate`, { method: "POST", body });
+      showLiveSuccess("User deactivated", `${user.full_name || "The user"} can no longer sign in.`);
+      afterOverlaySave(`user-detail.html?user_id=${user.id}`);
+    } catch (error) {
+      submit.disabled = false;
+      const detail = String(error?.detail || error?.message || "");
+      errorEl.textContent = /review confirmation/i.test(detail)
+        ? "This person still owns open work. Choose who takes it over and tick the confirmation."
+        : /transfer user is required/i.test(detail)
+          ? "This person still owns open work. Choose who takes it over."
+          : detail || "Couldn't deactivate this user.";
+    }
+  });
 }
 
 async function loadRoles() {
@@ -2470,17 +2556,6 @@ async function loadRolePermissionsEditor() {
   }
 }
 
-async function loadReassignmentReviewDrawer() {
-  const reqId = queryInt("requisition_id");
-  if (reqId) {
-    const req = await apiRequest(`/requisitions/${reqId}`).catch(() => null);
-    if (req) setFirstText("[data-requisition-title]", req.title);
-  }
-  const users = await apiRequest("/users/?page_size=100").catch(() => ({ items: [] }));
-  const host = document.querySelector(".overlay-host .space-y-3");
-  if (host) host.innerHTML = (users.items || []).map((user) => renderAvailableUserRow(user, reqId)).join("") || '<div class="p-4 text-text-muted">No users available.</div>';
-}
-
 async function loadStatusUpdateDialog() {
   const reqId = queryInt("requisition_id");
   if (reqId) {
@@ -2586,6 +2661,13 @@ async function loadClientDetail() {
   setApiField("open_requisitions", "—");
   setApiField("priority_roles", "—");
   setApiField("last_activity", formatWhen(client.updated_at) || "—");
+  setApiField("status", client.status);
+  setApiField("industry", client.industry);
+  setApiField("client_owner_name", client.client_owner_name);
+  setApiField("client_owner_initials", client.client_owner_name ? personInitials(client.client_owner_name) : "—");
+  setApiField("business_source_owner_name", client.business_source_owner_name);
+  setApiField("business_source_owner_initials", client.business_source_owner_name ? personInitials(client.business_source_owner_name) : "—");
+  loadClientDetailLists(client);
   renderArchiveControl({
     kind: "client", record: client, resourcePath: `/clients/${client.id}`, permission: "client.delete.soft",
     anchor: document.querySelector("[data-client-detail] h1") || surface?.querySelector("h1, h2"),
@@ -2602,6 +2684,49 @@ async function loadClientDetail() {
     title: "Hiring stages for this client",
     intro: "Every requisition for this client uses these stages.",
     canEdit: hasPermission("client.update"),
+  });
+}
+
+/* Client detail: contacts card and the client's requisitions table. */
+async function loadClientDetailLists(client) {
+  const [contacts, requisitions] = await Promise.all([
+    apiRequest(`/clients/${client.id}/contacts`).catch(() => []),
+    apiRequest(`/requisitions/?client_id=${client.id}&page_size=100`).catch(() => ({ items: [] })),
+  ]);
+  const contactItems = Array.isArray(contacts) ? contacts : contacts.items || [];
+  const primary = contactItems.find((c) => c.is_primary_contact) || contactItems[0];
+  setApiField("primary_contact", primary?.contact_name);
+  const contactHost = document.querySelector("[data-client-contacts]");
+  if (contactHost) {
+    contactHost.innerHTML = contactItems.length
+      ? contactItems.map((c) => `<div class="rounded-xl border border-border bg-surface-alt/70 p-4">
+          <div class="flex items-start justify-between gap-3"><div>
+            <p class="font-body-md text-body-md font-semibold text-on-surface">${escapeLiveHtml(c.contact_name || "—")}</p>
+            <p class="font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(c.designation || "")}</p></div>
+            ${c.is_primary_contact ? '<span class="rounded-full bg-primary px-2 py-0.5 font-label-caps text-[10px] text-on-primary">Primary</span>' : ""}</div>
+          <div class="mt-3 grid gap-1.5 font-body-sm text-body-sm text-secondary">
+            ${c.email ? `<p class="flex items-center gap-2"><span class="material-symbols-outlined text-[15px]">mail</span>${escapeLiveHtml(c.email)}</p>` : ""}
+            ${c.phone ? `<p class="flex items-center gap-2"><span class="material-symbols-outlined text-[15px]">call</span>${escapeLiveHtml(c.phone)}</p>` : ""}
+          </div></div>`).join("")
+      : '<p class="font-body-sm text-body-sm text-text-muted">No contacts added yet.</p>';
+  }
+  const reqItems = requisitions.items || [];
+  const openItems = reqItems.filter((r) => String(r.status || "open").toLowerCase() === "open");
+  setApiField("open_requisitions", openItems.length);
+  setApiField("priority_roles", openItems.filter((r) => ["high", "critical"].includes(String(r.priority || "").toLowerCase())).length);
+  fillExistingTable(reqItems, (row, item) => {
+    const cells = row.querySelectorAll("td");
+    const link = cells[0]?.querySelector("a");
+    if (link) {
+      link.textContent = item.title || item.requisition_code || "—";
+      link.href = `requisition-detail.html?requisition_id=${item.id}`;
+    }
+    const code = cells[0]?.querySelector("p");
+    if (code) code.textContent = item.requisition_code || "";
+    if (typeof paintPriorityBadge === "function") paintPriorityBadge(cells[1], item.priority);
+    paintPlainCell(cells[2], item.primary_owner_name);
+    paintPlainCell(cells[3], item.status);
+    paintPlainCell(cells[4], ageDaysLabel(item.created_at));
   });
 }
 
@@ -2732,19 +2857,61 @@ async function loadRequisitionDetail() {
   const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
   if (!requisition) return;
   const surface = document.querySelector(".workspace-surface");
-  setFirstText(".workspace-surface nav span:last-child", requisition.title);
-  setFirstText(".workspace-surface h1, .workspace-surface h2", requisition.title);
-  setFirstText(".workspace-surface h1 + span, .workspace-surface h2 + span", reqCode(requisition));
-  const reqDetailCodeHost = document.querySelector(".workspace-surface h1 + span, .workspace-surface h2 + span");
-  if (reqDetailCodeHost && typeof entityBadgeHtml === "function" && requisition.requisition_code && !reqDetailCodeHost.querySelector(".entity-badge")) {
-    reqDetailCodeHost.insertAdjacentHTML("afterend", entityBadgeHtml(requisition.requisition_code, requisition.branch_code));
+  document.querySelectorAll("[data-requisition-title]").forEach((node) => { node.textContent = requisition.title || "Requisition"; });
+  const label = (value) => (value ? titleFromCode(String(value)) : null);
+  setApiField("requisition_code", reqCode(requisition));
+  setApiField("status", label(requisition.status));
+  setApiField("client_name", requisition.client_name);
+  setApiField("primary_owner_name", requisition.primary_owner_name);
+  setApiField("delivery_owner_name", requisition.delivery_owner_name);
+  setApiField("primary_contact_name", requisition.primary_contact_name);
+  setApiField("openings_count", requisition.openings_count);
+  setApiField("priority", label(requisition.priority));
+  setApiField("employment_type", label(requisition.employment_type));
+  setApiField("work_mode", label(requisition.work_mode));
+  const money = (value) => (value == null ? null : Number(value).toLocaleString("en-IN"));
+  setApiField("budget", requisition.budget_min != null || requisition.budget_max != null
+    ? `${requisition.currency_code || ""} ${[money(requisition.budget_min), money(requisition.budget_max)].filter(Boolean).join(" – ")}`.trim()
+    : null);
+  setApiField("target_closure_date", requisition.target_closure_date ? formatWhen(requisition.target_closure_date).slice(0, 10) : null);
+  setApiField("job_description", requisition.job_description);
+  const chips = (host, list) => {
+    if (!host) return;
+    host.innerHTML = (list || []).length
+      ? list.map((skill) => `<li class="rounded-full border border-border bg-surface-alt px-2.5 py-0.5 text-[12px] text-on-surface">${escapeLiveHtml(skill)}</li>`).join("")
+      : '<li class="font-body-sm text-body-sm text-text-muted">None listed.</li>';
+  };
+  chips(document.querySelector("[data-req-must]"), requisition.must_have_skills);
+  chips(document.querySelector("[data-req-nice]"), requisition.good_to_have_skills);
+  const actions = {
+    edit: hasPermission("requisition.update") ? `requisition-intake-edit.html?requisition_id=${requisition.id}` : null,
+    status: hasPermission("requisition.status.update") ? `status-update-dialog.html?requisition_id=${requisition.id}` : null,
+    assignments: `assignment-history-drawer.html?requisition_id=${requisition.id}`,
+    pipeline: `pipeline-board.html?requisition_id=${requisition.id}`,
+  };
+  document.querySelectorAll("[data-req-action]").forEach((link) => {
+    const href = actions[link.dataset.reqAction];
+    if (!href) return;
+    link.href = href;
+    link.classList.remove("hidden");
+  });
+  const board = await apiRequest(`/pipeline/board?requisition_id=${requisition.id}`).catch(() => []);
+  const apps = (Array.isArray(board) ? board : board.items || []).filter((a) => String(a.requisition_id) === String(requisition.id));
+  const inBucket = (re) => apps.filter((a) => re.test(String(a.current_stage || ""))).length;
+  const count = (key, value) => setFirstText(`[data-req-count="${key}"]`, value);
+  count("applications", apps.length);
+  count("interview", inBucket(/interview/i));
+  count("offer", inBucket(/offer/i));
+  const opened = requisition.created_at ? Math.max(0, Math.round((Date.now() - new Date(requisition.created_at)) / 86400000) - (requisition.hold_days_total || 0)) : null;
+  count("days_open", opened ?? "—");
+  const list = document.querySelector("[data-req-candidates]");
+  if (list) {
+    list.innerHTML = apps.length
+      ? apps.map((a) => `<li class="flex items-center justify-between gap-3 py-2">
+          <a class="font-body-md text-body-md font-semibold text-on-surface hover:text-primary" href="candidate-screening.html?application_id=${a.application_id}">${escapeLiveHtml(a.candidate_name || "Candidate")}</a>
+          <span class="font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(a.current_stage || "—")}</span></li>`).join("")
+      : '<li class="py-2 font-body-sm text-body-sm text-text-muted">No candidates on this requisition yet.</li>';
   }
-  fillDashboardMetrics([
-    { label: "Openings", value: requisition.openings_count, hint: requisition.employment_type || "Open role" },
-    { label: "Priority", value: requisition.priority, hint: requisition.status },
-    { label: "Target Close", value: formatWhen(requisition.target_closure_date).slice(0, 10), hint: "Target date" },
-    { label: "Owners", value: 1, hint: requisition.primary_owner_name || "Primary owner" },
-  ]);
   renderRequisitionHoldPanel(surface, requisition);
 }
 
@@ -2817,10 +2984,22 @@ function renderRequisitionHoldPanel(surface, requisition) {
 
 async function loadAssignmentHistoryDrawer() {
   const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
-  if (!requisition) return;
-  const assignments = await apiRequest(`/requisitions/${requisition.id}/assignments`).catch(() => []);
-  const host = document.querySelector(".overlay-host .flex-1") || document.querySelector(".overlay-host");
-  if (host) host.innerHTML = '<div class="p-4 text-text-muted">Assignment history loaded.</div>';
+  const host = document.querySelector("[data-assignment-history-list]");
+  if (!requisition) { if (host) host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">No requisition selected.</p>'; return; }
+  const payload = await apiRequest(`/requisitions/${requisition.id}/assignments`).catch(() => []);
+  const assignments = (Array.isArray(payload) ? payload : payload.items || []).slice().sort((a, b) => String(b.assigned_at || "").localeCompare(String(a.assigned_at || "")));
+  setFirstText("[data-assignment-requisition]", [requisition.title, requisition.requisition_code].filter(Boolean).join(" · ") || "—");
+  setFirstText("[data-assignment-owner]", requisition.primary_owner_name || "Unassigned");
+  if (!host) return;
+  host.innerHTML = assignments.length
+    ? assignments.map((a) => `<div class="bg-surface border border-border rounded-lg p-3 flex flex-col gap-1">
+        <div class="flex justify-between items-start gap-2">
+          <span class="font-body-md text-body-md font-semibold text-on-surface">${escapeLiveHtml(a.assigned_user_name || "Unknown user")}</span>
+          <span class="font-body-sm text-body-sm text-text-muted whitespace-nowrap">${escapeLiveHtml(formatWhen(a.assigned_at || a.created_at))}</span>
+        </div>
+        <p class="font-body-sm text-body-sm text-text-muted">${escapeLiveHtml(String(a.assignment_type || "assignment").replace(/_/g, " "))} · ${escapeLiveHtml(a.status || "—")}${a.assigned_by_user_name ? ` · assigned by ${escapeLiveHtml(a.assigned_by_user_name)}` : ""}</p>
+      </div>`).join("")
+    : '<p class="font-body-sm text-body-sm text-text-muted">No assignments recorded for this requisition.</p>';
 }
 
 let workAssignmentReqId = null;
@@ -3056,6 +3235,7 @@ async function loadCandidateDetail() {
   setFirstText("[data-candidate-name]", candidate.full_name);
   setFirstText("[data-candidate-email]", candidate.email);
   setFirstText("[data-candidate-phone]", candidate.phone);
+  paintCandidateDetailProfile(candidate);
   const candidateNameHost = document.querySelector("[data-candidate-name]");
   if (candidateNameHost?.parentElement && typeof entityBadgeHtml === "function" && candidate.candidate_code && !candidateNameHost.parentElement.querySelector(":scope > .entity-badge")) {
     candidateNameHost.insertAdjacentHTML("afterend", entityBadgeHtml(candidate.candidate_code, candidate.branch_code));
@@ -3075,6 +3255,54 @@ async function loadCandidateDetail() {
     anchor: candidateNameHost?.parentElement || candidateNameHost,
   });
   renderCandidatePrivacyControl(candidate, candidateNameHost?.parentElement || candidateNameHost);
+}
+
+/* candidate-detail.html: paint the CandidateResponse fields into the
+   data-candidate-* hooks. Anything the API leaves null stays "—". */
+function paintCandidateDetailProfile(candidate) {
+  const dash = (value) => (value === null || value === undefined || value === "" ? "—" : String(value));
+  const set = (selector, value) => { const node = document.querySelector(selector); if (node) node.textContent = dash(value); };
+  set("[data-candidate-initials]", personInitials(candidate.full_name));
+  const status = document.querySelector("[data-candidate-status]");
+  if (status && candidate.profile_status) {
+    status.textContent = titleFromCode(candidate.profile_status);
+    status.hidden = false;
+  }
+  set("[data-candidate-headline]", [candidate.current_designation, candidate.current_company].filter(Boolean).join(" · "));
+  const applications = Array.isArray(candidate.applications) ? candidate.applications : [];
+  set("[data-candidate-application-count]", applications.length);
+  const years = candidate.total_experience_years;
+  set("[data-candidate-experience]", years === null || years === undefined ? "" : `${years} yrs`);
+  set("[data-candidate-days]", candidate.created_at ? ageDaysLabel(candidate.created_at) : "");
+  set("[data-candidate-source]", [candidate.source_type, candidate.source_detail].filter(Boolean).join(" · "));
+  set("[data-candidate-designation]", candidate.current_designation);
+  set("[data-candidate-company]", candidate.current_company);
+  const notice = candidate.notice_period_days;
+  set("[data-candidate-notice]", notice === null || notice === undefined ? "" : `${notice} day${Number(notice) === 1 ? "" : "s"}`);
+  set("[data-candidate-sourced-by]", candidate.sourced_by_name);
+  set("[data-candidate-intake]", candidate.intake_stage ? titleFromCode(candidate.intake_stage) : "");
+  set("[data-candidate-resume]", candidate.resume_file_name
+    ? `${candidate.resume_file_name}${candidate.resume_uploaded_at ? ` · uploaded ${formatWhen(candidate.resume_uploaded_at)}` : ""}`
+    : "No resume uploaded");
+  set("[data-candidate-owner]", candidate.primary_owner_name || "Unassigned");
+  set("[data-candidate-owner-initials]", candidate.primary_owner_name ? personInitials(candidate.primary_owner_name) : "");
+  const historyLink = document.querySelector("[data-candidate-history-link]");
+  if (historyLink && candidate.id) historyLink.setAttribute("href", `application-history.html?candidate_id=${candidate.id}`);
+  const social = document.querySelector("[data-candidate-social]");
+  const links = (candidate.social_profiles || []).filter((p) => p && (p.url || p.link));
+  if (social && links.length) {
+    social.innerHTML = links.map((p) => `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-text-muted text-[20px]">public</span><span class="font-body-md text-body-md text-on-surface truncate">${escapeLiveHtml(p.platform || p.type || p.label ? `${p.platform || p.type || p.label}: ` : "")}${escapeLiveHtml(p.url || p.link)}</span></div>`).join("");
+    social.hidden = false;
+  }
+  const appsHost = document.querySelector("[data-candidate-applications]");
+  if (appsHost) {
+    appsHost.innerHTML = applications.length
+      ? applications.map((a) => `<div class="p-4 hover:bg-highlight-soft transition-colors cursor-pointer" data-route="application-detail-drawer.html?application_id=${encodeURIComponent(a.id)}">
+          <div class="flex justify-between items-start gap-3 mb-2"><h4 class="font-headline-sm text-headline-sm text-on-surface">${escapeLiveHtml(a.requisition_title || "Requisition")}</h4><span class="bg-info-bg text-info-text border border-info-text/20 px-2 py-0.5 rounded font-label-caps text-label-caps whitespace-nowrap">${escapeLiveHtml(a.current_stage || "—")}</span></div>
+          <div class="flex justify-between items-center gap-3"><span class="font-body-sm text-body-sm text-text-muted">${escapeLiveHtml([titleFromCode(a.application_status), a.owner_name].filter(Boolean).join(" · ") || "—")}</span><span class="font-data-tabular text-data-tabular text-text-muted">${a.stage_updated_at ? `${ageDaysLabel(a.stage_updated_at)} in stage` : ""}</span></div>
+        </div>`).join("")
+      : `<p class="p-4 font-body-sm text-body-sm text-text-muted">No applications yet.</p>`;
+  }
 }
 
 /* Phase 5.3: a candidate's own data request — export it, or erase it.
@@ -3139,39 +3367,151 @@ async function loadCandidateReviewDrawer() {
 }
 
 async function loadCandidateDuplicateReview() {
-  const candidates = await apiRequest("/candidates/?duplicate_state=in-review&page_size=20").catch(() => ({ items: [] }));
-  fillExistingTable(candidates.items || [], (row, item) => {
-    const cells = row.querySelectorAll("td");
-    setStackedCell(cells[0], item.full_name, item.email || "");
-    setCellValue(cells[1], item.duplicate_status || "In Review");
-  });
+  /* candidate-duplicate-review.html: the incoming candidate vs its top
+     duplicate-check match, painted into the data-dup-* hooks. */
+  const candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?duplicate_state=in-review&page_size=1", (id) => `/candidates/${id}`).catch(() => null);
+  const set = (selector, value) => { const node = document.querySelector(selector); if (node) node.textContent = value === null || value === undefined || value === "" ? "—" : String(value); };
+  const reasons = document.querySelector("[data-dup-reasons]");
+  const summary = document.querySelector("[data-dup-match-summary]");
+  if (!candidate) {
+    if (summary) summary.textContent = "No candidate is waiting for duplicate review.";
+    if (reasons) reasons.innerHTML = `<li class="text-text-muted">Nothing to review.</li>`;
+    return;
+  }
+  set("[data-dup-candidate-code]", candidate.candidate_code || candidate.id);
+  set("[data-dup-candidate-name]", candidate.full_name);
+  set("[data-dup-incoming-source]", [candidate.source_type, candidate.source_detail].filter(Boolean).join(" · "));
+  set("[data-dup-incoming-created]", formatWhen(candidate.created_at));
+  set("[data-dup-incoming-name]", candidate.full_name);
+  set("[data-dup-incoming-email]", candidate.email);
+  set("[data-dup-incoming-phone]", candidate.phone);
+  set("[data-dup-incoming-company]", candidate.current_company);
+  set("[data-dup-incoming-designation]", candidate.current_designation);
+  const duplicate = await apiRequest(`/candidates/${candidate.id}/duplicate-check`).catch(() => ({ matches: [] }));
+  const match = duplicate.matches?.[0];
+  if (!match) {
+    if (summary) summary.textContent = "No matching record found.";
+    if (reasons) reasons.innerHTML = `<li class="text-text-muted">No duplicate matches found.</li>`;
+    return;
+  }
+  if (summary) summary.textContent = `${duplicate.matches.length} possible match${duplicate.matches.length === 1 ? "" : "es"}`;
+  set("[data-dup-match-name]", match.matched_candidate_name);
+  set("[data-dup-match-email]", match.email);
+  set("[data-dup-match-phone]", match.phone);
+  set("[data-dup-match-company]", match.current_company);
+  set("[data-dup-match-designation]", match.current_designation);
+  set("[data-dup-score]", match.match_score === null || match.match_score === undefined ? "" : `${match.match_score}%`);
+  if (reasons) {
+    reasons.innerHTML = (match.match_reasons || []).length
+      ? match.match_reasons.map((reason) => `<li class="flex gap-2 items-start"><span class="material-symbols-outlined text-[16px] text-success-text mt-0.5">check</span><span>${escapeLiveHtml(reason)}</span></li>`).join("")
+      : `<li class="text-text-muted">No match reasons recorded.</li>`;
+  }
 }
 
 async function loadDuplicateWarningModal() {
-  const candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?duplicate_state=in-review&page_size=1", (id) => `/candidates/${id}`);
-  if (!candidate) return;
+  const candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?duplicate_state=in-review&page_size=1", (id) => `/candidates/${id}`).catch(() => null);
+  if (!candidate) {
+    const checking = document.querySelector("[data-dup-checking]");
+    if (checking) checking.hidden = true;
+    const list = document.querySelector("[data-dup-matches]");
+    if (list) list.innerHTML = `<p class="font-body-sm text-body-sm text-text-muted">No candidate selected for a duplicate check.</p>`;
+    return;
+  }
   const duplicate = await apiRequest(`/candidates/${candidate.id}/duplicate-check`).catch(() => ({ matches: [] }));
-  const match = duplicate.matches?.[0] || {};
-  const host = document.querySelector(".workspace-surface");
-  if (host) host.innerHTML = `<div class="p-4"><h2>Duplicate Warning</h2><p>${escapeLiveHtml(candidate.full_name)} may match ${escapeLiveHtml(match.matched_candidate_name || "another candidate")} (${match.match_score || 0}% match).</p></div>`;
-}async function loadCandidateScreening() {
+  const matches = duplicate.matches || [];
+  setFirstText("[data-dup-candidate-name]", candidate.full_name || "—");
+  setFirstText("[data-dup-candidate-designation]", candidate.current_designation ? `(${candidate.current_designation})` : "");
+  setFirstText("[data-dup-match-count]", matches.length);
+  const checking = document.querySelector("[data-dup-checking]");
+  if (checking) checking.hidden = true;
+  const reviewLink = document.querySelector("[data-dup-review-link]");
+  if (reviewLink) reviewLink.dataset.route = `review-matches-workspace.html?candidate_id=${candidate.id}`;
+  const list = document.querySelector("[data-dup-matches]");
+  if (!list) return;
+  list.innerHTML = matches.length
+    ? matches.map((match) => `<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 p-stack-default border border-border rounded-lg bg-surface hover:bg-highlight-soft transition-colors cursor-pointer" data-route="candidate-detail.html?candidate_id=${encodeURIComponent(match.matched_candidate_id)}">
+        <div class="flex flex-col gap-base">
+          <div class="flex items-center gap-stack-compact"><span class="font-headline-sm text-headline-sm text-primary">${escapeLiveHtml(match.matched_candidate_name || "Candidate")}</span><span class="${Number(match.match_score) >= 90 ? "bg-success-bg text-success-text border-success-text/20" : "bg-warning-bg text-warning-text border-warning-text/20"} px-2 py-0.5 rounded-sm font-label-caps text-label-caps border">${escapeLiveHtml(match.match_score ?? "—")}% Match</span></div>
+          ${(match.match_reasons || []).length ? `<div class="flex items-center gap-2 flex-wrap"><span class="font-body-sm text-body-sm text-text-muted">Matched on:</span>${match.match_reasons.map((reason) => `<span class="bg-info-bg text-info-text px-2 py-0.5 rounded-sm font-label-caps text-label-caps border border-info-text/20">${escapeLiveHtml(reason)}</span>`).join("")}</div>` : ""}
+        </div>
+        <div class="text-right"><p class="font-label-caps text-label-caps text-text-muted">Current Role</p><p class="font-data-tabular text-data-tabular text-on-surface">${escapeLiveHtml([match.current_designation, match.current_company].filter(Boolean).join(" · ") || "—")}</p></div>
+      </div>`).join("")
+    : `<p class="font-body-sm text-body-sm text-text-muted">No probable matches found.</p>`;
+}/* Screening one application: who the candidate is, what the requisition asks
+   for, and links to the real next steps (stage move, interview, AI screener). */
+async function loadCandidateScreening() {
   const applicationId = queryInt("application_id");
   if (!applicationId) return;
   try {
     const application = await apiRequest(`/pipeline/applications/${applicationId}`);
     setFirstText("[data-candidate-name]", application.candidate_name);
-    setFirstText("[data-requisition-title]", application.requisition_title);
+    setFirstText("[data-requisition-title]", [application.requisition_title, application.requisition_code].filter(Boolean).join(" · "));
     setFirstText("[data-current-stage]", application.current_stage);
+    const [candidate, requisition] = await Promise.all([
+      application.candidate_id ? apiRequest(`/candidates/${application.candidate_id}`).catch(() => null) : null,
+      application.requisition_id ? apiRequest(`/requisitions/${application.requisition_id}`).catch(() => null) : null,
+    ]);
+    if (candidate) {
+      setApiField("current_designation", candidate.current_designation);
+      setApiField("current_company", candidate.current_company);
+      setApiField("total_experience_years", candidate.total_experience_years != null ? `${candidate.total_experience_years} years` : null);
+      setApiField("notice_period_days", candidate.notice_period_days != null ? `${candidate.notice_period_days} days` : null);
+      setApiField("source_type", candidate.source_type ? titleFromCode(candidate.source_type) : null);
+      setApiField("resume_file_name", candidate.resume_file_name || "Not uploaded");
+    }
+    const chips = (host, list) => {
+      if (!host) return;
+      host.innerHTML = (list || []).length
+        ? list.map((skill) => `<li class="rounded-full border border-border bg-surface-alt px-2.5 py-0.5 text-[12px] text-on-surface">${escapeLiveHtml(skill)}</li>`).join("")
+        : '<li class="font-body-sm text-body-sm text-text-muted">None listed.</li>';
+    };
+    chips(document.querySelector("[data-screening-must]"), requisition?.must_have_skills);
+    chips(document.querySelector("[data-screening-nice]"), requisition?.good_to_have_skills);
+    const links = {
+      move: `stage-move-dialog.html?application_id=${applicationId}`,
+      interview: `interview-scheduler.html?application_id=${applicationId}`,
+      screen: `agents-workbench.html?candidate_id=${application.candidate_id}&requisition_id=${application.requisition_id}`,
+      profile: `candidate-detail.html?candidate_id=${application.candidate_id}`,
+    };
+    document.querySelectorAll("[data-screening-action]").forEach((link) => {
+      const href = links[link.dataset.screeningAction];
+      if (!href) return;
+      link.href = href;
+      link.classList.remove("hidden");
+    });
+    const hint = document.querySelector("[data-screening-hint]");
+    if (hint) hint.textContent = "Record the outcome by moving the candidate to the right stage.";
   } catch (error) { showLiveError(error); }
 }
 
 async function loadReviewMatchesWorkspace() {
-  const candidates = await apiRequest("/candidates/?page_size=50").catch(() => ({ items: [] }));
-  fillExistingTable(candidates.items || [], (row, item) => {
-    const cells = row.querySelectorAll("td");
-    setStackedCell(cells[0], item.full_name, item.email || "");
-    setCellValue(cells[1], item.source_type || "—");
-  });
+  /* review-matches-workspace.html: incoming candidate vs its top
+     duplicate-check match, painted into the data-rm-* hooks. */
+  const set = (selector, value) => { const node = document.querySelector(selector); if (node) node.textContent = value === null || value === undefined || value === "" ? "—" : String(value); };
+  const role = (designation, company) => [designation, company].filter(Boolean).join(" at ");
+  const candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?duplicate_state=in-review&page_size=1", (id) => `/candidates/${id}`).catch(() => null);
+  if (!candidate) {
+    set("[data-rm-incoming-meta]", "No candidate selected for review.");
+    set("[data-rm-existing-meta]", "");
+    return;
+  }
+  set("[data-rm-incoming-name]", candidate.full_name);
+  set("[data-rm-incoming-meta]", [candidate.source_type && `Source: ${candidate.source_type}`, candidate.created_at && `Added ${relativeTime(candidate.created_at)}`].filter(Boolean).join(" • "));
+  set("[data-rm-incoming-email]", candidate.email);
+  set("[data-rm-incoming-phone]", candidate.phone);
+  set("[data-rm-incoming-role]", role(candidate.current_designation, candidate.current_company));
+  const duplicate = await apiRequest(`/candidates/${candidate.id}/duplicate-check`).catch(() => ({ matches: [] }));
+  const match = duplicate.matches?.[0];
+  if (!match) {
+    set("[data-rm-existing-meta]", "No matching record found.");
+    return;
+  }
+  set("[data-rm-existing-name]", match.matched_candidate_name);
+  set("[data-rm-existing-meta]", (match.match_reasons || []).length ? `Matched on: ${match.match_reasons.join(", ")}` : "");
+  set("[data-rm-existing-email]", match.email);
+  set("[data-rm-existing-phone]", match.phone);
+  set("[data-rm-existing-role]", role(match.current_designation, match.current_company));
+  set("[data-rm-score]", match.match_score === null || match.match_score === undefined ? "" : `${match.match_score}% confidence`);
 }
 
 
@@ -3539,16 +3879,39 @@ function pipelineStageMatchesColumn(stage, columnTitle) {
       stageDialogName.insertAdjacentHTML("afterend", entityBadgeHtml(application.candidate_code || application.requisition_code, application.branch_code));
     }
     setFirstText("[data-requisition-title]", application.requisition_title);
+    ["application_status", "owner_name", "location_name", "screening_status", "sourced_by_name", "stage_reason"].forEach((key) => setApiField(key, application[key] || null));
+    ["applied_at", "stage_updated_at", "last_activity_at"].forEach((key) => setApiField(key, application[key] ? formatWhen(application[key]) : null));
+    const drawer = document.querySelector("[data-overlay-surface]");
+    const candidateLink = drawer?.querySelector('[data-route^="candidate-detail.html"]');
+    if (candidateLink && application.candidate_id) candidateLink.dataset.route = `candidate-detail.html?candidate_id=${application.candidate_id}`;
+    const historyLink = drawer?.querySelector('[data-route^="application-history.html"]');
+    if (historyLink) historyLink.dataset.route = `application-history.html?application_id=${applicationId}`;
   } catch (error) { showLiveError(error); }
 }
 
 async function loadPipelineApplicationHistory() {
   const applicationId = queryInt("application_id");
-  if (!applicationId) return;
+  if (!applicationId) {
+    const emptyHost = document.querySelector("[data-history-list], .workspace-surface .space-y-3, .overlay-host .space-y-3");
+    if (emptyHost) emptyHost.innerHTML = `<div class="p-4 text-body-sm text-text-muted">Open an application to see its stage history.</div>`;
+    return;
+  }
   try {
+    if (document.querySelector("[data-history-header]")) {
+      /* stage-history-audit-log header: candidate, requisition and current stage */
+      const application = await apiRequest(`/pipeline/applications/${applicationId}`).catch(() => null);
+      if (application) {
+        setFirstText("[data-candidate-name]", application.candidate_name);
+        setFirstText("[data-current-stage]", application.current_stage);
+        setFirstText("[data-requisition-title]", application.requisition_title);
+        setApiField("requisition_code", application.requisition_code || null);
+        setApiField("owner_name", application.owner_name || null);
+        setApiField("stage_updated_at", application.stage_updated_at ? formatWhen(application.stage_updated_at) : null);
+      }
+    }
     const payload = await apiRequest(`/pipeline/applications/${applicationId}/history`);
     const items = payload.items || payload || [];
-    const host = document.querySelector(".workspace-surface .space-y-3, .overlay-host .space-y-3");
+    const host = document.querySelector("[data-history-list], .workspace-surface .space-y-3, .overlay-host .space-y-3");
     renderPipelineHistoryItems(host, items);
   } catch (error) { showLiveError(error); }
 }
@@ -3684,12 +4047,26 @@ async function loadDailyUpdatesReview() {
 }
 
 async function loadDailyUpdateDetail() {
-  const updateId = queryInt("daily_update_id");
-  if (!updateId) return;
-  const updates = await apiRequest("/daily-updates/?page_size=50").catch(() => ({ items: [] }));
-  const item = (updates.items || []).find((u) => u.id === updateId) || (updates.items || [])[0];
-  if (!item) return;
-  setFirstText("[data-update-summary]", item.progress_summary || "—");
+  const host = document.querySelector("[data-daily-update-detail]");
+  const item = await detailFromRoute(["daily_update_id", "id"], "/daily-updates/?page_size=1", (id) => `/daily-updates/${id}`).catch(() => null);
+  if (!item) {
+    if (host) host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">This update could not be found.</p>';
+    return;
+  }
+  const label = (value) => String(value || "").replace(/[_-]/g, " ").replace(/^./, (c) => c.toUpperCase());
+  setApiField("submission_status", label(item.submission_status) || null);
+  setApiField("submitted_by_name", item.submitted_by_name);
+  setApiField("update_date", item.update_date ? formatWhen(item.update_date) : null);
+  ["profiles_sourced_count", "profiles_screened_count", "profiles_submitted_count", "interviews_scheduled_count", "offers_closed_count"]
+    .forEach((field) => setApiField(field, item[field] ?? 0));
+  setApiField("summary", item.summary);
+  setApiField("blockers", item.blockers || "None reported.");
+  setApiField("next_actions", item.next_actions);
+  const req = document.querySelector("[data-daily-update-requisition]");
+  if (req) {
+    req.textContent = item.requisition_title || "—";
+    if (item.requisition_id) req.href = `requisition-detail.html?requisition_id=${item.requisition_id}`;
+  }
 }
 
 async function loadDailyReview() {
@@ -3876,10 +4253,8 @@ async function loadDashboards() {
   });
   const now = new Date();
   const quarter = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`;
-  Array.from(document.querySelectorAll(".workspace-surface button")).forEach((button) => {
-    if (/Q3 2023/.test(button.textContent || "")) {
-      button.innerHTML = `<span class="material-symbols-outlined text-[16px]">calendar_today</span> ${quarter}`;
-    }
+  document.querySelectorAll(".workspace-surface [data-period-label]").forEach((button) => {
+    button.innerHTML = `<span class="material-symbols-outlined text-[16px]">calendar_today</span> ${quarter}`;
   });
 
   paintLabeledKpi("Total Active Reqs", company.total_open_requisitions || 0, `${company.total_locations || 0} locations`);
@@ -3960,7 +4335,7 @@ async function loadDashboards() {
       .slice(0, 5)
       .map(([label, value]) => ({ label, value: Math.round(value) }));
     renderRankedMetricList(revenueContainer, revenueData, {
-      format: (value) => value ? `$${Number(value).toLocaleString()}` : "—",
+      format: (value) => value ? (placements.currency && placements.currency !== "INR" ? `${Number(value).toLocaleString()} ${placements.currency}` : `₹${Number(value).toLocaleString("en-IN")}`) : "—",
       insight: revenueData[0] ? `${revenueData[0].label} currently leads placement revenue.` : "",
       empty: "No placement revenue this period.",
     });
@@ -4644,6 +5019,7 @@ async function loadMeetingFormDialog() {
       ["internal_review", "Internal Review"],
     ].map(([val, label]) => `<option value="${val}">${label}</option>`).join("");
   }
+  fillSelect("meeting_client", clients.items || [], (c) => escapeLiveHtml(c.client_name || `Client ${c.id}`), (c) => c.id, queryInt("client_id") || session?.client_id);
 }async function loadFollowUps() {
   const payload = await apiRequest("/meetings/?page_size=50").catch(() => ({ items: [] }));
   const all = payload.items || [];
@@ -4676,29 +5052,138 @@ async function loadMeetingFormDialog() {
   }
 }
 
+/* A follow-up is stored as a meeting of type "follow_up" (the API has no
+   separate follow-up record); same form and submit as Schedule Meeting. */
 async function loadFollowUpFormDialog() {
-  const [clients, users, locations] = await Promise.all([
-    apiRequest("/clients/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/users/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
-  ]);
+  await loadMeetingFormDialog();
+  const type = document.getElementById("meeting_type");
+  if (type) type.value = "follow_up";
 }/* ═══════════════════════════════════════════════════════════════
    INTERVIEWS
    ═══════════════════════════════════════════════════════════════ */
 
+/* Delivery work queue: open requisitions ranked overdue → priority → due date. */
+async function loadDeliveryWorkQueue() {
+  const tbody = document.querySelector("[data-queue-rows]");
+  if (!tbody) return;
+  const payload = await apiRequest("/requisitions/?status=open&page_size=100").catch(() => ({ items: [] }));
+  const items = payload.items || [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = (r) => (r.target_closure_date ? new Date(String(r.target_closure_date).slice(0, 10) + "T00:00:00") : null);
+  const days = (r) => { const d = due(r); return d ? Math.round((d - today) / 86400000) : null; };
+  const rank = { critical: 0, high: 1, medium: 2, low: 3 };
+  items.sort((a, b) => {
+    const oa = (days(a) ?? 1e9) < 0 ? 0 : 1; const ob = (days(b) ?? 1e9) < 0 ? 0 : 1;
+    if (oa !== ob) return oa - ob;
+    const pa = rank[a.priority] ?? 4; const pb = rank[b.priority] ?? 4;
+    if (pa !== pb) return pa - pb;
+    return (days(a) ?? 1e9) - (days(b) ?? 1e9);
+  });
+  const count = (key, value) => setFirstText(`[data-queue-count="${key}"]`, value);
+  count("open", payload.meta?.total ?? items.length);
+  count("overdue", items.filter((r) => (days(r) ?? 0) < 0).length);
+  count("due_soon", items.filter((r) => { const d = days(r); return d !== null && d >= 0 && d <= 7; }).length);
+  count("urgent", items.filter((r) => r.priority === "high" || r.priority === "critical").length);
+  const dueText = (r) => {
+    const d = days(r);
+    if (d === null) return '<span class="text-text-muted">No date</span>';
+    if (d < 0) return `<span class="font-semibold text-danger-text">${-d}d overdue</span>`;
+    if (d <= 7) return `<span class="font-semibold text-warning-text">${d === 0 ? "Today" : `in ${d}d`}</span>`;
+    return escapeLiveHtml(formatWhen(r.target_closure_date));
+  };
+  tbody.innerHTML = items.length ? items.map((r, index) => `<tr class="cursor-pointer hover:bg-highlight-soft" data-route="requisition-detail.html?requisition_id=${r.id}">
+      <td class="px-4 py-2 text-text-muted">${index + 1}</td>
+      <td class="px-4 py-2"><p class="font-semibold text-on-surface">${escapeLiveHtml(r.title || "Requisition")}</p><p class="text-[12px] text-text-muted">${escapeLiveHtml([r.requisition_code, r.client_name].filter(Boolean).join(" · "))}</p></td>
+      <td class="px-4 py-2">${escapeLiveHtml(titleFromCode(r.priority || "") || "—")}</td>
+      <td class="px-4 py-2">${escapeLiveHtml(r.openings_count ?? "—")}</td>
+      <td class="px-4 py-2">${dueText(r)}</td>
+      <td class="px-4 py-2">${escapeLiveHtml(r.delivery_owner_name || r.primary_owner_name || "—")}</td>
+    </tr>`).join("")
+    : '<tr><td class="px-4 py-6 text-center text-text-muted" colspan="6">No open requisitions.</td></tr>';
+}
+
+/* Interviews: list (GET /interviews/) and schedule (POST /interviews/). */
+async function loadInterviewScheduler() {
+  const list = document.querySelector("[data-interview-list]");
+  if (!list) return;
+  const render = async () => {
+    const payload = await apiRequest("/interviews/?page_size=100").catch(() => ({ items: [] }));
+    const items = (payload.items || []).slice().sort((a, b) => String(b.scheduled_at || "").localeCompare(String(a.scheduled_at || "")));
+    list.innerHTML = items.map((item, index) => renderInterviewCard(item, index)).join("")
+      || '<p class="p-6 text-center font-body-sm text-body-sm text-text-muted">No interviews yet.</p>';
+  };
+  await render();
+
+  const form = document.querySelector("[data-interview-form]");
+  const openButton = document.querySelector("[data-interview-new]");
+  if (!form || !openButton || !hasPermission("interview.create") || form.dataset.wired) return;
+  form.dataset.wired = "true";
+  openButton.classList.remove("hidden");
+  const show = (on) => { form.classList.toggle("hidden", !on); form.classList.toggle("grid", on); };
+  openButton.addEventListener("click", async () => {
+    show(true);
+    const [board, users] = await Promise.all([
+      apiRequest("/pipeline/board").catch(() => []),
+      apiRequest("/users/?page_size=100&status=active").catch(() => ({ items: [] })),
+    ]);
+    const applications = (Array.isArray(board) ? board : board.items || []).filter((a) => !/rejected|withdrawn|joined/i.test(String(a.application_status || "")));
+    fillSelect("interview_application", applications,
+      (a) => escapeLiveHtml(`${a.candidate_name || "Candidate"} — ${a.requisition_title || "Requisition"}${a.current_stage ? ` (${a.current_stage})` : ""}`),
+      (a) => a.application_id, queryInt("application_id"));
+    fillSelect("interview_interviewer", users.items || [], (u) => escapeLiveHtml(u.full_name || u.email || `User ${u.id}`), (u) => u.id, null);
+  });
+  form.querySelector("[data-interview-cancel]")?.addEventListener("click", () => show(false));
+  if (queryInt("application_id")) openButton.click(); /* arrived from a candidate's application */
+  const errorEl = form.querySelector("[data-interview-error]");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const applicationId = intOrNull(form.querySelector("#interview_application").value);
+    const roundName = form.querySelector("#interview_round_name").value.trim();
+    const when = form.querySelector("#interview_when").value;
+    const interviewer = form.querySelector("#interview_interviewer");
+    errorEl.textContent = "";
+    if (!applicationId) { errorEl.textContent = "Choose the candidate and requisition."; return; }
+    if (!roundName) { errorEl.textContent = "Give the round a name."; return; }
+    const body = JSON.stringify({
+      candidate_application_id: applicationId,
+      round_type: form.querySelector("#interview_round_type").value,
+      round_name: roundName,
+      scheduled_at: when ? new Date(when).toISOString() : null,
+      interviewer_user_id: intOrNull(interviewer.value),
+      interviewer_name: interviewer.value ? interviewer.selectedOptions[0]?.textContent || null : null,
+      created_by_user_id: currentUserId(),
+    });
+    const submit = form.querySelector("[type=submit]");
+    submit.disabled = true;
+    try {
+      await apiRequest("/interviews/", { method: "POST", body });
+      showLiveSuccess("Interview scheduled", roundName);
+      form.reset();
+      show(false);
+      await render();
+    } catch (error) {
+      errorEl.textContent = error?.message || "Couldn't schedule the interview.";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
 async function loadInterviewDetail() {
-  const interviewId = queryInt("interview_id");
-  if (!interviewId) return;
+  const host = document.querySelector("[data-interview-detail-host]");
+  if (!host) return;
+  const interviewId = queryInt("interview_id", "id");
+  if (!interviewId) {
+    host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">Open an interview from the <a class="font-semibold text-primary" href="interview-scheduler.html">interview list</a> to see its details.</p>';
+    return;
+  }
   try {
     const item = await apiRequest(`/interviews/${interviewId}`);
-    if (!item) return;
-    const surface = document.querySelector(".workspace-surface");
-    if (!surface) return;
-    const detail = document.createElement("div");
-    detail.innerHTML = renderInterviewDetail(item);
-    surface.querySelector("[data-live-interview-detail]")?.remove();
-    surface.prepend(detail);
-  } catch (error) { showLiveError(error); }
+    host.innerHTML = item ? renderInterviewDetail(item) : '<p class="font-body-sm text-body-sm text-text-muted">This interview could not be found.</p>';
+  } catch (error) {
+    host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">This interview could not be loaded.</p>';
+    showLiveError(error);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -4893,7 +5378,7 @@ function triToOption(value) { return value === true ? "yes" : value === false ? 
 function optionToTri(value) { return value === "yes" ? true : value === "no" ? false : null; }
 
 async function loadOfferCreateDialog() {
-  /* The offer form uses position/department selects — populate from backend */
+  /* Candidate/requisition lists resolve the candidate card when only candidate_id/requisition_id are given */
   const candidates = await apiRequest("/candidates/?page_size=50").catch(() => ({ items: [] }));
   const requisitions = await apiRequest("/requisitions/?page_size=50").catch(() => ({ items: [] }));
   /* If candidate_id or requisition_id in URL, pre-select */
@@ -4907,8 +5392,20 @@ async function loadOfferCreateDialog() {
     const el = document.getElementById("requisition_id");
     if (el) el.value = requisitionId;
   }
+  /* Fill the candidate card ([data-offer-candidate-*]) from the application, or from the candidate/requisition lists */
+  const offerAppId = queryInt("application_id", "candidate_application_id");
+  const offerApp = offerAppId ? await apiRequest(`/pipeline/applications/${offerAppId}`).catch(() => null) : null;
+  const offerCand = (candidates.items || []).find((c) => c.id === candidateId);
+  const offerReq = (requisitions.items || []).find((r) => r.id === (offerApp?.requisition_id || requisitionId));
+  const offerName = offerApp?.candidate_name || offerCand?.full_name || "";
+  const offerReqTitle = offerApp?.requisition_title || offerReq?.title || "";
+  const offerReqCode = offerApp?.requisition_code || offerReq?.requisition_code || "";
+  const offerSet = (key, value) => { const node = document.querySelector(`[data-offer-candidate-${key}]`); if (node) node.textContent = value || "—"; };
+  offerSet("name", offerName || "No candidate selected");
+  offerSet("meta", [offerReqTitle, offerReqCode].filter(Boolean).join(" · ") || "Open this form from a candidate application.");
+  offerSet("initials", offerName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join(""));
   syncCurrencySymbols();
-  await applyOfferBonusPolicy(queryInt("application_id", "candidate_application_id"));
+  await applyOfferBonusPolicy(offerAppId);
 }
 
 /* Phase 4.13: hide the signing-bonus field where the company (or, for client
@@ -5527,7 +6024,51 @@ function renderApprovalRows(tbody, items) {
   if (typeof hydrateLiveFilters === "function") hydrateLiveFilters(tbody.closest(".workspace-surface, section") || document);
 }
 
-async function decideApproval(approvalId, decision) {
+/* Approval review drawer: one approval, read from the API; Approve/Reject
+   only while it is pending (the API checks the caller may decide). */
+async function loadApprovalReviewDrawer() {
+  const host = document.querySelector("[data-approval-review]");
+  if (!host) return;
+  const approval = await detailFromRoute(["approval_id", "id"], "/approvals/?status=pending&page_size=1", (id) => `/approvals/${id}`).catch(() => null);
+  if (!approval) {
+    host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">This approval request could not be found.</p>';
+    return;
+  }
+  const label = (value) => String(value || "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) || "—";
+  setApiField("title", approval.title || "Approval request");
+  setApiField("approval_type", label(approval.approval_type));
+  setApiField("status", label(approval.status));
+  setApiField("requester_name", approval.requester_name);
+  setApiField("location_name", approval.location_name);
+  setApiField("created_at", approval.created_at ? formatWhen(approval.created_at) : null);
+  setApiField("sla_deadline", approval.sla_deadline ? formatWhen(approval.sla_deadline) : null);
+  setApiField("priority", approval.priority ? label(approval.priority) : null);
+  setApiField("assigned_reviewer_name", approval.assigned_reviewer_name);
+  setApiField("description", approval.description);
+  const related = document.querySelector("[data-approval-related]");
+  const relatedPages = { requisition: "requisition-detail.html", candidate: "candidate-detail.html", client: "client-detail.html", offer: "offer-management.html" };
+  const relatedPage = relatedPages[String(approval.related_entity_type || "").toLowerCase()];
+  if (related && relatedPage && approval.related_entity_id) {
+    related.href = `${relatedPage}?id=${encodeURIComponent(approval.related_entity_id)}`;
+    related.classList.remove("hidden");
+  }
+  if (approval.status !== "pending") {
+    document.querySelector("[data-approval-decision]")?.classList.remove("hidden");
+    setApiField("decision_user_name", approval.decision_user_name);
+    setApiField("decision_at", approval.decision_at ? formatWhen(approval.decision_at) : null);
+    setApiField("decision_notes", approval.decision_notes);
+    return;
+  }
+  const actions = document.querySelector("[data-approval-actions]");
+  if (!actions) return;
+  actions.classList.remove("hidden");
+  actions.classList.add("flex");
+  actions.querySelectorAll("[data-approval-decide]").forEach((button) => {
+    button.addEventListener("click", () => decideApproval(approval.id, button.dataset.approvalDecide, () => afterOverlaySave("approvals-inbox.html")));
+  });
+}
+
+async function decideApproval(approvalId, decision, onDone = null) {
   let notes = null;
   if (decision === "rejected") {
     notes = await promptNotesDialog({
@@ -5544,7 +6085,8 @@ async function decideApproval(approvalId, decision) {
       body: JSON.stringify({ decision, decision_notes: notes || (decision === "approved" ? "Approved" : "Rejected"), decision_user_id: currentUserId() }),
     });
     showLiveSuccess(decision === "approved" ? "Approved" : "Rejected", "Decision saved.");
-    loadApprovalsInbox();
+    if (typeof onDone === "function") onDone();
+    else loadApprovalsInbox();
   } catch (error) { showLiveError(error); }
 }
 
@@ -5802,7 +6344,8 @@ async function submitMeetingForm() {
   const meetingDate = document.getElementById("meeting_date")?.value;
   const startTime = document.getElementById("start_time")?.value;
   const agenda = document.getElementById("notes")?.value || null;
-  const clientId = intOrNull(queryInt("client_id")) || session?.client_id;
+  const clientId = intOrNull(document.getElementById("meeting_client")?.value) || intOrNull(queryInt("client_id")) || session?.client_id;
+  const followUpDue = document.getElementById("follow_up_due_date")?.value || null;
   const locationId = session?.location_id || currentLocationId();
   let scheduledAt = null;
   if (meetingDate && startTime) scheduledAt = new Date(`${meetingDate}T${startTime}`).toISOString();
@@ -5810,7 +6353,7 @@ async function submitMeetingForm() {
   const typeMap = { standup: "internal_review", debrief: "internal_review", client_sync: "client_introduction", kickoff: "requirement_discussion", interview_panel: "review_meeting", other: "internal_review" };
   const normalizedType = typeMap[meetingType] || meetingType || "internal_review";
   if (!title) { showLiveError(new Error("Meeting title is required.")); return; }
-  if (!clientId) { showLiveError(new Error("A client is required for meetings. Please create a client first.")); return; }
+  if (!clientId) { showLiveError(new Error("Choose the client this meeting is with.")); return; }
   const payload = {
     location_id: locationId,
     client_id: clientId,
@@ -5819,11 +6362,13 @@ async function submitMeetingForm() {
     meeting_type: normalizedType,
     scheduled_at: scheduledAt,
     agenda,
+    follow_up_due_date: followUpDue,
   };
   try {
     await apiRequest("/meetings/", { method: "POST", body: JSON.stringify(payload) });
-    showLiveSuccess("Meeting scheduled", title);
-    afterOverlaySave("meetings.html");
+    const isFollowUp = routeId() === "follow-up-form-dialog";
+    showLiveSuccess(isFollowUp ? "Follow-up created" : "Meeting scheduled", title);
+    afterOverlaySave(isFollowUp ? "follow-ups.html" : "meetings.html");
   } catch (error) { showLiveError(error); }
 }
 
@@ -5833,7 +6378,7 @@ async function submitOfferCreate() {
   const candidateId = intOrNull(queryInt("candidate_id")) || intOrNull(document.getElementById("candidate_id")?.value);
   const requisitionId = intOrNull(queryInt("requisition_id")) || intOrNull(document.getElementById("requisition_id")?.value);
   const offeredCtc = parseMoneyInput(document.getElementById("base_salary")?.value);
-  const currency = document.getElementById("currency")?.value || "USD";
+  const currency = document.getElementById("currency")?.value || "INR";
   const bonusInput = document.getElementById("signing_bonus");
   const signingBonus = bonusInput?.dataset?.bonusAllowed === "false" ? null : parseMoneyInput(bonusInput?.value);
   const startDate = document.getElementById("start_date")?.value || null;
@@ -6232,7 +6777,7 @@ function bindLiveApiInteractions() {
     // Form submissions
     const routeSubmitButton = target?.closest("button");
     const route = routeId();
-    const submitRoutes = new Set(["contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "daily-updates-workspace", "meeting-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer", "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup", "onboarding-hiring-teams"]);
+    const submitRoutes = new Set(["contact-form-dialog", "requisition-intake", "requisition-intake-edit", "daily-updates-submission", "daily-updates-workspace", "meeting-form-dialog", "follow-up-form-dialog", "offer-create-dialog", "link-to-requisition-dialog", "stage-move-dialog", "candidate-review-drawer"]);
     const label = (typeof getActionLabel === "function" ? getActionLabel(routeSubmitButton) : (routeSubmitButton?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase());
     if (routeSubmitButton && submitRoutes.has(route) && /^(save|create|update|submit|schedule|confirm|continue|next|add|send|save changes|save user|save client|save contact|save role|create requisition|save candidate|update candidate)/.test(label)) {
       event.preventDefault();
@@ -6246,11 +6791,6 @@ function bindLiveApiInteractions() {
     }
   }, true);
 
-  document.addEventListener("change", (event) => {
-    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    const resumeInput = target?.closest?.("[data-live-resume-file-input]");
-    if (resumeInput) uploadCandidateResume(resumeInput);
-  });
 
   // Login form
   const loginForm = document.querySelector('form[data-login], form[action*="login"], #login-form');
@@ -6266,187 +6806,7 @@ function bindLiveApiInteractions() {
 }
 
 
-/* ═══════════════════════════════════════════════════════════════
-   ONBOARDING — Setup Flow Submissions
-   ═══════════════════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════════════════════
-   ONBOARDING — Location guidance
-   Locations scope clients, requisitions and users, so during setup
-   we surface the admin's working location and make switching to a
-   newly created HQ one click. This prevents the "client owner must
-   belong to the same location" rejection from surprising new users.
-   ═══════════════════════════════════════════════════════════════ */
-
-function wireOnboardingLocationGuidance() {
-  const session = RecruitOpsLive.session || readSession();
-  const banner = document.querySelector("[data-current-location-banner]");
-  if (!banner) return;
-  const nameEl = banner.querySelector("[data-current-location-name]");
-  const locationName = session?.location_name || "your primary location";
-  if (nameEl && session?.location_name) nameEl.textContent = session.location_name;
-  else if (nameEl) nameEl.textContent = "your primary location";
-  banner.classList.remove("hidden");
-  banner.classList.add("flex");
-  /* Keep the session location fresh after the admin moves to a new HQ. */
-  banner.querySelector("[data-switch-location-btn]")?.addEventListener("click", async () => {
-    const created = banner.querySelector("[data-created-location-name]")?.textContent || "";
-    const locations = session.onboarding?.locations || [];
-    const target = locations.find((loc) => loc.name === created);
-    if (!target) return;
-    try {
-      await apiRequest(`/users/${session.user_id}/move`, {
-        method: "POST",
-        body: JSON.stringify({ new_primary_location_id: target.id, reason: "Set as company headquarters during onboarding", review_confirmed: true }),
-      });
-      session.location_id = target.id;
-      session.location_name = target.name;
-      writeSession(session);
-      RecruitOpsLive.session = session;
-      if (nameEl) nameEl.textContent = target.name;
-      banner.querySelector("[data-switch-location-row]")?.classList.add("hidden");
-      showLiveSuccess("Working location updated", `You now work from ${target.name}.`);
-    } catch (error) { showLiveError(error); }
-  });
-}
-
-async function submitOnboardingCompanyProfile() {
-  const session = RecruitOpsLive.session || readSession();
-  const legalName = document.getElementById("legalName")?.value?.trim();
-  const brandName = document.getElementById("brandName")?.value?.trim();
-  const industry = document.getElementById("industry")?.value;
-  const size = document.getElementById("size")?.value;
-  const currency = document.getElementById("currency")?.value;
-  const timezone = document.getElementById("timezone")?.value;
-  if (!legalName) { showLiveError(new Error("Company legal name is required.")); return; }
-  /* Store company profile in session for onboarding flow */
-  session.onboarding = session.onboarding || {};
-  session.onboarding.company = { legalName, brandName, industry, size, currency, timezone };
-  writeSession(session);
-  RecruitOpsLive.session = session;
-  /* Persist a headquarters location so the company exists in the database */
-  try {
-    const locationName = legalName + " — Headquarters";
-    const payload = {
-      location_name: locationName,
-      location_code: legalName.substring(0, 10).toUpperCase().replace(/\s+/g, ""),
-      status: "active",
-    };
-    const result = await apiRequest("/locations/", { method: "POST", body: JSON.stringify(payload) });
-    session.onboarding.locations = session.onboarding.locations || [];
-    session.onboarding.locations.push({ id: result.id, name: locationName });
-    writeSession(session);
-    RecruitOpsLive.session = session;
-    showLiveSuccess("Company profile saved", "Headquarters location created.");
-  } catch (error) {
-    /* Location may already exist — still save the profile */
-    showLiveSuccess("Company profile saved");
-  }
-}
-
-async function submitOnboardingLocation() {
-  const session = RecruitOpsLive.session || readSession();
-  const nameInput = document.querySelector("input[placeholder*='location' i], input[placeholder*='office' i], input[placeholder*='branch' i]") || document.querySelector(".workspace-surface input[type='text']");
-  const name = nameInput?.value?.trim();
-  if (!name) { showLiveError(new Error("Location name is required.")); return; }
-  const payload = {
-    location_name: name,
-    location_code: name.substring(0, 10).toUpperCase().replace(/\s+/g, ""),
-    status: "active",
-  };
-  try {
-    const result = await apiRequest("/locations/", { method: "POST", body: JSON.stringify(payload) });
-    session.onboarding = session.onboarding || {};
-    session.onboarding.locations = session.onboarding.locations || [];
-    session.onboarding.locations.push({ id: result.id, name });
-    writeSession(session);
-    RecruitOpsLive.session = session;
-    showLiveSuccess("Location created", name);
-    if (nameInput) nameInput.value = "";
-    /* If this differs from the admin's working location, offer a one-click move. */
-    if (session.location_id && result.id !== session.location_id) {
-      const banner = document.querySelector("[data-current-location-banner]");
-      if (banner) {
-        const createdEl = banner.querySelector("[data-created-location-name]");
-        if (createdEl) createdEl.textContent = name;
-        banner.querySelector("[data-switch-location-row]")?.classList.remove("hidden");
-      }
-    }
-  } catch (error) { showLiveError(error); }
-}
-
-async function submitOnboardingRole() {
-  const session = RecruitOpsLive.session || readSession();
-  const nameInput = document.querySelector("input[placeholder*='role' i], input[placeholder*='title' i]") || document.querySelector(".workspace-surface input[type='text']");
-  const name = nameInput?.value?.trim();
-  if (!name) { showLiveError(new Error("Role name is required.")); return; }
-  const payload = {
-    name: name,
-    code: name.toLowerCase().replace(/\s+/g, "_").substring(0, 30),
-    status: "active",
-  };
-  try {
-    const result = await apiRequest("/roles/", { method: "POST", body: JSON.stringify(payload) });
-    session.onboarding = session.onboarding || {};
-    session.onboarding.roles = session.onboarding.roles || [];
-    session.onboarding.roles.push({ id: result.id, name });
-    writeSession(session);
-    RecruitOpsLive.session = session;
-    showLiveSuccess("Role created", name);
-    if (nameInput) nameInput.value = "";
-  } catch (error) { showLiveError(error); }
-}
-
-async function submitOnboardingTeam() {
-  const session = RecruitOpsLive.session || readSession();
-  const nameInput = document.querySelector("input[placeholder*='name' i]") || document.querySelector(".workspace-surface input[type='text']");
-  const emailInput = document.querySelector("input[type='email'], input[placeholder*='email' i]");
-  const name = nameInput?.value?.trim();
-  const email = emailInput?.value?.trim();
-  if (!name || !email) { showLiveError(new Error("Name and email are required.")); return; }
-  const locationId = session?.location_id || currentLocationId();
-  const roleId = session?.onboarding?.roles?.[0]?.id || 4; /* Default to recruiter role */
-  const payload = {
-    full_name: name,
-    email: email,
-    employee_code: name.substring(0, 8).toUpperCase().replace(/\s+/g, "") + Math.floor(Math.random() * 1000),
-    primary_location_id: locationId,
-    primary_role_id: roleId,
-    status: "active",
-  };
-  try {
-    const result = await apiRequest("/users/", { method: "POST", body: JSON.stringify(payload) });
-    session.onboarding = session.onboarding || {};
-    session.onboarding.team = session.onboarding.team || [];
-    session.onboarding.team.push({ id: result.id, name, email });
-    writeSession(session);
-    RecruitOpsLive.session = session;
-    showLiveSuccess("Team member added", name);
-    if (nameInput) nameInput.value = "";
-    if (emailInput) emailInput.value = "";
-  } catch (error) { showLiveError(error); }
-}
-
-async function completeOnboarding() {
-  const session = RecruitOpsLive.session || readSession();
-  /* Mark onboarding as complete */
-  localStorage.setItem("recruitops-onboarding-complete", "true");
-  /* Ensure user has Admin role */
-  session.role = "admin";
-  session.role_code = "admin";
-  writeSession(session);
-  RecruitOpsLive.session = session;
-  /* Persist the admin role assignment to the database */
-  try {
-    const userId = session.user_id || currentUserId();
-    if (userId && session.token) {
-      await apiRequest(`/users/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "active" }),
-      });
-    }
-  } catch (e) { /* Best effort — session already set */ }
-}
 
 /* ═══════════════════════════════════════════════════════════════
    PAGE BOOT & ROUTING
@@ -6518,7 +6878,6 @@ async function bootPage() {
     "work-assignment": loadWorkAssignment,
     "portal-accounts": loadPortalAccounts,
     "reassign-owner-dialog": loadReassignOwnerDialog,
-    "reassignment-review-drawer": loadReassignmentReviewDrawer,
     "status-update-dialog": loadStatusUpdateDialog,
     "exception-request-dialog": loadWorkflowOverlay,
     "clarification-request-dialog": loadWorkflowOverlay,
@@ -6544,20 +6903,13 @@ async function bootPage() {
     "meeting-form-dialog": loadMeetingFormDialog,
     "follow-ups": loadFollowUps,
     "follow-up-form-dialog": loadFollowUpFormDialog,
-    "interview-scheduler": async () => {
-      const payload = await apiRequest("/interviews/?page_size=50").catch(() => ({ items: [] }));
-      const surface = document.querySelector(".workspace-surface");
-      if (surface) {
-        const list = surface.querySelector(".rounded-xl.flex.flex-col");
-        if (list) list.innerHTML = (payload.items || []).map((item, i) => renderInterviewCard(item, i)).join("") || '<div class="p-6 text-center text-text-muted">No interviews.</div>';
-      }
-    },
+    "interview-scheduler": loadInterviewScheduler,
     "interview-detail": loadInterviewDetail,
     "interview-feedback-dialog": loadInterviewFeedbackDialog,
     "notifications-center": loadNotifications,
     "notification-detail-panel": loadNotificationDetailPanel,
     "approvals-inbox": loadApprovalsInbox,
-    "approval-review-drawer": loadWorkflowOverlay,
+    "approval-review-drawer": loadApprovalReviewDrawer,
     "dashboard-actions-overlay": loadDashboardActionsOverlay,
     "offer-management": loadOfferManagement,
     "offer-create-dialog": loadOfferCreateDialog,
@@ -6575,6 +6927,11 @@ async function bootPage() {
     "review-matches-workspace": loadReviewMatchesWorkspace,
     "requisition-list": async () => {
       const payload = await apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] }));
+      /* KPI strip: counted from the loaded page of requisitions (up to 100). */
+      const openReqs = (payload.items || []).filter((r) => String(r.status || "open").toLowerCase() === "open");
+      setApiField("req_total_open", openReqs.length);
+      setApiField("req_critical", openReqs.filter((r) => String(r.priority || "").toLowerCase() === "critical").length);
+      setApiField("req_stale", openReqs.filter((r) => Date.now() - new Date(r.created_at).getTime() > 60 * 86400000).length);
       fillExistingTable(payload.items || [], (row, item) => {
         const cells = row.querySelectorAll("td");
         /* Column order: Requisition | Client | Openings | Ownership | Location | Priority | Status | Age */
@@ -6605,21 +6962,26 @@ async function bootPage() {
       });
     },
     "application-history": async () => {
+      const historyAppId = queryInt("application_id");
+      if (historyAppId) {
+        const application = await apiRequest(`/pipeline/applications/${historyAppId}`).catch(() => null);
+        if (application) {
+          setFirstText("[data-candidate-name]", application.candidate_name);
+          setFirstText("[data-current-stage]", application.current_stage);
+          setFirstText("[data-requisition-title]", application.requisition_title);
+          ["requisition_code", "owner_name", "location_name", "application_status"].forEach((key) => setApiField(key, application[key] || null));
+        }
+        await loadPipelineApplicationHistory();
+        return;
+      }
+      const historyHost = document.querySelector(".workspace-surface .space-y-3");
+      if (historyHost) historyHost.innerHTML = `<div class="p-4 text-body-sm text-text-muted">Open an application to see its stage history.</div>`;
       const candidateId = queryInt("candidate_id");
       if (!candidateId) return;
       const candidate = await apiRequest(`/candidates/${candidateId}`).catch(() => null);
       if (candidate) setFirstText("[data-candidate-name], h1", candidate.full_name);
     },
-    "delivery-work-queue": async () => {
-      const payload = await apiRequest("/requisitions/?page_size=50").catch(() => ({ items: [] }));
-      fillExistingTable(payload.items || [], (row, item) => {
-        const cells = row.querySelectorAll("td");
-        setStackedCell(cells[0], item.title, item.client_name || "");
-        setCellValue(cells[1], item.priority || "—");
-        setCellValue(cells[2], item.openings_count || "0");
-        setCellValue(cells[3], item.status || "open");
-      });
-    },
+    "delivery-work-queue": loadDeliveryWorkQueue,
     "support-workspace": async () => {
       // Support page - no API needed, shows static help content
     },
@@ -6654,13 +7016,6 @@ async function bootPage() {
         runAgentAction(runButton, { ...agentsRunContext, agentId: "resume_screener" });
       }
     },
-    "onboarding-company-profile": async () => { wireOnboardingLocationGuidance(); },
-    "onboarding-hiring-teams": async () => {},
-    "onboarding-locations": async () => { wireOnboardingLocationGuidance(); },
-    "onboarding-role-setup": async () => {},
-    "onboarding-pipeline-stage-builder": async () => {},
-    "onboarding-integrations": async () => {},
-    "onboarding-success-launch": async () => { await completeOnboarding(); },
   };
   RecruitOpsLive.pageLoaders = loaders;
   RecruitOpsLive.reloadCurrentPage = async () => {

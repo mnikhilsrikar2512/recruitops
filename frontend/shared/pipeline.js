@@ -723,49 +723,6 @@ function setupReassignOwnerOverlay() {
 }
 
 
-function setupApprovalReviewOverlay() {
-  if (document.body?.dataset.routeId !== "approval-review-drawer") return;
-  const surface = document.querySelector("[data-overlay-surface='true']");
-  const footer = surface?.querySelector("footer");
-  const requestInfoButton = Array.from(footer?.querySelectorAll("button") || []).find((button) => /request info/i.test(getActionLabel(button)));
-  const rejectButton = Array.from(footer?.querySelectorAll("button") || []).find((button) => /^reject$/.test(getActionLabel(button)));
-  const approveButton = Array.from(footer?.querySelectorAll("button") || []).find((button) => /^approve$/.test(getActionLabel(button)));
-  const summary = ensureDecisionSummary(
-    surface?.querySelector(".flex-1.overflow-y-auto") || surface,
-    "approval-review",
-    "Decision status",
-    "Choose the next decision path once the request type, impact, and risk are clear.",
-  );
-  if (!surface || !summary || !footer) return;
-
-  const setState = (state) => {
-    const map = {
-      info: [
-        { icon: "info", text: "Request more information" },
-        { icon: "schedule", text: "Decision paused until requester responds" },
-      ],
-      reject: [
-        { icon: "cancel", text: "Reject this request" },
-        { icon: "gavel", text: "A rejection rationale should be captured next" },
-      ],
-      approve: [
-        { icon: "check_circle", text: "Approve this request" },
-        { icon: "done_all", text: "Ready for downstream workflow release" },
-      ],
-    };
-    updateDecisionSummaryMeta(summary, map[state] || [
-      { icon: "pending_actions", text: "Decision not chosen yet" },
-      { icon: "rule", text: "Review the business and audit context first" },
-    ]);
-  };
-
-  requestInfoButton?.addEventListener("click", () => setState("info"));
-  rejectButton?.addEventListener("click", () => setState("reject"));
-  approveButton?.addEventListener("click", () => setState("approve"));
-  setState("");
-}
-
-
 function setupPipelineHistoryOverlay() {
   if (document.body?.dataset.routeId !== "pipeline-history-drawer") return;
   const surface = document.querySelector("[data-overlay-surface='true']");

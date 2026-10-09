@@ -1,8 +1,8 @@
 {
  "generated_at_unix": 1789682101,
- "primary_route_count": 84,
- "overlay_route_count": 22,
- "total_route_count": 106,
+ "primary_route_count": 75,
+ "overlay_route_count": 21,
+ "total_route_count": 96,
  "primary_routes": [
   {
    "file": "login.html",
@@ -240,10 +240,6 @@
     {
      "label": "Deactivate User",
      "href": "deactivate-user-dialog.html"
-    },
-    {
-     "label": "Reassignment Review",
-     "href": "reassignment-review-drawer.html"
     }
    ]
   },
@@ -994,190 +990,6 @@
    ]
   },
   {
-   "file": "onboarding-welcome.html",
-   "route_id": "onboarding-welcome",
-   "kind": "standalone",
-   "title": "Welcome Setup",
-   "section": "Onboarding",
-   "subtitle": "First onboarding step for starting a new RecruitOps workspace.",
-   "source": "v6:onboarding_welcome_welcome_setup",
-   "nav": null,
-   "links": [
-    {
-     "label": "Next: Company Profile",
-     "href": "onboarding-company-profile.html"
-    },
-    {
-     "label": "Skip to Dashboard",
-     "href": "role-dashboard.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-company-profile.html",
-   "route_id": "onboarding-company-profile",
-   "kind": "standalone",
-   "title": "Company Profile Setup",
-   "section": "Onboarding",
-   "subtitle": "Capture workspace identity, company details, and brand basics.",
-   "source": "v6:onboarding_company_profile_setup",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Welcome",
-     "href": "onboarding-welcome.html"
-    },
-    {
-     "label": "Next: Hiring Teams",
-     "href": "onboarding-hiring-teams.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-hiring-teams.html",
-   "route_id": "onboarding-hiring-teams",
-   "kind": "standalone",
-   "title": "Hiring Teams Setup",
-   "section": "Onboarding",
-   "subtitle": "Map hiring teams, owners, and collaboration coverage.",
-   "source": "v6:onboarding_hiring_teams_setup",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Company Profile",
-     "href": "onboarding-company-profile.html"
-    },
-    {
-     "label": "Next: Locations",
-     "href": "onboarding-locations.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-locations.html",
-   "route_id": "onboarding-locations",
-   "kind": "standalone",
-   "title": "Locations Setup",
-   "section": "Onboarding",
-   "subtitle": "Configure operating locations and regional hiring coverage.",
-   "source": "v6:onboarding_locations_setup",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Hiring Teams",
-     "href": "onboarding-hiring-teams.html"
-    },
-    {
-     "label": "Next: Roles",
-     "href": "onboarding-role-setup.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-role-setup.html",
-   "route_id": "onboarding-role-setup",
-   "kind": "standalone",
-   "title": "Role Setup",
-   "section": "Onboarding",
-   "subtitle": "Configure permissions and role templates for the workspace.",
-   "source": "v6:onboarding_role_setup_refined",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Locations",
-     "href": "onboarding-locations.html"
-    },
-    {
-     "label": "Next: Pipeline Builder",
-     "href": "onboarding-pipeline-stage-builder.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-pipeline-stage-builder.html",
-   "route_id": "onboarding-pipeline-stage-builder",
-   "kind": "standalone",
-   "title": "Pipeline Stage Builder",
-   "section": "Onboarding",
-   "subtitle": "Build the default hiring pipeline before launch.",
-   "source": "v6:onboarding_pipeline_stage_builder",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Roles",
-     "href": "onboarding-role-setup.html"
-    },
-    {
-     "label": "Add Custom Stage",
-     "href": "onboarding-add-custom-stage-overlay.html"
-    },
-    {
-     "label": "Next: Integrations",
-     "href": "onboarding-integrations.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-add-custom-stage-overlay.html",
-   "route_id": "onboarding-add-custom-stage-overlay",
-   "kind": "standalone",
-   "title": "Add Custom Stage",
-   "section": "Onboarding",
-   "subtitle": "Focused stage-creation view for onboarding pipeline setup.",
-   "source": "v6:onboarding_add_custom_stage_overlay",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Pipeline Builder",
-     "href": "onboarding-pipeline-stage-builder.html"
-    },
-    {
-     "label": "Continue to Integrations",
-     "href": "onboarding-integrations.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-integrations.html",
-   "route_id": "onboarding-integrations",
-   "kind": "standalone",
-   "title": "Integrations Setup",
-   "section": "Onboarding",
-   "subtitle": "Connect core tools or continue with integrations staged for later.",
-   "source": "v6:onboarding_integrations_setup",
-   "nav": null,
-   "links": [
-    {
-     "label": "Back to Pipeline Builder",
-     "href": "onboarding-pipeline-stage-builder.html"
-    },
-    {
-     "label": "Launch Workspace",
-     "href": "onboarding-success-launch.html"
-    }
-   ]
-  },
-  {
-   "file": "onboarding-success-launch.html",
-   "route_id": "onboarding-success-launch",
-   "kind": "standalone",
-   "title": "Workspace Ready",
-   "section": "Onboarding",
-   "subtitle": "Completion state for launching the configured RecruitOps workspace.",
-   "source": "v6:onboarding_success_launch",
-   "nav": null,
-   "links": [
-    {
-     "label": "Open Dashboard",
-     "href": "role-dashboard.html"
-    },
-    {
-     "label": "Review Setup",
-     "href": "onboarding-welcome.html"
-    }
-   ]
-  },
-  {
    "file": "tenant-setup.html",
    "route_id": "tenant-setup",
    "kind": "standalone",
@@ -1765,19 +1577,6 @@
    "parent_title": "Requisition Detail",
    "parent_section": "Requisitions",
    "source": "reassign_owner_dialog_refined_audit_flow",
-   "required_selectors": []
-  },
-  {
-   "file": "reassignment-review-drawer.html",
-   "route_id": "reassignment-review-drawer",
-   "kind": "overlay",
-   "title": "Reassignment Review",
-   "overlay_kind": "drawer",
-   "parent": "user-detail.html",
-   "parent_route_id": "user-detail",
-   "parent_title": "User Detail",
-   "parent_section": "Administration",
-   "source": "v4:reassignment_review_drawer",
    "required_selectors": []
   },
   {

@@ -19,7 +19,6 @@ const OVERLAY_ROUTE_FILES = new Set([
   "notification-detail-panel.html",
   "pipeline-history-drawer.html",
   "reassign-owner-dialog.html",
-  "reassignment-review-drawer.html",
   "stage-move-dialog.html",
   "status-update-dialog.html",
   "interview-feedback-dialog.html",
@@ -27,7 +26,6 @@ const OVERLAY_ROUTE_FILES = new Set([
   "meeting-form-dialog.html",
   "follow-up-form-dialog.html",
   "dashboard-actions-overlay.html",
-  "onboarding-add-custom-stage-overlay.html",
 ]);
 
 function dismissToast(toast) {

@@ -298,6 +298,58 @@ async function loadHomeMetrics() {
      and an unfiltered total would be a false number. */
 }
 
+/* ── Setup checklist (frontend cleanup F.1) ───────────────────────
+   Shown on Home to a company's admins until they hide it. Every item is
+   worked out by the API from the company's own data. */
+
+async function buildSetupChecklist() {
+  const host = document.querySelector("[data-setup-checklist]");
+  if (!host || !navPermissionSet().has("settings.update")) return;
+  const data = await apiRequest("/settings/setup-checklist").catch(() => null);
+  if (!data || data.dismissed) {
+    host.hidden = true;
+    return;
+  }
+  const esc = (value) => (typeof escapeLiveHtml === "function" ? escapeLiveHtml(value) : String(value ?? ""));
+  const rows = data.items
+    .map(
+      (item) => `<li class="flex items-start gap-3 py-2.5" data-setup-item="${esc(item.key)}" data-done="${item.done}">
+        <span class="material-symbols-outlined mt-0.5 text-[20px] ${item.done ? "text-success-text" : "text-text-muted"}" aria-hidden="true">${item.done ? "check_circle" : "radio_button_unchecked"}</span>
+        <div class="min-w-0 flex-1">
+          <p class="font-body-md text-body-md font-semibold ${item.done ? "text-text-muted line-through" : "text-on-surface"}">${esc(item.title)}${item.optional ? ' <span class="ml-1 rounded-full bg-surface-soft px-2 py-0.5 text-[11px] font-semibold text-text-muted no-underline">Optional</span>' : ""}</p>
+          <p class="font-body-sm text-body-sm text-text-muted">${esc(item.description)}</p>
+        </div>
+        ${item.done ? '<span class="sr-only">Done</span>' : `<a class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-[13px] font-semibold text-primary hover:bg-highlight-soft" href="${esc(item.page)}">Open</a>`}
+      </li>`,
+    )
+    .join("");
+  const percent = data.total ? Math.round((data.done / data.total) * 100) : 0;
+  host.innerHTML = `<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h2 id="setup-checklist-title" class="font-headline-md text-headline-md text-on-surface">${data.complete ? "Your company is set up" : "Set up your company"}</h2>
+        <p class="font-body-sm text-body-sm text-text-muted">${data.done} of ${data.total} done. Only admins see this list.</p>
+      </div>
+      <button type="button" class="self-start rounded-lg px-3 py-1.5 text-[13px] font-semibold text-text-muted hover:bg-highlight-soft" data-setup-checklist-hide>Hide this list</button>
+    </div>
+    <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-soft" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-label="Setup progress">
+      <div class="h-full rounded-full bg-primary" style="width:${percent}%"></div>
+    </div>
+    <ul class="mt-2 divide-y divide-border">${rows}</ul>`;
+  host.hidden = false;
+  host.querySelector("[data-setup-checklist-hide]")?.addEventListener("click", async (event) => {
+    event.currentTarget.disabled = true;
+    const body = JSON.stringify({ dismissed: true });
+    try {
+      await apiRequest("/settings/setup-checklist/dismissed", { method: "PUT", body });
+      host.hidden = true;
+      if (typeof showToast === "function") showToast("Checklist hidden", "You can do these any time from the admin pages.");
+    } catch (error) {
+      event.currentTarget.disabled = false;
+      if (typeof showLiveError === "function") showLiveError(error);
+    }
+  });
+}
+
 /* ── Boot ─────────────────────────────────────────────────────── */
 
 function bootNavigationChrome() {
@@ -305,6 +357,7 @@ function bootNavigationChrome() {
   buildMobileNav();
   if (document.querySelector("[data-home-grid]")) buildHomeGrid();
   if (document.querySelector("[data-home-metrics]")) buildHomeMetrics();
+  if (document.querySelector("[data-setup-checklist]")) buildSetupChecklist();
   wireGlobalSearch();
 }
 

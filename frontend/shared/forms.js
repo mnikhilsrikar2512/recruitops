@@ -106,9 +106,9 @@ function isFieldComplete(field) {
 
 
 function setupFormProgress(form) {
-  if (form.id === "login-form") return;
-  if (form.dataset.skipProgress === "true") return;
-  if (form.id === "profile-details-form" || form.id === "profile-password-form") return;
+  /* Opt-in: only long data-entry forms (data-progress="true") get the bar.
+     Filters, confirmations and short dialogs stay clean. */
+  if (form.dataset.progress !== "true") return;
   const fields = getProgressFields(form);
   if (fields.length < 2) return;
 
@@ -118,8 +118,8 @@ function setupFormProgress(form) {
   progressCard.innerHTML = `
     <div class="form-progress-label">
       <div>
-        <strong>Completion progress</strong>
-        <p class="m-0 text-[12px] text-text-muted">Keep moving through the essentials before triggering the next workflow step.</p>
+        <strong>Progress</strong>
+        <p class="m-0 text-[12px] text-text-muted">Required fields filled in so far.</p>
       </div>
       <span data-form-progress-count>0 of ${fields.length} ready</span>
     </div>

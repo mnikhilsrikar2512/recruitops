@@ -129,12 +129,12 @@ def main() -> int:
             if name not in PUBLIC and LIVE["session"]:
                 context.add_init_script(
                     f"try {{ localStorage.setItem('recruitops-session', {json.dumps(LIVE['session'])});"
-                    " localStorage.setItem('recruitops-onboarding-complete', 'true'); } catch (e) {}"
+                    " } catch (e) {}"
                 )
             elif name not in PUBLIC:
                 context.add_init_script(
                     f"try {{ localStorage.setItem('recruitops-session', {json.dumps(json.dumps(session_for(opts.persona)))});"
-                    " localStorage.setItem('recruitops-onboarding-complete', 'true'); } catch (e) {}"
+                    " } catch (e) {}"
                 )
 
             def route_external(route):
