@@ -477,7 +477,42 @@ def setup_password_service(
         force_password_change_on_first_login=False,
     )
     mark_password_reset_token_used(engine, token_record["id"])
-    return PasswordSetupResponse(message="Password set successfully")
+    # Phase 5.2: using the emailed setup link proves the address.
+    try:
+        from sqlalchemy import text as _text
+
+        with engine.begin() as connection:
+            connection.execute(_text("UPDATE dbo.users SET email_verified_at = COALESCE(email_verified_at, SYSUTCDATETIME()) "
+                                     "WHERE id = :u"), {"u": token_record["user_id"]})
+    except Exception:  # noqa: BLE001 — older databases without the column
+        pass
+    return _after_first_password(engine, int(token_record["user_id"]))
+
+
+def _after_first_password(engine: Engine, user_id: int) -> PasswordSetupResponse:
+    """Phase 5.2: an ops-provisioned company is still pending when its first
+    admin sets a password. Same rule as self-serve: two-step verification
+    first (when required), then the company becomes active."""
+    from sqlalchemy import text as _text
+
+    from app.core.tokens import issue_signup_token
+
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(_text(
+                "SELECT t.id, t.status FROM dbo.users u JOIN dbo.tenants t ON t.id = u.tenant_id WHERE u.id = :u"),
+                {"u": user_id}).first()
+    except Exception:  # noqa: BLE001
+        row = None
+    if row is None or row[1] != "pending":
+        return PasswordSetupResponse(message="Password set successfully")
+    if not settings.mfa_enforce_admin_enrollment:
+        with engine.begin() as connection:
+            connection.execute(_text("UPDATE dbo.tenants SET status = N'active', updated_at = SYSUTCDATETIME() "
+                                     "WHERE id = :t AND status = N'pending'"), {"t": row[0]})
+        return PasswordSetupResponse(message="Password set; your company is active")
+    setup_token, _ = issue_signup_token(user_id=user_id, tenant_id=int(row[0]))
+    return PasswordSetupResponse(message="Password set; now set up two-step verification", next="mfa", setup_token=setup_token)
 
 
 def forgot_password_service(

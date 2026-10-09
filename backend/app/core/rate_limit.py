@@ -25,6 +25,8 @@ RULES: dict[str, int] = {
     "password_token:ip": 10,
     "refresh:ip": 30,
     "mfa:account": 10,
+    "signup:ip": 5,  # Phase 5.2: new companies per minute per IP
+    "signup_verify:ip": 20,
 }
 WINDOW_SECONDS = 60
 

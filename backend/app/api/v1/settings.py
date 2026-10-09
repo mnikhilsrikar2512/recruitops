@@ -210,3 +210,34 @@ def save_client_stage_list_endpoint(
 ) -> StageListResponse:
     """Every requisition for this client uses this list."""
     return save_list_service(engine, auth, payload, client_id)
+
+
+# ── Setup checklist (frontend cleanup F.1) ─────────────────────────────
+from app.schemas.settings import SetupChecklistDismiss, SetupChecklistResponse  # noqa: E402
+from app.services import setup_checklist  # noqa: E402
+
+
+def _checklist_tenant(auth: object) -> int:
+    tenant_id = caller_tenant_id(auth)
+    if tenant_id is None:
+        raise HTTPException(status_code=404, detail="No company")
+    return int(tenant_id)
+
+
+@router.get("/setup-checklist", response_model=SetupChecklistResponse)
+def get_setup_checklist_endpoint(
+    auth: object = Depends(require_permissions("settings.update")),
+    engine: Engine = Depends(get_engine),
+) -> SetupChecklistResponse:
+    return SetupChecklistResponse(**setup_checklist.checklist(engine, _checklist_tenant(auth)))
+
+
+@router.put("/setup-checklist/dismissed", response_model=SetupChecklistResponse)
+def dismiss_setup_checklist_endpoint(
+    payload: SetupChecklistDismiss,
+    auth: object = Depends(require_permissions("settings.update")),
+    engine: Engine = Depends(get_engine),
+) -> SetupChecklistResponse:
+    tenant_id = _checklist_tenant(auth)
+    setup_checklist.set_dismissed(engine, tenant_id, payload.dismissed)
+    return SetupChecklistResponse(**setup_checklist.checklist(engine, tenant_id))

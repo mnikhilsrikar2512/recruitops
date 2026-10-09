@@ -25,6 +25,7 @@ from app.api.v1 import (
     requisitions,
     roles,
     settings,
+    signup,
     system,
     users,
     workflow_actions,
@@ -58,3 +59,4 @@ api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
 api_router.include_router(legal.router, prefix="/legal", tags=["legal"])
 api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])
 api_router.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
+api_router.include_router(signup.router, prefix="/signup", tags=["signup"])

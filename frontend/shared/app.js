@@ -663,7 +663,8 @@ function setupOverlayInteractionPolish(scope = document) {
       const nestedFooter = bodySection && !footerSection
         ? Array.from(bodySection.children).reverse().find((child) => {
           const className = child.className || "";
-          return /border-t|justify-end|rounded-b/.test(className) && child.querySelector("button, a[href]");
+          /* Never lift a button row out of a <form>: its submit button would stop submitting. */
+          return /border-t|justify-end|rounded-b/.test(className) && child.querySelector("button, a[href]") && !child.closest("form");
         })
         : null;
       if (nestedFooter) {
@@ -1185,26 +1186,6 @@ function setupMyWorkWorkspace() {
 function setupRecoveryUtilities() {
   const routeId = document.body?.dataset.routeId || "";
 
-  if (routeId === "access-denied") {
-    const copyButton = Array.from(document.querySelectorAll("button")).find((button) =>
-      /copy request id/i.test(button.getAttribute("aria-label") || ""),
-    );
-    const requestId = Array.from(document.querySelectorAll("span"))
-      .find((node) => /REQ-\d{8}/.test(node.textContent || ""))
-      ?.textContent?.trim();
-
-    if (copyButton && requestId) {
-      copyButton.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard?.writeText(requestId);
-        } catch {
-          // File-based previews can block clipboard access; the toast still preserves the workflow.
-        }
-        showToast("Request ID copied", `${requestId} is ready to share with support or an administrator.`);
-      });
-    }
-  }
-
   if (routeId === "support-workspace") {
     const blockerButtons = Array.from(document.querySelectorAll("button"));
     blockerButtons.forEach((button) => {
@@ -1228,15 +1209,6 @@ function setupRecoveryUtilities() {
     });
   }
 
-  if (routeId === "not-found") {
-    document.querySelectorAll("a[href='javascript:void(0)']").forEach((link) => {
-      const label = getActionLabel(link);
-      if (/documentation registry/.test(label)) {
-      }
-      if (/platform status dashboard/.test(label)) {
-      }
-    });
-  }
 }
 
 function setupApprovalsWorkspace() {
@@ -1416,7 +1388,6 @@ function setupOverlayWorkflows() {
   setupExceptionRequestOverlay();
   setupStageMoveOverlay();
   setupReassignOwnerOverlay();
-  setupApprovalReviewOverlay();
   setupPipelineHistoryOverlay();
 }
 
@@ -1870,7 +1841,7 @@ function setupMarketingInteractions() {
   const routePrefix = window.location.pathname.endsWith("/index.html") || window.location.pathname.endsWith("/frontend/")
     ? "pages/"
     : "";
-  const onboardingWelcomeHref = `${routePrefix}onboarding-welcome.html`;
+  const signupHref = `${routePrefix}signup.html`;
   const routeMap = [
     { pattern: /step\s*1|define|strategy|plan/i, href: "product-tour-plan-strategy.html" },
     { pattern: /step\s*2|ownership|accountability|assign/i, href: "product-tour-assign-ownership.html" },
@@ -1890,7 +1861,7 @@ function setupMarketingInteractions() {
       link.setAttribute("href", "product-tour.html");
     }
     if (/start free trial|get started|sign up/i.test(label)) {
-      link.setAttribute("href", onboardingWelcomeHref);
+      link.setAttribute("href", signupHref);
     }
     const step = routeMap.find((entry) => entry.pattern.test(label));
     if (step) {
@@ -1906,7 +1877,7 @@ function setupMarketingInteractions() {
   document.querySelectorAll("button:not([data-route])").forEach((button) => {
     const label = getActionLabel(button);
     if (/start free trial|get started|sign up/i.test(label)) {
-      button.dataset.route = onboardingWelcomeHref;
+      button.dataset.route = signupHref;
     }
   });
 
@@ -1927,135 +1898,6 @@ function setupMarketingInteractions() {
     .filter((node) => /96%|100%|clarity score|workflow clarity/i.test(node.textContent || ""))
     .slice(0, 3)
     .forEach((node) => node.classList.add("marketing-score-pulse"));
-}
-
-function setupOnboardingInteractions() {
-  const routeId = document.body?.dataset.routeId || "";
-  if (!routeId.startsWith("onboarding-")) return;
-
-  document.querySelectorAll("button[disabled][data-route]").forEach((button) => {
-    button.dataset.pendingRoute = button.dataset.route;
-    button.removeAttribute("data-route");
-  });
-
-  const enablePendingRoutes = () => {
-    document.querySelectorAll("button[data-pending-route]").forEach((button) => {
-      button.disabled = false;
-      button.dataset.route = button.dataset.pendingRoute || "";
-      delete button.dataset.pendingRoute;
-      button.setAttribute("aria-disabled", "false");
-    });
-  };
-
-  if (routeId === "onboarding-hiring-teams") {
-    const addTeamButton = Array.from(document.querySelectorAll("button")).find((button) => /add team/i.test(getActionLabel(button)));
-    addTeamButton?.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const heading = Array.from(document.querySelectorAll("h3")).find((node) => /configured teams/i.test(node.textContent || ""));
-      if (heading) heading.textContent = "Configured Teams (1)";
-      const emptyState = Array.from(document.querySelectorAll("p")).find((node) => /no teams mapped yet/i.test(node.textContent || ""))?.closest("div");
-      if (emptyState) {
-        emptyState.classList.remove("border-dashed");
-        emptyState.innerHTML = `
-          <div class="w-12 h-12 rounded-full bg-success-bg flex items-center justify-center mb-2">
-            <span class="material-symbols-outlined text-success-text text-xl">groups</span>
-          </div>
-          <p class="font-body-md text-body-md text-on-surface-variant font-medium">Engineering team mapped</p>
-          <p class="font-body-sm text-body-sm text-text-muted">Default recruiter and hiring manager are ready.</p>
-        `;
-      }
-      document.querySelectorAll(".grayscale").forEach((node) => node.classList.remove("grayscale", "opacity-50"));
-      Array.from(document.querySelectorAll("span")).filter((node) => /pending/i.test(node.textContent || "")).forEach((node) => {
-        node.textContent = "UNLOCKED";
-      });
-      enablePendingRoutes();
-      showToast("Team added", "The onboarding team map is complete enough to continue.");
-    });
-  }
-
-  if (routeId === "onboarding-locations") {
-    Array.from(document.querySelectorAll("button")).forEach((button) => {
-      const label = getActionLabel(button);
-      if (/add location/i.test(label)) {
-        button.addEventListener("click", () => showToast("Location added", "It will be included in your workspace."));
-      }
-      if (/import locations/i.test(label)) {
-        button.addEventListener("click", () => showToast("Import started", "Choose a file to import your locations."));
-      }
-      if (/edit/.test(label)) {
-        button.dataset.toastTitle = "Location updated";
-        button.dataset.toast = "Your changes have been recorded.";
-      }
-      if (/delete/.test(label)) {
-        button.dataset.toastTitle = "Location removed";
-        button.dataset.toast = "It is no longer part of your setup.";
-      }
-    });
-  }
-
-  if (routeId === "onboarding-pipeline-stage-builder") {
-    Array.from(document.querySelectorAll("button")).forEach((button) => {
-      const label = getActionLabel(button);
-      if (/save pipeline/i.test(label)) {
-        button.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const inputs = Array.from(document.querySelectorAll("#stage-list input[type='text'], #stage-list input:not([type])"));
-          const stages = inputs.map((input) => input.value.trim()).filter(Boolean);
-          if (stages.length >= 2) {
-            if (typeof savePipelineFlow === "function") savePipelineFlow(stages);
-            const session = RecruitOpsLive.session || (typeof readSession === "function" ? readSession() : {});
-            session.onboarding = session.onboarding || {};
-            session.onboarding.stages = stages;
-            if (typeof writeSession === "function") writeSession(session);
-            RecruitOpsLive.session = session;
-            showToast("Pipeline saved", stages.length + " stages saved to your pipeline.");
-          } else {
-            showToast("Need more stages", "Add at least two stages to define your pipeline.");
-          }
-        });
-      }
-    });
-  }
-
-  if (routeId === "onboarding-add-custom-stage-overlay") {
-    Array.from(document.querySelectorAll("button")).forEach((button) => {
-      const label = getActionLabel(button);
-      if (/add to pipeline/i.test(label)) {
-        button.dataset.route = "onboarding-pipeline-stage-builder.html";
-      }
-      if (/close/i.test(label)) {
-        button.dataset.route = "onboarding-pipeline-stage-builder.html";
-        button.setAttribute("aria-label", "Close custom stage");
-        button.setAttribute("title", "Close custom stage");
-      }
-    });
-  }
-
-  if (routeId === "onboarding-integrations") {
-    Array.from(document.querySelectorAll("button")).forEach((button) => {
-      const label = getActionLabel(button);
-      if (/connect|configure|reconnect|manage/i.test(label)) {
-        button.addEventListener("click", (event) => {
-          event.preventDefault();
-          const card = button.closest("[class*='border']") || button.parentElement;
-          const name = card?.querySelector("h3, h4, strong, .font-headline-sm")?.textContent?.trim() || "integration";
-          button.disabled = true;
-          button.innerHTML = '<span class="material-symbols-outlined text-sm">check</span> Connected';
-          button.classList.remove("bg-primary", "hover:bg-primary-hover");
-          button.classList.add("bg-success-bg", "text-success-text");
-          const session = RecruitOpsLive.session || (typeof readSession === "function" ? readSession() : {});
-          session.onboarding = session.onboarding || {};
-          session.onboarding.integrations = session.onboarding.integrations || [];
-          session.onboarding.integrations.push(name);
-          if (typeof writeSession === "function") writeSession(session);
-          RecruitOpsLive.session = session;
-          showToast("Integration connected", name + " is now linked to your workspace.");
-        });
-      }
-    });
-  }
 }
 
 function runLoginDemo(form) {
@@ -2088,7 +1930,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupOverlayContextPolish();
   upgradeContextualRoutes(document);
   setupMarketingInteractions();
-  setupOnboardingInteractions();
   setupResumeUploadWorkspace();
   setupDailyUpdatesWorkspace();
   setupMyWorkWorkspace();
@@ -3100,3 +2941,13 @@ function renderDonutChart(container, data, options = {}) {
     </div>`;
   container.innerHTML = svg;
 }
+
+/* Any [data-history-back] control goes back one page, or Home when there
+   is nothing to go back to. (No inline handlers: they break a strict CSP.) */
+document.addEventListener("click", (event) => {
+  const control = event.target.closest?.("[data-history-back]");
+  if (!control) return;
+  event.preventDefault();
+  if (window.history.length > 1) window.history.back();
+  else window.location.href = "home.html";
+});

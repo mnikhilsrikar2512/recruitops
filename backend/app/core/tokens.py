@@ -93,3 +93,28 @@ def decode_mfa_token(token: str) -> dict:
     if claims.get("typ") != MFA_TYPE:
         raise InvalidToken("not an MFA token")
     return claims
+
+
+# ---- Phase 5.2: signup setup token ---------------------------------------
+SIGNUP_TYPE = "signup"
+SIGNUP_TOKEN_MINUTES = 30
+
+
+def issue_signup_token(*, user_id: int, tenant_id: int) -> tuple[str, datetime]:
+    """After the email link is used: lets the new admin set up two-step
+    verification (the company isn't active yet, so there is no session)."""
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=SIGNUP_TOKEN_MINUTES)
+    claims = {"sub": str(user_id), "tid": str(tenant_id), "typ": SIGNUP_TYPE,
+              "iat": int(now.timestamp()), "exp": int(expires_at.timestamp())}
+    return jwt.encode(claims, _signing_key(), algorithm=ALGORITHM), expires_at
+
+
+def decode_signup_token(token: str) -> dict:
+    try:
+        claims = jwt.decode(token, _signing_key(), algorithms=[ALGORITHM], options={"require": ["exp", "sub", "tid", "typ"]})
+    except jwt.PyJWTError as exc:
+        raise InvalidToken(str(exc)) from exc
+    if claims.get("typ") != SIGNUP_TYPE:
+        raise InvalidToken("not a signup token")
+    return claims

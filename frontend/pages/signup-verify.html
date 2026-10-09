@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Finish setting up — RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+<body class="bg-background text-on-background antialiased" data-route-id="signup-verify" data-route-kind="auth" data-route-title="Finish setting up" data-route-section="Authentication">
+  <main id="main-content" class="mx-auto max-w-3xl px-4 py-10">
+    <a href="../index.html" class="inline-flex items-center gap-2 font-bold text-on-surface no-underline mb-6"><span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-on-primary">R</span> RecruitOps</a>
+    <h1 class="text-2xl font-bold text-on-surface">Finish setting up</h1>
+    <div id="step" class="mt-6 rounded-xl border border-border bg-surface p-5 text-[14px]"><p>Checking your link…</p></div>
+    <p id="msg" role="alert" class="hidden mt-4 rounded-lg px-3 py-2 text-[14px]"></p>
+  </main>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+  <script src="../shared/renderers.js?v=1790668771"></script>
+  <script src="../shared/api-client.js?v=1790668771"></script>
+  <script src="../shared/ui-utils.js?v=1790668771"></script>
+  <script src="../shared/tables.js?v=1790668771"></script>
+  <script src="../shared/forms.js?v=1790668771"></script>
+  <script src="../shared/sidebar.js?v=1790668771"></script>
+  <script src="../shared/pipeline.js?v=1790668771"></script>
+  <script src="../shared/routing.js?v=1790668771"></script>
+  <script src="../shared/app.js?v=1790668771"></script>
+  <script>
+  (function () {
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    var message = document.getElementById("msg");
+    function say(t, ok) { message.textContent = t; message.classList.remove("hidden"); message.style.background = ok ? "#EAF3EC" : "#FBECEA"; message.style.color = ok ? "#2F5A3A" : "#8A2E22"; }
+    function errText(e, fallback) { return (e && (typeof e.detail === "string" ? e.detail : e.message)) || fallback; }
+    var step = document.getElementById("step");
+    var token = new URLSearchParams(location.search).get("token");
+    var setupToken = null;
+    function done(text) { step.innerHTML = "<p>" + esc(text) + '</p><a href="login.html" class="mt-4 inline-block rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Sign in</a>'; }
+    async function startMfa() {
+      var s = await apiRequest("/signup/mfa/start", { method: "POST", body: JSON.stringify({ setup_token: setupToken }) });
+      step.innerHTML = '<h2 class="text-lg font-bold">Set up two-step verification</h2><p class="mt-1 text-text-muted">Admins sign in with a password and a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…).</p>' +
+        '<ol class="mt-3 list-decimal pl-5 flex flex-col gap-2"><li>In the app, add an account with this key: <code class="rounded bg-surface-alt px-2 py-1 font-mono">' + esc(s.secret) + '</code> (or <a class="text-primary underline" data-otpauth-link>open it in your authenticator</a>).</li>' +
+        '<li><label>Enter the 6-digit code it shows: <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" class="ml-2 w-32 rounded-lg border border-border px-2 py-1"/></label></li></ol>' +
+        '<button type="button" id="mfa-confirm" class="mt-4 rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Confirm and activate</button>';
+      var otpLink = step.querySelector("[data-otpauth-link]");
+      if (otpLink) otpLink.setAttribute("href", s.otpauth_uri || "#");
+      document.getElementById("mfa-confirm").addEventListener("click", async function () {
+        try {
+          var code = document.getElementById("mfa-code").value.trim();
+          var r = await apiRequest("/signup/mfa/confirm", { method: "POST", body: JSON.stringify({ setup_token: setupToken, code: code }) });
+          step.innerHTML = '<h2 class="text-lg font-bold">Your company is ' + (r.company_status === "active" ? "ready" : "almost ready") + '</h2><p class="mt-1">Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone.</p><pre class="mt-2 rounded bg-surface-alt p-3 font-mono">' + esc((r.recovery_codes || []).join("\n")) + '</pre><a href="login.html" class="mt-4 inline-block rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Sign in</a>';
+        } catch (error) { say(errText(error, "That didn't work. Check the code and try again."), false); }
+      });
+    }
+    var fromSetup = (location.hash.match(/setup=([^&]+)/) || [])[1];
+    if (fromSetup) {
+      setupToken = decodeURIComponent(fromSetup);
+      history.replaceState(null, "", "signup-verify.html");
+      startMfa().catch(function (error) { say(errText(error, "This step has timed out. Use the link from your email again."), false); });
+    } else if (!token) { step.innerHTML = "<p>This page needs the link from your email.</p>"; }
+    else {
+      apiRequest("/signup/verify", { method: "POST", body: JSON.stringify({ token: token }) }).then(function (r) {
+        history.replaceState(null, "", "signup-verify.html");
+        if (r.next === "mfa" && r.setup_token) { setupToken = r.setup_token; return startMfa(); }
+        done("Your email is confirmed and your company is active.");
+      }).catch(function (error) { step.innerHTML = "<p>" + esc(errText(error, "This link didn't work.")) + '</p><p class="mt-2"><a class="text-primary underline" href="signup.html">Back to sign-up</a></p>'; });
+    }
+
+  })();
+  </script>
+</body>
+</html>

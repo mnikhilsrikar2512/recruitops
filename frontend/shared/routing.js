@@ -208,22 +208,6 @@ function resolveContextualRoute(button) {
   const label = getActionLabel(button);
   const icon = button.querySelector(".material-symbols-outlined")?.textContent?.trim().toLowerCase() || "";
 
-  const onboardingNextRoutes = {
-    "onboarding-welcome": "onboarding-company-profile.html",
-    "onboarding-company-profile": "onboarding-hiring-teams.html",
-    "onboarding-hiring-teams": "onboarding-locations.html",
-    "onboarding-locations": "onboarding-role-setup.html",
-    "onboarding-role-setup": "onboarding-pipeline-stage-builder.html",
-    "onboarding-pipeline-stage-builder": "onboarding-integrations.html",
-    "onboarding-integrations": "onboarding-success-launch.html",
-  };
-  if (routeId.startsWith("onboarding-")) {
-    if (/continue|next|finish setup|launch workspace/.test(label)) {
-      return onboardingNextRoutes[routeId] || "role-dashboard.html";
-    }
-    if (/invite/.test(label)) return routeId === "onboarding-hiring-teams" ? "onboarding-hiring-teams.html" : null;
-  }
-
   if (routeId === "approvals-inbox") {
     if (/review/.test(label)) return "approval-review-drawer.html";
     if (/request exception/.test(label)) return "exception-request-dialog.html";

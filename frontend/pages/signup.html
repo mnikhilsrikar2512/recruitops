@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Sign up — RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+<body class="bg-background text-on-background antialiased" data-route-id="signup" data-route-kind="auth" data-route-title="Sign up" data-route-section="Authentication">
+  <main id="main-content" class="mx-auto max-w-3xl px-4 py-10">
+    <a href="../index.html" class="inline-flex items-center gap-2 font-bold text-on-surface no-underline mb-6"><span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-on-primary">R</span> RecruitOps</a>
+    <h1 class="text-2xl font-bold text-on-surface">Create your company's RecruitOps account</h1>
+    <p class="mt-2 text-[14px] text-text-muted">You'll be the first admin. You can add offices, clients and your team afterwards.</p>
+    <form id="signup-form" class="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-surface p-5" novalidate>
+      <label class="text-[13px] font-semibold">Company name<input id="company_name" required minlength="2" maxlength="150" autocomplete="organization" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
+      <label class="text-[13px] font-semibold">Your name<input id="admin_name" required minlength="2" maxlength="150" autocomplete="name" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
+      <label class="text-[13px] font-semibold">Work email<input id="email" type="email" required autocomplete="email" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
+      <label class="text-[13px] font-semibold">Password<input id="password" type="password" required minlength="12" autocomplete="new-password" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/><span class="block text-[12px] font-normal text-text-muted">At least 12 characters; common or leaked passwords are refused.</span></label>
+      <label class="text-[13px] font-semibold">City of your head office <span class="font-normal text-text-muted">(optional)</span><input id="city" maxlength="100" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
+      <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden"><label>Website<input id="website" tabindex="-1" autocomplete="off"/></label></div>
+      <fieldset class="mt-2 flex flex-col gap-2 text-[13px]" id="legal-boxes"><legend class="font-semibold">Agreements</legend><p class="text-text-muted">Loading the current documents…</p></fieldset>
+      <button type="submit" class="mt-2 rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Create account</button>
+      <p class="text-[13px] text-text-muted">Already have an account? <a href="login.html" class="font-semibold text-primary">Sign in</a></p>
+    </form>
+    <p id="msg" role="alert" class="hidden mt-4 rounded-lg px-3 py-2 text-[14px]"></p>
+  </main>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+  <script src="../shared/renderers.js?v=1790668771"></script>
+  <script src="../shared/api-client.js?v=1790668771"></script>
+  <script src="../shared/ui-utils.js?v=1790668771"></script>
+  <script src="../shared/tables.js?v=1790668771"></script>
+  <script src="../shared/forms.js?v=1790668771"></script>
+  <script src="../shared/sidebar.js?v=1790668771"></script>
+  <script src="../shared/pipeline.js?v=1790668771"></script>
+  <script src="../shared/routing.js?v=1790668771"></script>
+  <script src="../shared/app.js?v=1790668771"></script>
+  <script>
+  (function () {
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    var message = document.getElementById("msg");
+    function say(t, ok) { message.textContent = t; message.classList.remove("hidden"); message.style.background = ok ? "#EAF3EC" : "#FBECEA"; message.style.color = ok ? "#2F5A3A" : "#8A2E22"; }
+    function errText(e, fallback) { return (e && (typeof e.detail === "string" ? e.detail : e.message)) || fallback; }
+    var form = document.getElementById("signup-form"), boxes = document.getElementById("legal-boxes");
+    var NAMES = { tos: "Terms of Service", privacy: "Privacy Policy", dpa: "Data Processing Addendum (on behalf of my company)" };
+    var versions = {};
+    apiRequest("/legal/documents").then(function (data) {
+      boxes.innerHTML = '<legend class="font-semibold">Agreements</legend>' + (data.items || []).map(function (d) {
+        versions[d.doc_type] = d.version;
+        return '<label class="flex items-start gap-2"><input type="checkbox" required data-doc="' + esc(d.doc_type) + '" class="mt-1 h-4 w-4"/><span>I accept the <a href="legal.html?doc=' + esc(d.doc_type) + '" target="_blank" rel="noopener" class="text-primary underline">' + esc(NAMES[d.doc_type] || d.title) + "</a> (version " + esc(d.version) + ")" + (d.is_placeholder ? ' <em class="text-text-muted">— draft text</em>' : "") + "</span></label>";
+      }).join("");
+    }).catch(function () { boxes.innerHTML = '<p class="text-error">Couldn\'t load the agreements. Reload the page.</p>'; });
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var unchecked = Array.prototype.some.call(boxes.querySelectorAll("[data-doc]"), function (b) { return !b.checked; });
+      if (!form.checkValidity() || unchecked) { say("Fill in every field and accept the agreements.", false); return; }
+      var body = JSON.stringify({
+        company_name: document.getElementById("company_name").value, admin_name: document.getElementById("admin_name").value,
+        email: document.getElementById("email").value, password: document.getElementById("password").value,
+        city: document.getElementById("city").value || null, website: document.getElementById("website").value || null, accepted: versions,
+      });
+      try {
+        var r = await apiRequest("/signup/", { method: "POST", body: body });
+        form.hidden = true;
+        say(r.message, true);
+        if (r.dev_verify_token) message.insertAdjacentHTML("beforeend", ' <br/><a class="font-semibold underline" href="signup-verify.html?token=' + encodeURIComponent(r.dev_verify_token) + '">Development: open the verification link</a>');
+      } catch (error) { say(errText(error, "Couldn't create the account. Try again."), false); }
+    });
+
+  })();
+  </script>
+</body>
+</html>

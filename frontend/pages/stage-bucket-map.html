@@ -28,7 +28,6 @@
         </a>
         <a href="candidate-review-drawer.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Open the candidate workspace to add or refine a profile."><span class="material-symbols-outlined text-[18px]">person_add</span><span class="sidebar-cta-copy">Add Candidate</span></a>
         <nav class="sidebar-nav" aria-label="Primary navigation" data-nav-root></nav>
-        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
       </aside>
       <div class="app-main">
         <header class="app-topbar">
@@ -53,9 +52,7 @@
             <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
               <span class="material-symbols-outlined text-[18px]">help</span>
             </button>
-            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
-              BN
-            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work"></button>
           </div>
         </header>
         
@@ -83,9 +80,16 @@
     
     <section class="shell-card">
       <div class="workspace-surface">
+        <h1 class="font-headline-lg text-headline-lg text-on-surface">Hiring stages</h1>
+        <p class="font-body-sm text-body-sm text-text-muted mt-1">The stages your company uses when it hires for itself, and for any client without its own list. A client's own list is set on that client's page.</p>
+        <div class="mt-4" id="company-stage-list"></div>
+      </div>
+    </section>
+    <section class="shell-card">
+      <div class="workspace-surface">
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <h2 class="font-headline-lg text-headline-lg text-on-surface">Stage Bucket Map</h2>
+            <h2 class="font-headline-md text-headline-md text-on-surface">How stages count in reports</h2>
             <p class="font-body-sm text-body-sm text-text-muted mt-1">Every pipeline stage your company uses is counted in one reporting bucket. Check that your own stage names land in the right one — reports such as Time to Fill, Placements and the dashboards count by bucket.</p>
           </div>
         </div>
@@ -188,6 +192,15 @@
       } catch (error) { say((error && error.detail) || "Couldn't reset that stage.", false); }
     });
     load();
+    var companyHost = document.getElementById("company-stage-list");
+    if (companyHost && typeof renderStageListEditor === "function") {
+      renderStageListEditor(companyHost, {
+        url: "/settings/stage-lists/company",
+        title: "Company stage list",
+        intro: "Candidates move through these stages in order. Closing stages (joined, rejected, withdrawn) end the process.",
+        canEdit: typeof hasPermission === "function" && hasPermission("settings.update"),
+      });
+    }
   })();
   </script>
 </body>

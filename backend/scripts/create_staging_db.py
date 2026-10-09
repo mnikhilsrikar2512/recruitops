@@ -25,7 +25,7 @@ sys.path.insert(0, str(BACKEND))
 # 005/006 tables are already in db/schema.sql (005 also inserts demo approvals
 # that need existing locations); 007 is covered by seed_ci.py. Only the
 # migrations newer than the schema dump are applied.
-MIGRATIONS = ["008_display_ids.sql", "009_branch_offer_toggle.sql", "010_tenants.sql", "011_admin_seed.sql", "012_tenant_settings.sql", "013_jwt_sessions.sql", "014_login_lockout.sql", "015_mfa.sql", "016_metric_buckets.sql", "017_pipeline_reopen.sql", "018_row_versions.sql", "019_soft_delete.sql", "020_offer_threshold.sql", "021_file_pipeline.sql", "022_signing_bonus_policy.sql", "023_withdraw_reasons.sql", "024_requisition_holds.sql", "025_client_stage_lists.sql", "026_legal.sql", "027_privacy.sql"]
+MIGRATIONS = ["008_display_ids.sql", "009_branch_offer_toggle.sql", "010_tenants.sql", "011_admin_seed.sql", "012_tenant_settings.sql", "013_jwt_sessions.sql", "014_login_lockout.sql", "015_mfa.sql", "016_metric_buckets.sql", "017_pipeline_reopen.sql", "018_row_versions.sql", "019_soft_delete.sql", "020_offer_threshold.sql", "021_file_pipeline.sql", "022_signing_bonus_policy.sql", "023_withdraw_reasons.sql", "024_requisition_holds.sql", "025_client_stage_lists.sql", "026_legal.sql", "027_privacy.sql", "028_signup.sql", "029_setup_checklist.sql"]
 
 
 def dev_db_name() -> str:

@@ -433,9 +433,9 @@ const NAV_ENTRIES = [
   {
     id: "stage-bucket-map",
     file: "stage-bucket-map.html",
-    label: "Stage Bucket Map",
+    label: "Hiring Stages",
     icon: "account_tree",
-    description: "How each pipeline stage is counted in reports.",
+    description: "Your company's stage list and how each stage is counted in reports.",
     permissions: ["settings.read"],
     category: "admin",
   },

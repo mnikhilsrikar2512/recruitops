@@ -1130,7 +1130,7 @@ function renderDeliveryWorkRow(item, index, pipelineByEntity) {
    ═══════════════════════════════════════════════════════════════ */
 
 function pipelineHistoryIcon(item) {
-  const action = String(item.action || "").toLowerCase();
+  const action = String(item.action || (item.to_stage ? "stage" : "")).toLowerCase();
   if (/create|sourced|added/.test(action)) return "add_circle";
   if (/move|stage|advance/.test(action)) return "swap_horiz";
   if (/reject|decline|withdraw/.test(action)) return "cancel";
@@ -1146,9 +1146,9 @@ function renderPipelineHistoryItems(host, items) {
     ? items.map((item) => `<div class="flex items-start gap-3 py-3" data-live-pipeline-history-row="true">
         <span class="material-symbols-outlined text-[20px] text-primary mt-0.5">${pipelineHistoryIcon(item)}</span>
         <div class="min-w-0 flex-1">
-          <p class="text-body-sm font-medium text-on-surface">${escapeLiveHtml(item.action || "Stage change")}</p>
-          <p class="text-[11px] text-text-muted">${escapeLiveHtml(item.actor_name || "System")} · ${escapeLiveHtml(relativeTime(item.created_at))}</p>
-          ${item.notes ? `<p class="mt-1 text-[11px] text-text-muted">${escapeLiveHtml(item.notes)}</p>` : ""}
+          <p class="text-body-sm font-medium text-on-surface">${escapeLiveHtml(item.action || (item.to_stage ? (item.from_stage && item.from_stage !== item.to_stage ? `${item.from_stage} → ${item.to_stage}` : `Stage: ${item.to_stage}`) : "Stage change"))}</p>
+          <p class="text-[11px] text-text-muted">${escapeLiveHtml(item.actor_name || item.changed_by_name || "System")} · ${escapeLiveHtml(relativeTime(item.created_at || item.changed_at))}</p>
+          ${(item.notes || item.change_reason) ? `<p class="mt-1 text-[11px] text-text-muted">${escapeLiveHtml(item.notes || item.change_reason)}</p>` : ""}
         </div>
       </div>`).join("")
     : `<div class="p-4 text-body-sm text-text-muted">No history records returned by the API.</div>`;
@@ -1179,7 +1179,7 @@ function dailyUpdateStatusMeta(item) {
   return { label: "Pending", badge: "bg-warning-bg text-warning-text border-[#E8D1B5]" };
 }function renderDailyUpdateTableRow(item) {
   const status = dailyUpdateStatusMeta(item);
-  return `<tr class="hover:bg-highlight-soft transition-colors" data-daily-update-id="${item.id}">
+  return `<tr class="cursor-pointer hover:bg-highlight-soft transition-colors" data-daily-update-id="${item.id}" data-route="daily-update-detail-panel.html?daily_update_id=${item.id}">
     <td class="py-2 px-4 text-on-surface font-medium">${escapeLiveHtml(item.requisition_title || "Update")}</td>
     <td class="py-2 px-4 text-text-muted">${escapeLiveHtml(item.submitted_by_name || "Unknown")}</td>
     <td class="py-2 px-4"><span class="inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold ${status.badge}">${escapeLiveHtml(status.label)}</span></td>
@@ -1199,6 +1199,21 @@ function dailyUpdateStatusMeta(item) {
       table.dataset.page = "1";
       applyClientPagination(table);
     }
+  }
+  const count = (key, value) => { const node = surface.querySelector(`[data-review-count="${key}"]`); if (node) node.textContent = String(value); };
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const blocked = items.filter((item) => String(item.blockers || "").trim());
+  count("total", meta.total ?? items.length);
+  count("today", items.filter((item) => String(item.update_date || item.submitted_at || "").slice(0, 10) === todayKey).length);
+  count("blocked", blocked.length);
+  count("drafts", items.filter((item) => /draft/i.test(String(item.submission_status || ""))).length);
+  const rail = surface.querySelector("[data-review-blockers]");
+  if (rail) {
+    rail.innerHTML = blocked.length
+      ? blocked.slice(0, 10).map((item) => `<li class="py-2"><a class="block hover:bg-highlight-soft" href="daily-update-detail-panel.html?daily_update_id=${item.id}">
+          <p class="font-body-sm text-body-sm font-semibold text-on-surface">${escapeLiveHtml(item.submitted_by_name || "Unknown")} · <span class="font-normal text-text-muted">${escapeLiveHtml(item.requisition_title || "")}</span></p>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">${escapeLiveHtml(String(item.blockers).slice(0, 160))}</p></a></li>`).join("")
+      : '<li class="py-2 font-body-sm text-body-sm text-text-muted">No blockers reported.</li>';
   }
 }
 

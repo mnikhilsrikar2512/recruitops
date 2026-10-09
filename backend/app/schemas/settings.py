@@ -79,3 +79,24 @@ class OfferApprovalSettings(BaseModel):
     # Omitted on PUT = leave unchanged.
     offers_signing_bonus: bool | None = None
     bonus_counts_against_budget: bool | None = None
+
+
+class SetupChecklistItem(BaseModel):
+    key: str
+    title: str
+    description: str
+    page: str
+    optional: bool
+    done: bool
+
+
+class SetupChecklistResponse(BaseModel):
+    items: list[SetupChecklistItem]
+    done: int
+    total: int
+    complete: bool
+    dismissed: bool
+
+
+class SetupChecklistDismiss(BaseModel):
+    dismissed: bool = True

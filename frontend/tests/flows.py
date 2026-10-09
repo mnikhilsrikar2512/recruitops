@@ -50,7 +50,7 @@ class Flow:
         if signed_in:
             self.context.add_init_script(
                 f"try {{ if (!sessionStorage.getItem('flow-seeded')) {{ sessionStorage.setItem('flow-seeded', '1'); localStorage.setItem('recruitops-session', {json.dumps(json.dumps(session()))}); }}"
-                " localStorage.setItem('recruitops-onboarding-complete', 'true'); } catch (e) {}")
+                " } catch (e) {}")
         self.context.route("**/*", lambda r: r.continue_() if r.request.url.startswith(base) else r.fulfill(
             status=200, content_type="application/javascript", body=TAILWIND_STUB if "tailwind" in r.request.url else ""))
         self.page: Page = self.context.new_page()
