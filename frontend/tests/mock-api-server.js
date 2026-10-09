@@ -252,7 +252,7 @@ function special(method, pathname, body) {
 /* ── HTTP ────────────────────────────────────────────────────── */
 const MIME = {
   ".html": "text/html", ".css": "text/css", ".js": "application/javascript", ".json": "application/json",
-  ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".webp": "image/webp",
+  ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".webp": "image/webp", ".woff2": "font/woff2",
 };
 
 function sendJson(res, status, payload) {

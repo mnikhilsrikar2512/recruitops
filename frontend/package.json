@@ -1,0 +1,19 @@
+{
+  "name": "recruitops-frontend",
+  "private": true,
+  "description": "Build step for the static frontend: compiled Tailwind CSS and self-hosted fonts (no third-party CDNs at runtime).",
+  "scripts": {
+    "build": "npm run build:fonts && npm run build:css && npm run build:stamp",
+    "build:css": "tailwindcss -c tailwind.build.config.js -i shared/tailwind.input.css -o shared/tailwind.css --minify",
+    "build:fonts": "node scripts/build-fonts.js",
+    "build:stamp": "python3 scripts/stamp_assets.py"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.0.0",
+    "@fontsource/manrope": "^5.0.0",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/forms": "^0.5.9",
+    "material-symbols": "^0.27.0",
+    "tailwindcss": "3.4.17"
+  }
+}

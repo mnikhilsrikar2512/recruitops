@@ -68,6 +68,13 @@ jobs:
           python -m pip install -r backend/requirements.txt playwright
           python -m playwright install --with-deps chromium
           npm install --no-save --prefix tools/ci typescript@5  # TS 7 (native) has no JS compiler API
+      - name: Built assets are up to date (compiled Tailwind, fonts, versions)
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          git diff --exit-code -- shared/tailwind.css shared/fonts index.html pages \
+            || { echo "::error::Run 'cd frontend && npm run build' and commit the result"; exit 1; }
       - name: Frontend checks
         env:
           NODE_PATH: tools/ci/node_modules
