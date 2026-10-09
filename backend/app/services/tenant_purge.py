@@ -65,7 +65,12 @@ def _foreign_keys(connection: Connection) -> list[dict]:
         FROM sys.foreign_keys fk
         JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
         JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
-        WHERE OBJECT_SCHEMA_NAME(fk.parent_object_id) = N'dbo';
+        JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id
+        WHERE OBJECT_SCHEMA_NAME(fk.parent_object_id) = N'dbo'
+          -- Only keys that point at a row id: #doom tracks ids. Keys to
+          -- lookup codes (e.g. stage_bucket_map.metric_bucket -> metric_buckets.code)
+          -- point at shared tables that are never purged.
+          AND LOWER(rc.name) = N'id';
         """)).mappings().all()
     return [dict(r) for r in rows]
 
