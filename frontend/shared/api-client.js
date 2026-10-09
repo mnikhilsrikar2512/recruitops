@@ -27,7 +27,7 @@ const PUBLIC_ROUTES = new Set([
   "onboarding-company-profile", "onboarding-locations", "onboarding-role-setup",
   "onboarding-pipeline-stage-builder", "onboarding-add-custom-stage-overlay",
   "onboarding-hiring-teams", "onboarding-integrations", "onboarding-success-launch",
-  "legal",
+  "legal", "signup", "signup-verify",
 ]);
 
 

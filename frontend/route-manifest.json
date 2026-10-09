@@ -1,8 +1,8 @@
 {
  "generated_at_unix": 1789682101,
- "primary_route_count": 82,
+ "primary_route_count": 84,
  "overlay_route_count": 22,
- "total_route_count": 104,
+ "total_route_count": 106,
  "primary_routes": [
   {
    "file": "login.html",
@@ -1530,6 +1530,38 @@
    "source": "privacy_requests",
    "nav": "data-export-delete-request.html",
    "links": []
+  },
+  {
+   "file": "signup.html",
+   "route_id": "signup",
+   "kind": "auth",
+   "title": "Sign up",
+   "section": "Authentication",
+   "subtitle": "Self-serve company signup with legal acceptance.",
+   "source": "signup",
+   "nav": null,
+   "links": [
+    {
+     "label": "Sign in",
+     "href": "login.html"
+    }
+   ]
+  },
+  {
+   "file": "signup-verify.html",
+   "route_id": "signup-verify",
+   "kind": "auth",
+   "title": "Finish setting up",
+   "section": "Authentication",
+   "subtitle": "Email confirmation, two-step verification set-up and activation.",
+   "source": "signup_verify",
+   "nav": null,
+   "links": [
+    {
+     "label": "Sign in",
+     "href": "login.html"
+    }
+   ]
   }
  ],
  "overlay_routes": [

@@ -75,3 +75,35 @@ Decisions for this phase (2026-10-08) are D-5a to D-5c below; see `decisions-202
   - Two throw-away companies are built, exported and purged. Afterwards nothing owned by the purged company is left, the other company is unchanged, the shared candidate has been handed over, and the hold rows exist and are released after their date.
   - The delete request needs a second admin and can be cancelled.
   - A candidate is exported, downloaded and erased; a shared candidate is refused.
+
+## 5.2 Self-serve signup + ops provisioning — built, awaiting verify
+- **One builder for both paths:** `app/services/provisioning.py` creates:
+  - the company (status `pending`, `onboarding` set to `self_serve` or `ops`)
+  - the company profile
+  - a head office, with a matching `locations` row under the same id
+  - the first admin, with the shared Admin role and the head office as their primary office
+  - an audit entry, `company.provisioned`
+- **Self-serve (`/pages/signup.html` → `/api/v1/signup`):**
+  - The form takes company, name, work email, password (the full password policy applies), optional city, and one tick per legal document at the version on screen.
+  - The account is created only if the ticked versions are the ones in force. All three acceptances are recorded: Terms and Privacy for the person, the DPA for the company.
+  - A 24-hour verification link is emailed. Each link works once, and a resend replaces the previous one.
+  - `POST /signup/verify` checks the link. With two-step verification required for admins (staging, production), the response hands a 30-minute setup token to `/signup/mfa/start` and `/signup/mfa/confirm`, and the company becomes **active** once the code is confirmed. In development the company becomes active at verification.
+  - A pending company can't sign in (403).
+  - **Anti-abuse:**
+    - 5 signups and resends per minute per IP, and 20 verify or set-up steps per minute per IP.
+    - A hidden honeypot field.
+    - The same answer whether or not the email is already registered.
+  - The verification token comes back in the response only outside staging and production, so the flow can be tested without an email server.
+- **Ops (`scripts/provision_company.py`, runbook `docs/runbooks/provision-company.md`):**
+  - Creates the same company, records the DPA signed offline on the company's behalf, and prints a one-time password setup link.
+  - `--reissue-link` sends a fresh link.
+  - Setting the password through that link confirms the email address. On a pending company it leads straight to two-step verification set-up and then activation, the same rule as self-serve.
+- **The password setup page is now wired to the API.** It was an unwired prototype form before.
+- **Migration `028_signup.sql`:** `users.email_verified_at` and `tenants.onboarding`.
+- **Tests (`test_signup_db.py`):**
+  - stale legal versions, weak passwords and the honeypot are refused
+  - full signup → verify → two-step set-up → active → sign-in with the second factor, with the legal rows checked
+  - with two-step verification not enforced, verify activates the company, and a resend replaces the old link
+  - the ops builder creates the same shape of company and refuses a duplicate email
+  - an ops admin goes from password setup to two-step set-up to an active company
+- **Not yet:** real email delivery. `send_email` is called, but SMTP is configured in Phase 6, and the existing forgot-password flow doesn't send email yet either.

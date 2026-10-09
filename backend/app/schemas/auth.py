@@ -120,6 +120,10 @@ class PasswordSetupRequest(BaseModel):
 
 class PasswordSetupResponse(BaseModel):
     message: str
+    # Phase 5.2: the first admin of a company that isn't active yet continues
+    # to two-step verification set-up with this token (signup-verify page).
+    next: str = "login"
+    setup_token: str | None = None
 
 
 class PasswordForgotRequest(BaseModel):
