@@ -37,7 +37,7 @@ def create_approval_service(engine: Engine, payload: ApprovalCreate) -> Approval
     return ApprovalResponse.model_validate(created)
 
 
-def decide_approval_service(engine: Engine, approval_id: int, payload: ApprovalDecision) -> ApprovalResponse:
+def decide_approval_service(engine: Engine, approval_id: int, payload: ApprovalDecision, auth_context=None) -> ApprovalResponse:
     existing = find_approval_by_id(engine, approval_id)
     if not existing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
@@ -51,5 +51,18 @@ def decide_approval_service(engine: Engine, approval_id: int, payload: ApprovalD
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Decision must be 'approved' or 'rejected'",
         )
+    # Phase 5.3: a company delete must be approved by a DIFFERENT admin; the
+    # decider is the signed-in user, never a client-supplied id.
+    is_privacy_delete = getattr(existing, "approval_type", None) == "privacy-delete"
+    if is_privacy_delete:
+        from app.services.privacy import assert_can_decide
+
+        decider_id = auth_context.user.id if auth_context is not None else None
+        assert_can_decide(engine, existing, decider_id)
+        payload = payload.model_copy(update={"decision_user_id": decider_id})
     updated = decide_approval(engine, approval_id, payload)
+    if is_privacy_delete:
+        from app.services.privacy import on_delete_approval_decided
+
+        on_delete_approval_decided(engine, existing, payload.decision, payload.decision_user_id)
     return ApprovalResponse.model_validate(updated)

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Data Export/Delete Requests - RecruitOps</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="../shared/tailwind.config.js?v=1790668771"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/global.css?v=1790668771" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=1790668771" />
+</head>
+  <body class="bg-background text-on-background antialiased" data-route-id="data-export-delete-request" data-route-kind="app" data-route-title="Data Export/Delete Requests" data-route-section="Administration">
+  
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <a href="../index.html" class="sidebar-brand" title="Return to frontend index">
+          <div class="sidebar-mark">R</div>
+          <div class="sidebar-brand-copy">
+            <div class="sidebar-brand-name">RecruitOps</div>
+            <div class="sidebar-brand-meta">Recruitment OS</div>
+          </div>
+        </a>
+        <a href="candidate-review-drawer.html" class="sidebar-cta-link mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-on-primary" title="Open the candidate workspace to add or refine a profile."><span class="material-symbols-outlined text-[18px]">person_add</span><span class="sidebar-cta-copy">Add Candidate</span></a>
+        <nav class="sidebar-nav" aria-label="Primary navigation" data-nav-root></nav>
+        <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" data-mobile-nav-open class="inline-flex rounded-full border border-border bg-surface p-2 text-on-surface lg:hidden" aria-label="Open mobile navigation">
+              <span class="material-symbols-outlined text-[18px]">menu</span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Administration</p>
+              <p class="truncate text-sm font-semibold text-on-surface" data-shell-page-title>Data Export/Delete Requests</p>
+            </div>
+          </div>
+          <div class="topbar-search hidden md:block" data-topbar-search-host>
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-text-muted">search</span>
+            <label class="sr-only" for="topbar-search">Search within RecruitOps</label>
+            <input id="topbar-search" data-global-search type="text" placeholder="Search within RecruitOps..." aria-label="Search within RecruitOps" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="topbar-action rounded-full border border-border bg-surface p-2 text-on-surface" data-route="notifications-center.html" aria-label="Review notifications" title="Open Notifications Center">
+              <span class="material-symbols-outlined text-[18px]">notifications</span>
+            </button>
+            <button type="button" class="topbar-action hidden rounded-full border border-border bg-surface p-2 text-on-surface sm:inline-flex" data-route="support-workspace.html" aria-label="Open support workspace" title="Open Support Workspace">
+              <span class="material-symbols-outlined text-[18px]">help</span>
+            </button>
+            <button type="button" class="topbar-action ml-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-highlight-soft text-sm font-semibold text-primary" data-route="my-work-dashboard.html" aria-label="Open my work" title="Open My Work">
+              BN
+            </button>
+          </div>
+        </header>
+        
+    <dialog id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+      <div class="mobile-nav-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">RecruitOps</p>
+            <h2 class="mt-1 text-lg font-bold text-on-surface">Navigation</h2>
+          </div>
+          <button type="button" data-mobile-nav-close class="rounded-full border border-border p-2 text-on-surface" aria-label="Close mobile navigation">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="space-y-4" data-mobile-nav-root>
+          <details class="nav-group"
+          <a href="login.html?loggedOut=true" class="sidebar-logout" title="Log out of RecruitOps" data-logout-link="true"><span class="material-symbols-outlined">logout</span><span class="sidebar-label">Logout</span></a>
+        
+        </div>
+      </div>
+    </dialog>
+    
+        <main id="main-content" tabindex="-1" class="app-canvas">
+          <div class="page-stack">
+    
+    <section class="shell-card">
+      <div class="workspace-surface">
+        <h2 class="font-headline-lg text-headline-lg text-on-surface">Data Export/Delete Requests</h2>
+        <p class="font-body-sm text-body-sm text-text-muted mt-1">Get a copy of everything your company holds in RecruitOps, or ask for all of it to be deleted. A single candidate's request (export or erase) is handled from that candidate's page.</p>
+        <p class="hidden mt-3 rounded-lg px-3 py-2 text-[13px]" role="alert" id="privacy-message"></p>
+        <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-border bg-surface p-4">
+            <h3 class="font-semibold text-on-surface">Export all company data</h3>
+            <p class="mt-1 text-[13px] text-text-muted">A zip with every record (one file per table, AI run logs included) and the stored documents. It takes a few minutes; the download works for 7 days.</p>
+            <button type="button" id="privacy-export" class="mt-3 rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-on-primary">Request export</button>
+          </div>
+          <div class="rounded-lg border border-border bg-surface p-4">
+            <h3 class="font-semibold text-on-surface">Delete all company data</h3>
+            <p class="mt-1 text-[13px] text-text-muted">Permanent. Another admin must approve it (if you are the only admin, you confirm with your two-step verification code). It then runs after 7 days, and can be cancelled until then. Audit records are kept for 90 days after the deletion.</p>
+            <form id="privacy-delete-form" class="mt-3 flex flex-col gap-2">
+              <label class="text-[12px] text-text-muted">Reason<input id="privacy-delete-reason" required minlength="3" maxlength="1000" class="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[13px]" /></label>
+              <label class="text-[12px] text-text-muted">Type DELETE to confirm<input id="privacy-delete-confirm" required class="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[13px]" /></label>
+              <button type="submit" class="self-start rounded-lg bg-error px-4 py-2 text-[13px] font-semibold text-on-error">Request deletion</button>
+            </form>
+          </div>
+        </div>
+        <h3 class="mt-6 font-semibold text-on-surface">Requests</h3>
+        <div class="mt-2 bg-surface border border-border rounded-lg shadow-sm overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-alt border-b border-border">
+              <tr>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Request</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Status</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">Asked by</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold">When</th>
+                <th class="font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="privacy-rows" class="font-data-tabular text-data-tabular text-on-surface divide-y divide-border">
+              <tr><td class="px-4 py-3" colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    
+  
+          </div>
+        </main>
+      </div>
+    </div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    
+    <script src="../shared/renderers.js?v=1790668771"></script>
+    <script src="../shared/api-client.js?v=1790668771"></script>
+    <script src="../shared/ui-utils.js?v=1790668771"></script>
+    <script src="../shared/tables.js?v=1790668771"></script>
+    <script src="../shared/forms.js?v=1790668771"></script>
+    <script src="../shared/sidebar.js?v=1790668771"></script>
+    <script src="../shared/pipeline.js?v=1790668771"></script>
+    <script src="../shared/routing.js?v=1790668771"></script>
+
+  <script src="../shared/navigation.config.js?v=1790668771"></script>
+    <script src="../shared/navigation.js?v=1790668771"></script>
+    <script src="../shared/app.js?v=1790668771"></script>
+
+  <script>
+  (function () {
+    var rows = document.getElementById("privacy-rows");
+    var message = document.getElementById("privacy-message");
+    var TYPES = { company_export: "Company export", company_delete: "Delete all company data", candidate_export: "Candidate export", candidate_erase: "Candidate erasure" };
+    var STATUS = { pending_approval: "Waiting for a second admin", scheduled: "Scheduled", processing: "In progress", completed: "Done", cancelled: "Cancelled", rejected: "Not approved", failed: "Failed" };
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    function when(v) { if (!v) return ""; try { return new Date(v).toLocaleString(); } catch (e) { return v; } }
+    function say(text, ok) { message.textContent = text; message.classList.remove("hidden"); message.style.background = ok ? "#EAF3EC" : "#FBECEA"; message.style.color = ok ? "#2F5A3A" : "#8A2E22"; }
+    function detail(r) {
+      if (r.status === "scheduled" && r.execute_after) return "Runs after " + when(r.execute_after);
+      if (r.error) return r.error;
+      if (r.candidate_id) return "Candidate #" + r.candidate_id;
+      return "";
+    }
+    function actions(r) {
+      var out = [];
+      if (r.download_ready) out.push('<button type="button" data-download="' + r.id + '" class="rounded-lg border border-border px-3 py-1 text-[12px]">Download</button>');
+      if (r.request_type === "company_delete" && r.status === "pending_approval") out.push('<button type="button" data-confirm="' + r.id + '" class="rounded-lg border border-border px-3 py-1 text-[12px]">I am the only admin — confirm</button>');
+      if (r.request_type === "company_delete" && (r.status === "pending_approval" || r.status === "scheduled")) out.push('<button type="button" data-cancel="' + r.id + '" class="rounded-lg border border-border px-3 py-1 text-[12px]">Cancel</button>');
+      return out.join(" ");
+    }
+    async function load() {
+      try {
+        var items = await apiRequest("/privacy/requests");
+        rows.innerHTML = (items || []).length ? items.map(function (r) {
+          return '<tr class="h-table-row"><td class="px-4 py-2">' + esc(TYPES[r.request_type] || r.request_type) + '<div class="text-[12px] text-text-muted">' + esc(detail(r)) + '</div></td><td class="px-4 py-2">' + esc(STATUS[r.status] || r.status) + '</td><td class="px-4 py-2">' + esc(r.requested_by_name || "") + '</td><td class="px-4 py-2 whitespace-nowrap">' + esc(when(r.requested_at)) + '</td><td class="px-4 py-2 text-right whitespace-nowrap">' + actions(r) + "</td></tr>";
+        }).join("") : '<tr><td class="px-4 py-3" colspan="5">No requests yet.</td></tr>';
+      } catch (error) { rows.innerHTML = '<tr><td class="px-4 py-3" colspan="5">' + esc((error && error.detail) || "Couldn't load requests.") + "</td></tr>"; }
+    }
+    document.getElementById("privacy-export").addEventListener("click", async function () {
+      try { await apiRequest("/privacy/export-request", { method: "POST" }); say("Export started. It appears below when it's ready to download.", true); setTimeout(load, 1500); load(); }
+      catch (error) { say((error && error.detail) || "Couldn't start the export.", false); }
+    });
+    document.getElementById("privacy-delete-form").addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var body = JSON.stringify({ reason: document.getElementById("privacy-delete-reason").value, confirm: document.getElementById("privacy-delete-confirm").value });
+      try {
+        var r = await apiRequest("/privacy/delete-request", { method: "POST", body: body });
+        say(r.needs_self_confirmation ? "Request recorded. You are the only admin: use \"confirm\" below with your two-step verification code." : "Request recorded. Another admin must approve it in the Approvals inbox.", true);
+        event.target.reset(); load();
+      } catch (error) { say((error && error.detail) || "Couldn't record the request.", false); }
+    });
+    rows.addEventListener("click", async function (event) {
+      var b = event.target.closest("button");
+      if (!b) return;
+      try {
+        if (b.dataset.download) { var link = await apiRequest("/privacy/requests/" + b.dataset.download + "/download", { method: "POST" }); window.location.href = link.url; return; }
+        if (b.dataset.cancel) { await apiRequest("/privacy/requests/" + b.dataset.cancel + "/cancel", { method: "POST" }); say("Cancelled. Nothing was deleted.", true); }
+        if (b.dataset.confirm) {
+          var code = window.prompt("Enter the 6-digit code from your authenticator app to confirm the company deletion:");
+          if (!code) return;
+          var confirmBody = JSON.stringify({ code: code.trim() });
+          await apiRequest("/privacy/requests/" + b.dataset.confirm + "/confirm", { method: "POST", body: confirmBody });
+          say("Confirmed. The deletion runs after the 7-day waiting period unless you cancel it.", true);
+        }
+        load();
+      } catch (error) { say((error && error.detail) || "That didn't work.", false); }
+    });
+    load();
+  })();
+  </script>
+</body>
+</html>

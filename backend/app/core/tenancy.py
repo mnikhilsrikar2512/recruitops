@@ -24,6 +24,8 @@ TABLE_TENANCY: dict[str, str] = {
     "stage_bucket_map": "tenant",  # NULL = platform default label map (016)
     "candidate_archives": "tenant",  # an archive hides a shared candidate from ONE company (019)
     "upload_quarantine": "tenant",  # uploads that failed the malware scan (021)
+    "privacy_requests": "tenant",  # export/delete/erase requests (027); kept after a purge
+    "privacy_audit_hold": "tenant",  # a purged company's audit rows, held 90 days (027)
     "legal_acceptances": "tenant",  # who accepted which legal version (026)
     "pipeline_templates": "tenant",  # company default + one list per client (025)
     # ---- through an office --------------------------------------------
