@@ -3,159 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Product Tour — RecruitOps</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="../shared/landing.css?v=f848f0eef6" />
-  <style>
-    .tour-step { opacity:0.5; transform:translateY(8px); transition:all 0.4s ease; }
-    .tour-step.visible { opacity:1; transform:translateY(0); }
-    .tour-step .step-mockup { max-height:0; overflow:hidden; transition:max-height 0.5s ease, opacity 0.3s ease; opacity:0; }
-    .tour-step.visible .step-mockup { max-height:600px; opacity:1; }
-    .sticky-steps { position:sticky; top:64px; z-index:40; background:rgba(246,247,244,0.95); backdrop-filter:blur(8px); border-bottom:1px solid #E7E7E4; }
-    .step-pill { transition:all 0.3s ease; cursor:pointer; }
-    .step-pill:hover { transform:translateY(-1px); }
-    .step-pill.active .step-circle { background:#1e293b; color:#fff; border-color:#1e293b; transform:scale(1.15); box-shadow:0 4px 12px rgba(36,72,60,0.25); }
-    .step-pill.active .step-label { color:#1e293b; font-weight:700; }
-    .step-pill.done .step-circle { background:#1e293b; color:#fff; border-color:#1e293b; }
-    .step-pill.done .step-label { color:#1e293b; }
-    /* Phones: labels don't fit — circles + connectors carry the progress */
-    @media (max-width: 480px) {
-      .step-label { display: none; }
-    }
-    .step-circle { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; border:2px solid #E7E7E4; background:#FAFBF8; color:#6E7476; transition:all 0.3s ease; }
-    .step-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#6E7476; transition:all 0.3s ease; white-space:nowrap; }
-    .step-connector { width:40px; height:2px; background:#E7E7E4; transition:background 0.3s ease; flex-shrink:0; }
-  </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=f848f0eef6" />
+  <title>Product tour — RecruitOps</title>
+  <meta name="description" content="Follow a requisition through RecruitOps in five steps: plan, assign, move, resolve and report." />
+  <meta property="og:title" content="Product tour — RecruitOps" />
+  <meta property="og:description" content="Follow a requisition through RecruitOps in five steps: plan, assign, move, resolve and report." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#f8f8f6" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=f1d86ca7bf" />
+  <link rel="stylesheet" href="../shared/marketing.css?v=f1d86ca7bf" />
+  <script src="../shared/marketing.js?v=f1d86ca7bf" defer></script>
 </head>
-<body class="bg-background" data-route-id="product-tour" data-route-kind="marketing" data-route-title="Product Tour" data-route-section="Marketing">
-  <main id="main-content">
+<body data-route-id="product-tour" data-route-kind="marketing">
+<main id="main">
 
-    <!-- HERO -->
-    <section class="landing-hero py-20 px-6">
-      <div class="landing-hero-bg"></div>
-      <div class="hero-grid"></div>
-      <div class="orb w-80 h-80 -top-40 -left-40 float-slow" style="background:#1e293b"></div>
-      <div class="orb w-72 h-72 top-10 -right-36 float-medium" style="background:#3a7a5f"></div>
-      <div class="max-w-4xl mx-auto text-center relative z-10">
-        <span class="hero-badge inline-flex items-center gap-1.5 bg-success-bg px-3 py-1 rounded-full mb-6" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1e293b"><span class="material-symbols-outlined" style="font-size:14px">play_circle</span> Product Tour</span>
-        <h1 class="hero-animate-1 font-extrabold text-on-surface mb-6" style="font-size:clamp(40px,5vw,52px);line-height:1.1">See the recruiting workflow<br/>end to end</h1>
-        <p class="hero-animate-2 text-on-surface-variant max-w-2xl mx-auto mb-10" style="font-size:18px;line-height:1.6">From requisition intake to candidate joining — every step is visible, owned, and tracked.</p>
-        <div class="hero-animate-3 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a class="btn-primary w-full sm:w-auto" href="signup.html">Start Free Trial</a>
-          <a class="btn-secondary w-full sm:w-auto" href="use-cases.html">View Use Cases</a>
-        </div>
-      </div>
-    </section>
+<section class="mk-hero center"><div class="mk-wrap">
+<span class="mk-eyebrow">Product tour</span>
+<h1>See how a role moves from request to hire.</h1>
+<p class="mk-lead">Follow a requisition through RecruitOps in five steps, or jump straight to the part you care about most.</p>
+<div class="mk-actions"><a class="mk-btn mk-btn-primary" href="product-tour-plan-strategy.html">Start with step one <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a><a class="mk-btn mk-btn-ghost" href="signup.html">Create your account</a></div>
+</div></section>
+<section class="mk-section tight"><div class="mk-wrap"><a class="mk-card mk-tour-row mk-reveal" href="product-tour-plan-strategy.html"><span class="big">01</span><div><h3>Plan: Start every role with a clear brief.</h3><p>Capture every role with its brief, budget and stages.</p></div><span class="mk-link">Explore <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></span></a><a class="mk-card mk-tour-row mk-reveal" href="product-tour-assign-ownership.html"><span class="big">02</span><div><h3>Assign: Make ownership obvious.</h3><p>Make ownership obvious: who sources, delivers and approves.</p></div><span class="mk-link">Explore <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></span></a><a class="mk-card mk-tour-row mk-reveal" href="product-tour-move-candidates.html"><span class="big">03</span><div><h3>Move: Move candidates forward with confidence.</h3><p>Move candidates through your stages, with a reason for every step.</p></div><span class="mk-link">Explore <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></span></a><a class="mk-card mk-tour-row mk-reveal" href="product-tour-resolve-exceptions.html"><span class="big">04</span><div><h3>Resolve: Handle exceptions without the chaos.</h3><p>Handle approvals, holds and surprises without losing the thread.</p></div><span class="mk-link">Explore <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></span></a><a class="mk-card mk-tour-row mk-reveal" href="product-tour-report-progress.html"><span class="big">05</span><div><h3>Report: Know where hiring stands, every day.</h3><p>See what is moving and what is stuck, every day.</p></div><span class="mk-link">Explore <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></span></a></div></section>
+<section class="mk-section alt"><div class="mk-wrap">
+<div class="mk-split mk-reveal"><div><span class="mk-eyebrow">One connected record</span><h2>Every step adds to the same story.</h2>
+<p class="mk-lead">The brief, the owners, every stage move, every decision and every update live on one record. Anyone picking up the role can see what happened and why.</p>
+<ul class="mk-list"><li>History on every requisition and candidate</li><li>Changes tracked, with no silent overwrites</li><li>Notifications when something needs you</li></ul></div>
+<div><div class="mk-mock" role="img" aria-label="Illustration of a pipeline board with candidates in stage columns"><div class="mk-mock-bar"><i></i><i></i><i></i><b>Requisition · candidates by stage</b></div><div class="mk-mock-body"><div class="mk-board"><div class="mk-col"><h5>Sourced</h5><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Screening</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip focus"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Interview</h5><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Offer</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div></div></div></div></div></div></div>
+</div></section>
+<section class="mk-section"><div class="mk-wrap">
+<div class="mk-head center mk-reveal"><span class="mk-eyebrow">Also included</span><h2>The details that keep a desk running.</h2></div>
+<div class="mk-grid three">
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">notifications</span></span><h3>Notifications</h3><p>A clear inbox of what changed and what needs you next.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">download</span></span><h3>Data export</h3><p>Admins can export the company's data whenever they need it.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">badge</span></span><h3>Roles and permissions</h3><p>Decide exactly what each role can see and change.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">location_city</span></span><h3>Several offices</h3><p>Run more than one office, each with its own team.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span></span><h3>Audit log</h3><p>A record of who did what, for admins and reviews.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">checklist</span></span><h3>Setup checklist</h3><p>New admins see what's left to set up, until it's done.</p></div>
+</div></div></section>
+<section class="mk-section tight"><div class="mk-wrap"><div class="mk-cta mk-reveal">
+<h2>Bring your hiring into one calm, clear place.</h2><p>Create your company account, set up your stages and invite your team. You can start with one office and one client and grow from there.</p>
+<div class="mk-actions"><a class="mk-btn mk-btn-light" href="signup.html">Create your account <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a><a class="mk-btn mk-btn-outline-light" href="product-tour.html">Take the product tour</a></div>
+</div></div></section>
 
-    <!-- FLOATING PROOF CHIPS -->
-    <section class="px-6 pb-10 max-w-4xl mx-auto relative z-20 -mt-2">
-      <div class="flex flex-wrap items-center justify-center gap-3">
-        <div class="float-chip" style="position:static;animation-delay:0s">
-          <span class="material-symbols-outlined">description</span>
-          <span>Letterhead reports<span class="chip-sub">PDF + Excel export</span></span>
-        </div>
-        <div class="float-chip" style="position:static;animation-delay:1.2s">
-          <span class="material-symbols-outlined">trending_up</span>
-          <span>Revenue tracking<span class="chip-sub">fee % × joined CTC</span></span>
-        </div>
-        <div class="float-chip" style="position:static;animation-delay:2.4s">
-          <span class="material-symbols-outlined">notifications</span>
-          <span>Live notifications<span class="chip-sub">stage moves &amp; approvals</span></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- STICKY STEP INDICATOR -->
-    <div class="sticky-steps" id="stepIndicator">
-      <div class="max-w-4xl mx-auto px-6 py-4">
-        <div class="flex items-center justify-center gap-0" id="stepPills">
-          <div class="step-pill active flex items-center gap-2" data-step="1" onclick="scrollToStep(1)"><div class="step-circle">1</div><span class="step-label">Intake</span></div>
-          <div class="step-connector"></div>
-          <div class="step-pill flex items-center gap-2" data-step="2" onclick="scrollToStep(2)"><div class="step-circle">2</div><span class="step-label">Pipeline</span></div>
-          <div class="step-connector"></div>
-          <div class="step-pill flex items-center gap-2" data-step="3" onclick="scrollToStep(3)"><div class="step-circle">3</div><span class="step-label">Approve</span></div>
-          <div class="step-connector"></div>
-          <div class="step-pill flex items-center gap-2" data-step="4" onclick="scrollToStep(4)"><div class="step-circle">4</div><span class="step-label">Report</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- STEP SECTIONS -->
-    <section class="py-16 px-6 bg-surface">
-      <div class="max-w-4xl mx-auto">
-
-        <!-- Step 1 -->
-        <div class="tour-step visible mb-24" id="step-1" data-step="1">
-          <div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 text-white rounded-lg flex items-center justify-center" style="background:#1e293b;font-size:14px;font-weight:700">1</div><h2 class="font-extrabold text-on-surface" style="font-size:28px">Create Requisition</h2></div>
-          <p class="text-on-surface-variant mb-6 max-w-2xl" style="font-size:16px">Initiate hiring with a clean intake form. Capture role, department, location, and skills. Submit for approval in one click.</p>
-          <ul class="flex flex-col gap-2 mb-6"><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#1e293b">check_circle</span> Standardized role templates</li><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#1e293b">check_circle</span> Automated approval routing</li><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#1e293b">check_circle</span> Custom designations and departments</li></ul>
-          <div class="step-mockup"><div class="bg-surface border border-border rounded-lg shadow-sm overflow-hidden"><div class="bg-surface-alt border-b border-border h-10 flex items-center px-4 gap-2"><div class="w-2.5 h-2.5 rounded-full bg-border"></div><div class="w-2.5 h-2.5 rounded-full bg-border"></div><div class="w-2.5 h-2.5 rounded-full bg-border"></div><span class="ml-4" style="font-size:11px;color:#6E7476;font-weight:600">Requisition Draft</span></div><div class="p-8"><div class="max-w-md space-y-5"><div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1e293b;margin-bottom:6px">Role Title</label><div class="h-10 bg-white border border-border rounded flex items-center px-3" style="font-size:13px;color:#17201C">Senior Frontend Engineer</div></div><div class="flex gap-4"><div class="flex-1"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:6px">Department</label><div class="h-10 bg-white border border-border rounded flex items-center px-3" style="font-size:13px;color:#17201C">Engineering</div></div><div class="flex-1"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:6px">Location</label><div class="h-10 bg-white border border-border rounded flex items-center px-3" style="font-size:13px;color:#17201C">Hyderabad</div></div></div><div class="pt-4 border-t border-border"><button class="h-10 w-full text-white rounded flex items-center justify-center" style="background:#1e293b;font-size:13px;font-weight:600">Submit for Approval</button></div></div></div></div></div>
-        </div>
-
-        <!-- Step 2 -->
-        <div class="tour-step mb-24" id="step-2" data-step="2">
-          <div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#EEF2EF"><span class="material-symbols-outlined" style="font-size:20px;color:#4B5257">account_tree</span></div><h2 class="font-extrabold text-on-surface" style="font-size:28px">Source &amp; Pipeline</h2></div>
-          <p class="text-on-surface-variant mb-6 max-w-2xl" style="font-size:16px">Add candidates and move them through custom stages — screening, interview, client round — each with its own owner.</p>
-          <ul class="flex flex-col gap-2 mb-6"><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#4B5257">check_circle</span> Custom pipeline stages per requisition</li><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#4B5257">check_circle</span> Drag-and-drop candidate movement</li></ul>
-          <div class="step-mockup"><div class="bg-surface border border-border rounded-lg shadow-sm p-4 overflow-x-auto"><div class="flex gap-3 min-w-max">
-            <div class="w-48 shrink-0"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:8px;padding:0 4px">Sourced</div><div class="bg-white border border-border rounded p-3" style="font-size:12px"><div style="font-weight:600;color:#17201C;margin-bottom:4px">Alex Mercer</div><div style="color:#6E7476">Google · 3 yrs</div></div></div>
-            <div class="w-48 shrink-0"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:8px;padding:0 4px">Screening</div><div class="bg-white border border-border rounded p-3" style="font-size:12px"><div style="font-weight:600;color:#17201C;margin-bottom:4px">Sarah Chen</div><div style="color:#6E7476">Stripe · 5 yrs</div></div></div>
-            <div class="w-48 shrink-0"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:8px;padding:0 4px">Interview</div><div class="bg-white rounded p-3" style="font-size:12px;border:1px solid rgba(36,72,60,0.2)"><div style="font-weight:600;color:#17201C;margin-bottom:4px">Elena Rostova</div><div style="color:#6E7476">Netflix · 8 yrs</div></div></div>
-            <div class="w-48 shrink-0"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:8px;padding:0 4px">Offer</div><div class="bg-surface-alt border border-border rounded p-3" style="font-size:12px;text-align:center;color:#6E7476">Empty</div></div>
-          </div></div></div>
-        </div>
-
-        <!-- Step 3 -->
-        <div class="tour-step mb-24" id="step-3" data-step="3">
-          <div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#F7F0E1"><span class="material-symbols-outlined" style="font-size:20px;color:#8A6A1F">fact_check</span></div><h2 class="font-extrabold text-on-surface" style="font-size:28px">Track &amp; Approve</h2></div>
-          <p class="text-on-surface-variant mb-6 max-w-2xl" style="font-size:16px">Daily updates keep the team aligned. Approval workflows route offers and requisitions automatically.</p>
-          <ul class="flex flex-col gap-2 mb-6"><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#8A6A1F">check_circle</span> Structured daily update submissions</li><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#8A6A1F">check_circle</span> Automated approval chains</li></ul>
-          <div class="step-mockup"><div class="bg-surface border border-border rounded-lg shadow-sm overflow-hidden"><div class="bg-surface-alt border-b border-border px-4 py-2.5 flex items-center justify-between"><span style="font-size:12px;font-weight:700;color:#17201C">Approvals Inbox</span><span style="font-size:10px;color:#6E7476">2 pending</span></div><div class="divide-y divide-border"><div class="px-4 py-3 flex items-center justify-between hover:bg-highlight-soft transition-colors"><div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#A63D33"></span><div><div style="font-size:13px;font-weight:600;color:#17201C">Budget Exception</div><div style="font-size:11px;color:#6E7476">REQ-9102 · Senior Frontend Dev</div></div></div><span style="font-size:11px;font-weight:600;color:#A63D33">Overdue 1d</span></div><div class="px-4 py-3 flex items-center justify-between hover:bg-highlight-soft transition-colors"><div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#8A6A1F"></span><div><div style="font-size:13px;font-weight:600;color:#17201C">New Requisition</div><div style="font-size:11px;color:#6E7476">REQ-9144 · Product Manager</div></div></div><span style="font-size:11px;font-weight:600;color:#1e293b">4d left</span></div></div></div></div>
-        </div>
-
-        <!-- Step 4 -->
-        <div class="tour-step mb-8" id="step-4" data-step="4">
-          <div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#E9F2EB"><span class="material-symbols-outlined" style="font-size:20px;color:#1e293b">monitoring</span></div><h2 class="font-extrabold text-on-surface" style="font-size:28px">Dashboard &amp; Reports</h2></div>
-          <p class="text-on-surface-variant mb-6 max-w-2xl" style="font-size:16px">Real-time dashboards with open reqs, pipeline health, stale positions, and team workload.</p>
-          <ul class="flex flex-col gap-2 mb-6"><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#1e293b">check_circle</span> Role-based KPI dashboards</li><li class="flex items-center gap-2" style="font-size:14px;color:#4B5257"><span class="material-symbols-outlined" style="font-size:18px;color:#1e293b">check_circle</span> Stale requisition tracking</li></ul>
-          <div class="step-mockup"><div class="bg-surface border border-border rounded-lg shadow-sm p-5"><div class="flex gap-3">
-            <div class="flex-1 bg-white border border-border rounded p-3"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Open Reqs</div><div style="font-size:20px;font-weight:700;color:#17201C">7</div></div>
-            <div class="flex-1 bg-white border border-border rounded p-3"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Pipeline</div><div style="font-size:20px;font-weight:700;color:#17201C">9</div></div>
-            <div class="flex-1 bg-white border border-border rounded p-3"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Pending</div><div style="font-size:20px;font-weight:700;color:#17201C">4</div></div>
-            <div class="flex-1 bg-white border border-border rounded p-3"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Offers</div><div style="font-size:20px;font-weight:700;color:#17201C">5</div></div>
-          </div></div></div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- CTA -->
-    <section class="py-16 px-6 text-center relative overflow-hidden" style="background:#1e293b">
-      <div class="cta-grid-bg"></div>
-      <div class="max-w-2xl mx-auto space-y-4 reveal relative z-10"><h2 class="text-white font-extrabold" style="font-size:clamp(28px,4vw,32px)">Ready to see it in action?</h2><p style="font-size:16px;color:rgba(255,255,255,0.7)">Set up your recruitment OS in minutes.</p><a class="btn-primary bg-white hover:bg-surface-alt mt-4" href="signup.html" style="color:#1e293b">Start Free Trial</a></div>
-    </section>
-
-  </main>
-  <script src="../shared/landing.js?v=f848f0eef6"></script>
-  <script src="../shared/renderers.js?v=f848f0eef6"></script>
-  <script src="../shared/api-client.js?v=f848f0eef6"></script>
-    <script src="../shared/ui-utils.js?v=f848f0eef6"></script>
-    <script src="../shared/tables.js?v=f848f0eef6"></script>
-    <script src="../shared/forms.js?v=f848f0eef6"></script>
-    <script src="../shared/sidebar.js?v=f848f0eef6"></script>
-    <script src="../shared/pipeline.js?v=f848f0eef6"></script>
-    <script src="../shared/routing.js?v=f848f0eef6"></script>
-
-  <script src="../shared/app.js?v=f848f0eef6"></script>
-  <script>
-    function scrollToStep(n){const el=document.getElementById('step-'+n);if(!el)return;const ind=document.getElementById('stepIndicator');const h=ind?ind.offsetHeight:0;window.scrollTo({top:el.getBoundingClientRect().top+window.pageYOffset-h-24,behavior:'smooth'})}
-    function updateActiveStep(){const ind=document.getElementById('stepIndicator');const h=ind?ind.offsetHeight:0;const y=window.pageYOffset;const steps=document.querySelectorAll('.tour-step');const pills=document.querySelectorAll('.step-pill');let a=0;steps.forEach((s,i)=>{if(y>=s.getBoundingClientRect().top+y-h-200)a=i});pills.forEach((p,i)=>{p.classList.remove('active','done');if(i===a)p.classList.add('active');else if(i<a)p.classList.add('done')});steps.forEach((s,i)=>{if(i===a)s.classList.add('visible');else s.classList.remove('visible')})}
-    let ticking=false;window.addEventListener('scroll',()=>{if(!ticking){requestAnimationFrame(()=>{updateActiveStep();ticking=false});ticking=true}});
-    document.addEventListener('DOMContentLoaded',()=>{updateActiveStep();const f=document.querySelector('#step-1 .step-mockup');if(f){f.style.maxHeight='600px';f.style.opacity='1'}});
-  </script>
+</main>
 </body>
 </html>

@@ -3,291 +3,104 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>RecruitOps — Customizable Recruitment Operating System</title>
-  <meta name="description" content="Build your own recruitment system with custom designations, pipeline stages, and role-based workflows." />
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="shared/global.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="shared/design-tokens.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="shared/visual-system.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="shared/landing.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="shared/fonts/fonts.css?v=f848f0eef6" />
-  <link rel="stylesheet" href="shared/tailwind.css?v=f848f0eef6" />
+  <title>RecruitOps — Recruitment operations for agencies and in-house teams</title>
+  <meta name="description" content="Requisitions, candidates, approvals and reporting in one place, shaped around your stages, your clients and your rules." />
+  <meta property="og:title" content="RecruitOps — Recruitment operations for agencies and in-house teams" />
+  <meta property="og:description" content="Requisitions, candidates, approvals and reporting in one place, shaped around your stages, your clients and your rules." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#f8f8f6" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="shared/fonts/fonts.css?v=f1d86ca7bf" />
+  <link rel="stylesheet" href="shared/marketing.css?v=f1d86ca7bf" />
+  <script src="shared/marketing.js?v=f1d86ca7bf" defer></script>
 </head>
-<body class="bg-background" data-route-id="index" data-route-kind="marketing">
+<body data-route-id="index" data-route-kind="marketing">
+<main id="main">
 
-  <main id="main-content">
+<section class="mk-hero"><div class="mk-wrap mk-hero-grid">
+<div>
+<span class="mk-eyebrow">Recruitment operations platform</span>
+<h1>Run hiring the way your team actually works.</h1>
+<p class="mk-lead">RecruitOps brings requisitions, candidates, approvals and reporting into one place, shaped around your stages, your clients and your rules. Built for agencies hiring for many clients and for teams hiring for themselves.</p>
+<div class="mk-actions"><a class="mk-btn mk-btn-primary" href="pages/signup.html">Create your account <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a><a class="mk-btn mk-btn-ghost" href="pages/product-tour.html">Take the product tour</a></div>
+<p class="mk-note"><span class="material-symbols-outlined" aria-hidden="true">lock</span> Two-step sign-in for admins and your company's data kept separate, from day one.</p>
+</div>
+<div class="mk-visual mk-reveal"><div class="mk-mock" role="img" aria-label="Illustration of a pipeline board with candidates in stage columns"><div class="mk-mock-bar"><i></i><i></i><i></i><b>Pipeline · Client stage list</b></div><div class="mk-mock-body"><div class="mk-board"><div class="mk-col"><h5>Sourced</h5><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Screening</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip focus"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Interview</h5><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Offer</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div></div></div></div></div>
+<div class="mk-float f1"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><div>Stage moved<small>Reason recorded in history</small></div></div>
+<div class="mk-float f2"><span class="material-symbols-outlined" aria-hidden="true">verified</span><div>Offer approved<small>Within the role's budget</small></div></div>
+</div>
+</div></section>
 
-    <!-- ═══ HERO ═══ -->
-    <section class="landing-hero pt-32 pb-24 px-6">
-      <div class="landing-hero-bg"></div>
-      <div class="hero-grid"></div>
-      <div class="orb w-96 h-96 -top-48 -left-48 float-slow" style="background:#1e293b"></div>
-      <div class="orb w-80 h-80 top-20 -right-40 float-medium" style="background:#334155"></div>
-      <div class="orb w-64 h-64 bottom-0 left-1/3 float-slow" style="background:#64748b;opacity:0.12"></div>
-      <div class="max-w-5xl mx-auto text-center relative z-10">
-        <div class="hero-badge inline-flex items-center gap-2 bg-success-bg px-4 py-1.5 rounded-full mb-8">
-          <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-text opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-success-text"></span></span>
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1e293b">Customizable Recruitment OS</span>
-        </div>
-        <h1 class="hero-animate-1 font-extrabold text-on-surface mb-6" style="font-size:clamp(40px,6vw,68px);line-height:1.08;">
-          Your recruitment system.<br/><span class="gradient-text">Your rules.</span>
-        </h1>
-        <p class="hero-animate-2 text-on-surface-variant mb-10 max-w-2xl mx-auto" style="font-size:clamp(16px,2vw,20px);line-height:1.6;">
-          Create your own designations, pipeline stages, roles, and approval workflows. RecruitOps adapts to how your team hires — not the other way around.
-        </p>
-        <div class="hero-animate-3 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a class="btn-primary w-full sm:w-auto text-center" href="pages/signup.html">Start Free Trial</a>
-          <a class="btn-secondary w-full sm:w-auto text-center" href="pages/product-tour.html">
-            <span class="material-symbols-outlined" style="font-size:20px">play_circle</span> Take a Product Tour
-          </a>
-        </div>
-      </div>
-    </section>
+<section class="mk-section alt"><div class="mk-wrap">
+<div class="mk-head center mk-reveal"><span class="mk-eyebrow">Who it's for</span><h2>Two ways of hiring. One system that fits both.</h2>
+<p class="mk-lead">Whether you recruit for many clients or build your own team, the work is the same at heart: clear roles, clear owners and a pipeline you can trust.</p></div>
+<div class="mk-grid two">
+<div class="mk-card mk-audience mk-reveal"><span class="mk-tag"><span class="material-symbols-outlined" aria-hidden="true">handshake</span> Agencies</span><h3>For recruitment and staffing agencies</h3>
+<p>Give every client its own hiring stages, offer rules and contacts. Keep holds, withdrawals and approvals tidy per client, and keep each account's history in one place.</p>
+<ul class="mk-list"><li>Hiring stages set per client</li><li>Signing-bonus rules per client</li><li>Holds that pause the role, not the work</li><li>Client contacts, meetings and follow-ups</li></ul>
+<a class="mk-link" href="pages/use-cases.html#agencies">How agencies use RecruitOps <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div>
+<div class="mk-card mk-audience mk-reveal"><span class="mk-tag"><span class="material-symbols-outlined" aria-hidden="true">apartment</span> In-house teams</span><h3>For in-house talent teams</h3>
+<p>Open roles with a budget, route offers for approval when they go above it, and see where every candidate stands across offices and hiring managers.</p>
+<ul class="mk-list"><li>Requisitions with pay ranges</li><li>Offer approvals above your limit</li><li>Several offices, one view</li><li>Clear visibility for hiring managers</li></ul>
+<a class="mk-link" href="pages/use-cases.html#in-house">How in-house teams use RecruitOps <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div>
+</div>
+</div></section>
 
-    <!-- ═══ PRODUCT PREVIEW ═══ -->
-    <section class="px-6 pb-24 max-w-6xl mx-auto relative z-20 -mt-8 reveal-scale">
-      <div class="tilt-wrap relative">
-        <div class="float-chip float-chip-1">
-          <span class="material-symbols-outlined">how_to_reg</span>
-          <span>Placement confirmed<span class="chip-sub">Demo Revenue Client · just now</span></span>
-        </div>
-        <div class="float-chip float-chip-2">
-          <span class="material-symbols-outlined">trending_up</span>
-          <span>Revenue ₹15.4L this month<span class="chip-sub">auto-calculated at 8.33% fee</span></span>
-        </div>
-        <div class="float-chip float-chip-3">
-          <span class="material-symbols-outlined">fact_check</span>
-          <span>Offer approved<span class="chip-sub">2-step workflow · 0 blockers</span></span>
-        </div>
-        <div class="tilt-card bg-surface rounded-2xl shadow-[0_20px_80px_rgba(36,72,60,0.1)] overflow-hidden relative">
-          <div class="tilt-glare"></div>
-        <div class="bg-surface-alt border-b border-border h-10 flex items-center px-4 gap-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-[#E85D4A]"></div>
-          <div class="w-2.5 h-2.5 rounded-full bg-[#E8A838]"></div>
-          <div class="w-2.5 h-2.5 rounded-full bg-[#4CAF50]"></div>
-          <div class="flex-1 text-center"><span style="font-size:11px;color:#6E7476;font-weight:500">RecruitOps — Role Dashboard</span></div>
-        </div>
-        <div class="flex product-preview-body">
-          <div class="w-48 product-preview-sidebar bg-surface border-r border-border p-4 flex flex-col gap-1 shrink-0">
-            <div class="flex items-center gap-2 mb-4">
-              <div class="w-7 h-7 bg-primary-container rounded-lg flex items-center justify-center" style="color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:14px;height:14px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
-              <span style="font-size:11px;font-weight:700;color:#1e293b">RecruitOps</span>
-            </div>
-            <div class="flex items-center gap-2 px-2 py-1.5 bg-primary-container text-white rounded-lg" style="font-size:11px;font-weight:600"><span class="material-symbols-outlined" style="font-size:14px">dashboard</span> Dashboard</div>
-            <div class="flex items-center gap-2 px-2 py-1.5 text-text-muted rounded-lg" style="font-size:11px"><span class="material-symbols-outlined" style="font-size:14px">apartment</span> Clients</div>
-            <div class="flex items-center gap-2 px-2 py-1.5 text-text-muted rounded-lg" style="font-size:11px"><span class="material-symbols-outlined" style="font-size:14px">work</span> Requisitions</div>
-            <div class="flex items-center gap-2 px-2 py-1.5 text-text-muted rounded-lg" style="font-size:11px"><span class="material-symbols-outlined" style="font-size:14px">group</span> Candidates</div>
-            <div class="flex items-center gap-2 px-2 py-1.5 text-text-muted rounded-lg" style="font-size:11px"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span> Pipeline</div>
-          </div>
-          <div class="flex-1 p-5 bg-background overflow-hidden">
-            <div class="flex gap-3 mb-4">
-              <div class="flex-1 bg-surface border border-border rounded-lg p-3 card-hover"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Open Reqs</div><div style="font-size:22px;font-weight:700;color:#17201C" data-count="7">7</div></div>
-              <div class="flex-1 bg-surface border border-border rounded-lg p-3 card-hover"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Pipeline</div><div style="font-size:22px;font-weight:700;color:#17201C" data-count="9">9</div></div>
-              <div class="flex-1 bg-surface border border-border rounded-lg p-3 card-hover"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Pending</div><div style="font-size:22px;font-weight:700;color:#17201C" data-count="4">4</div></div>
-              <div class="flex-1 bg-surface border border-border rounded-lg p-3 card-hover"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476;margin-bottom:4px">Offers</div><div style="font-size:22px;font-weight:700;color:#17201C" data-count="5">5</div></div>
-            </div>
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
-              <div class="bg-surface-alt px-4 py-2 border-b border-border flex items-center justify-between">
-                <span style="font-size:11px;font-weight:700;color:#17201C">Urgent Action Queue</span>
-                <span style="font-size:10px;color:#6E7476">4 items</span>
-              </div>
-              <div class="px-4 py-2 border-b border-border flex" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6E7476">
-                <div class="flex-1">Signal</div><div style="width:96px">Entity</div><div style="width:64px">Age</div><div style="width:64px;text-align:right">Action</div>
-              </div>
-              <div class="px-4 py-2.5 border-b border-border flex items-center hover:bg-highlight-soft transition-colors" style="font-size:11px">
-                <div class="flex-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0" style="background:#A63D33"></span> Duplicate detected</div>
-                <div style="width:96px;color:#6E7476">REQ-4092</div><div style="width:64px;color:#A63D33">4h</div><div style="width:64px;text-align:right;color:#1e293b;font-weight:600">Resolve</div>
-              </div>
-              <div class="px-4 py-2.5 border-b border-border flex items-center hover:bg-highlight-soft transition-colors" style="font-size:11px;background:rgba(250,251,248,0.5)">
-                <div class="flex-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0" style="background:#8A6A1F"></span> HM unverified</div>
-                <div style="width:96px;color:#6E7476">REQ-5110</div><div style="width:64px;color:#8A6A1F">2d</div><div style="width:64px;text-align:right;color:#1e293b;font-weight:600">Nudge</div>
-              </div>            <div class="px-4 py-2.5 flex items-center hover:bg-highlight-soft transition-colors" style="font-size:11px">
-              <div class="flex-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0" style="background:#1e293b"></span> Stuck in screen</div>
-              <div style="width:96px;color:#6E7476">S. Jenkins</div><div style="width:64px;color:#6E7476">4d</div><div style="width:64px;text-align:right;color:#1e293b;font-weight:600">Review</div>
-            </div>
-            </div>
-          </div>
-        </div>
-      </div><!-- /tilt-card -->
-      </div><!-- /tilt-wrap -->
-    </section>
+<section class="mk-section"><div class="mk-wrap">
+<div class="mk-head mk-reveal"><span class="mk-eyebrow">How it works</span><h2>From open role to accepted offer.</h2>
+<p class="mk-lead">Five kinds of work, one connected record. Each step builds on the last, so nothing has to be typed twice or chased by email.</p></div>
+<div class="mk-steps"><div class="mk-card mk-step mk-reveal"><span class="mk-step-num">1</span><h3>Plan</h3><p>Capture every role with its brief, budget and stages.</p><a class="mk-link" href="pages/product-tour-plan-strategy.html">Explore plan <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div><div class="mk-card mk-step mk-reveal"><span class="mk-step-num">2</span><h3>Assign</h3><p>Make ownership obvious: who sources, delivers and approves.</p><a class="mk-link" href="pages/product-tour-assign-ownership.html">Explore assign <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div><div class="mk-card mk-step mk-reveal"><span class="mk-step-num">3</span><h3>Move</h3><p>Move candidates through your stages, with a reason for every step.</p><a class="mk-link" href="pages/product-tour-move-candidates.html">Explore move <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div><div class="mk-card mk-step mk-reveal"><span class="mk-step-num">4</span><h3>Resolve</h3><p>Handle approvals, holds and surprises without losing the thread.</p><a class="mk-link" href="pages/product-tour-resolve-exceptions.html">Explore resolve <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div><div class="mk-card mk-step mk-reveal"><span class="mk-step-num">5</span><h3>Report</h3><p>See what is moving and what is stuck, every day.</p><a class="mk-link" href="pages/product-tour-report-progress.html">Explore report <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a></div></div>
+</div></section>
 
-    <!-- ═══ STATS ═══ -->
-    <section class="border-y border-border py-14 px-6 band-grid" style="background:#FAFBF8">
-      <div class="max-w-5xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-8 text-center stagger">
-        <div class="flex-1 reveal" style="--i:0"><p class="font-extrabold mb-1" style="font-size:40px;color:#1e293b"><span data-count="40" data-suffix="%">40%</span></p><p style="font-size:13px;color:#4B5257;font-weight:500">Fewer missed follow-ups</p></div>
-        <div class="hidden lg:block w-px h-12 bg-border"></div>
-        <div class="flex-1 reveal" style="--i:1"><p class="font-extrabold mb-1" style="font-size:40px;color:#1e293b"><span data-count="2" data-suffix="x">2x</span></p><p style="font-size:13px;color:#4B5257;font-weight:500">Faster pipeline reviews</p></div>
-        <div class="hidden lg:block w-px h-12 bg-border"></div>
-        <div class="flex-1 reveal" style="--i:2"><p class="font-extrabold mb-1" style="font-size:40px;color:#1e293b"><span data-count="1" data-suffix="">1</span></p><p style="font-size:13px;color:#4B5257;font-weight:500">Operating view for every team</p></div>
-      </div>
-    </section>
+<section class="mk-section alt"><div class="mk-wrap">
+<div class="mk-split mk-reveal">
+<div><span class="mk-eyebrow">Your process, not ours</span><h2>Shaped around how your company hires.</h2>
+<p class="mk-lead">Name your own roles and designations, decide who can see what, and set the stages candidates move through. When a client changes their process, RecruitOps helps you move existing candidates across safely.</p>
+<ul class="mk-list"><li>Your own roles, permissions and designations</li><li>A company stage list, plus one per client</li><li>Offices and role-based access</li><li>Approval limits you decide</li></ul></div>
+<div><div class="mk-mock" role="img" aria-label="Illustration of different hiring stage lists for different clients"><div class="mk-mock-bar"><i></i><i></i><i></i><b>Stage list · per client</b></div><div class="mk-mock-body"><div class="mk-rows"><div class="mk-row"><div><strong>Company default</strong><span class="sub">Used when hiring for yourselves</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">home</span>Default</span></div><div class="mk-row"><div><strong>Client A</strong><span class="sub">Adds a client interview round</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">tune</span>Custom</span></div><div class="mk-row"><div><strong>Client B</strong><span class="sub">Shorter process, fewer rounds</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">tune</span>Custom</span></div><div class="mk-row"><div><strong>Reporting buckets</strong><span class="sub">Every stage counted consistently</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">insights</span>Mapped</span></div></div></div></div></div>
+</div>
+</div></section>
 
-    <!-- ═══ HOW IT WORKS ═══ -->
-    <section class="py-24 px-6 bg-surface">
-      <div class="max-w-5xl mx-auto">
-        <div class="text-center mb-16 reveal">
-          <span class="inline-flex items-center gap-1.5 bg-success-bg px-3 py-1 rounded-full mb-4" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1e293b">
-            <span class="material-symbols-outlined" style="font-size:14px">route</span> How It Works
-          </span>
-          <h2 class="font-extrabold text-on-surface mb-4" style="font-size:clamp(28px,4vw,36px)">Three steps to your recruitment OS</h2>
-          <p class="text-on-surface-variant max-w-xl mx-auto" style="font-size:16px">No consultants needed. Set up in minutes.</p>
-        </div>
-        <div class="flex flex-col lg:flex-row gap-8 stagger">
-          <div class="flex-1 text-center reveal card-hover bg-surface border border-border rounded-xl p-8" style="--i:0">
-            <div class="w-14 h-14 text-white rounded-xl flex items-center justify-center mx-auto mb-5 shadow-sm" style="background:#1e293b"><span style="font-size:24px;font-weight:800">1</span></div>
-            <h3 class="font-bold text-on-surface mb-2" style="font-size:18px">Define Your Structure</h3>
-            <p class="text-on-surface-variant" style="font-size:14px;line-height:1.6">Create custom designations, departments, and locations.</p>
-          </div>
-          <div class="flex-1 text-center reveal card-hover bg-surface border border-border rounded-xl p-8" style="--i:1">
-            <div class="w-14 h-14 text-white rounded-xl flex items-center justify-center mx-auto mb-5 shadow-sm" style="background:#1e293b"><span style="font-size:24px;font-weight:800">2</span></div>
-            <h3 class="font-bold text-on-surface mb-2" style="font-size:18px">Build Your Pipeline</h3>
-            <p class="text-on-surface-variant" style="font-size:14px;line-height:1.6">Design your own hiring stages from sourcing to joining.</p>
-          </div>
-          <div class="flex-1 text-center reveal card-hover bg-surface border border-border rounded-xl p-8" style="--i:2">
-            <div class="w-14 h-14 text-white rounded-xl flex items-center justify-center mx-auto mb-5 shadow-sm" style="background:#1e293b"><span style="font-size:24px;font-weight:800">3</span></div>
-            <h3 class="font-bold text-on-surface mb-2" style="font-size:18px">Run &amp; Optimize</h3>
-            <p class="text-on-surface-variant" style="font-size:14px;line-height:1.6">Track updates, approve offers, review pipeline health.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+<section class="mk-section"><div class="mk-wrap">
+<div class="mk-head center mk-reveal"><span class="mk-eyebrow">Everything in one place</span><h2>What a recruiting desk needs, day to day.</h2></div>
+<div class="mk-grid four">
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">work</span></span><h3>Requisitions</h3><p>A structured brief for every role, with budget, skills and target date.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">person_search</span></span><h3>Candidate profiles</h3><p>One profile per person, with duplicate checks before they cause trouble.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">view_kanban</span></span><h3>Pipeline board</h3><p>See every candidate by stage and move them with a reason.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">event_available</span></span><h3>Interviews</h3><p>Schedule rounds, assign interviewers and collect feedback.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">request_quote</span></span><h3>Offers</h3><p>Create offers in your currency, with approval when they need it.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">edit_calendar</span></span><h3>Daily updates</h3><p>Short updates from the team, reviewed in one place.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></span><h3>Meetings and follow-ups</h3><p>Client meetings and next steps that don't slip.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">monitoring</span></span><h3>Reports</h3><p>Time to fill, funnel and source views from live data.</p></div>
+</div>
+</div></section>
 
-    <!-- ═══ WORKFLOW ILLUSTRATION ═══ -->
-    <section class="py-20 px-6 band-grid" style="background:#FAFBF8">
-      <div class="max-w-5xl mx-auto">
-        <div class="text-center mb-10 reveal">
-          <h2 class="font-extrabold text-on-surface mb-3" style="font-size:clamp(24px,3vw,30px)">Watch a candidate move through your pipeline</h2>
-          <p class="text-on-surface-variant" style="font-size:15px">Every stage owned. Every move recorded. Every report automatic.</p>
-        </div>
-        <div class="reveal-scale" data-shot-band>
-          <div class="shot-frame bg-surface border border-border rounded-2xl shadow-[0_16px_48px_rgba(36,72,60,0.08)] overflow-hidden">
-            <div class="bg-surface-alt border-b border-border h-10 flex items-center px-4 gap-2">
-              <div class="w-2.5 h-2.5 rounded-full bg-[#E85D4A]"></div>
-              <div class="w-2.5 h-2.5 rounded-full bg-[#E8A838]"></div>
-              <div class="w-2.5 h-2.5 rounded-full bg-[#4CAF50]"></div>
-              <div class="flex-1 text-center"><span style="font-size:11px;color:#6E7476;font-weight:500">RecruitOps — Pipeline Board · live product</span></div>
-            </div>
-            <picture>
-              <source srcset="/assets/screenshots/pipeline-board.webp" type="image/webp">
-              <img src="/assets/screenshots/pipeline-board.png"
-                   alt="Real RecruitOps pipeline board: candidate cards with match scores moving across hiring stages"
-                   style="width:100%;height:auto;display:block"
-                   loading="lazy" decoding="async"
-                   onerror="this.closest('[data-shot-band]').classList.add('img-failed')">
-            </picture>
-          </div>
-          <div class="shot-fallback bg-surface border border-border rounded-2xl shadow-[0_16px_48px_rgba(36,72,60,0.08)] p-8">
-          <svg viewBox="0 0 880 240" style="width:100%;height:auto" role="img" aria-label="Pipeline illustration: candidates flowing from Sourced through Screening, Interview and Offer to Joined">
-            <!-- connector path -->
-            <path class="draw-line" d="M 90 120 C 180 120 180 60 270 60 C 360 60 360 120 450 120 C 540 120 540 60 630 60 C 720 60 720 120 790 120"
-                  fill="none" stroke="#3a7a5f" stroke-width="2.5" stroke-dasharray="6 5" opacity="0.55"/>
-            <!-- stage nodes -->
-            <g font-family="Manrope, sans-serif">
-              <g><circle cx="90" cy="120" r="34" fill="#EEF2EF" stroke="#1e293b" stroke-width="2"/><text x="90" y="126" text-anchor="middle" font-size="20">🔍</text><text x="90" y="180" text-anchor="middle" font-size="12" font-weight="700" fill="#17201C">Sourced</text><text x="90" y="196" text-anchor="middle" font-size="10" fill="#6E7476">24 candidates</text></g>
-              <g><circle cx="270" cy="60" r="34" fill="#EEF2EF" stroke="#1e293b" stroke-width="2"/><text x="270" y="66" text-anchor="middle" font-size="20">📞</text><text x="270" y="120" text-anchor="middle" font-size="12" font-weight="700" fill="#17201C">Screening</text><text x="270" y="136" text-anchor="middle" font-size="10" fill="#6E7476">11 in call</text></g>
-              <g><circle cx="450" cy="120" r="34" fill="#F7F0E1" stroke="#8A6A1F" stroke-width="2"/><text x="450" y="126" text-anchor="middle" font-size="20">🧑‍💼</text><text x="450" y="180" text-anchor="middle" font-size="12" font-weight="700" fill="#17201C">Interview</text><text x="450" y="196" text-anchor="middle" font-size="10" fill="#6E7476">6 scheduled</text></g>
-              <g><circle cx="630" cy="60" r="34" fill="#F7F0E1" stroke="#8A6A1F" stroke-width="2"/><text x="630" y="66" text-anchor="middle" font-size="20">📄</text><text x="630" y="120" text-anchor="middle" font-size="12" font-weight="700" fill="#17201C">Offer</text><text x="630" y="136" text-anchor="middle" font-size="10" fill="#6E7476">2 awaiting sign-off</text></g>
-              <g><circle cx="790" cy="120" r="34" fill="#E9F2EB" stroke="#1e293b" stroke-width="2.5"/><text x="790" y="126" text-anchor="middle" font-size="20">🎉</text><text x="790" y="180" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">Joined</text><text x="790" y="196" text-anchor="middle" font-size="10" fill="#6E7476">1 this week</text></g>
-            </g>
-          </svg>
-          </div><!-- /shot-fallback -->
-        </div><!-- /data-shot-band -->
-      </div>
-    </section>
+<section class="mk-section mk-dark"><div class="mk-wrap">
+<div class="mk-head mk-reveal"><span class="mk-eyebrow">Trust and control</span><h2>Built to be trusted with candidate data.</h2>
+<p class="mk-lead">Recruitment data is personal data. RecruitOps treats it that way, from the first screen to the last export.</p></div>
+<div class="mk-grid three">
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">phonelink_lock</span></span><h3>Two-step sign-in</h3><p>Admins confirm every sign-in with a code from their phone.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">domain</span></span><h3>Your data stays yours</h3><p>Each company's records are kept apart from every other company's.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">history</span></span><h3>Full audit trail</h3><p>Sign-ins, changes and decisions are logged and searchable.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">download</span></span><h3>Export or delete</h3><p>Export your company's data, or a single candidate's, when asked.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">shield</span></span><h3>Safe file uploads</h3><p>Resumes and documents are checked for malware before anyone opens them.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon"><span class="material-symbols-outlined" aria-hidden="true">devices</span></span><h3>Sessions you control</h3><p>See where you're signed in and sign out other devices.</p></div>
+</div>
+</div></section>
 
-    <!-- ═══ CAPABILITIES MARQUEE ═══ -->
-    <section class="py-10 px-6 border-b border-border overflow-hidden band-fade-edges" aria-hidden="true">
-      <div class="marquee-track">
-        <span class="marquee-item"><span class="material-symbols-outlined">badge</span> Custom Designations</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">account_tree</span> Pipeline Stages</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">shield_person</span> Roles &amp; Permissions</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">fact_check</span> Approval Workflows</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">location_on</span> Multi-Location</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">monitoring</span> Live Dashboards</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">description</span> Letterhead Reports</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">vpn_key</span> Portal Accounts</span>
-        <!-- duplicate for seamless loop -->
-        <span class="marquee-item"><span class="material-symbols-outlined">badge</span> Custom Designations</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">account_tree</span> Pipeline Stages</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">shield_person</span> Roles &amp; Permissions</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">fact_check</span> Approval Workflows</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">location_on</span> Multi-Location</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">monitoring</span> Live Dashboards</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">description</span> Letterhead Reports</span>
-        <span class="marquee-item"><span class="material-symbols-outlined">vpn_key</span> Portal Accounts</span>
-      </div>
-    </section>
+<section class="mk-section"><div class="mk-wrap">
+<div class="mk-head center mk-reveal"><span class="mk-eyebrow">Getting started</span><h2>Up and running without a project plan.</h2></div>
+<div class="mk-grid three">
+<div class="mk-card mk-reveal"><span class="mk-icon dark"><span class="material-symbols-outlined" aria-hidden="true">add_business</span></span><h3>1. Create your account</h3><p>Sign up with your company name and work email, then confirm your address.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon dark"><span class="material-symbols-outlined" aria-hidden="true">tune</span></span><h3>2. Set it up your way</h3><p>Add your offices, your hiring stages and the clients you work with.</p></div>
+<div class="mk-card mk-reveal"><span class="mk-icon dark"><span class="material-symbols-outlined" aria-hidden="true">group_add</span></span><h3>3. Bring in your team</h3><p>Invite recruiters and managers, then open your first requisition.</p></div>
+</div>
+</div></section>
+<section class="mk-section tight"><div class="mk-wrap"><div class="mk-cta mk-reveal">
+<h2>Bring your hiring into one calm, clear place.</h2><p>Create your company account, set up your stages and invite your team. You can start with one office and one client and grow from there.</p>
+<div class="mk-actions"><a class="mk-btn mk-btn-light" href="pages/signup.html">Create your account <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></a><a class="mk-btn mk-btn-outline-light" href="pages/product-tour.html">Take the product tour</a></div>
+</div></div></section>
 
-    <!-- ═══ FEATURES ═══ -->
-    <section class="py-24 px-6 max-w-6xl mx-auto">
-      <div class="text-center mb-16 reveal">
-        <span class="inline-flex items-center gap-1.5 bg-success-bg px-3 py-1 rounded-full mb-4" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1e293b">
-          <span class="material-symbols-outlined" style="font-size:14px">star</span> Why RecruitOps
-        </span>
-        <h2 class="font-extrabold text-on-surface mb-4" style="font-size:clamp(28px,4vw,36px)">Built for how you actually recruit</h2>
-      </div>
-      <div class="flex flex-col gap-5 stagger">
-        <div class="reveal-left card-hover bg-surface border border-border rounded-xl p-6 flex items-start gap-4" style="--i:0"><div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(36,72,60,0.1)"><span class="material-symbols-outlined" style="font-size:24px;color:#1e293b">badge</span></div><div><h3 class="font-bold text-on-surface mb-1" style="font-size:16px">Custom Designations</h3><p class="text-on-surface-variant" style="font-size:14px;line-height:1.5">Create the job titles your organization uses. You define what exists.</p></div></div>
-        <div class="reveal-right card-hover bg-surface border border-border rounded-xl p-6 flex items-start gap-4" style="--i:1"><div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:#EEF2EF"><span class="material-symbols-outlined" style="font-size:24px;color:#4B5257">account_tree</span></div><div><h3 class="font-bold text-on-surface mb-1" style="font-size:16px">Custom Pipeline Stages</h3><p class="text-on-surface-variant" style="font-size:14px;line-height:1.5">Design your own hiring pipeline. Add, rename, or remove stages.</p></div></div>
-        <div class="reveal-left card-hover bg-surface border border-border rounded-xl p-6 flex items-start gap-4" style="--i:2"><div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:#F7F0E1"><span class="material-symbols-outlined" style="font-size:24px;color:#8A6A1F">shield_person</span></div><div><h3 class="font-bold text-on-surface mb-1" style="font-size:16px">Role-Based Access</h3><p class="text-on-surface-variant" style="font-size:14px;line-height:1.5">Create custom roles with granular permissions.</p></div></div>
-        <div class="reveal-right card-hover bg-surface border border-border rounded-xl p-6 flex items-start gap-4" style="--i:3"><div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:#E9F2EB"><span class="material-symbols-outlined" style="font-size:24px;color:#1e293b">fact_check</span></div><div><h3 class="font-bold text-on-surface mb-1" style="font-size:16px">Approval Workflows</h3><p class="text-on-surface-variant" style="font-size:14px;line-height:1.5">Automated approval chains for offers and requisitions.</p></div></div>
-        <div class="reveal-left card-hover bg-surface border border-border rounded-xl p-6 flex items-start gap-4" style="--i:4"><div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:#EEF2EF"><span class="material-symbols-outlined" style="font-size:24px;color:#4B5257">assignment</span></div><div><h3 class="font-bold text-on-surface mb-1" style="font-size:16px">Daily Updates</h3><p class="text-on-surface-variant" style="font-size:14px;line-height:1.5">Structured daily update submissions with progress tracking.</p></div></div>
-        <div class="reveal-right card-hover bg-surface border border-border rounded-xl p-6 flex items-start gap-4" style="--i:5"><div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(36,72,60,0.1)"><span class="material-symbols-outlined" style="font-size:24px;color:#1e293b">monitoring</span></div><div><h3 class="font-bold text-on-surface mb-1" style="font-size:16px">Real-Time Dashboards</h3><p class="text-on-surface-variant" style="font-size:14px;line-height:1.5">Role-based dashboards with live data from the API.</p></div></div>
-      </div>
-    </section>
-
-    <!-- ═══ USE CASES ═══ -->
-    <section class="py-20 px-6 border-y border-border" style="background:#FAFBF8">
-      <div class="max-w-5xl mx-auto">
-        <div class="text-center mb-12 reveal">
-          <h2 class="font-extrabold text-on-surface mb-4" style="font-size:clamp(28px,4vw,36px)">Who uses RecruitOps?</h2>
-          <p class="text-on-surface-variant" style="font-size:16px">From solo recruiters to multi-location firms.</p>
-        </div>
-        <div class="flex flex-col lg:flex-row gap-6 stagger">
-          <div class="reveal-pop flex-1 card-hover bg-surface border border-border rounded-xl p-6" style="--i:0"><div class="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style="background:rgba(36,72,60,0.1)"><span class="material-symbols-outlined" style="font-size:20px;color:#1e293b">apartment</span></div><h3 class="font-bold text-on-surface mb-2" style="font-size:16px">Staffing Agencies</h3><p class="text-on-surface-variant" style="font-size:13px;line-height:1.5">Manage multiple clients, track submittals, and coordinate teams.</p></div>
-          <div class="reveal-pop flex-1 card-hover bg-surface border border-border rounded-xl p-6" style="--i:1"><div class="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style="background:#EEF2EF"><span class="material-symbols-outlined" style="font-size:20px;color:#4B5257">business</span></div><h3 class="font-bold text-on-surface mb-2" style="font-size:16px">In-House HR Teams</h3><p class="text-on-surface-variant" style="font-size:13px;line-height:1.5">Centralize hiring with custom approval chains.</p></div>
-          <div class="reveal-pop flex-1 card-hover bg-surface border border-border rounded-xl p-6" style="--i:2"><div class="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style="background:#F7F0E1"><span class="material-symbols-outlined" style="font-size:20px;color:#8A6A1F">groups</span></div><h3 class="font-bold text-on-surface mb-2" style="font-size:16px">Growing Startups</h3><p class="text-on-surface-variant" style="font-size:13px;line-height:1.5">Start lean, scale as you grow.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ═══ CTA ═══ -->
-    <section class="relative py-24 px-6 text-center overflow-hidden" style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%)">
-      <div class="cta-grid-bg"></div>
-      <div class="orb w-96 h-96 -top-48 -right-48" style="background:rgba(255,255,255,0.05)"></div>
-      <div class="orb w-72 h-72 bottom-0 -left-24" style="background:rgba(255,255,255,0.04)"></div>
-      <div class="max-w-3xl mx-auto space-y-6 relative z-10 reveal">
-        <h2 class="text-white font-extrabold leading-tight" style="font-size:clamp(32px,5vw,42px)">Build your recruiting<br/>command center.</h2>
-        <p class="max-w-xl mx-auto" style="font-size:18px;color:rgba(255,255,255,0.6)">Set up your recruitment OS in minutes.</p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-          <a class="btn-primary bg-white text-on-surface hover:bg-surface-alt" href="pages/signup.html" style="color:#1e293b">Start Free Trial</a>
-          <a class="btn-secondary border-white/20 text-white hover:bg-white/10" href="pages/product-tour.html" style="color:#fff;background:transparent">View Product Tour</a>
-        </div>
-        <div class="flex items-center justify-center gap-3 pt-6">
-          <div class="avatar-stack">
-            <span class="avatar" style="background:#3a7a5f">AR</span>
-            <span class="avatar" style="background:#8A6A1F">SK</span>
-            <span class="avatar" style="background:#A63D33">MJ</span>
-            <span class="avatar" style="background:#4B5257">+9</span>
-          </div>
-          <p style="font-size:13px;color:rgba(255,255,255,0.55)">Teams already hiring with RecruitOps</p>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <script src="shared/landing.js?v=f848f0eef6"></script>
-  <script src="shared/renderers.js?v=f848f0eef6"></script>
-  <script src="shared/api-client.js?v=f848f0eef6"></script>
-    <script src="shared/ui-utils.js?v=f848f0eef6"></script>
-    <script src="shared/tables.js?v=f848f0eef6"></script>
-    <script src="shared/forms.js?v=f848f0eef6"></script>
-    <script src="shared/sidebar.js?v=f848f0eef6"></script>
-    <script src="shared/pipeline.js?v=f848f0eef6"></script>
-    <script src="shared/routing.js?v=f848f0eef6"></script>
-
-  <script src="shared/app.js?v=f848f0eef6"></script>
+</main>
 </body>
 </html>
