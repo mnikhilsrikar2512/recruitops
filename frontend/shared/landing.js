@@ -36,13 +36,13 @@
           RecruitOps
         </a>
         <div class="landing-nav-links">
-          <a href="${prefix}product-tour.html"${isActive("product-tour")}>Product</a>
-          <a href="${prefix}use-cases.html"${isActive("use-cases")}>Use Cases</a>
+          <a href="${prefix}product-tour.html"${isActive("product-tour")}>Product tour</a>
+          <a href="${prefix}use-cases.html"${isActive("use-cases")}>Use cases</a>
         </div>
       </div>
       <div class="landing-nav-actions">
-        <a class="btn-nav btn-nav-ghost" href="${prefix}login.html">Sign In</a>
-        <a class="btn-nav btn-nav-primary" href="${prefix}login.html">Start Free Trial</a>
+        <a class="btn-nav btn-nav-ghost" href="${prefix}login.html">Sign in</a>
+        <a class="btn-nav btn-nav-primary" href="${prefix}signup.html">Create account</a>
         <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false" aria-controls="mobileMenu">
           <span class="material-symbols-outlined" style="font-size:22px">menu</span>
         </button>
@@ -51,10 +51,10 @@
     <ul class="mobile-menu" id="mobileMenu">
       <li class="mobile-menu-clip">
         <ul class="mobile-menu-list">
-          <li><a href="${prefix}product-tour.html"${isActive("product-tour")}>Product</a></li>
-          <li><a href="${prefix}use-cases.html"${isActive("use-cases")}>Use Cases</a></li>
-          <li><a href="${prefix}login.html">Sign In</a></li>
-          <li><a href="${prefix}login.html" class="mobile-menu-cta">Start Free Trial</a></li>
+          <li><a href="${prefix}product-tour.html"${isActive("product-tour")}>Product tour</a></li>
+          <li><a href="${prefix}use-cases.html"${isActive("use-cases")}>Use cases</a></li>
+          <li><a href="${prefix}login.html">Sign in</a></li>
+          <li><a href="${prefix}signup.html" class="mobile-menu-cta">Create your account</a></li>
         </ul>
       </li>
     </ul>
@@ -70,34 +70,32 @@
             ${LOGO_SVG}
             RecruitOps
           </a>
-          <p>The customizable recruitment operating system. Build your own designations, pipelines, and approval workflows.</p>
-          <a class="btn-primary" href="${prefix}login.html" style="font-size:12px;padding:10px 20px">
-            Start Free Trial
+          <p>Recruitment operations for agencies and in-house teams. Your stages, your clients, your rules.</p>
+          <a class="btn-primary" href="${prefix}signup.html" style="font-size:12px;padding:10px 20px">
+            Create your account
             <span class="material-symbols-outlined" style="font-size:16px">arrow_forward</span>
           </a>
         </div>
         <div class="landing-footer-col">
           <h4>Product</h4>
-          <a href="${prefix}product-tour.html">Product Tour</a>
-          <a href="${prefix}use-cases.html">Use Cases</a>
-          <a href="${prefix}product-tour.html#features">Features</a>
+          <a href="${prefix}product-tour.html">Product tour</a>
+          <a href="${prefix}use-cases.html">Use cases</a>
         </div>
         <div class="landing-footer-col">
-          <h4>Company</h4>
-          <a href="${prefix}login.html">Sign In</a>
-          <a href="${prefix}login.html">Get Started</a>
-          <a href="${prefix}login.html">Support</a>
+          <h4>Account</h4>
+          <a href="${prefix}signup.html">Create your account</a>
+          <a href="${prefix}login.html">Sign in</a>
+          <a href="${prefix}forgot-password.html">Reset your password</a>
         </div>
         <div class="landing-footer-col">
           <h4>Legal</h4>
-          <span>Privacy Policy</span>
-          <span>Terms of Service</span>
-          <span>Cookie Policy</span>
+          <a href="${prefix}legal.html?doc=tos">Terms of Service</a>
+          <a href="${prefix}legal.html?doc=privacy">Privacy Policy</a>
+          <a href="${prefix}legal.html?doc=dpa">Data Processing Agreement</a>
         </div>
       </div>
       <div class="landing-footer-bottom">
-        <div class="copy">&copy; 2026 RecruitOps. All rights reserved.</div>
-        <div class="status"><span class="status-dot"></span> All systems operational</div>
+        <div class="copy">&copy; ${new Date().getFullYear()} RecruitOps. All rights reserved.</div>
       </div>
     </div>
   </footer>`;
