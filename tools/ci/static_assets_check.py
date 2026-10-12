@@ -11,6 +11,8 @@ FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 REF = re.compile(r'(?:src|href)="([^"#]+)"')
 missing = []
 for html in sorted(FRONTEND.rglob("*.html")):
+    if "node_modules" in html.parts:
+        continue  # build tooling, not served
     if "tests" in html.parts:
         continue
     for ref in REF.findall(html.read_text(encoding="utf-8")):

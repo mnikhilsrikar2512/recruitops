@@ -9,7 +9,7 @@ const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
   '.webp': 'image/webp', '.avif': 'image/avif',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
 };
 
 function proxyApi(req, res) {
@@ -58,7 +58,7 @@ http.createServer((req, res) => {
     'Referrer-Policy': 'same-origin',
     'X-Frame-Options': 'SAMEORIGIN',
   };
-  const isAsset = ext === '.css' || ext === '.js';
+  const isAsset = ext === '.css' || ext === '.js' || ext === '.woff2';
   const cacheAssets = process.env.NODE_ENV === 'production';
   if (ext === '.html' || (isAsset && !cacheAssets)) {
     headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';

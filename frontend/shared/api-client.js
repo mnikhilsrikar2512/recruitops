@@ -2085,6 +2085,7 @@ async function openLocationDialog(existing) {
 
 async function loadUsers() {
   const payload = await apiRequest("/users/?page_size=100");
+  setFirstText("[data-user-total]", `Users: ${payload.meta?.total ?? (payload.items || []).length}`);
   fillExistingTable(payload.items || [], (row, item) => {
     const cells = row.querySelectorAll("td");
     paintStackedUserCell(cells[1], item.full_name, item.employee_code);

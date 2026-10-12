@@ -55,12 +55,18 @@ finds no prototype text left.
   submit button stopped submitting. It no longer does that.
 - No inline `onclick`: a delegated `[data-history-back]` handler instead.
 
-## F.2 — next: production assets
-- Replace the Tailwind Play CDN (`cdn.tailwindcss.com`, a dev tool) with a
-  compiled stylesheet; self-host Inter/Manrope and Material Symbols (no Google
-  Fonts calls — privacy, and needed for a strict CSP in Phase 6).
-- One cache-busting version for all assets.
-- Needs `npm` on the Mac (the build is `npx tailwindcss@3 …`).
+## F.2 — done
+- The Tailwind Play CDN (a development tool that compiled CSS in every
+  visitor's browser) is replaced by a compiled `shared/tailwind.css`, built
+  from the same theme (`shared/tailwind.config.js`) by `npm run build`.
+- Inter, Manrope and Material Symbols are self-hosted in `shared/fonts/`;
+  pages no longer call Google Fonts (privacy, and a strict CSP in Phase 6).
+- One asset version for every page: a hash of `shared/`, written by
+  `scripts/stamp_assets.py` (part of `npm run build`).
+- CI rebuilds and fails if the committed CSS/fonts/versions are stale.
+- `server.js` serves `.woff2` (cached immutably in production).
+
+**After changing any page or shared file:** `cd frontend && npm run build`, then commit.
 
 ## Backlog found during F.1 (not done)
 - Money and dates are still formatted `en-US`/USD in a few renderers
@@ -69,5 +75,9 @@ finds no prototype text left.
 - `routing.js` still guesses routes from button labels (prototype heuristic);
   `tables.js` "polishes" filter bars by rewriting them. Both are fragile.
 - `api-client.js` is ~370 KB in one file; split by module.
+- `npm audit` reports 7 issues in build-time dev dependencies only (Tailwind 3's
+  toolchain); nothing ships to the browser. Review when moving to Tailwind 4.
+- "Total users" and similar header counts were fake; a sweep for hard-coded
+  counts is worth doing alongside the analytics pages.
 - Home tiles are built from the permissions stored at sign-in and are not
   rebuilt after the background permission refresh.
