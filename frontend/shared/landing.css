@@ -92,15 +92,15 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Footer ── */
 .landing-footer { background: #fff; border-top: 1px solid #E7E7E4; }
 .landing-footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.landing-footer-main { padding: 56px 0 48px; display: flex; gap: 48px; flex-wrap: wrap; }
-.landing-footer-brand { flex: 1; min-width: 240px; max-width: 320px; }
-.landing-footer-brand p { font-size: 13px; color: #6E7476; line-height: 1.6; margin: 16px 0 24px; }
+.landing-footer-main { padding: 64px 0 48px; display: grid; grid-template-columns: minmax(220px, 1.3fr) repeat(3, minmax(120px, 1fr)); column-gap: 40px; row-gap: 40px; align-items: start; }
+.landing-footer-brand { max-width: 320px; padding-right: 8px; }
+.landing-footer-brand p { font-size: 13px; color: #6E7476; line-height: 1.65; margin: 14px 0 24px; }
 .landing-footer-col { border: none !important; background: transparent !important; box-shadow: none !important; outline: none !important; border-radius: 0 !important; }
 .landing-footer-col * { border: none !important; background: transparent !important; box-shadow: none !important; outline: none !important; }
 .landing-footer-col h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6E7476; margin-bottom: 16px; }
-.landing-footer-col a, .landing-footer-col span { display: block; font-size: 13px; color: #4B5257; text-decoration: none !important; padding: 4px 0; transition: color 0.2s; border: none !important; background: transparent !important; }
+.landing-footer-col a, .landing-footer-col span { display: block; font-size: 13px; color: #4B5257; text-decoration: none !important; padding: 6px 0; line-height: 1.4; transition: color 0.2s; border: none !important; background: transparent !important; }
 .landing-footer-col a:hover { color: #1e293b; background: transparent !important; border: none !important; text-decoration: none !important; }
-.landing-footer-bottom { border-top: 1px solid #E7E7E4; padding: 20px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.landing-footer-bottom { border-top: 1px solid #E7E7E4; margin-top: 8px; padding: 24px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .landing-footer-bottom .copy { font-size: 12px; color: #6E7476; }
 .landing-footer-bottom .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6E7476; }
 .landing-footer-bottom .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #1e293b; }
@@ -110,8 +110,8 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 .landing-footer-brand a.landing-nav-brand:hover { background: transparent !important; box-shadow: none !important; }
 @media (max-width: 768px), (orientation: landscape) and (max-height: 540px) {
   .landing-nav-links { display: none; }
-  .landing-footer-main { flex-direction: column; gap: 32px; }
-  .landing-footer-brand { max-width: none; }
+  .landing-footer-main { grid-template-columns: 1fr; row-gap: 32px; padding: 48px 0 40px; }
+  .landing-footer-brand { max-width: none; padding-right: 0; }
   /* Keep the nav row to one line when the burger appears */
   .landing-nav-actions .btn-nav-ghost { display: none; }
 }
@@ -142,7 +142,7 @@ html, body {
 .btn-secondary:hover { background: #FAFBF8; transform: translateY(-1px); }
 
 /* ── Hero ── */
-.landing-hero { position: relative; overflow: hidden; min-height: min(70vh, 680px); min-height: min(70dvh, 680px); }
+.landing-hero { position: relative; overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); }
 .landing-hero-bg { position: absolute; inset: 0; }
 
 /* ── Hero layered background: dot grid + mesh glow + conic sweep ── */
