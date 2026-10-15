@@ -126,6 +126,7 @@ function sampleString(name, s, seed) {
   if (/file_?name/.test(name)) return `${FIRST_NAMES[seed % FIRST_NAMES.length].toLowerCase().replace(/\s+/g, "_")}_resume.pdf`;
   if (/^skills$|_skills$/.test(name)) return SKILLS[seed % SKILLS.length];
   if (/source_type/.test(name)) return SOURCE_TYPES[seed % SOURCE_TYPES.length];
+  if (/source_detail/.test(name)) return ["Referred by a current employee", "Inbound application", "Sourced from job board post", "Agency submission", "Event / career fair"][seed % 5];
   if (/work_mode/.test(name)) return WORK_MODES[seed % WORK_MODES.length];
   if (/employment_type/.test(name)) return EMPLOYMENT_TYPES[seed % EMPLOYMENT_TYPES.length];
   if (/industry/.test(name)) return INDUSTRIES[seed % INDUSTRIES.length];
@@ -166,6 +167,11 @@ function sample(schema, name = "", seed = 1, depth = 0) {
     if (name === "page_size") return 50;
     // field-name-aware range so e.g. notice_period_days stays in a plausible band
     if (/days$/.test(name)) return 1 + (seed % 30);
+    // match_score (integer, e.g. duplicate-candidate matching) used to return
+    // the raw seed (1, 2, 3…), so a match found on email+phone+employer showed
+    // as "1% confidence" instead of a high score — the opposite of what the
+    // match reasons next to it implied.
+    if (/score$/.test(name)) return 72 + ((seed * 7) % 27);
     return seed;
   }
   if (type === "number") {
