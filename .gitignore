@@ -39,3 +39,4 @@ docs/*.pdf
 frontend/node_modules/
 _claude_scratch.tar.gz
 fe_sync.tar.gz
+_claude_review_scratch.tgz
