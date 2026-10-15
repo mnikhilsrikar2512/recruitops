@@ -85,7 +85,6 @@
           <h4>Account</h4>
           <a href="${prefix}signup.html">Create your account</a>
           <a href="${prefix}login.html">Sign in</a>
-          <a href="${prefix}forgot-password.html">Reset your password</a>
         </div>
         <div class="landing-footer-col">
           <h4>Legal</h4>

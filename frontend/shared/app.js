@@ -286,7 +286,7 @@ function setupWorkspaceInsights() {
 
   const trigger = Array.from(document.querySelectorAll("button"))
     .find((button) => /\binsights\b/i.test(getActionLabel(button)));
-  const host = document.querySelector("[data-demo-validate]");
+  const host = document.querySelector(".shell-card, .auth-card");
   if (!trigger || !host || host.querySelector("[data-workspace-insight-panel]")) return;
 
   const panel = document.createElement("section");
@@ -1230,7 +1230,7 @@ function setupApprovalsWorkspace() {
 function setupDuplicateResolutionWorkspace() {
   if (document.body?.dataset.routeId !== "candidate-duplicate-review") return;
   if (document.querySelector("[data-duplicate-summary]")) return;
-  const host = document.querySelector("[data-demo-validate]");
+  const host = document.querySelector(".shell-card, .auth-card");
   const radios = Array.from(document.querySelectorAll('input[name="resolution"]'));
   const confirmButton = Array.from(document.querySelectorAll("button")).find((button) =>
     /confirm resolution/i.test(button.textContent || ""),
@@ -1508,7 +1508,12 @@ function markFilterToolbar(toolbar) {
 
 function setupDenseWorkspaceLayouts() {
   const routeId = document.body?.dataset.routeId || "";
-  const host = document.querySelector("[data-demo-validate]");
+  // `[data-demo-validate]` was the marker on the page's <section class="shell-card">
+  // in earlier page shells; it was dropped from the generated HTML at some
+  // point and this selector was never updated, so this whole function has
+  // been a silent no-op. `.shell-card`/`.auth-card` is what that attribute
+  // used to sit on, so this restores the original targeting.
+  const host = document.querySelector(".shell-card, .auth-card");
   const surface = resolveWorkspaceSurface(host);
   if (!surface) return;
 
@@ -1565,7 +1570,9 @@ function setupDenseWorkspaceLayouts() {
 
 function setupWorkspaceVisualPolish() {
   const routeId = document.body?.dataset.routeId || "";
-  const host = document.querySelector("[data-demo-validate]");
+  // Same dead-marker fix as setupDenseWorkspaceLayouts() above: this used
+  // to find the page's <section class="shell-card">/<div class="auth-card">.
+  const host = document.querySelector(".shell-card, .auth-card");
   if (!host) return;
 
   if (HEADINGLESS_WORKSPACE_ROUTES.has(routeId)) {

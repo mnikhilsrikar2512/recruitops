@@ -77,7 +77,12 @@ function branchTone(code) {
 function branchCodeLabel(code) {
   const raw = String(code || "").trim();
   if (!raw) return "";
-  return raw.replace(/[0-9]+$/, "").toUpperCase() || raw.toUpperCase();
+  // Strip a trailing numeric suffix ("BLR01" -> "BLR"); also strip any
+  // separator that suffix leaves dangling ("CODE-101" -> "CODE-" -> "CODE")
+  // so a branch code that happens to look like a display id never renders
+  // as a bare hyphen with nothing after it.
+  const stripped = raw.replace(/[0-9]+$/, "").replace(/[-_\s]+$/, "");
+  return (stripped || raw).toUpperCase();
 }
 
 function entityBadgeHtml(displayId, branchCode) {
@@ -193,7 +198,7 @@ function tableHeaders() {
     critical: "bg-danger-bg text-danger-text",
     high: "bg-warning-bg text-warning-text",
     medium: "bg-info-bg text-info-text",
-    low: "bg-surface-dim text-text-muted",
+    low: "bg-surface-dim text-on-surface-variant",  // text-muted on surface-dim was 3.87:1, under WCAG AA (4.5:1) for this 12px badge text
   };
   const badge = td.querySelector("span") || td;
   badge.className = `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[p] || tones.low}`;

@@ -254,7 +254,7 @@ function openPipelineFlowManager() {
 
 function resolvePipelineColumnFromHeading(heading) {
   let node = heading?.parentElement;
-  while (node && !node.classList?.contains("workspace-surface") && !node.classList?.contains("overlay-underlay") && !node.matches?.("[data-demo-validate]")) {
+  while (node && !node.classList?.contains("workspace-surface") && !node.classList?.contains("overlay-underlay") && !node.matches?.(".shell-card, .auth-card")) {
     const className = String(node.className || "");
     const looksLikeStageColumn = className.includes("w-[300px]") && /flex-col/.test(className) && /border/.test(className);
     if (looksLikeStageColumn || (node.dataset?.pipelineStage && !node.dataset.pipelineBoardTrack)) {
@@ -270,7 +270,7 @@ function resolvePipelineColumnFromHeading(heading) {
 
 
 function getPipelineColumns(root = document) {
-  return Array.from(root.querySelectorAll(".workspace-surface h3, .overlay-underlay h3, [data-demo-validate] h3"))
+  return Array.from(root.querySelectorAll(".workspace-surface h3, .overlay-underlay h3, .shell-card h3, .auth-card h3"))
     .map((heading) => {
       const name = normalizePipelineStage(heading.textContent);
       const column = resolvePipelineColumnFromHeading(heading);

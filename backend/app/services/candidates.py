@@ -55,6 +55,7 @@ from app.services.uploads import ingest, read_capped
 from app.services import scope
 from app.services.auth import AuthContext
 from app.services.notifications import create_notification_service
+from app.services.cross_tenant_signals import check_and_record_cross_tenant_signal
 
 
 def _assert_user_exists(engine: Engine, user_id: int | None, label: str) -> None:
@@ -553,6 +554,23 @@ def finalize_candidate_service(
     _assert_user_exists(engine, payload.submitted_by_user_id, "Submitted by user")
     _assert_user_exists(engine, payload.finalized_by_user_id, "Finalized by user")
     finalized = finalize_candidate_into_requisition(engine, candidate_id, payload)
+    response = CandidateFinalizeResponse.model_validate(finalized)
+    # 030: lightweight cross-company duplicate-submission flag. Never
+    # blocks or fails the finalize — a problem here is a missed flag,
+    # not a broken finalize.
+    try:
+        response.cross_tenant_flag = check_and_record_cross_tenant_signal(
+            engine,
+            tenant_id=scope.tenant_id_of(auth_context) if auth_context else None,
+            candidate_id=candidate_id,
+            requisition_id=payload.requisition_id,
+            application_id=finalized.application_id,
+            email=getattr(candidate, "email", None),
+            phone=getattr(candidate, "phone", None),
+            client_name=getattr(requisition, "client_name", None),
+        )
+    except Exception:
+        pass
     if getattr(requisition, "primary_owner_user_id", None):
         try:
             create_notification_service(
@@ -574,7 +592,7 @@ def finalize_candidate_service(
             )
         except Exception:
             pass
-    return CandidateFinalizeResponse.model_validate(finalized)
+    return response
 
 
 def reassign_candidate_owner_service(

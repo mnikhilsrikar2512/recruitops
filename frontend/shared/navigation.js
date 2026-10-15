@@ -263,15 +263,23 @@ function navCanSeeMetric(metric, codes) {
   return !required.length || required.some((code) => codes.has(code));
 }
 
+/* Only these have a real loader below. The other entries in
+   NAV_HOME_METRICS (overdue-updates, sla-at-risk) stay in the config as
+   documentation of a metric nothing computes yet — a tile that always
+   shows "—" reads as broken, not as "no data", so it's left off Home
+   rather than shown unfilled (same call the empty-metric fallback below
+   already makes: a false number is worse than no number). */
+const LOADED_METRIC_IDS = new Set(["open-requisitions", "unread-notifications", "pending-approvals"]);
+
 function buildHomeMetrics() {
   const host = document.querySelector("[data-home-metrics]");
   if (!host) return;
   const codes = navPermissionSet();
   const config = window.NAV_CONFIG;
-  const visible = config.metrics.filter((metric) => navCanSeeMetric(metric, codes));
+  const visible = config.metrics.filter((metric) => navCanSeeMetric(metric, codes) && LOADED_METRIC_IDS.has(metric.id));
   host.innerHTML = visible
     .map(
-      (metric) => `<div class="rounded-xl border border-border bg-surface p-3" data-metric-id="${metric.id}">
+      (metric) => `<div class="rounded-2xl border border-border bg-surface p-3 shadow-sm" data-metric-id="${metric.id}">
         <p class="font-label-caps text-label-caps text-text-muted uppercase">${metric.label}</p>
         <p class="mt-1 font-headline-md text-headline-md text-primary" data-metric-value>—</p>
       </div>`,

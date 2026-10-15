@@ -56,7 +56,7 @@ function rowMatchesLens(rowText, lens) {
 
 function applyTableLens(group, button) {
   const lens = normalizeLensLabel(button.textContent);
-  const host = group.closest(".bg-surface, .shell-card, [data-demo-validate]") || document;
+  const host = group.closest(".bg-surface, .shell-card, .auth-card") || document;
   const table = host.querySelector("table") || document.querySelector("table");
   const tbody = table?.querySelector("tbody");
   const rows = Array.from(tbody?.querySelectorAll("tr:not(.demo-empty-row)") || []);
@@ -370,7 +370,7 @@ function getTableForFilterToolbar(toolbar) {
   if (tableSurface?.querySelector("table")) return tableSurface.querySelector("table");
   /* Filter bars are usually a sibling card of the table card inside a
      workspace section — fall back to the enclosing section. */
-  const scope = toolbar?.closest(".workspace-surface, section, [data-demo-validate]");
+  const scope = toolbar?.closest(".workspace-surface, section, .shell-card, .auth-card");
   return scope?.querySelector("table") || document.querySelector("table");
 }
 
@@ -1917,7 +1917,17 @@ function arrangeFilterToolbar(toolbar) {
     });
   }
   const ordered = [tabGroup, searchWrap, selectCluster].filter(Boolean);
-  ordered.forEach((node) => toolbar.appendChild(node));
+  // When a table card has exactly one filter control (e.g. a single "Filter
+  // clients..." search box) with no sibling controls, findFilterToolbar()'s
+  // scope-narrowing walk can resolve "toolbar" to be that control's own
+  // immediate wrapper — so searchWrap and toolbar end up the same element.
+  // appendChild(self) throws HierarchyRequestError ("contains the parent"),
+  // which took down the whole page. Skip a no-op/self-referential move
+  // instead of attempting it.
+  ordered.forEach((node) => {
+    if (node === toolbar || node.contains(toolbar)) return;
+    toolbar.appendChild(node);
+  });
   Array.from(toolbar.children).forEach((child) => {
     if (ordered.includes(child)) return;
     if (child.matches(".w-px, .h-6.w-px")) child.remove();

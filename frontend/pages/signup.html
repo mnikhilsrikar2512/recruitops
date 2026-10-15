@@ -5,39 +5,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Sign up — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=82049302da" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=82049302da" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=82049302da" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=82049302da" />
+  <link rel="stylesheet" href="../shared/global.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/landing.css?v=92644c4e43" />
+  <style>
+    .login-split { display:flex; min-height:100vh; }
+    .login-left { flex:1; background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
+    .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .login-back-home:hover { color:#1e293b; }
+    @media(max-width:1024px){ .login-left{display:none;} }
+  </style>
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=92644c4e43" />
 </head>
-<body class="bg-background text-on-background antialiased" data-route-id="signup" data-route-kind="auth" data-route-title="Sign up" data-route-section="Authentication">
-  <main id="main-content" class="mx-auto max-w-3xl px-4 py-10">
-    <a href="../index.html" class="inline-flex items-center gap-2 font-bold text-on-surface no-underline mb-6"><span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-on-primary">R</span> RecruitOps</a>
-    <h1 class="text-2xl font-bold text-on-surface">Create your company's RecruitOps account</h1>
-    <p class="mt-2 text-[14px] text-text-muted">You'll be the first admin. You can add offices, clients and your team afterwards.</p>
-    <form id="signup-form" class="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-surface p-5" novalidate>
-      <label class="text-[13px] font-semibold">Company name<input id="company_name" required minlength="2" maxlength="150" autocomplete="organization" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
-      <label class="text-[13px] font-semibold">Your name<input id="admin_name" required minlength="2" maxlength="150" autocomplete="name" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
-      <label class="text-[13px] font-semibold">Work email<input id="email" type="email" required autocomplete="email" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
-      <label class="text-[13px] font-semibold">Password<input id="password" type="password" required minlength="12" autocomplete="new-password" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/><span class="block text-[12px] font-normal text-text-muted">At least 12 characters; common or leaked passwords are refused.</span></label>
-      <label class="text-[13px] font-semibold">City of your head office <span class="font-normal text-text-muted">(optional)</span><input id="city" maxlength="100" class="mt-1 w-full rounded-lg border border-border px-3 py-2 font-normal"/></label>
-      <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden"><label>Website<input id="website" tabindex="-1" autocomplete="off"/></label></div>
-      <fieldset class="mt-2 flex flex-col gap-2 text-[13px]" id="legal-boxes"><legend class="font-semibold">Agreements</legend><p class="text-text-muted">Loading the current documents…</p></fieldset>
-      <button type="submit" class="mt-2 rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Create account</button>
-      <p class="text-[13px] text-text-muted">Already have an account? <a href="login.html" class="font-semibold text-primary">Sign in</a></p>
-    </form>
-    <p id="msg" role="alert" class="hidden mt-4 rounded-lg px-3 py-2 text-[14px]"></p>
+<body data-route-id="signup" data-route-kind="auth" data-route-title="Sign up" data-route-section="Authentication">
+  <main>
+    <div class="login-split">
+      <!-- Left: Context -->
+      <div class="login-left text-white">
+        <div class="absolute top-0 right-0 w-64 h-64 rounded-full" style="background:rgba(255,255,255,0.05);transform:translate(30%,-30%)"></div>
+        <div style="position:relative;z-index:10;max-width:400px">
+          <a href="../index.html" class="landing-nav-brand" style="color:#fff;margin-bottom:48px;display:flex">
+            <svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg> RecruitOps
+          </a>
+          <h1 style="font-size:36px;font-weight:800;line-height:1.15;margin-bottom:16px">Set up your company's workspace.</h1>
+          <p style="font-size:16px;color:rgba(255,255,255,0.7);line-height:1.6;margin-bottom:40px">You'll be the first admin. Add offices, clients and your team once you're in.</p>
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,0.1)"><span class="material-symbols-outlined" style="font-size:18px">apartment</span></div><span style="font-size:14px;color:rgba(255,255,255,0.8)">Add your offices and branches</span></div>
+            <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,0.1)"><span class="material-symbols-outlined" style="font-size:18px">account_tree</span></div><span style="font-size:14px;color:rgba(255,255,255,0.8)">Build hiring pipelines that match your process</span></div>
+            <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,0.1)"><span class="material-symbols-outlined" style="font-size:18px">group_add</span></div><span style="font-size:14px;color:rgba(255,255,255,0.8)">Invite your team whenever you're ready</span></div>
+            <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,0.1)"><span class="material-symbols-outlined" style="font-size:18px">shield_person</span></div><span style="font-size:14px;color:rgba(255,255,255,0.8)">Role-based access with permissions</span></div>
+          </div>
+          <div style="margin-top:48px;padding-top:32px;border-top:1px solid rgba(255,255,255,0.1)">
+            <a href="../index.html" style="font-size:13px;color:rgba(255,255,255,0.5);text-decoration:none;display:flex;align-items:center;gap:6px"><span class="material-symbols-outlined" style="font-size:16px">arrow_back</span> Back to homepage</a>
+          </div>
+        </div>
+      </div>
+      <!-- Right: Form -->
+      <div class="login-right">
+        <div style="width:100%;max-width:440px">
+          <a href="../index.html" class="login-back-home" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6E7476;text-decoration:none;margin-bottom:20px">
+            <span class="material-symbols-outlined" style="font-size:16px">arrow_back</span>
+            Back to homepage
+          </a>
+          <a href="../index.html" class="lg:hidden flex items-center gap-2 mb-8 justify-center" style="text-decoration:none" aria-label="RecruitOps home">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#1e293b;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
+            <span style="font-size:18px;font-weight:700;color:#1e293b">RecruitOps</span>
+          </a>
+          <div class="bg-surface border border-border rounded-lg" style="box-shadow:0 4px 24px rgba(39,48,56,0.06)">
+            <div style="padding:20px 24px;border-bottom:1px solid #E7E7E4">
+              <h2 style="font-size:20px;font-weight:700;color:#17201C">Create your company's RecruitOps account</h2>
+              <p style="font-size:13px;color:#6E7476;margin-top:4px">You'll be the first admin. Add offices, clients and your team afterwards.</p>
+            </div>
+            <div style="padding:24px;position:relative">
+              <form class="flex flex-col gap-4" id="signup-form" novalidate>
+                <div class="flex flex-col gap-1.5">
+                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="company_name">Company name</label>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">domain</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="company_name" required minlength="2" maxlength="150" autocomplete="organization" placeholder="Acme Staffing"/></div>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="admin_name">Your name</label>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">person</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="admin_name" required minlength="2" maxlength="150" autocomplete="name" placeholder="Jane Doe"/></div>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="email">Work email</label>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">mail</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="email" type="email" required autocomplete="email" placeholder="name@company.com"/></div>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="password">Password</label>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">lock</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 44px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="password" type="password" required minlength="12" autocomplete="new-password" placeholder="At least 12 characters"/><button type="button" class="ro-password-toggle" data-password-toggle aria-label="Show password"><span class="material-symbols-outlined" style="font-size:18px">visibility</span></button></div>
+                  <span style="font-size:12px;color:#6E7476">At least 12 characters; common or leaked passwords are refused.</span>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="city">City of your head office <span style="font-weight:400;color:#6E7476">(optional)</span></label>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">location_on</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="city" maxlength="100" placeholder="Bengaluru"/></div>
+                </div>
+                <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden"><label>Website<input id="website" tabindex="-1" autocomplete="off"/></label></div>
+                <fieldset class="flex flex-col gap-2" id="legal-boxes" style="font-size:13px;color:#4B5257"><legend style="font-size:12px;font-weight:600;color:#4B5257">Agreements</legend><p style="color:#6E7476">Loading the current documents…</p></fieldset>
+                <button style="width:100%;background:#1e293b;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;min-height:44px" type="submit"><span>Create account</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span></button>
+              </form>
+              <p id="msg" role="alert" class="hidden" style="margin-top:16px;border-radius:8px;padding:10px 12px;font-size:13px"></p>
+            </div>
+            <div style="background:#fafaf9;padding:12px 24px;border-top:1px solid #E7E7E4;display:flex;justify-content:flex-end;align-items:center">
+              <a href="legal.html?doc=tos" style="font-size:13px;color:#6E7476;text-decoration:none;margin-right:auto">Terms</a><a href="legal.html?doc=privacy" style="font-size:13px;color:#6E7476;text-decoration:none;margin-right:16px">Privacy</a><a href="support-workspace.html" style="font-size:13px;color:#6E7476;text-decoration:none">Need help?</a>
+            </div>
+          </div>
+          <p class="text-center mt-6" style="font-size:13px;color:#6E7476">Already have an account? <a href="login.html" style="color:#1e293b;font-weight:600;text-decoration:none">Sign in</a></p>
+        </div>
+      </div>
+    </div>
   </main>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
-  <script src="../shared/renderers.js?v=82049302da"></script>
-  <script src="../shared/api-client.js?v=82049302da"></script>
-  <script src="../shared/ui-utils.js?v=82049302da"></script>
-  <script src="../shared/tables.js?v=82049302da"></script>
-  <script src="../shared/forms.js?v=82049302da"></script>
-  <script src="../shared/sidebar.js?v=82049302da"></script>
-  <script src="../shared/pipeline.js?v=82049302da"></script>
-  <script src="../shared/routing.js?v=82049302da"></script>
-  <script src="../shared/app.js?v=82049302da"></script>
+  <script src="../shared/renderers.js?v=92644c4e43"></script>
+  <script src="../shared/api-client.js?v=92644c4e43"></script>
+  <script src="../shared/ui-utils.js?v=92644c4e43"></script>
+  <script src="../shared/tables.js?v=92644c4e43"></script>
+  <script src="../shared/forms.js?v=92644c4e43"></script>
+  <script src="../shared/sidebar.js?v=92644c4e43"></script>
+  <script src="../shared/pipeline.js?v=92644c4e43"></script>
+  <script src="../shared/routing.js?v=92644c4e43"></script>
+  <script src="../shared/app.js?v=92644c4e43"></script>
   <script>
   (function () {
     function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -48,11 +115,11 @@
     var NAMES = { tos: "Terms of Service", privacy: "Privacy Policy", dpa: "Data Processing Addendum (on behalf of my company)" };
     var versions = {};
     apiRequest("/legal/documents").then(function (data) {
-      boxes.innerHTML = '<legend class="font-semibold">Agreements</legend>' + (data.items || []).map(function (d) {
+      boxes.innerHTML = '<legend style="font-size:12px;font-weight:600;color:#4B5257">Agreements</legend>' + (data.items || []).map(function (d) {
         versions[d.doc_type] = d.version;
-        return '<label class="flex items-start gap-2"><input type="checkbox" required data-doc="' + esc(d.doc_type) + '" class="mt-1 h-4 w-4"/><span>I accept the <a href="legal.html?doc=' + esc(d.doc_type) + '" target="_blank" rel="noopener" class="text-primary underline">' + esc(NAMES[d.doc_type] || d.title) + "</a> (version " + esc(d.version) + ")" + (d.is_placeholder ? ' <em class="text-text-muted">— draft text</em>' : "") + "</span></label>";
+        return '<label class="flex items-start gap-2"><input type="checkbox" required data-doc="' + esc(d.doc_type) + '" class="mt-1 h-4 w-4"/><span>I accept the <a href="legal.html?doc=' + esc(d.doc_type) + '" target="_blank" rel="noopener" style="color:#1e293b;text-decoration:underline">' + esc(NAMES[d.doc_type] || d.title) + "</a> (version " + esc(d.version) + ")" + (d.is_placeholder ? ' <em style="color:#6E7476">— draft text</em>' : "") + "</span></label>";
       }).join("");
-    }).catch(function () { boxes.innerHTML = '<p class="text-error">Couldn\'t load the agreements. Reload the page.</p>'; });
+    }).catch(function () { boxes.innerHTML = '<p style="color:#A63D33">Couldn\'t load the agreements. Reload the page.</p>'; });
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       var unchecked = Array.prototype.some.call(boxes.querySelectorAll("[data-doc]"), function (b) { return !b.checked; });
@@ -66,7 +133,7 @@
         var r = await apiRequest("/signup/", { method: "POST", body: body });
         form.hidden = true;
         say(r.message, true);
-        if (r.dev_verify_token) message.insertAdjacentHTML("beforeend", ' <br/><a class="font-semibold underline" href="signup-verify.html?token=' + encodeURIComponent(r.dev_verify_token) + '">Development: open the verification link</a>');
+        if (r.dev_verify_token) message.insertAdjacentHTML("beforeend", ' <br/><a style="font-weight:600;text-decoration:underline" href="signup-verify.html?token=' + encodeURIComponent(r.dev_verify_token) + '">Development: open the verification link</a>');
       } catch (error) { say(errText(error, "Couldn't create the account. Try again."), false); }
     });
 

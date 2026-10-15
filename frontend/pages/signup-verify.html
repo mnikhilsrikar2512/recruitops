@@ -5,28 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Finish setting up — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=82049302da" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=82049302da" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=82049302da" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=82049302da" />
+  <link rel="stylesheet" href="../shared/global.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/landing.css?v=92644c4e43" />
+  <style>
+    .login-split { display:flex; min-height:100vh; }
+    .login-left { flex:1; background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
+    .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .login-back-home:hover { color:#1e293b; }
+    @media(max-width:1024px){ .login-left{display:none;} }
+  </style>
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=92644c4e43" />
 </head>
-<body class="bg-background text-on-background antialiased" data-route-id="signup-verify" data-route-kind="auth" data-route-title="Finish setting up" data-route-section="Authentication">
-  <main id="main-content" class="mx-auto max-w-3xl px-4 py-10">
-    <a href="../index.html" class="inline-flex items-center gap-2 font-bold text-on-surface no-underline mb-6"><span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-on-primary">R</span> RecruitOps</a>
-    <h1 class="text-2xl font-bold text-on-surface">Finish setting up</h1>
-    <div id="step" class="mt-6 rounded-xl border border-border bg-surface p-5 text-[14px]"><p>Checking your link…</p></div>
-    <p id="msg" role="alert" class="hidden mt-4 rounded-lg px-3 py-2 text-[14px]"></p>
+<body data-route-id="signup-verify" data-route-kind="auth" data-route-title="Finish setting up" data-route-section="Authentication">
+  <main>
+    <div class="login-split">
+      <!-- Left: Context -->
+      <div class="login-left text-white">
+        <div class="absolute top-0 right-0 w-64 h-64 rounded-full" style="background:rgba(255,255,255,0.05);transform:translate(30%,-30%)"></div>
+        <div style="position:relative;z-index:10;max-width:400px">
+          <a href="../index.html" class="landing-nav-brand" style="color:#fff;margin-bottom:48px;display:flex">
+            <svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg> RecruitOps
+          </a>
+          <h1 style="font-size:36px;font-weight:800;line-height:1.15;margin-bottom:16px">Almost there.</h1>
+          <p style="font-size:16px;color:rgba(255,255,255,0.7);line-height:1.6">Confirm your email and add two-step verification to finish setting up your company's workspace.</p>
+          <div style="margin-top:48px;padding-top:32px;border-top:1px solid rgba(255,255,255,0.1)">
+            <a href="../index.html" style="font-size:13px;color:rgba(255,255,255,0.5);text-decoration:none;display:flex;align-items:center;gap:6px"><span class="material-symbols-outlined" style="font-size:16px">arrow_back</span> Back to homepage</a>
+          </div>
+        </div>
+      </div>
+      <!-- Right: Form -->
+      <div class="login-right">
+        <div style="width:100%;max-width:440px">
+          <a href="../index.html" class="login-back-home" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6E7476;text-decoration:none;margin-bottom:20px">
+            <span class="material-symbols-outlined" style="font-size:16px">arrow_back</span>
+            Back to homepage
+          </a>
+          <a href="../index.html" class="lg:hidden flex items-center gap-2 mb-8 justify-center" style="text-decoration:none" aria-label="RecruitOps home">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#1e293b;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
+            <span style="font-size:18px;font-weight:700;color:#1e293b">RecruitOps</span>
+          </a>
+          <div class="bg-surface border border-border rounded-lg" style="box-shadow:0 4px 24px rgba(39,48,56,0.06)">
+            <div style="padding:20px 24px;border-bottom:1px solid #E7E7E4">
+              <h2 style="font-size:20px;font-weight:700;color:#17201C">Finish setting up</h2>
+              <p style="font-size:13px;color:#6E7476;margin-top:4px">A couple of quick steps and your workspace is ready.</p>
+            </div>
+            <div style="padding:24px;position:relative" id="step" class="text-[14px]"><p style="color:#4B5257">Checking your link…</p></div>
+          </div>
+          <p id="msg" role="alert" class="hidden" style="margin-top:16px;border-radius:8px;padding:10px 12px;font-size:13px"></p>
+        </div>
+      </div>
+    </div>
   </main>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
-  <script src="../shared/renderers.js?v=82049302da"></script>
-  <script src="../shared/api-client.js?v=82049302da"></script>
-  <script src="../shared/ui-utils.js?v=82049302da"></script>
-  <script src="../shared/tables.js?v=82049302da"></script>
-  <script src="../shared/forms.js?v=82049302da"></script>
-  <script src="../shared/sidebar.js?v=82049302da"></script>
-  <script src="../shared/pipeline.js?v=82049302da"></script>
-  <script src="../shared/routing.js?v=82049302da"></script>
-  <script src="../shared/app.js?v=82049302da"></script>
+  <script src="../shared/renderers.js?v=92644c4e43"></script>
+  <script src="../shared/api-client.js?v=92644c4e43"></script>
+  <script src="../shared/ui-utils.js?v=92644c4e43"></script>
+  <script src="../shared/tables.js?v=92644c4e43"></script>
+  <script src="../shared/forms.js?v=92644c4e43"></script>
+  <script src="../shared/sidebar.js?v=92644c4e43"></script>
+  <script src="../shared/pipeline.js?v=92644c4e43"></script>
+  <script src="../shared/routing.js?v=92644c4e43"></script>
+  <script src="../shared/app.js?v=92644c4e43"></script>
   <script>
   (function () {
     function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -36,20 +77,20 @@
     var step = document.getElementById("step");
     var token = new URLSearchParams(location.search).get("token");
     var setupToken = null;
-    function done(text) { step.innerHTML = "<p>" + esc(text) + '</p><a href="login.html" class="mt-4 inline-block rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Sign in</a>'; }
+    function done(text) { step.innerHTML = "<p>" + esc(text) + '</p><a href="login.html" style="margin-top:16px;display:inline-block;background:#1e293b;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">Sign in</a>'; }
     async function startMfa() {
       var s = await apiRequest("/signup/mfa/start", { method: "POST", body: JSON.stringify({ setup_token: setupToken }) });
-      step.innerHTML = '<h2 class="text-lg font-bold">Set up two-step verification</h2><p class="mt-1 text-text-muted">Admins sign in with a password and a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…).</p>' +
-        '<ol class="mt-3 list-decimal pl-5 flex flex-col gap-2"><li>In the app, add an account with this key: <code class="rounded bg-surface-alt px-2 py-1 font-mono">' + esc(s.secret) + '</code> (or <a class="text-primary underline" data-otpauth-link>open it in your authenticator</a>).</li>' +
-        '<li><label>Enter the 6-digit code it shows: <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" class="ml-2 w-32 rounded-lg border border-border px-2 py-1"/></label></li></ol>' +
-        '<button type="button" id="mfa-confirm" class="mt-4 rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Confirm and activate</button>';
+      step.innerHTML = '<h2 style="font-size:16px;font-weight:700;color:#17201C">Set up two-step verification</h2><p style="margin-top:6px;color:#6E7476">Admins sign in with a password and a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…).</p>' +
+        '<ol style="margin-top:14px;padding-left:20px;display:flex;flex-direction:column;gap:10px;list-style:decimal"><li>In the app, add an account with this key: <code style="background:#fafaf9;border-radius:4px;padding:4px 8px;font-family:monospace">' + esc(s.secret) + '</code> (or <a style="color:#1e293b;text-decoration:underline" data-otpauth-link>open it in your authenticator</a>).</li>' +
+        '<li><label>Enter the 6-digit code it shows: <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" style="margin-left:8px;width:120px;border:1px solid #E7E7E4;border-radius:8px;padding:8px 10px;font-size:14px"/></label></li></ol>' +
+        '<button type="button" id="mfa-confirm" style="margin-top:16px;background:#1e293b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Confirm and activate</button>';
       var otpLink = step.querySelector("[data-otpauth-link]");
       if (otpLink) otpLink.setAttribute("href", s.otpauth_uri || "#");
       document.getElementById("mfa-confirm").addEventListener("click", async function () {
         try {
           var code = document.getElementById("mfa-code").value.trim();
           var r = await apiRequest("/signup/mfa/confirm", { method: "POST", body: JSON.stringify({ setup_token: setupToken, code: code }) });
-          step.innerHTML = '<h2 class="text-lg font-bold">Your company is ' + (r.company_status === "active" ? "ready" : "almost ready") + '</h2><p class="mt-1">Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone.</p><pre class="mt-2 rounded bg-surface-alt p-3 font-mono">' + esc((r.recovery_codes || []).join("\n")) + '</pre><a href="login.html" class="mt-4 inline-block rounded-lg bg-primary px-5 py-2 font-semibold text-on-primary">Sign in</a>';
+          step.innerHTML = '<h2 style="font-size:16px;font-weight:700;color:#17201C">Your company is ' + (r.company_status === "active" ? "ready" : "almost ready") + '</h2><p style="margin-top:6px;color:#4B5257">Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone.</p><pre style="margin-top:10px;background:#fafaf9;border-radius:8px;padding:12px;font-family:monospace;font-size:13px">' + esc((r.recovery_codes || []).join("\n")) + '</pre><a href="login.html" style="margin-top:16px;display:inline-block;background:#1e293b;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">Sign in</a>';
         } catch (error) { say(errText(error, "That didn't work. Check the code and try again."), false); }
       });
     }
@@ -58,13 +99,13 @@
       setupToken = decodeURIComponent(fromSetup);
       history.replaceState(null, "", "signup-verify.html");
       startMfa().catch(function (error) { say(errText(error, "This step has timed out. Use the link from your email again."), false); });
-    } else if (!token) { step.innerHTML = "<p>This page needs the link from your email.</p>"; }
+    } else if (!token) { step.innerHTML = "<p style=\"color:#4B5257\">This page needs the link from your email.</p>"; }
     else {
       apiRequest("/signup/verify", { method: "POST", body: JSON.stringify({ token: token }) }).then(function (r) {
         history.replaceState(null, "", "signup-verify.html");
         if (r.next === "mfa" && r.setup_token) { setupToken = r.setup_token; return startMfa(); }
         done("Your email is confirmed and your company is active.");
-      }).catch(function (error) { step.innerHTML = "<p>" + esc(errText(error, "This link didn't work.")) + '</p><p class="mt-2"><a class="text-primary underline" href="signup.html">Back to sign-up</a></p>'; });
+      }).catch(function (error) { step.innerHTML = "<p style=\"color:#4B5257\">" + esc(errText(error, "This link didn't work.")) + '</p><p style="margin-top:8px"><a style="color:#1e293b;text-decoration:underline" href="signup.html">Back to sign-up</a></p>'; });
     }
 
   })();
