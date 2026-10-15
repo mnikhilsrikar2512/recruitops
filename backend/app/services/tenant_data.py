@@ -16,6 +16,7 @@ from app.services.scope import CANDIDATE_IN_TENANT_SQL
 EXPORT_SKIP = {
     "user_sessions", "user_refresh_tokens", "user_mfa", "user_mfa_recovery_codes",
     "password_reset_tokens", "user_invitations", "upload_idempotency", "privacy_audit_hold",
+    "cross_tenant_submission_signals",  # internal anti-duplicate hashes, not user-facing data (030)
 }
 # … and columns that look like secrets are dropped from what is exported.
 SECRET_COLUMN_HINTS = ("password", "secret", "token", "_hash", "otp")

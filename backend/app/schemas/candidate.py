@@ -325,6 +325,17 @@ class CandidateDuplicateCheckResponse(BaseModel):
     matches: list[CandidateDuplicateMatchResponse]
 
 
+class CrossTenantFlagResponse(BaseModel):
+    """030: another company may have already submitted a matching
+    candidate to a client with this name recently. Never names the
+    other company or exposes any of its data — see
+    services/cross_tenant_signals.py."""
+
+    flagged: bool
+    other_vendor_submissions: int = 0
+    most_recent_days_ago: int | None = None
+
+
 class CandidateFinalizeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -334,6 +345,7 @@ class CandidateFinalizeResponse(BaseModel):
     current_stage: str
     application_status: str
     finalized_at: datetime
+    cross_tenant_flag: CrossTenantFlagResponse | None = None
 
 
 class CandidateOwnerReassignment(BaseModel):

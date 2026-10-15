@@ -6422,7 +6422,7 @@ async function submitLinkToRequisition() {
   if (!candidateId || !requisitionId) { showLiveError(new Error("Please select a candidate and a requisition.")); return; }
   const session = RecruitOpsLive.session || readSession();
   try {
-    await apiRequest(`/candidates/${candidateId}/applications`, {
+    const result = await apiRequest(`/candidates/${candidateId}/applications`, {
       method: "POST",
       body: JSON.stringify({
         requisition_id: requisitionId,
@@ -6431,6 +6431,17 @@ async function submitLinkToRequisition() {
       }),
     });
     showLiveSuccess("Candidate linked to requisition");
+    const flag = result?.cross_tenant_flag;
+    if (flag?.flagged) {
+      /* 030: another company may have already submitted a matching
+         candidate to this client recently. We never see who or any of
+         their data — just that it happened. */
+      const when = flag.most_recent_days_ago === 0 ? "today" : `${flag.most_recent_days_ago} day${flag.most_recent_days_ago === 1 ? "" : "s"} ago`;
+      showToast(
+        "Possible duplicate submission",
+        `Another agency may have already submitted a candidate matching this profile to this client, as recently as ${when}. You may want to confirm with the client before proceeding.`,
+      );
+    }
     afterOverlaySave("candidate-profiles.html");
   } catch (error) {
     const msg = error?.message || String(error);
