@@ -648,6 +648,32 @@
     body[data-route-id="pipeline-board"] .page-stack {
       width: min(100%, 1680px);
     }
+    /* The board used to sit in a short card above a tall stretch of empty
+       canvas (the "two section" feel the rest of the app already moved
+       away from). Stretch the whole chain down to the canvas edge so the
+       columns fill the window, Trello-style, instead of floating above
+       dead space. */
+    body[data-route-id="pipeline-board"] .app-canvas {
+      display: flex;
+      flex-direction: column;
+    }
+    body[data-route-id="pipeline-board"] .page-stack,
+    body[data-route-id="pipeline-board"] .shell-card,
+    body[data-route-id="pipeline-board"] .workspace-surface {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    body[data-route-id="pipeline-board"] .workspace-surface > .flex-1 {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    body[data-route-id="pipeline-board"] .workspace-surface > .flex-1 > .flex.gap-4 {
+      flex: 1 1 auto;
+      min-height: 420px;
+    }
     .auth-main,
     .landing-main {
       width: min(100%, 1180px);
@@ -4861,6 +4887,15 @@ body[data-route-id="pipeline-board"] [data-layout="pipeline-filter-bar"] input {
   width: 200px !important;
   max-width: 52vw !important;
   height: 40px !important;
+}
+@media (max-width: 480px) {
+  /* On a phone the 4 filter selects stack into their own tall column
+     next to search (ro-filter-selects, injected by hydrateLiveFilters).
+     Centering the row then floats the short search box in the middle of
+     that tall column instead of lining it up with the selects' top edge. */
+  body[data-route-id="pipeline-board"] [data-layout="pipeline-filter-bar"] {
+    align-items: flex-start !important;
+  }
 }
 
 @media (max-width: 1023px) {

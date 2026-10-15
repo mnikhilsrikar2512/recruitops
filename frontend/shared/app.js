@@ -1508,7 +1508,12 @@ function markFilterToolbar(toolbar) {
 
 function setupDenseWorkspaceLayouts() {
   const routeId = document.body?.dataset.routeId || "";
-  const host = document.querySelector("[data-demo-validate]");
+  // `[data-demo-validate]` was the marker on the page's <section class="shell-card">
+  // in earlier page shells; it was dropped from the generated HTML at some
+  // point and this selector was never updated, so this whole function has
+  // been a silent no-op. `.shell-card`/`.auth-card` is what that attribute
+  // used to sit on, so this restores the original targeting.
+  const host = document.querySelector(".shell-card, .auth-card");
   const surface = resolveWorkspaceSurface(host);
   if (!surface) return;
 

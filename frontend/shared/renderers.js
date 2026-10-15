@@ -77,7 +77,12 @@ function branchTone(code) {
 function branchCodeLabel(code) {
   const raw = String(code || "").trim();
   if (!raw) return "";
-  return raw.replace(/[0-9]+$/, "").toUpperCase() || raw.toUpperCase();
+  // Strip a trailing numeric suffix ("BLR01" -> "BLR"); also strip any
+  // separator that suffix leaves dangling ("CODE-101" -> "CODE-" -> "CODE")
+  // so a branch code that happens to look like a display id never renders
+  // as a bare hyphen with nothing after it.
+  const stripped = raw.replace(/[0-9]+$/, "").replace(/[-_\s]+$/, "");
+  return (stripped || raw).toUpperCase();
 }
 
 function entityBadgeHtml(displayId, branchCode) {
