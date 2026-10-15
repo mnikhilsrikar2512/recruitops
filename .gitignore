@@ -37,3 +37,5 @@ docs/*.pdf
 
 # Frontend build tooling
 frontend/node_modules/
+_claude_scratch.tar.gz
+fe_sync.tar.gz
