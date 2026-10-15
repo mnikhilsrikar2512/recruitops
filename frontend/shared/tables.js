@@ -56,7 +56,7 @@ function rowMatchesLens(rowText, lens) {
 
 function applyTableLens(group, button) {
   const lens = normalizeLensLabel(button.textContent);
-  const host = group.closest(".bg-surface, .shell-card, [data-demo-validate]") || document;
+  const host = group.closest(".bg-surface, .shell-card, .auth-card") || document;
   const table = host.querySelector("table") || document.querySelector("table");
   const tbody = table?.querySelector("tbody");
   const rows = Array.from(tbody?.querySelectorAll("tr:not(.demo-empty-row)") || []);
@@ -370,7 +370,7 @@ function getTableForFilterToolbar(toolbar) {
   if (tableSurface?.querySelector("table")) return tableSurface.querySelector("table");
   /* Filter bars are usually a sibling card of the table card inside a
      workspace section — fall back to the enclosing section. */
-  const scope = toolbar?.closest(".workspace-surface, section, [data-demo-validate]");
+  const scope = toolbar?.closest(".workspace-surface, section, .shell-card, .auth-card");
   return scope?.querySelector("table") || document.querySelector("table");
 }
 

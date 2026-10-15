@@ -286,7 +286,7 @@ function setupWorkspaceInsights() {
 
   const trigger = Array.from(document.querySelectorAll("button"))
     .find((button) => /\binsights\b/i.test(getActionLabel(button)));
-  const host = document.querySelector("[data-demo-validate]");
+  const host = document.querySelector(".shell-card, .auth-card");
   if (!trigger || !host || host.querySelector("[data-workspace-insight-panel]")) return;
 
   const panel = document.createElement("section");
@@ -1230,7 +1230,7 @@ function setupApprovalsWorkspace() {
 function setupDuplicateResolutionWorkspace() {
   if (document.body?.dataset.routeId !== "candidate-duplicate-review") return;
   if (document.querySelector("[data-duplicate-summary]")) return;
-  const host = document.querySelector("[data-demo-validate]");
+  const host = document.querySelector(".shell-card, .auth-card");
   const radios = Array.from(document.querySelectorAll('input[name="resolution"]'));
   const confirmButton = Array.from(document.querySelectorAll("button")).find((button) =>
     /confirm resolution/i.test(button.textContent || ""),
@@ -1570,7 +1570,9 @@ function setupDenseWorkspaceLayouts() {
 
 function setupWorkspaceVisualPolish() {
   const routeId = document.body?.dataset.routeId || "";
-  const host = document.querySelector("[data-demo-validate]");
+  // Same dead-marker fix as setupDenseWorkspaceLayouts() above: this used
+  // to find the page's <section class="shell-card">/<div class="auth-card">.
+  const host = document.querySelector(".shell-card, .auth-card");
   if (!host) return;
 
   if (HEADINGLESS_WORKSPACE_ROUTES.has(routeId)) {
