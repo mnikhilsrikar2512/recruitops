@@ -1,0 +1,83 @@
+/* RoCharts — chrome for the SVG chart renderers in shared/charts.js.
+   Pairs with design-tokens.css; no colors are hard-coded except the
+   validated chart palette, which lives in charts.js alongside the
+   marks it colors. */
+
+.ro-chart { position: relative; width: 100%; }
+.ro-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+.ro-chart-data-table { position: absolute; width: 1px; height: 1px; overflow: hidden; }
+
+.ro-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 12px;
+  color: var(--ro-muted);
+  text-align: center;
+}
+.ro-chart-empty .material-symbols-outlined { font-size: 26px; opacity: 0.6; }
+.ro-chart-empty p { margin: 0; font-size: 13px; }
+
+/* Horizontal bar list */
+.ro-chart-bar { display: flex; flex-direction: column; gap: 10px; }
+.ro-bar-row { display: grid; grid-template-columns: 112px 1fr 64px; align-items: center; gap: 10px; border-radius: 6px; }
+.ro-bar-row:focus-visible { outline: var(--ro-focus); outline-offset: 2px; }
+.ro-bar-label { font-size: 12px; color: var(--ro-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ro-bar-track { height: 10px; border-radius: 999px; background: var(--ro-border); overflow: hidden; }
+.ro-bar-fill { display: block; height: 100%; border-radius: 999px; transition: width var(--ro-motion) ease; }
+.ro-bar-value { font-size: 12px; font-weight: 600; color: var(--ro-text); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Legend */
+.ro-chart-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; justify-content: center; }
+.ro-chart-legend-stack { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; justify-content: flex-start; }
+.ro-chart-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ro-muted); }
+.ro-chart-legend-item strong { color: var(--ro-text); font-weight: 600; margin-left: 2px; }
+.ro-chart-swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
+
+/* Donut */
+.ro-chart-donut { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
+.ro-chart-donut svg { width: 160px; height: 160px; flex: none; }
+
+/* Grouped bar / line chart axes */
+.ro-chart-grouped-bar svg text,
+.ro-chart-line svg text { font-family: var(--ro-font); }
+.ro-chart-bar-rect { transition: opacity var(--ro-motion) ease; cursor: pointer; }
+.ro-chart-bar-rect:hover { opacity: 0.85; }
+.ro-chart-line circle { cursor: pointer; }
+
+/* Sparkline inside KPI tiles */
+.ro-sparkline { display: block; }
+
+/* Hover tooltip (single shared element, positioned via JS) */
+.ro-chart-tooltip {
+  position: fixed;
+  z-index: 80;
+  display: none;
+  pointer-events: none;
+  background: var(--ro-primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  max-width: 220px;
+}
+.ro-chart-tooltip strong { font-weight: 600; }
+
+/* Chart card wrapper used on report/dashboard pages */
+.ro-chart-card {
+  border: 1px solid var(--ro-border);
+  background: var(--ro-surface);
+  border-radius: var(--ro-radius-card);
+  padding: 16px;
+}
+.ro-chart-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.ro-chart-card-head h3 { font-size: 13px; font-weight: 600; color: var(--ro-text); margin: 0; }
+.ro-chart-card-head p { font-size: 11px; color: var(--ro-muted); margin: 2px 0 0; }
+
+@media print {
+  .ro-chart-tooltip { display: none !important; }
+}

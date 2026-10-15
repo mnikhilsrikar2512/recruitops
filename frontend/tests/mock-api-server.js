@@ -131,8 +131,12 @@ function sampleString(name, s, seed) {
   if (/employment_type/.test(name)) return EMPLOYMENT_TYPES[seed % EMPLOYMENT_TYPES.length];
   if (/industry/.test(name)) return INDUSTRIES[seed % INDUSTRIES.length];
   if (/designation/.test(name)) return JOB_TITLES[seed % JOB_TITLES.length];
-  if (/company|client_name|legal_name|account_name|^client$/.test(name)) return COMPANY_NAMES[seed % COMPANY_NAMES.length];
-  if (/branch_name|location_name/.test(name)) return LOCATION_NAMES[seed % LOCATION_NAMES.length];
+  if (/company|client_name|legal_name|account_name|^client$|^display_name$/.test(name)) return COMPANY_NAMES[seed % COMPANY_NAMES.length];
+  if (/branch_name|location_name|^hq_city$/.test(name)) return LOCATION_NAMES[seed % LOCATION_NAMES.length];
+  if (/^hq_state$/.test(name)) return ["Karnataka", "Maharashtra", "Delhi", "Telangana", "Tamil Nadu"][seed % 5];
+  if (/^registered_address$/.test(name)) return STREET_ADDRESSES[seed % STREET_ADDRESSES.length];
+  if (/^website_url$/.test(name)) return `https://www.${COMPANY_NAMES[seed % COMPANY_NAMES.length].toLowerCase().replace(/[^a-z]+/g, "")}.com`;
+  if (/^country_name$/.test(name)) return "India";
   if (/entity_type/.test(name)) return ENTITY_TYPES[seed % ENTITY_TYPES.length];
   if (/age_label/.test(name)) return `${2 + ((seed * 3) % 58)}d`;
   if (/match_reasons/.test(name)) return MATCH_REASONS[seed % MATCH_REASONS.length];
@@ -318,7 +322,100 @@ function special(method, pathname, body) {
   if (method === "GET" && pathname === "/api/v1/permissions/me") {
     return [200, { user_id: 1, role_code: p.role_code, permissions: p.permissions }];
   }
+  /* The generic /reports/datasets/{name} endpoint is used by SLA Tracker
+     and the Custom Report Builder preview. Its response schema is too
+     generic for the catch-all sampler below (it would produce "key 1" /
+     "label 1" placeholder rows), so give each known dataset a realistic
+     shape here instead. */
+  const datasetMatch = /^\/api\/v1\/reports\/datasets\/(\w+)$/.exec(pathname);
+  if (method === "GET" && datasetMatch) {
+    return [200, reportDataset(datasetMatch[1])];
+  }
   return null;
+}
+
+function reportDataset(name) {
+  const n = (seed) => 1 + ((seed * 2654435761) % 2147483647);
+  if (name === "sla") {
+    const columns = [
+      { key: "mandate", label: "Mandate", type: "string" },
+      { key: "client", label: "Client", type: "string" },
+      { key: "sla_target_days", label: "SLA Target (days)", type: "number" },
+      { key: "current_days", label: "Current (days)", type: "number" },
+      { key: "status", label: "Status", type: "string" },
+      { key: "owner", label: "Owner", type: "string" },
+    ];
+    const rows = JOB_TITLES.map((title, i) => {
+      const target = 30 + (i % 3) * 10;
+      const current = Math.max(3, target - 12 + ((n(i) % 25)));
+      return {
+        mandate: title,
+        client: COMPANY_NAMES[i % COMPANY_NAMES.length],
+        sla_target_days: target,
+        current_days: current,
+        status: "open",
+        owner: FIRST_NAMES[i % FIRST_NAMES.length],
+      };
+    });
+    return { dimensions: [{ key: "sla", label: "SLA", columns, requires: [] }], rows };
+  }
+  if (name === "time_to_fill") {
+    const columns = [
+      { key: "requisition", label: "Requisition", type: "string" },
+      { key: "department", label: "Department", type: "string" },
+      { key: "days_to_fill", label: "Days to Fill", type: "number" },
+    ];
+    const rows = JOB_TITLES.map((title, i) => ({ requisition: title, department: ["Engineering", "Sales", "Marketing", "Operations"][i % 4], days_to_fill: 14 + (n(i) % 50) }));
+    return { dimensions: [{ key: "time_to_fill", label: "Time to Fill", columns, requires: [] }], rows };
+  }
+  if (name === "source_effectiveness") {
+    const columns = [
+      { key: "source", label: "Source", type: "string" },
+      { key: "candidates", label: "Candidates", type: "number" },
+      { key: "hired", label: "Hired", type: "number" },
+      { key: "conversion_rate", label: "Conversion %", type: "number" },
+    ];
+    const rows = SOURCE_TYPES.map((source, i) => {
+      const candidates = 20 + (n(i) % 300);
+      const hired = Math.max(1, Math.round(candidates * (0.05 + (n(i + 1) % 25) / 100)));
+      return { source, candidates, hired, conversion_rate: Math.round((hired / candidates) * 100) };
+    });
+    return { dimensions: [{ key: "source_effectiveness", label: "Source Effectiveness", columns, requires: [] }], rows };
+  }
+  if (name === "pipeline") {
+    const columns = [
+      { key: "stage", label: "Stage", type: "string" },
+      { key: "candidates", label: "Candidates", type: "number" },
+      { key: "conversion_rate", label: "Conversion %", type: "number" },
+    ];
+    const stages = ["Applied", "Screened", "Interview", "Offer", "Joined"];
+    const rows = stages.map((stage, i) => ({ stage, candidates: Math.max(1, 200 - i * 38), conversion_rate: Math.max(5, 100 - i * 18) }));
+    return { dimensions: [{ key: "pipeline", label: "Pipeline", columns, requires: [] }], rows };
+  }
+  if (name === "daily_updates") {
+    const columns = [
+      { key: "user", label: "User", type: "string" },
+      { key: "date", label: "Date", type: "date" },
+      { key: "blockers", label: "Blockers", type: "string" },
+    ];
+    const rows = FIRST_NAMES.slice(0, 6).map((user, i) => ({ user, date: reportIsoDaysAgoForMock(i), blockers: i % 3 === 0 ? "Awaiting client feedback" : "" }));
+    return { dimensions: [{ key: "daily_updates", label: "Daily Updates", columns, requires: [] }], rows };
+  }
+  /* requisitions (default) */
+  const columns = [
+    { key: "title", label: "Requisition", type: "string" },
+    { key: "client", label: "Client", type: "string" },
+    { key: "status", label: "Status", type: "string" },
+    { key: "openings", label: "Openings", type: "number" },
+  ];
+  const rows = JOB_TITLES.map((title, i) => ({ title, client: COMPANY_NAMES[i % COMPANY_NAMES.length], status: i % 4 === 0 ? "closed" : "open", openings: 1 + (n(i) % 4) }));
+  return { dimensions: [{ key: "requisitions", label: "Requisitions", columns, requires: [] }], rows };
+}
+
+function reportIsoDaysAgoForMock(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
 }
 
 /* ── HTTP ────────────────────────────────────────────────────── */

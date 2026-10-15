@@ -4247,6 +4247,21 @@
       table { break-inside: auto; }
       thead { display: table-header-group; }
       tr { break-inside: avoid; }
+
+      /* Generic report/dashboard pages (not just report-viewer's letterhead
+         sheet): print only the data region, inject a printed header, and
+         keep each chart/card whole across a page break. */
+      [data-report-print] .ro-chart-card,
+      [data-report-print] section { break-inside: avoid-page; }
+      .ro-print-header { display: none; }
+      .ro-print-header.is-active {
+        display: block;
+        margin-bottom: 16px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #c9c9c5;
+      }
+      .ro-print-header .ro-print-header-title { font-size: 18px; font-weight: 700; color: #1a1d20; margin: 0; }
+      .ro-print-header .ro-print-header-meta { font-size: 11px; color: #6e7476; margin: 2px 0 0; }
     }
 
     /* ═══ MOBILE (≤640px) — in-app page fixes ═══
