@@ -7177,7 +7177,21 @@ async function bootPage() {
     },
     "delivery-work-queue": loadDeliveryWorkQueue,
     "support-workspace": async () => {
-      // Support page - no API needed, shows static help content
+      // Support page - static help content, except a live backend health check
+      const statusEl = document.querySelector("[data-health-status]");
+      const iconEl = document.querySelector("[data-health-icon]");
+      if (statusEl) {
+        try {
+          await apiRequest("/health");
+          statusEl.textContent = "All Systems Operational";
+          statusEl.className = "font-label-caps text-label-caps px-2 py-1 rounded bg-success-bg text-success-text";
+          if (iconEl) iconEl.className = "material-symbols-outlined text-[20px] text-success-text";
+        } catch {
+          statusEl.textContent = "Degraded";
+          statusEl.className = "font-label-caps text-label-caps px-2 py-1 rounded bg-danger-bg text-danger-text";
+          if (iconEl) iconEl.className = "material-symbols-outlined text-[20px] text-danger-text";
+        }
+      }
     },
     "agents-workbench": async () => {
       const [catalog, runsPayload] = await Promise.all([
