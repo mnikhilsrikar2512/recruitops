@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../shared/visual-system.css?v=92644c4e43" />
   <link rel="stylesheet" href="../shared/fonts/fonts.css?v=92644c4e43" />
   <link rel="stylesheet" href="../shared/tailwind.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/charts.css?v=92644c4e43" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="team-workload" data-route-kind="app" data-route-title="Team Workload" data-route-section="Team">
   
@@ -74,16 +75,72 @@
         <main id="main-content" tabindex="-1" class="app-canvas">
           <div class="page-stack">
     
-    <section class="shell-card">
+    <section class="shell-card" data-report-print>
       <div class="workspace-surface">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"> <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4"> <div class="flex items-center justify-between mb-2"> <span class="text-label-caps font-bold text-text-muted uppercase tracking-wider">Total Active Assignments</span> <span class="material-symbols-outlined text-[20px] text-primary">assignment</span> </div> <p class="text-headline-lg font-bold text-on-surface">156</p> <p class="text-body-sm text-success mt-1">+8% vs last month</p> </div> <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4"> <div class="flex items-center justify-between mb-2"> <span class="text-label-caps font-bold text-text-muted uppercase tracking-wider">Avg Utilization</span> <span class="material-symbols-outlined text-[20px] text-info">speed</span> </div> <p class="text-headline-lg font-bold text-on-surface">78%</p> <p class="text-body-sm text-success mt-1">+3% vs last month</p> </div> <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4"> <div class="flex items-center justify-between mb-2"> <span class="text-label-caps font-bold text-text-muted uppercase tracking-wider">Overloaded Members</span> <span class="material-symbols-outlined text-[20px] text-error">warning</span> </div> <p class="text-headline-lg font-bold text-on-surface">3</p> <p class="text-body-sm text-error mt-1">+1 vs last month</p> </div> <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4"> <div class="flex items-center justify-between mb-2"> <span class="text-label-caps font-bold text-text-muted uppercase tracking-wider">Available Capacity</span> <span class="material-symbols-outlined text-[20px] text-success">check_circle</span> </div> <p class="text-headline-lg font-bold text-on-surface">22%</p> <p class="text-body-sm text-text-muted mt-1">3 team members available</p> </div> </div> <div class="bg-surface border border-outline-variant rounded-lg mb-6"> <div class="p-4 border-b border-outline-variant"> <div class="flex items-center justify-between"> <div> <h3 class="text-headline-sm font-semibold text-on-surface">Team Member Workload</h3> <p class="text-body-sm text-text-muted">Current assignments and capacity per team member</p> </div> <button class="px-3 py-2 rounded-lg border border-outline-variant text-body-sm text-on-surface-variant hover:bg-highlight-soft transition-colors flex items-center gap-2"> <span class="material-symbols-outlined text-[16px]">filter_list</span>Filter </button> </div> </div> <div class="overflow-x-auto"> <table class="w-full"> <thead> <tr class="border-b border-outline-variant"> <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Member</th> <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Role</th> <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Active Requisitions</th> <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Active Candidates</th> <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Capacity</th> <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Status</th> </tr> </thead> <tbody><tr hidden data-row-template="true" class="border-b border-outline-variant hover:bg-highlight-soft"> <td class="px-4 py-3"> <div class="flex items-center gap-3"> <div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-label-caps font-bold">MK</div> <span class="text-body-sm text-on-surface font-medium">—</span> </div> </td> <td class="px-4 py-3 text-body-sm text-on-surface">Senior Recruiter</td> <td class="px-4 py-3 text-data-tabular text-on-surface">12</td> <td class="px-4 py-3 text-data-tabular text-on-surface">34</td> <td class="px-4 py-3"> <div class="w-full bg-outline-variant rounded-full h-3"> <div class="bg-error rounded-full" style="width: 95%">
-</div> </div> </td> <td class="px-4 py-3">
-<span class="px-2 py-0.5 rounded bg-danger-bg text-danger-text text-label-caps font-semibold">OVERLOADED</span>
-</td> </tr></tbody> </table> </div> </div> <div class="grid grid-cols-1 lg:grid-cols-2 gap-6"> <div class="bg-surface border border-outline-variant rounded-lg"> <div class="p-4 border-b border-outline-variant"> <h3 class="text-headline-sm font-semibold text-on-surface">Workload by Department</h3> <p class="text-body-sm text-text-muted">Assignment distribution across departments</p> </div> <div class="p-4"> <div class="space-y-4"> <div class="flex items-center gap-4"> <span class="text-body-sm text-on-surface w-24">Engineering</span> <div class="flex-1 bg-outline-variant rounded-full h-6"> <div class="bg-primary rounded-full" style="width: 85%">
-</div> </div> <span class="text-data-tabular font-semibold text-on-surface w-16 text-right">58</span> </div> <div class="flex items-center gap-4"> <span class="text-body-sm text-on-surface w-24">Sales</span> <div class="flex-1 bg-outline-variant rounded-full h-6"> <div class="bg-primary rounded-full" style="width: 72%">
-</div> </div> <span class="text-data-tabular font-semibold text-on-surface w-16 text-right">42</span> </div> <div class="flex items-center gap-4"> <span class="text-body-sm text-on-surface w-24">Marketing</span> <div class="flex-1 bg-outline-variant rounded-full h-6"> <div class="bg-primary rounded-full" style="width: 55%">
-</div> </div> <span class="text-data-tabular font-semibold text-on-surface w-16 text-right">30</span> </div> <div class="flex items-center gap-4"> <span class="text-body-sm text-on-surface w-24">Operations</span> <div class="flex-1 bg-outline-variant rounded-full h-6"> <div class="bg-primary rounded-full" style="width: 42%">
-</div> </div> <span class="text-data-tabular font-semibold text-on-surface w-16 text-right">26</span> </div> </div> </div> </div>  </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6 no-print">
+          <div>
+            <h1 class="text-headline-lg font-bold text-on-surface">Team Workload</h1>
+            <p class="text-body-sm text-text-muted">Current assignments and capacity per team member, live from the roster.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" data-export-pdf class="px-3 py-2 rounded-lg border border-outline-variant text-on-surface text-body-sm font-semibold hover:bg-highlight-soft transition-colors flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>PDF
+            </button>
+            <button type="button" data-export-excel class="px-3 py-2 rounded-lg border border-outline-variant text-on-surface text-body-sm font-semibold hover:bg-highlight-soft transition-colors flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">download</span>Excel
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-workload-kpis>
+          <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4 animate-pulse h-24"></div>
+          <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4 animate-pulse h-24"></div>
+          <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4 animate-pulse h-24"></div>
+          <div class="metric-card bg-surface border border-outline-variant rounded-lg p-4 animate-pulse h-24"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="ro-chart-card">
+            <div class="ro-chart-card-head">
+              <div>
+                <h3>Utilization by team member</h3>
+                <p>Top 10 by current load</p>
+              </div>
+            </div>
+            <div data-workload-capacity-chart></div>
+          </div>
+          <div class="ro-chart-card">
+            <div class="ro-chart-card-head">
+              <div>
+                <h3>Active assignments by role</h3>
+                <p>Requisitions + candidates owned, summed per role</p>
+              </div>
+            </div>
+            <div data-workload-role-chart></div>
+          </div>
+        </div>
+
+        <div class="bg-surface border border-outline-variant rounded-lg">
+          <div class="p-4 border-b border-outline-variant">
+            <h3 class="text-headline-sm font-semibold text-on-surface">Team Member Workload</h3>
+            <p class="text-body-sm text-text-muted">Current assignments and capacity per team member</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="border-b border-outline-variant">
+                  <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Member</th>
+                  <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Active Requisitions</th>
+                  <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Active Candidates</th>
+                  <th class="text-left px-4 py-3 text-label-caps font-bold text-text-muted uppercase tracking-wider">Capacity</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
     
@@ -94,6 +151,8 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
+    <script src="../shared/charts.js?v=92644c4e43"></script>
+    <script src="../shared/export.js?v=92644c4e43"></script>
     <script src="../shared/renderers.js?v=92644c4e43"></script>
     <script src="../shared/api-client.js?v=92644c4e43"></script>
     <script src="../shared/ui-utils.js?v=92644c4e43"></script>

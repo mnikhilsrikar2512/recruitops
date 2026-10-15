@@ -1349,6 +1349,69 @@ function workloadStatus(utilization) {
   return { label: "Capacity", barClass: "bg-success-text", textClass: "text-success-text" };
 }
 
+function teamWorkloadStatusColor(utilization) {
+  const value = Number(utilization) || 0;
+  if (value > 85) return (window.RoCharts && window.RoCharts.STATUS.critical) || "#a63d33";
+  if (value >= 40) return "#2a78d6";
+  return (window.RoCharts && window.RoCharts.STATUS.good) || "#217a46";
+}
+
+function renderTeamWorkloadKpis(members) {
+  const host = document.querySelector("[data-workload-kpis]");
+  if (!host) return;
+  const total = members.reduce((sum, m) => sum + m.activeReqs + m.activeCandidates, 0);
+  const avgUtil = members.length ? Math.round(members.reduce((sum, m) => sum + m.utilization, 0) / members.length) : 0;
+  const overloaded = members.filter((m) => m.utilization > 85).length;
+  const available = members.filter((m) => m.utilization < 40).length;
+  const tiles = [
+    { label: "Total Active Assignments", value: String(total), icon: "assignment", hint: `${members.length} team member${members.length === 1 ? "" : "s"}`, hintClass: "text-text-muted" },
+    { label: "Avg Utilization", value: `${avgUtil}%`, icon: "speed", hint: avgUtil > 85 ? "Team is stretched thin" : "Across the team", hintClass: avgUtil > 85 ? "text-danger-text" : "text-text-muted" },
+    { label: "Overloaded Members", value: String(overloaded), icon: "warning", hint: overloaded ? "Over 85% utilization" : "None over capacity", hintClass: overloaded ? "text-danger-text" : "text-success-text" },
+    { label: "Available Capacity", value: String(available), icon: "check_circle", hint: available ? `${available} team member${available === 1 ? "" : "s"} under 40%` : "No spare capacity", hintClass: "text-text-muted" },
+  ];
+  host.innerHTML = tiles
+    .map(
+      (t) => `<div class="metric-card bg-surface border border-outline-variant rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-label-caps font-bold text-text-muted uppercase tracking-wider">${escapeLiveHtml(t.label)}</span>
+          <span class="material-symbols-outlined text-[20px] text-primary">${t.icon}</span>
+        </div>
+        <p class="text-headline-lg font-bold text-on-surface">${escapeLiveHtml(t.value)}</p>
+        <p class="text-body-sm ${t.hintClass} mt-1">${escapeLiveHtml(t.hint)}</p>
+      </div>`
+    )
+    .join("");
+}
+
+function renderTeamWorkloadCapacityChart(members) {
+  const host = document.querySelector("[data-workload-capacity-chart]");
+  if (!host || !window.RoCharts) return;
+  const sorted = [...members].sort((a, b) => b.utilization - a.utilization).slice(0, 10);
+  window.RoCharts.bar(host, {
+    items: sorted.map((m) => ({ label: m.full_name || "Team member", value: m.utilization, color: teamWorkloadStatusColor(m.utilization) })),
+    format: "percent",
+    empty: "No team members to show capacity for yet.",
+    labelHeader: "Team member",
+    valueHeader: "Utilization",
+    ariaLabel: "Team member utilization",
+  });
+}
+
+function renderTeamWorkloadByRole(members) {
+  const host = document.querySelector("[data-workload-role-chart]");
+  if (!host || !window.RoCharts) return;
+  const byRole = new Map();
+  members.forEach((m) => {
+    const role = m.primary_role_name || "Unassigned role";
+    byRole.set(role, (byRole.get(role) || 0) + m.activeReqs + m.activeCandidates);
+  });
+  const items = Array.from(byRole.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([label, value], i) => ({ label, value, color: window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length] }));
+  window.RoCharts.bar(host, { items, empty: "No active assignments yet.", labelHeader: "Role", valueHeader: "Assignments", ariaLabel: "Active assignments by role" });
+}
+
 function renderTeamWorkloadRows(members) {
   return members.map((member) => {
     const status = workloadStatus(member.utilization);
@@ -1370,13 +1433,23 @@ function buildUserPerformanceMembers(users, requisitions, candidates, offers) {
   });
 }
 
+function userPerformanceConversion(member) {
+  if (!member.submitted) return null;
+  return Math.round((member.hired / member.submitted) * 100);
+}
+
 function renderUserPerformanceRows(members) {
-  return members.map((member) => `<tr class="hover:bg-highlight-soft transition-colors">
+  return members.map((member) => {
+    const conversion = userPerformanceConversion(member);
+    const badge = conversion == null ? "bg-surface-alt text-text-muted" : conversion >= 20 ? "bg-success-bg text-success-text" : conversion >= 8 ? "bg-warning-bg text-warning-text" : "bg-surface-alt text-on-surface";
+    return `<tr class="hover:bg-highlight-soft transition-colors">
     <td class="py-2 px-4"><div class="flex items-center gap-3"><div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-container text-[11px] font-bold text-on-primary-container">${escapeLiveHtml(personInitials(member.full_name))}</div><span class="font-medium text-on-surface">${escapeLiveHtml(member.full_name || "User")}</span></div></td>
-    <td class="py-2 px-4 text-data-tabular text-on-surface">${member.submitted}</td>
-    <td class="py-2 px-4 text-data-tabular text-success-text font-semibold">${member.hired}</td>
-    <td class="py-2 px-4 text-data-tabular text-on-surface">${member.activeReqs}</td>
-  </tr>`).join("");
+    <td class="py-2 px-4 text-data-tabular text-on-surface text-right">${member.submitted}</td>
+    <td class="py-2 px-4 text-data-tabular text-success-text font-semibold text-right">${member.hired}</td>
+    <td class="py-2 px-4 text-data-tabular text-on-surface text-right">${member.activeReqs}</td>
+    <td class="py-2 px-4 text-right"><span class="px-2 py-0.5 rounded ${badge} text-label-caps font-semibold">${conversion == null ? "—" : `${conversion}%`}</span></td>
+  </tr>`;
+  }).join("");
 }
 
 function renderUserPerformanceTriage(members) {
@@ -1396,21 +1469,45 @@ function renderUserPerformanceTriage(members) {
 }
 
 function renderUserPerformanceWorkloadChart(members) {
-  const panel = findPanelByHeading("Workload Distribution");
-  if (!panel) return;
-  const host = panel.querySelector(".space-y-3") || panel;
-  const max = Math.max(...members.map((m) => m.submitted + m.hired + m.activeReqs), 1);
-  host.innerHTML = members.slice(0, 6).map((member) => {
-    const total = member.submitted + member.hired + member.activeReqs;
-    const pct = Math.round((total / max) * 100);
-    return `<div class="flex items-center gap-3">
-      <span class="w-24 truncate text-body-sm text-on-surface">${escapeLiveHtml(member.full_name || "User")}</span>
-      <div class="h-4 flex-1 overflow-hidden rounded bg-outline-variant">
-        <div class="h-4 rounded bg-primary" style="width:${pct}%"></div>
-      </div>
-      <span class="w-8 text-right text-[11px] font-semibold text-on-surface">${total}</span>
-    </div>`;
-  }).join("") || `<div class="p-2 text-body-sm text-text-muted">No workload data available.</div>`;
+  const host = document.querySelector("[data-perf-workload-chart]") || findPanelByHeading("Workload Balance")?.querySelector(".ro-chart-host");
+  if (!host || !window.RoCharts) return;
+  const sorted = [...members].sort((a, b) => (b.submitted + b.hired + b.activeReqs) - (a.submitted + a.hired + a.activeReqs)).slice(0, 8);
+  window.RoCharts.bar(host, {
+    items: sorted.map((m) => ({ label: m.full_name || "User", value: m.submitted + m.hired + m.activeReqs })),
+    empty: "No workload data available.",
+    labelHeader: "Recruiter",
+    valueHeader: "Total load",
+    ariaLabel: "Workload balance across recruiters",
+  });
+}
+
+function renderUserPerformanceKpis(members, avgTimeToFill) {
+  const host = document.querySelector("[data-perf-kpis]");
+  if (!host) return;
+  const totalSubmitted = members.reduce((sum, m) => sum + m.submitted, 0);
+  const totalHired = members.reduce((sum, m) => sum + m.hired, 0);
+  const avgReqs = members.length ? Math.round((members.reduce((sum, m) => sum + m.activeReqs, 0) / members.length) * 10) / 10 : 0;
+  const top = [...members].sort((a, b) => b.hired - a.hired)[0];
+  const tiles = [
+    { label: "Team Avg Time to Fill", value: avgTimeToFill != null ? `${avgTimeToFill}` : "—", unit: avgTimeToFill != null ? "days" : "", icon: "hourglass_top" },
+    { label: "Total Submissions", value: String(totalSubmitted), icon: "groups", hint: `${totalHired} hired (${totalSubmitted ? Math.round((totalHired / totalSubmitted) * 100) : 0}% conversion)` },
+    { label: "Avg Active Reqs / User", value: String(avgReqs), icon: "assignment", hint: `${members.length} recruiter${members.length === 1 ? "" : "s"}` },
+    { label: "Top Performer", value: top && top.hired ? escapeLiveHtml(top.full_name || "—") : "—", icon: "military_tech", hint: top && top.hired ? `${top.hired} hire${top.hired === 1 ? "" : "s"}` : "No hires recorded yet" },
+  ];
+  host.innerHTML = tiles
+    .map(
+      (t) => `<div class="bg-surface border border-border p-inset-card flex flex-col justify-between rounded-lg">
+        <div class="flex justify-between items-start mb-2">
+          <span class="font-label-caps text-label-caps text-text-muted uppercase tracking-wide">${escapeLiveHtml(t.label)}</span>
+          <span class="material-symbols-outlined text-text-muted text-[20px]">${t.icon}</span>
+        </div>
+        <div class="flex items-end gap-2 mt-1">
+          <span class="font-headline-lg text-headline-lg text-on-surface">${t.value}<span class="text-[14px] text-text-muted font-normal ml-1">${t.unit || ""}</span></span>
+        </div>
+        ${t.hint ? `<p class="text-body-sm text-text-muted mt-1">${t.hint}</p>` : ""}
+      </div>`
+    )
+    .join("");
 }
 
 
@@ -1422,23 +1519,23 @@ function renderTimeToFillBars(panelTitle, rows) {
   const panel = findPanelByHeading(panelTitle);
   if (!panel) return;
   const host = panel.querySelector(".space-y-4") || panel.querySelector(".space-y-3") || panel;
-  if (!host) return;
-  if (!rows || !rows.length) {
-    host.innerHTML = `<div class="p-2 text-body-sm text-text-muted">No closed requisitions to report on yet.</div>`;
-    return;
-  }
-  const max = Math.max(...rows.map((row) => row.days || 0), 1);
-  host.innerHTML = rows.map((row) => `<div class="flex items-center gap-3">
-        <span class="w-28 truncate text-body-sm text-on-surface">${escapeLiveHtml(row.label || row.title || "Role")}</span>
-        <div class="h-4 flex-1 overflow-hidden rounded bg-outline-variant">
-          <div class="h-4 rounded bg-primary" style="width:${Math.round(((row.days || 0) / max) * 100)}%"></div>
-        </div>
-        <span class="w-14 text-right text-[11px] font-semibold text-on-surface">${row.days != null ? `${row.days} days` : "—"}</span>
-      </div>`).join("");
+  if (!host || !window.RoCharts) return;
+  window.RoCharts.bar(host, {
+    items: (rows || []).map((row, i) => ({
+      label: row.label || row.title || "Role",
+      value: row.days || 0,
+      color: row.days > (row.slaTarget || 45) ? window.RoCharts.STATUS.critical : window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length],
+    })),
+    format: "days",
+    empty: "No closed requisitions to report on yet.",
+    labelHeader: "Group",
+    valueHeader: "Avg days to fill",
+    ariaLabel: panelTitle,
+  });
 }
 
 function renderTimeToFillTrend(report) {
-  const panel = findPanelByHeading("Time to Fill Trend");
+  const panel = findPanelByHeading("Time to Fill Summary");
   const host = panel?.querySelector(".chart-placeholder") || panel?.querySelector(".p-4:last-child");
   if (!host) return;
   host.classList.remove("chart-placeholder");
@@ -1493,6 +1590,48 @@ function slaRowStatus(row) {
   if (over > 0) return { label: `Overdue +${over}d`, badge: "bg-danger-bg text-danger" };
   if (over > -6) return { label: "At risk", badge: "bg-warning-bg text-warning" };
   return { label: "On track", badge: "bg-success-bg text-success" };
+}
+
+function renderSlaCompositionChart(rows) {
+  const host = document.querySelector("[data-sla-composition-chart]");
+  if (!host || !window.RoCharts) return;
+  let onTrack = 0, atRisk = 0, breached = 0;
+  rows.forEach((row) => {
+    const status = slaRowStatus(row).label;
+    if (status === "Met" || status === "On track") onTrack += 1;
+    else if (status === "At risk") atRisk += 1;
+    else breached += 1;
+  });
+  window.RoCharts.donut(host, {
+    segments: [
+      { label: "On track", value: onTrack, color: window.RoCharts.STATUS.good },
+      { label: "At risk", value: atRisk, color: window.RoCharts.STATUS.warning },
+      { label: "Breached / overdue", value: breached, color: window.RoCharts.STATUS.critical },
+    ],
+    centerLabel: "Mandates",
+    empty: "No requisitions to track yet.",
+    ariaLabel: "SLA composition",
+  });
+}
+
+function renderSlaBreachedList(rows) {
+  const host = document.querySelector("[data-sla-breached-list]");
+  if (!host) return;
+  const breached = rows
+    .map((row) => ({ ...row, over: row.current_days - row.sla_target_days }))
+    .filter((row) => row.over > 0)
+    .sort((a, b) => b.over - a.over)
+    .slice(0, 6);
+  host.innerHTML = breached.length
+    ? breached.map((row) => `<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-highlight-soft">
+        <span class="material-symbols-outlined text-[20px] text-danger-text">error</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-body-sm text-on-surface font-medium m-0 truncate">${escapeLiveHtml(row.mandate)}</p>
+          <p class="text-body-sm text-text-muted m-0">${escapeLiveHtml(row.client || "No client on file")} · ${escapeLiveHtml(row.owner || "Unassigned")}</p>
+        </div>
+        <span class="text-data-tabular font-semibold text-danger-text shrink-0">+${row.over}d</span>
+      </div>`).join("")
+    : `<div class="p-2 text-body-sm text-text-muted">Nothing is over its SLA target right now.</div>`;
 }
 
 function renderSlaTrackerTable(rows) {

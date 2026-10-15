@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../shared/visual-system.css?v=92644c4e43" />
   <link rel="stylesheet" href="../shared/fonts/fonts.css?v=92644c4e43" />
   <link rel="stylesheet" href="../shared/tailwind.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/charts.css?v=92644c4e43" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="report-viewer" data-route-kind="app" data-route-title="Placements Report" data-route-section="Reports">
   
@@ -98,7 +99,7 @@
             <span class="material-symbols-outlined text-[18px]">print</span>Print / PDF
           </button>
           <button id="report-csv" type="button" class="px-4 py-2 rounded-lg border border-outline-variant text-on-surface text-body-sm font-semibold hover:bg-highlight-soft transition-colors flex items-center gap-2">
-            <span class="material-symbols-outlined text-[18px]">download</span>Excel (CSV)
+            <span class="material-symbols-outlined text-[18px]">download</span>Excel
           </button>
         </div>
 
@@ -130,6 +131,14 @@
 
         <!-- KPI strip -->
         <div id="report-kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"></div>
+
+        <!-- Summary chart -->
+        <div class="ro-chart-card mb-8">
+          <div class="ro-chart-card-head">
+            <div><h3>Where it's coming from</h3><p>Top clients for this period</p></div>
+          </div>
+          <div id="report-chart"></div>
+        </div>
 
         <!-- Detail section -->
         <section class="report-section mb-8">
@@ -167,6 +176,8 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
+    <script src="../shared/charts.js?v=92644c4e43"></script>
+    <script src="../shared/export.js?v=92644c4e43"></script>
     <script src="../shared/renderers.js?v=92644c4e43"></script>
     <script src="../shared/api-client.js?v=92644c4e43"></script>
     <script src="../shared/ui-utils.js?v=92644c4e43"></script>
