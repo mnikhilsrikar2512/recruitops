@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>User Performance - RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=92644c4e43" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=92644c4e43" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=92644c4e43" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=92644c4e43" />
+  <link rel="stylesheet" href="../shared/global.css?v=7725423992" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=7725423992" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=7725423992" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=7725423992" />
+  <link rel="stylesheet" href="../shared/charts.css?v=7725423992" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="user-performance-reports" data-route-kind="app" data-route-title="User Performance" data-route-section="Reports">
   
@@ -74,21 +75,74 @@
         <main id="main-content" tabindex="-1" class="app-canvas">
           <div class="page-stack">
     
-    <section class="shell-card">
+    <section class="shell-card" data-report-print>
       <div class="workspace-surface">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6"> <div> <h2 class="font-headline-lg text-headline-lg text-on-surface">User Performance Matrix</h2> <p class="font-body-sm text-body-sm text-text-muted mt-1">Monitor team productivity, workload capacity, and conversion quality.</p> </div> <div class="flex items-center gap-3"> <button class="flex items-center gap-2 px-4 py-2 border border-border rounded-DEFAULT bg-surface text-secondary hover:bg-highlight-soft transition-colors font-body-sm text-body-sm font-semibold"> <span class="material-symbols-outlined text-[18px]">download</span> Export Report </button> <button class="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-on-secondary hover:opacity-90 transition-colors font-body-sm text-body-sm font-semibold"> <span class="material-symbols-outlined text-[18px]">schedule_send</span> Automated Send </button> </div> </div> <!-- Global Filters Strip --> <div class="bg-surface border-b border-border p-4 flex flex-wrap items-center gap-6 mb-6"> <div class="flex items-center gap-2"> <span class="material-symbols-outlined text-text-muted text-[18px]">calendar_today</span> <select class="bg-transparent border-none p-0 py-1 pr-6 focus:ring-0 font-body-sm text-body-sm text-on-surface font-semibold cursor-pointer"> <option>Last 90 days</option> </select> </div> <div class="h-4 w-px bg-border">
-</div> <div class="flex items-center gap-2"> <span class="material-symbols-outlined text-text-muted text-[18px]">location_on</span> <select class="bg-transparent border-none p-0 py-1 pr-6 focus:ring-0 font-body-sm text-body-sm text-on-surface cursor-pointer"> <option>All Teams / Locations</option> <option>North America</option> <option>EMEA</option> <option>APAC</option> </select> </div> <div class="h-4 w-px bg-border">
-</div> <div class="flex items-center gap-2"> <span class="material-symbols-outlined text-text-muted text-[18px]">engineering</span> <select class="bg-transparent border-none p-0 py-1 pr-6 focus:ring-0 font-body-sm text-body-sm text-on-surface cursor-pointer"> <option>All Specialties</option> <option>Engineering</option> <option>Product &amp; Design</option> <option>Sales &amp; Marketing</option> </select> </div> <div class="h-4 w-px bg-border">
-</div> <div class="flex items-center gap-2"> <span class="material-symbols-outlined text-text-muted text-[18px]">trending_up</span> <select class="bg-transparent border-none p-0 py-1 pr-6 focus:ring-0 font-body-sm text-body-sm text-on-surface cursor-pointer"> <option>All Performance Tiers</option> <option>Top Performers</option> <option>Solid Contributors</option> <option>Needs Attention</option> </select> </div> </div> <!-- Executive KPI Strip --> <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"> <!-- KPI 1 --> <div class="bg-surface border border-border p-inset-card flex flex-col justify-between group hover:bg-highlight-soft transition-colors cursor-pointer rounded-lg"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase tracking-wide">Team Avg Time to Fill</span> <span class="material-symbols-outlined text-text-muted text-[20px] group-hover:text-primary transition-colors">hourglass_top</span> </div> <div class="flex items-end gap-3 mt-1"> <span class="font-headline-lg text-headline-lg text-on-surface">42<span class="text-[16px] text-text-muted font-normal ml-1">days</span>
-</span> <span class="flex items-center text-success-text bg-success-bg px-1.5 py-0.5 rounded font-body-sm text-body-sm mb-1 opacity-80"> <span class="material-symbols-outlined text-[14px] mr-0.5">arrow_downward</span> 5% </span> </div> </div> <!-- KPI 2 --> <div class="bg-surface border border-border p-inset-card flex flex-col justify-between group hover:bg-highlight-soft transition-colors cursor-pointer rounded-lg"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase tracking-wide">Overall Placement Rate</span> <span class="material-symbols-outlined text-text-muted text-[20px] group-hover:text-primary transition-colors">check_circle</span> </div> <div class="flex items-end gap-3 mt-1"> <span class="font-headline-lg text-headline-lg text-on-surface">72<span class="text-[16px] text-text-muted font-normal">%</span>
-</span> <span class="flex items-center text-success-text bg-success-bg px-1.5 py-0.5 rounded font-body-sm text-body-sm mb-1 opacity-80"> <span class="material-symbols-outlined text-[14px] mr-0.5">arrow_upward</span> 2.1% </span> </div> </div> <!-- KPI 3 --> <div class="bg-surface border border-border p-inset-card flex flex-col justify-between group hover:bg-highlight-soft transition-colors cursor-pointer rounded-lg"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase tracking-wide">Avg Reqs per User</span> <span class="material-symbols-outlined text-text-muted text-[20px] group-hover:text-primary transition-colors">assignment</span> </div> <div class="flex items-end gap-3 mt-1"> <span class="font-headline-lg text-headline-lg text-on-surface">14</span> <span class="flex items-center text-warning-text bg-warning-bg px-1.5 py-0.5 rounded font-body-sm text-body-sm mb-1 opacity-80"> <span class="material-symbols-outlined text-[14px] mr-0.5">arrow_upward</span> 3 </span> </div> </div> <!-- KPI 4 --> <div class="bg-surface border border-border p-inset-card flex flex-col justify-between group hover:bg-highlight-soft transition-colors cursor-pointer rounded-lg"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase tracking-wide">Total Team Placements</span> <span class="material-symbols-outlined text-text-muted text-[20px] group-hover:text-primary transition-colors">military_tech</span> </div> <div class="flex items-end gap-3 mt-1"> <span class="font-headline-lg text-headline-lg text-on-surface">842</span> <span class="flex items-center text-text-muted font-body-sm text-body-sm mb-1 opacity-80"> YTD </span> </div> </div> </div> <!-- Main Layout Grid --> <div class="grid grid-cols-1 xl:grid-cols-3 gap-6"> <!-- Left Column (Matrix Table) --> <div class="xl:col-span-2 flex flex-col gap-6"> <div class="bg-surface border border-border flex flex-col shadow-sm rounded-lg"> <div class="bg-surface-alt border-b border-border px-4 py-3 flex justify-between items-center"> <h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Recruiter Performance Matrix</h3> <button class="p-1 text-text-muted hover:text-primary transition-colors"> <span class="material-symbols-outlined text-[20px]">filter_list</span> </button> </div> <div class="overflow-x-auto"> <table class="w-full text-left border-collapse"> <thead> <tr class="bg-surface border-b border-border bg-surface-alt"> <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface">Recruiter Name</th> <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Active Reqs</th> <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Time to Fill</th> <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Conversion %</th> <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface">Capacity Status</th> <th class="px-4 py-3 bg-surface w-10">
-</th> </tr> </thead> <tbody class="font-data-tabular text-data-tabular"><tr hidden data-row-template="true" class="border-b border-border hover:bg-highlight-soft transition-colors h-table-row"> <td class="px-4 py-2"> <div class="flex items-center gap-3"> <div class="w-7 h-7 rounded-full bg-surface-dim"> <div class="w-full bg-surface-dim text-text-muted flex items-center justify-center font-headline-sm font-semibold text-[11px] border border-border" title="Corporate headshot of a female recruiter smiling professionally.">CH</div> </div> <span class="text-on-surface font-medium">—</span> </div> </td> <td class="px-4 py-2 text-right text-on-surface text-primary">12</td> <td class="px-4 py-2 text-right text-success-text">35d</td> <td class="px-4 py-2 text-right text-on-surface">78%</td> <td class="px-4 py-2"> <span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-success-bg text-success-text font-body-sm text-[12px] font-medium border border-success-text/20"> On Track </span> </td> <td class="px-4 py-2 text-right"> <button class="text-text-muted hover:text-primary">
-<span class="material-symbols-outlined text-[18px]">more_vert</span>
-</button> </td> </tr></tbody> </table> </div> <div class="px-4 py-3 bg-surface-alt border-t border-border flex justify-between items-center text-body-sm text-text-muted"> <span class="">Showing 1-5 of 24 recruiters</span> <div class="flex items-center gap-2"> <button class="p-1 rounded hover:bg-highlight-soft disabled:opacity-50">
-<span class="material-symbols-outlined text-[18px]">chevron_left</span>
-</button> <span class="">Page 1 of 5</span> <button class="p-1 rounded hover:bg-highlight-soft">
-<span class="material-symbols-outlined text-[18px]">chevron_right</span>
-</button> </div> </div> </div> </div> <!-- Right Column (Visuals & Triage) --> <div class="xl:col-span-1 flex flex-col gap-6">  <!-- Workload Balance Chart (Placeholder) --> <div class="bg-surface border border-border rounded-DEFAULT shadow-sm flex-1 flex flex-col"> <div class="bg-surface-alt border-b border-border px-4 py-3 flex justify-between items-center"> <h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Workload Balance</h3> <button class="p-1 text-text-muted hover:text-primary transition-colors"> <span class="material-symbols-outlined text-[20px]">more_horiz</span> </button> </div> <div class="p-4 flex-1 flex flex-col items-center justify-center relative min-h-[200px] bg-surface-soft/50"> <!-- Abstract Chart Representation --> <div class="w-full flex items-end justify-around h-32 gap-2 mt-4"> <div class="w-8 bg-primary/40 rounded-t-sm relative group transition-all hover:bg-primary"> <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted hidden group-hover:block bg-surface px-1 border border-border rounded shadow-sm z-10">SJ</div> </div> <div class="w-8 bg-primary/40 rounded-t-sm relative group transition-all hover:bg-primary"> <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted hidden group-hover:block bg-surface px-1 border border-border rounded shadow-sm z-10">MC</div> </div> <div class="w-8 bg-primary/40 rounded-t-sm relative group transition-all hover:bg-primary"> <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted hidden group-hover:block bg-surface px-1 border border-border rounded shadow-sm z-10">DR</div> </div> <div class="w-8 bg-primary/40 rounded-t-sm relative group transition-all hover:bg-primary"> <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted hidden group-hover:block bg-surface px-1 border border-border rounded shadow-sm z-10">AK</div> </div> <div class="w-8 bg-primary/40 rounded-t-sm relative group transition-all hover:bg-primary"> <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted hidden group-hover:block bg-surface px-1 border border-border rounded shadow-sm z-10">TL</div> </div> </div> <div class="w-full border-t border-outline-variant/30 border-dashed absolute bottom-[40%] flex items-center justify-end"> <span class="text-[10px] text-text-muted bg-surface-soft/50 px-1 -mt-2 opacity-60">Target Cap (15)</span> </div> </div> </div> </div> </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 no-print">
+          <div>
+            <h1 class="font-headline-lg text-headline-lg text-on-surface">User Performance Matrix</h1>
+            <p class="font-body-sm text-body-sm text-text-muted mt-1">Team productivity, workload, and conversion quality — live from the roster.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" data-export-pdf class="flex items-center gap-2 px-3 py-2 border border-border rounded-lg bg-surface text-secondary hover:bg-highlight-soft transition-colors font-body-sm text-body-sm font-semibold">
+              <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>PDF
+            </button>
+            <button type="button" data-export-excel class="flex items-center gap-2 px-3 py-2 border border-border rounded-lg bg-surface text-secondary hover:bg-highlight-soft transition-colors font-body-sm text-body-sm font-semibold">
+              <span class="material-symbols-outlined text-[18px]">download</span>Excel
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-perf-kpis>
+          <div class="bg-surface border border-border rounded-lg p-inset-card animate-pulse h-24"></div>
+          <div class="bg-surface border border-border rounded-lg p-inset-card animate-pulse h-24"></div>
+          <div class="bg-surface border border-border rounded-lg p-inset-card animate-pulse h-24"></div>
+          <div class="bg-surface border border-border rounded-lg p-inset-card animate-pulse h-24"></div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 flex flex-col gap-6">
+            <div class="bg-surface border border-border flex flex-col shadow-sm rounded-lg">
+              <div class="bg-surface-alt border-b border-border px-4 py-3">
+                <h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Recruiter Performance Matrix</h3>
+                <p class="text-body-sm text-text-muted">Submissions, hires, and current load per recruiter</p>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-surface border-b border-border bg-surface-alt">
+                      <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface">Recruiter</th>
+                      <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Submitted</th>
+                      <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Hired</th>
+                      <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Active Reqs</th>
+                      <th class="px-4 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider bg-surface text-right">Conversion</th>
+                    </tr>
+                  </thead>
+                  <tbody class="font-data-tabular text-data-tabular"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="xl:col-span-1 flex flex-col gap-6">
+            <div class="ro-chart-card">
+              <div class="ro-chart-card-head">
+                <div>
+                  <h3>Workload balance</h3>
+                  <p>Submitted + hired + active reqs, per recruiter</p>
+                </div>
+              </div>
+              <div data-perf-workload-chart></div>
+            </div>
+            <div class="bg-surface border border-border rounded-lg shadow-sm flex-1 flex flex-col">
+              <div class="bg-surface-alt border-b border-border px-4 py-3">
+                <h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Performance Triage</h3>
+                <p class="text-body-sm text-text-muted">Top performers by hires this period</p>
+              </div>
+              <div class="p-3 space-y-3"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
     
@@ -99,17 +153,19 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
-    <script src="../shared/renderers.js?v=92644c4e43"></script>
-    <script src="../shared/api-client.js?v=92644c4e43"></script>
-    <script src="../shared/ui-utils.js?v=92644c4e43"></script>
-    <script src="../shared/tables.js?v=92644c4e43"></script>
-    <script src="../shared/forms.js?v=92644c4e43"></script>
-    <script src="../shared/sidebar.js?v=92644c4e43"></script>
-    <script src="../shared/pipeline.js?v=92644c4e43"></script>
-    <script src="../shared/routing.js?v=92644c4e43"></script>
+    <script src="../shared/charts.js?v=7725423992"></script>
+    <script src="../shared/export.js?v=7725423992"></script>
+    <script src="../shared/renderers.js?v=7725423992"></script>
+    <script src="../shared/api-client.js?v=7725423992"></script>
+    <script src="../shared/ui-utils.js?v=7725423992"></script>
+    <script src="../shared/tables.js?v=7725423992"></script>
+    <script src="../shared/forms.js?v=7725423992"></script>
+    <script src="../shared/sidebar.js?v=7725423992"></script>
+    <script src="../shared/pipeline.js?v=7725423992"></script>
+    <script src="../shared/routing.js?v=7725423992"></script>
 
-  <script src="../shared/navigation.config.js?v=92644c4e43"></script>
-    <script src="../shared/navigation.js?v=92644c4e43"></script>
-    <script src="../shared/app.js?v=92644c4e43"></script>
+  <script src="../shared/navigation.config.js?v=7725423992"></script>
+    <script src="../shared/navigation.js?v=7725423992"></script>
+    <script src="../shared/app.js?v=7725423992"></script>
 </body>
 </html>

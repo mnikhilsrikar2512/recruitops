@@ -4465,20 +4465,73 @@ async function loadMyWorkDashboard() {
   const members = buildWorkloadMembers(users.items || [], requisitions.items || [], candidates.items || []);
   const tbody = document.querySelector(".workspace-surface tbody");
   if (tbody) tbody.innerHTML = renderTeamWorkloadRows(members);
+  renderTeamWorkloadKpis(members);
+  renderTeamWorkloadCapacityChart(members);
+  renderTeamWorkloadByRole(members);
+  wireReportExportButtons({
+    title: "Team Workload",
+    subtitle: "Current assignments and capacity per team member",
+    filePrefix: "team-workload",
+    columns: [
+      { key: "full_name", label: "Member" },
+      { key: "primary_role_name", label: "Role" },
+      { key: "activeReqs", label: "Active Requisitions", numeric: true },
+      { key: "activeCandidates", label: "Active Candidates", numeric: true },
+      { key: "utilization", label: "Utilization %", numeric: true },
+    ],
+    rows: members,
+  });
+}
+
+/* Shared "Download PDF" / "Download Excel" wiring for report pages:
+   PDF prints the page's live charts + tables (vector, via window.print);
+   Excel exports the underlying rows as a formatted workbook. Call once
+   per page load with the rows that back that page's charts/table. */
+function wireReportExportButtons(spec) {
+  const pdfBtn = document.querySelector("[data-export-pdf]");
+  const excelBtn = document.querySelector("[data-export-excel]");
+  if (pdfBtn && window.RoExport) {
+    pdfBtn.onclick = () => window.RoExport.downloadPdf({ title: spec.title, subtitle: spec.subtitle, docTitle: `${spec.title} - RecruitOps` });
+  }
+  if (excelBtn && window.RoExport) {
+    excelBtn.onclick = () =>
+      window.RoExport.downloadExcel(spec.filePrefix || "report", {
+        title: spec.title,
+        subtitle: spec.subtitle,
+        sheetName: spec.title,
+        columns: spec.columns,
+        rows: spec.rows,
+      });
+  }
 }
 
 async function loadUserPerformanceReports() {
-  const [users, requisitions, candidates, offers] = await Promise.all([
+  const [users, requisitions, candidates, offers, ttf] = await Promise.all([
     apiRequest("/users/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] })),
     apiRequest("/offers/?page_size=50").catch(() => ({ items: [] })),
+    apiRequest("/reports/time-to-fill").catch(() => null),
   ]);
   const members = buildUserPerformanceMembers(users.items || [], requisitions.items || [], candidates.items || [], offers.items || []);
   const tbody = document.querySelector(".workspace-surface tbody");
   if (tbody) tbody.innerHTML = renderUserPerformanceRows(members);
+  renderUserPerformanceKpis(members, ttf?.summary?.avg_days ?? null);
   renderUserPerformanceTriage(members);
   renderUserPerformanceWorkloadChart(members);
+  wireReportExportButtons({
+    title: "User Performance Matrix",
+    subtitle: "Team productivity, workload, and conversion quality",
+    filePrefix: "user-performance",
+    columns: [
+      { key: "full_name", label: "Recruiter" },
+      { key: "submitted", label: "Submitted", numeric: true },
+      { key: "hired", label: "Hired", numeric: true },
+      { key: "activeReqs", label: "Active Requisitions", numeric: true },
+      { key: "conversion", label: "Conversion %", numeric: true },
+    ],
+    rows: members.map((m) => ({ ...m, conversion: userPerformanceConversion(m) })),
+  });
 }
 
 
@@ -4649,30 +4702,31 @@ function renderReportTable(columns, rows, footerRow) {
 
 function downloadReportCsv() {
   const { columns, data, type } = reportState;
-  if (!data || !columns.length) return;
-  const rows = type === "placements" ? data.rows : data.rows;
-  const lines = [columns.map((c) => c.label).join(",")];
-  for (const row of rows) {
-    lines.push(
-      columns
-        .map((c) => {
-          const raw = row[c.key];
-          const text = raw == null ? "" : String(raw);
-          return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-        })
-        .join(",")
-    );
+  if (!data || !columns.length || !window.RoExport) return;
+  const def = REPORT_DEFS[type];
+  window.RoExport.downloadExcel(`${type}-report-${data.period_from}-to-${data.period_to}`, {
+    title: def?.name || "Report",
+    subtitle: `${data.period_from} to ${data.period_to}`,
+    sheetName: def?.name || "Report",
+    columns: columns.map((c) => ({ key: c.key, label: c.label, numeric: Boolean(c.num) })),
+    rows: data.rows || [],
+  });
+}
+
+function renderReportChart(type, data) {
+  const host = document.querySelector("#report-chart");
+  if (!host || !window.RoCharts) return;
+  if (type === "placements") {
+    const byClient = new Map();
+    (data.rows || []).forEach((row) => byClient.set(row.client, (byClient.get(row.client) || 0) + 1));
+    const items = Array.from(byClient.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
+      .map(([label, value], i) => ({ label: label || "Unassigned", value, color: window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length] }));
+    window.RoCharts.bar(host, { items, empty: "No placements in this period.", labelHeader: "Client", valueHeader: "Placements", ariaLabel: "Placements by client" });
+  } else {
+    const items = [...(data.rows || [])].sort((a, b) => (b.revenue || 0) - (a.revenue || 0)).slice(0, 8)
+      .map((row, i) => ({ label: row.client_name || "Unassigned", value: row.revenue || 0, color: window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length] }));
+    window.RoCharts.bar(host, { items, format: (v) => reportMoney(v, data.currency), empty: "No client activity in this period.", labelHeader: "Client", valueHeader: "Revenue", ariaLabel: "Revenue by client" });
   }
-  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${type}-report-${data.period_from}-to-${data.period_to}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  if (typeof showToast === "function") showToast("Excel (CSV) downloaded", "Your export is ready");
 }
 
 const REPORT_DEFS = {
@@ -4768,6 +4822,7 @@ async function fetchAndRenderReport() {
       ? { candidate: "Total", ctc_display: reportMoney(s.total_ctc, currency), revenue_display: reportMoney(s.total_revenue, currency) }
       : null;
     renderReportTable(columns, rows, footerRow);
+    renderReportChart(type, data);
   } else {
     const t = data.totals || {};
     renderReportKpis([
@@ -4785,6 +4840,7 @@ async function fetchAndRenderReport() {
       ? { client_name: "Total", requisitions: t.requisitions, open_requisitions: t.open_requisitions, placements: t.placements, revenue_display: reportMoney(t.revenue, currency) }
       : null;
     renderReportTable(def.columns(currency), rows, footerRow);
+    renderReportChart(type, data);
   }
 }
 
@@ -4897,6 +4953,20 @@ async function loadTimeToFillReport() {
   renderTimeToFillBars("Time to Fill by Department", (report.by_department || []).map((row) => ({ label: row.label, days: row.avg_days })));
   renderTimeToFillBars("Time to Fill by Seniority", (report.by_seniority || []).map((row) => ({ label: row.label, days: row.avg_days })));
   renderTimeToFillTrend(report);
+  wireReportExportButtons({
+    title: "Time to Fill Report",
+    subtitle: "Average days to fill, by department and seniority",
+    filePrefix: "time-to-fill",
+    columns: [
+      { key: "group", label: "Group" },
+      { key: "metric", label: "Breakdown" },
+      { key: "days", label: "Avg Days", numeric: true },
+    ],
+    rows: [
+      ...(report.by_department || []).map((row) => ({ group: "Department", metric: row.label, days: row.avg_days })),
+      ...(report.by_seniority || []).map((row) => ({ group: "Seniority", metric: row.label, days: row.avg_days })),
+    ],
+  });
 }
 
 async function loadSourceEffectiveness() {
@@ -4916,6 +4986,31 @@ async function loadSourceEffectiveness() {
   renderSourceEffectivenessTable(rows);
   renderSourceLeaderboard(rows);
   renderSourceRecommendations(rows);
+  const volumeHost = document.querySelector("[data-source-volume-chart]");
+  if (volumeHost && window.RoCharts) {
+    const sorted = [...rows].sort((a, b) => (b.candidates || 0) - (a.candidates || 0)).slice(0, 8);
+    window.RoCharts.bar(volumeHost, {
+      items: sorted.map((row, i) => ({ label: row.source, value: row.candidates || 0, color: window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length] })),
+      empty: "No candidate source data available yet.",
+      labelHeader: "Source",
+      valueHeader: "Candidates",
+      ariaLabel: "Candidates by source",
+    });
+  }
+  wireReportExportButtons({
+    title: "Source Effectiveness",
+    subtitle: "Channel volume, conversion, and cost per hire",
+    filePrefix: "source-effectiveness",
+    columns: [
+      { key: "source", label: "Source" },
+      { key: "candidates", label: "Candidates", numeric: true },
+      { key: "hired", label: "Hired", numeric: true },
+      { key: "conversion_rate", label: "Conversion %", numeric: true },
+      { key: "cost_per_hire", label: "Cost per Hire", numeric: true },
+      { key: "quality_score", label: "Quality Score", numeric: true },
+    ],
+    rows,
+  });
 }
 
 async function loadSlaTracker() {
@@ -4931,6 +5026,21 @@ async function loadSlaTracker() {
   const avgOpen = open.length ? Math.round(open.reduce((sum, row) => sum + (row.current_days || 0), 0) / open.length) : null;
   setMetricCardValue("Avg Time to Fill", avgOpen != null ? `${avgOpen} days` : "—");
   renderSlaTrackerTable(rows);
+  renderSlaCompositionChart(rows);
+  renderSlaBreachedList(rows);
+  wireReportExportButtons({
+    title: "SLA Tracker",
+    subtitle: "Current status of every tracked mandate",
+    filePrefix: "sla-tracker",
+    columns: [
+      { key: "mandate", label: "Mandate" },
+      { key: "client", label: "Client" },
+      { key: "sla_target_days", label: "SLA Target (days)", numeric: true },
+      { key: "current_days", label: "Current (days)", numeric: true },
+      { key: "owner", label: "Owner" },
+    ],
+    rows,
+  });
 }/* ═══════════════════════════════════════════════════════════════
    WORKFLOW ACTIONS & OVERLAY
    ═══════════════════════════════════════════════════════════════ */
@@ -6212,6 +6322,21 @@ async function loadReportsLibrary() {
   const surface = document.querySelector(".workspace-surface");
   if (surface) surface.dataset.liveReports = JSON.stringify(reports);
   renderReportLibraryCards(reports);
+  const generateBtn = document.querySelector("[data-quick-report-generate]");
+  const typeSelect = document.querySelector("[data-quick-report-type]");
+  if (generateBtn && typeSelect) {
+    const destinations = {
+      "Hiring Summary": "analytics-dashboard.html",
+      "Pipeline Analysis": "pipeline-analytics.html",
+      "Source ROI": "source-effectiveness.html",
+      "Time to Fill": "time-to-fill-report.html",
+      "Recruiter Performance": "user-performance-reports.html",
+    };
+    generateBtn.onclick = () => {
+      const href = destinations[typeSelect.value] || "custom-report-builder.html";
+      window.location.href = href;
+    };
+  }
 }
 
 async function loadAnalyticsDashboard() {
@@ -6514,6 +6639,22 @@ function bindCustomReportBuilder(root) {
   root.addEventListener("change", () => styleCustomReportChoices(root));
   const generateButton = Array.from(root.querySelectorAll("button")).find((button) => /generate now/i.test(button.textContent || ""));
   if (generateButton) generateButton.addEventListener("click", () => runCustomReport(root));
+  const pdfBtn = root.querySelector("[data-export-pdf]");
+  const excelBtn = root.querySelector("[data-export-excel]");
+  if (pdfBtn) pdfBtn.addEventListener("click", () => {
+    if (!customReportState.rows.length) return;
+    window.RoExport?.downloadPdf({ title: customReportState.dimension?.label || "Custom Report", docTitle: "Custom Report - RecruitOps" });
+  });
+  if (excelBtn) excelBtn.addEventListener("click", () => {
+    if (!customReportState.rows.length || !window.RoExport) return;
+    const columns = (customReportState.dimension?.columns || []).filter((c) => customReportState.rows.some((r) => r[c.key] != null));
+    window.RoExport.downloadExcel("custom-report", {
+      title: customReportState.dimension?.label || "Custom Report",
+      sheetName: "Custom Report",
+      columns: columns.map((c) => ({ key: c.key, label: c.label, numeric: c.type === "number" })),
+      rows: customReportState.rows,
+    });
+  });
 }
 
 function renderCustomReportDatasetTable(root, dataset, dimension, rows) {
@@ -6555,11 +6696,52 @@ async function runCustomReport(root) {
   try {
     const payload = await apiRequest(`/reports/datasets/${dataset}`);
     const dimension = payload.dimensions?.[0];
-    renderCustomReportDatasetTable(root, dataset, dimension, payload.rows || []);
+    const rows = payload.rows || [];
+    renderCustomReportPreview(root, dataset, dimension, rows, inputs.selectedViz);
     root.dataset.liveCustomReportDestination = customReportDestination(inputs.selectedMetrics);
+    customReportState.dataset = dataset;
+    customReportState.dimension = dimension;
+    customReportState.rows = rows;
+    const exportHost = document.querySelector("[data-custom-report-export]");
+    if (exportHost) exportHost.classList.remove("hidden");
   } catch (error) {
     showLiveError(error);
   }
+}
+
+const customReportState = { dataset: null, dimension: null, rows: [] };
+
+function renderCustomReportPreview(root, dataset, dimension, rows, viz) {
+  const host = root.querySelector(".chart-placeholder") || root.querySelector("[data-custom-report-preview]");
+  if (!host) return;
+  const columns = (dimension?.columns || []).filter((column) => rows.length === 0 || rows.some((row) => row[column.key] != null));
+  const labelCol = columns.find((c) => c.type !== "number" && c.type !== "date") || columns[0];
+  const numCol = columns.find((c) => c.type === "number");
+  host.classList.remove("chart-placeholder");
+
+  if ((viz === "Bar Chart" || viz === "Pie Chart") && labelCol && numCol && window.RoCharts) {
+    host.innerHTML = `<div class="ro-chart-card"><div class="ro-chart-card-head"><div><h3>${escapeLiveHtml(dimension?.label || dataset)}</h3><p>${rows.length} row${rows.length === 1 ? "" : "s"} from live data</p></div></div><div data-custom-chart></div></div>`;
+    const chartHost = host.querySelector("[data-custom-chart]");
+    const items = rows.slice(0, 10).map((row, i) => ({ label: String(row[labelCol.key] ?? "—"), value: Number(row[numCol.key]) || 0, color: window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length] }));
+    if (viz === "Pie Chart") {
+      window.RoCharts.donut(chartHost, { segments: items, empty: "No rows returned for this dataset.", centerLabel: numCol.label });
+    } else {
+      window.RoCharts.bar(chartHost, { items, empty: "No rows returned for this dataset.", labelHeader: labelCol.label, valueHeader: numCol.label });
+    }
+    return;
+  }
+  if (viz === "Line Chart" && labelCol && numCol && window.RoCharts) {
+    host.innerHTML = `<div class="ro-chart-card"><div class="ro-chart-card-head"><div><h3>${escapeLiveHtml(dimension?.label || dataset)}</h3><p>${rows.length} row${rows.length === 1 ? "" : "s"} from live data</p></div></div><div data-custom-chart></div></div>`;
+    const chartHost = host.querySelector("[data-custom-chart]");
+    const slice = rows.slice(0, 20);
+    window.RoCharts.line(chartHost, {
+      labels: slice.map((row) => String(row[labelCol.key] ?? "—")),
+      series: [{ name: numCol.label, values: slice.map((row) => Number(row[numCol.key]) || 0) }],
+      empty: "No rows returned for this dataset.",
+    });
+    return;
+  }
+  renderCustomReportDatasetTable(root, dataset, dimension, rows);
 }
 
 
