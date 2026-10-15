@@ -78,12 +78,44 @@ function nonNull(schema) {
 }
 
 const FIRST_NAMES = ["Asha Rao", "Vikram Shah", "Meera Iyer", "Rohan Gupta", "Neha Kapoor"];
+/* Field-name-aware fallbacks for the generic schema sampler below. Without
+   these, any string field the patterns don't recognize falls through to a
+   "field name + seed" placeholder ("current company 1", "work mode 2") and
+   a few actively mislead ("resume_file_name" matched the generic *_name
+   pattern and returned a person's name instead of a filename, and any
+   "number"-typed field — experience years, days-to-fill, hours — reused
+   the budget/CTC formula and came out as a six-figure number). These lists
+   keep screenshots and manual QA readable without claiming to be real data. */
+const COMPANY_NAMES = ["Acme Corp", "Globex Technologies", "Initech Solutions", "Stark Industries", "Umbrella Group", "Northwind Traders"];
+const LOCATION_NAMES = ["Bengaluru", "Pune", "Hyderabad", "Mumbai", "Chennai", "Austin Tech Center"];
+const JOB_TITLES = ["Senior Backend Engineer", "Data Analyst", "Product Designer", "Engineering Manager", "QA Lead", "DevOps Engineer"];
+const INDUSTRIES = ["Technology", "Financial Services", "Healthcare", "E-commerce", "Manufacturing", "Telecom"];
+const SOURCE_TYPES = ["LinkedIn", "Referral", "Naukri", "Indeed", "Agency", "Career Site"];
+const WORK_MODES = ["Remote", "Hybrid", "On-site"];
+const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship"];
+const ENTITY_TYPES = ["Requisition", "Candidate", "Application", "Offer"];
+const SKILLS = ["SQL", "Python", "Stakeholder management", "React", "Node.js", "Communication", "Excel", "Negotiation", "Figma", "Project management", "AWS", "Data analysis"];
+const MATCH_REASONS = ["Email matches", "Phone number matches", "Same employer and role", "Matching resume fingerprint"];
+const STREET_ADDRESSES = ["221 Residency Road", "48 MG Road", "12 Park Street", "77 Brigade Road"];
+const SUMMARIES = [
+  "Steady progress today; pipeline health looks good.",
+  "Made headway on outstanding screenings, one blocker flagged.",
+  "Caught up on interviews; offers pending client sign-off.",
+];
 function sampleString(name, s, seed) {
   if (s.enum) return s.enum[seed % s.enum.length];
   if (s.const) return s.const;
   if (s.format === "date-time") return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (s.format === "date") return `2026-09-${String(1 + (seed % 25)).padStart(2, "0")}`;
   if (s.format === "email" || /email/.test(name)) return `user${seed}@example.test`;
+  // "candidate" ends in the letters "date", so it used to fall through to the
+  // date/timestamp branch below and render as an ISO timestamp instead of a
+  // name (seen on the placements report). Catch the exact field names that
+  // collide with that suffix before the generic date-suffix check runs.
+  if (/^candidate$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
+  if (/^consultant$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
+  if (/^requisition$/.test(name)) return JOB_TITLES[seed % JOB_TITLES.length];
+  if (/^department$/.test(name)) return ["Engineering", "Sales", "Finance", "Operations", "Marketing"][seed % 5];
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
@@ -91,10 +123,24 @@ function sampleString(name, s, seed) {
   if (/currency/.test(name)) return "INR";
   if (/phone/.test(name)) return `+91 98000 0000${seed % 10}`;
   if (/(^|_)code$/.test(name)) return `CODE-${100 + seed}`;
+  if (/file_?name/.test(name)) return `${FIRST_NAMES[seed % FIRST_NAMES.length].toLowerCase().replace(/\s+/g, "_")}_resume.pdf`;
+  if (/^skills$|_skills$/.test(name)) return SKILLS[seed % SKILLS.length];
+  if (/source_type/.test(name)) return SOURCE_TYPES[seed % SOURCE_TYPES.length];
+  if (/work_mode/.test(name)) return WORK_MODES[seed % WORK_MODES.length];
+  if (/employment_type/.test(name)) return EMPLOYMENT_TYPES[seed % EMPLOYMENT_TYPES.length];
+  if (/industry/.test(name)) return INDUSTRIES[seed % INDUSTRIES.length];
+  if (/designation/.test(name)) return JOB_TITLES[seed % JOB_TITLES.length];
+  if (/company|client_name|legal_name|account_name|^client$/.test(name)) return COMPANY_NAMES[seed % COMPANY_NAMES.length];
+  if (/branch_name|location_name/.test(name)) return LOCATION_NAMES[seed % LOCATION_NAMES.length];
+  if (/entity_type/.test(name)) return ENTITY_TYPES[seed % ENTITY_TYPES.length];
+  if (/age_label/.test(name)) return `${2 + ((seed * 3) % 58)}d`;
+  if (/match_reasons/.test(name)) return MATCH_REASONS[seed % MATCH_REASONS.length];
+  if (/^address$/.test(name)) return STREET_ADDRESSES[seed % STREET_ADDRESSES.length];
+  if (/^summary$/.test(name)) return SUMMARIES[seed % SUMMARIES.length];
   if (/full_name|_name$|^name$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
   if (/url|path/.test(name)) return `/files/sample-${seed}.pdf`;
   if (/token/.test(name)) return `mock-token-${seed}`;
-  if (/title/.test(name)) return ["Senior Backend Engineer", "Data Analyst", "Product Designer"][seed % 3];
+  if (/title/.test(name)) return JOB_TITLES[seed % JOB_TITLES.length];
   return `${name.replace(/_/g, " ")} ${seed}`.trim();
 }
 
@@ -114,8 +160,27 @@ function sample(schema, name = "", seed = 1, depth = 0) {
     const count = depth === 0 || name === "items" ? 3 : 2;
     return Array.from({ length: count }, (_v, i) => sample(s.items || {}, name, seed + i, depth + 1));
   }
-  if (type === "integer") return name === "total" ? 3 : name === "page" ? 1 : name === "page_size" ? 50 : seed;
-  if (type === "number") return 100000 + seed * 2500;
+  if (type === "integer") {
+    if (name === "total") return 3;
+    if (name === "page") return 1;
+    if (name === "page_size") return 50;
+    // field-name-aware range so e.g. notice_period_days stays in a plausible band
+    if (/days$/.test(name)) return 1 + (seed % 30);
+    return seed;
+  }
+  if (type === "number") {
+    // Every float-typed field used to share one "big currency number" formula
+    // (100000 + seed*2500), so non-money fields like total_experience_years
+    // or avg_days_to_fill rendered as "102500 years"/"102500 days". Route by
+    // field-name semantics first and keep the original formula only for
+    // genuinely money-like fields (budget, CTC, revenue, bonus).
+    if (/years/.test(name)) return Math.round((1 + ((seed * 3) % 14)) * 10) / 10;
+    if (/days/.test(name)) return 5 + ((seed * 4) % 55);
+    if (/hours/.test(name)) return 1 + ((seed * 3) % 180);
+    if (/pct|percent|rate|conversion|score/.test(name)) return Math.round((10 + ((seed * 7) % 85)) * 10) / 10;
+    if (/threshold/.test(name)) return 50 + ((seed * 5) % 50);
+    return 100000 + seed * 2500;
+  }
   if (type === "boolean") return /enabled|active|is_/.test(name) ? true : seed % 2 === 0;
   if (type === "string" || s.format) return sampleString(name, s, seed);
   return null;
