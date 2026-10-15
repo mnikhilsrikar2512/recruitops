@@ -193,7 +193,7 @@ function tableHeaders() {
     critical: "bg-danger-bg text-danger-text",
     high: "bg-warning-bg text-warning-text",
     medium: "bg-info-bg text-info-text",
-    low: "bg-surface-dim text-text-muted",
+    low: "bg-surface-dim text-on-surface-variant",  // text-muted on surface-dim was 3.87:1, under WCAG AA (4.5:1) for this 12px badge text
   };
   const badge = td.querySelector("span") || td;
   badge.className = `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[p] || tones.low}`;
