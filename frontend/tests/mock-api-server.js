@@ -136,6 +136,7 @@ function sampleString(name, s, seed) {
   if (/entity_type/.test(name)) return ENTITY_TYPES[seed % ENTITY_TYPES.length];
   if (/age_label/.test(name)) return `${2 + ((seed * 3) % 58)}d`;
   if (/match_reasons/.test(name)) return MATCH_REASONS[seed % MATCH_REASONS.length];
+  if (/change_reason/.test(name)) return ["Panel feedback pending", "Candidate requested reschedule", "Budget approval needed", "Moved per client request", "Scheduling conflict resolved"][seed % 5];
   if (/^address$/.test(name)) return STREET_ADDRESSES[seed % STREET_ADDRESSES.length];
   if (/^summary$/.test(name)) return SUMMARIES[seed % SUMMARIES.length];
   if (/full_name|_name$|^name$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
