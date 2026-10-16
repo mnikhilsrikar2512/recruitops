@@ -520,6 +520,63 @@ function special(method, pathname, body) {
       }),
     }];
   }
+  /* Requisitions showed the same collision one layer down: the generic
+     /status$/ sampleString pattern returns "open" / "active" / "pending"
+     — a set shared by many unrelated schemas — but a requisition's real
+     status lifecycle is open / draft / on-hold / filled / closed
+     (confirmed from how requisition-detail.html, status-update-dialog.html
+     and the role-dashboard "stale requisitions" widget all branch on it).
+     "active" and "pending" aren't real requisition statuses, so 2 of every
+     3 requisitions were silently invisible to any `status === "open"`
+     check sitewide — including the location-dashboard rebuild's KPI
+     strip. Scoped to requisitions only; every other `status$` field
+     (offers, roles, locations, …) is untouched. */
+  const REQUISITION_STATUSES = ["open", "open", "open", "on-hold", "filled", "closed", "draft"];
+  if (method === "GET" && pathname === "/api/v1/requisitions/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        item.status = REQUISITION_STATUSES[(item.id || i + 1) % REQUISITION_STATUSES.length];
+      });
+      return [200, payload];
+    }
+  }
+  const requisitionDetailMatch = /^\/api\/v1\/requisitions\/(\d+)$/.exec(pathname);
+  if (method === "GET" && requisitionDetailMatch) {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      payload.status = REQUISITION_STATUSES[Number(requisitionDetailMatch[1]) % REQUISITION_STATUSES.length];
+      return [200, payload];
+    }
+  }
+  /* Source Effectiveness (and the location-dashboard widget that reuses
+     this same endpoint) showed "source 1" / "source 2" — SourceEffectivenessRow.source
+     has no dedicated pattern, and a bare "source" is too generic for one:
+     StageBucketResponse/StageListResponse also have a field literally named
+     "source" but meaning something else entirely ("platform"/"company"/
+     "inferred" — already handled by their own special() cases above), so
+     this stays scoped to the source-effectiveness report only. */
+  const SOURCE_CHANNELS = ["LinkedIn", "Employee Referral", "Naukri", "Company Website", "Indeed", "Agency", "Direct Application"];
+  if (method === "GET" && pathname === "/api/v1/reports/source-effectiveness") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.rows || []).forEach((row, i) => { row.source = SOURCE_CHANNELS[i % SOURCE_CHANNELS.length]; });
+      if (payload.best_source) payload.best_source = SOURCE_CHANNELS[0];
+      return [200, payload];
+    }
+  }
   return null;
 }
 const STAGE_BUCKET_CHOICES_MOCK = [

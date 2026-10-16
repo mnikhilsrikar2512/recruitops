@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Location Dashboard - RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=36cb2e355c" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=36cb2e355c" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=36cb2e355c" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=36cb2e355c" />
+  <link rel="stylesheet" href="../shared/global.css?v=a2d6423eac" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=a2d6423eac" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=a2d6423eac" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=a2d6423eac" />
+  <link rel="stylesheet" href="../shared/charts.css?v=a2d6423eac" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="location-dashboard" data-route-kind="app" data-route-title="Location Dashboard" data-route-section="Administration">
   
@@ -75,21 +76,125 @@
           <div class="page-stack">
     
     <section class="shell-card">
-      <div class="workspace-surface">
-      <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4"> <div> <div class="flex items-center gap-2 text-text-muted font-label-caps text-label-caps mb-1"> <span>Reports</span> <span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span> <span class="text-primary font-bold">Location Dashboard</span> </div> <h2 class="font-headline-lg text-headline-lg font-bold text-on-background">Location Performance</h2> </div> <div class="flex flex-wrap items-center gap-3"> <div class="flex items-center border border-border rounded-DEFAULT bg-surface px-3 py-1.5 shadow-sm"> <span class="material-symbols-outlined text-text-muted mr-2" data-icon="location_on">location_on</span> <select class="bg-transparent border-none text-on-surface font-data-tabular focus:ring-0 p-0 pr-6 text-sm font-medium"> <option>New York Hub</option> <option>London Office</option> <option>SF Bay Area</option> </select> </div> <button class="px-4 py-2 bg-surface border border-border text-on-background rounded-DEFAULT font-data-tabular hover:bg-highlight-soft transition-colors flex items-center gap-2 text-sm font-medium"> <span class="material-symbols-outlined text-[18px]" data-icon="bookmark">bookmark</span> Save View </button> <button class="px-4 py-2 bg-primary text-on-primary rounded-DEFAULT font-data-tabular hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm font-medium" id="export-btn"> <span class="material-symbols-outlined text-[18px]" data-icon="download">download</span> Export </button> </div> </div> <!-- Filter Bar --> <div class="bg-surface border border-border rounded-DEFAULT p-3 mb-6 flex flex-wrap gap-3 items-center shadow-sm"> <div class="flex items-center gap-2 border-r border-border pr-3"> <span class="material-symbols-outlined text-text-muted text-[18px]" data-icon="filter_list">filter_list</span> <span class="font-label-caps text-label-caps text-text-muted uppercase">Filters</span> </div> <select class="bg-surface border border-border text-on-surface font-body-sm rounded px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary text-sm"> <option>Role Family: All</option> <option>Engineering</option> <option>Product</option> <option>Design</option> </select> <select class="bg-surface border border-border text-on-surface font-body-sm rounded px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary text-sm"> <option>Recruiter: All</option> <option>—</option> <option>—</option> </select> <div class="flex items-center gap-2 bg-surface border border-border rounded px-3 py-1.5 text-sm"> <span class="material-symbols-outlined text-text-muted text-[16px]" data-icon="calendar_today">calendar_today</span> <span class="font-body-sm">Last 30 Days</span> </div> <button class="text-primary hover:text-primary-hover font-data-tabular text-sm ml-auto">Clear Filters</button> </div> <!-- KPI Strip --> <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"> <!-- KPI Card 1 --> <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-primary shadow-sm flex flex-col justify-between hover:bg-highlight-soft transition-colors cursor-default"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase">Active Reqs</span> <span class="material-symbols-outlined text-primary text-[20px]" data-icon="work_outline">work_outline</span> </div> <div class="flex items-baseline gap-2"> <span class="font-headline-lg text-headline-lg font-bold text-on-background">42</span> <span class="font-data-tabular text-success-text text-xs flex items-center bg-success-bg px-1.5 py-0.5 rounded"> <span class="material-symbols-outlined text-[12px]" data-icon="arrow_upward">arrow_upward</span> 12% </span> </div> </div> <!-- KPI Card 2 --> <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-warning-text shadow-sm flex flex-col justify-between hover:bg-highlight-soft transition-colors cursor-default"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase">Avg Time to Hire</span> <span class="material-symbols-outlined text-warning-text text-[20px]" data-icon="timer">timer</span> </div> <div class="flex items-baseline gap-2"> <span class="font-headline-lg text-headline-lg font-bold text-on-background">48d</span> <span class="font-data-tabular text-danger-text text-xs flex items-center bg-danger-bg px-1.5 py-0.5 rounded"> <span class="material-symbols-outlined text-[12px]" data-icon="arrow_upward">arrow_upward</span> 3d </span> </div> </div> <!-- KPI Card 3 --> <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-tertiary shadow-sm flex flex-col justify-between hover:bg-highlight-soft transition-colors cursor-default"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase">Fill Rate</span> <span class="material-symbols-outlined text-tertiary text-[20px]" data-icon="check_circle">check_circle</span> </div> <div class="flex items-baseline gap-2"> <span class="font-headline-lg text-headline-lg font-bold text-on-background">85%</span> <span class="font-data-tabular text-success-text text-xs flex items-center bg-success-bg px-1.5 py-0.5 rounded"> <span class="material-symbols-outlined text-[12px]" data-icon="arrow_upward">arrow_upward</span> 5% </span> </div> </div> <!-- KPI Card 4 --> <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-info-text shadow-sm flex flex-col justify-between hover:bg-highlight-soft transition-colors cursor-default"> <div class="flex justify-between items-start mb-2"> <span class="font-label-caps text-label-caps text-text-muted uppercase">Compliance %</span> <span class="material-symbols-outlined text-info-text text-[20px]" data-icon="fact_check">fact_check</span> </div> <div class="flex items-baseline gap-2"> <span class="font-headline-lg text-headline-lg font-bold text-on-background">92%</span> <span class="font-data-tabular text-text-muted text-xs flex items-center bg-surface-alt px-1.5 py-0.5 rounded"> Stable </span> </div> </div> </div> <!-- Main Dashboard Grid (Bento Style) --> <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6"> <!-- Left Column (Span 2) --> <div class="lg:col-span-2 flex flex-col gap-6"> <!-- Top Risks Table --> <div class="bg-surface border border-border rounded-DEFAULT shadow-sm flex flex-col"> <div class="bg-surface-alt px-5 py-3 border-b border-border flex justify-between items-center"> <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface flex items-center gap-2"> <span class="material-symbols-outlined text-danger-text text-[20px]" data-icon="warning">warning</span> Top Risks: New York Hub </h3> <button class="text-primary font-data-tabular text-sm hover:underline">View All</button> </div> <div class="overflow-x-auto"> <table class="w-full text-left border-collapse"> <thead> <tr class="border-b border-border bg-surface-bright"> <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold">Requisition</th> <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold">Risk Type</th> <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold">Impact</th> <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold text-right">Action</th> </tr> </thead> <tbody class="font-data-tabular text-sm"><tr hidden data-row-template="true" class="border-b border-border hover:bg-highlight-soft transition-colors bg-surface"> <td class="px-5 py-3"> <div class="font-medium text-on-surface">—</div> <div class="text-xs text-text-muted font-body-sm">Senior Frontend Engineer</div> </td> <td class="px-5 py-3"> <span class="inline-flex items-center px-2 py-1 rounded-sm text-xs font-medium bg-danger-bg text-danger-text border border-danger-text/20"> Stale Pipeline </span> </td> <td class="px-5 py-3"> <div class="flex items-center gap-1 text-danger-text"> <span class="w-2 h-2 rounded-full bg-danger-text">
-</span> High </div> </td> <td class="px-5 py-3 text-right"> <button class="text-primary hover:text-primary-hover font-medium">Review</button> </td> </tr></tbody> </table> </div> </div> <!-- Pipeline Aging --> <div class="bg-surface border border-border rounded-DEFAULT shadow-sm p-5"> <div class="flex justify-between items-center mb-4"> <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Pipeline Aging</h3> <span class="font-label-caps text-label-caps text-text-muted uppercase">Avg Days in Stage</span> </div> <div class="space-y-4"> <!-- Stage 1 --> <div> <div class="flex justify-between text-sm mb-1"> <span class="font-body-sm text-on-surface">Applied</span> <span class="font-data-tabular font-medium">3 days</span> </div> <div class="w-full bg-surface-alt rounded-full h-2"> <div class="bg-primary h-2 rounded-full" style="width: 15%">
-</div> </div> </div> <!-- Stage 2 --> <div> <div class="flex justify-between text-sm mb-1"> <span class="font-body-sm text-on-surface">Screening</span> <span class="font-data-tabular font-medium">5 days</span> </div> <div class="w-full bg-surface-alt rounded-full h-2"> <div class="bg-primary h-2 rounded-full" style="width: 25%">
-</div> </div> </div> <!-- Stage 3 --> <div> <div class="flex justify-between text-sm mb-1"> <span class="font-body-sm text-on-surface">Interviews</span> <span class="font-data-tabular font-medium text-warning-text">14 days</span> </div> <div class="w-full bg-surface-alt rounded-full h-2"> <div class="bg-warning-text h-2 rounded-full" style="width: 70%">
-</div> </div> </div> <!-- Stage 4 --> <div> <div class="flex justify-between text-sm mb-1"> <span class="font-body-sm text-on-surface">Offer Stage</span> <span class="font-data-tabular font-medium">4 days</span> </div> <div class="w-full bg-surface-alt rounded-full h-2"> <div class="bg-primary h-2 rounded-full" style="width: 20%">
-</div> </div> </div> </div> </div> </div> <!-- Right Column (Span 1) --> <div class="flex flex-col gap-6"> <!-- Requisition Health --> <div class="bg-surface border border-border rounded-DEFAULT shadow-sm p-5"> <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface mb-4">Requisition Health</h3> <div class="flex items-end gap-2 h-32 mb-4 pt-4 border-b border-border/50"> <!-- Healthy --> <div class="flex-1 flex flex-col justify-end items-center group"> <div class="w-full bg-success-bg border border-success-text/30 rounded-t-sm h-[65%] relative group-hover:bg-success-text/20 transition-colors"> <span class="absolute -top-6 left-1/2 -translate-x-1/2 font-data-tabular text-sm font-bold">28</span> </div> <span class="font-label-caps text-label-caps text-text-muted mt-2">Healthy</span> </div> <!-- At Risk --> <div class="flex-1 flex flex-col justify-end items-center group"> <div class="w-full bg-warning-bg border border-warning-text/30 rounded-t-sm h-[25%] relative group-hover:bg-warning-text/20 transition-colors"> <span class="absolute -top-6 left-1/2 -translate-x-1/2 font-data-tabular text-sm font-bold">11</span> </div> <span class="font-label-caps text-label-caps text-text-muted mt-2">At Risk</span> </div> <!-- Critical --> <div class="flex-1 flex flex-col justify-end items-center group"> <div class="w-full bg-danger-bg border border-danger-text/30 rounded-t-sm h-[10%] relative group-hover:bg-danger-text/20 transition-colors"> <span class="absolute -top-6 left-1/2 -translate-x-1/2 font-data-tabular text-sm font-bold">3</span> </div> <span class="font-label-caps text-label-caps text-text-muted mt-2">Critical</span> </div> </div> </div> <!-- Source Effectiveness --> <div class="bg-surface border border-border rounded-DEFAULT shadow-sm p-5 flex-1"> <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface mb-4">Source Effectiveness</h3> <div class="space-y-3"> <div class="flex items-center justify-between"> <div class="flex items-center gap-2"> <div class="w-3 h-3 rounded-sm bg-primary">
-</div> <span class="font-body-sm text-sm text-on-surface">LinkedIn</span> </div> <span class="font-data-tabular text-sm font-medium">45%</span> </div> <div class="flex items-center justify-between"> <div class="flex items-center gap-2"> <div class="w-3 h-3 rounded-sm bg-tertiary">
-</div> <span class="font-body-sm text-sm text-on-surface">Referrals</span> </div> <span class="font-data-tabular text-sm font-medium">30%</span> </div> <div class="flex items-center justify-between"> <div class="flex items-center gap-2"> <div class="w-3 h-3 rounded-sm bg-secondary">
-</div> <span class="font-body-sm text-sm text-on-surface">Direct App</span> </div> <span class="font-data-tabular text-sm font-medium">15%</span> </div> <div class="flex items-center justify-between"> <div class="flex items-center gap-2"> <div class="w-3 h-3 rounded-sm bg-border">
-</div> <span class="font-body-sm text-sm text-on-surface">Agency</span> </div> <span class="font-data-tabular text-sm font-medium">10%</span> </div> </div> <!-- Simple visual bar --> <div class="w-full h-2 flex rounded-full mt-4"> <div class="bg-primary" style="width: 45%">
-</div> <div class="bg-tertiary" style="width: 30%">
-</div> <div class="bg-secondary" style="width: 15%">
-</div> <div class="bg-border" style="width: 10%">
-</div> </div> </div> </div> </div>
+      <div class="workspace-surface" data-manual-pagination="true">
+        <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+          <div>
+            <div class="flex items-center gap-2 text-text-muted font-label-caps text-label-caps mb-1">
+              <span>Reports</span>
+              <span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span>
+              <span class="text-primary font-bold">Location Dashboard</span>
+            </div>
+            <h2 class="font-headline-lg text-headline-lg font-bold text-on-background">Location Performance</h2>
+            <p class="mt-1 font-body-sm text-body-sm text-text-muted" data-location-subtitle>Loading…</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center border border-border rounded-DEFAULT bg-surface px-3 py-1.5 shadow-sm">
+              <span class="material-symbols-outlined text-text-muted mr-2" data-icon="location_on">location_on</span>
+              <label class="sr-only" for="location-dashboard-select">Choose a location</label>
+              <select id="location-dashboard-select" data-no-filter class="bg-transparent border-none text-on-surface font-data-tabular focus:ring-0 p-0 pr-6 text-sm font-medium"><option>Loading…</option></select>
+            </div>
+            <button type="button" class="px-4 py-2 bg-primary text-on-primary rounded-DEFAULT font-data-tabular hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm font-medium" data-export-excel>
+              <span class="material-symbols-outlined text-[18px]" data-icon="download">download</span> Export
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Strip -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-primary shadow-sm flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-label-caps text-label-caps text-text-muted uppercase">Active Requisitions</span>
+              <span class="material-symbols-outlined text-primary text-[20px]" data-icon="work_outline">work_outline</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="font-headline-lg text-headline-lg font-bold text-on-background" data-kpi-active-reqs>—</span>
+            </div>
+            <p class="font-body-sm text-body-sm text-text-muted mt-1" data-kpi-active-reqs-hint></p>
+          </div>
+          <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-warning-text shadow-sm flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-label-caps text-label-caps text-text-muted uppercase">Avg Time to Hire</span>
+              <span class="material-symbols-outlined text-warning-text text-[20px]" data-icon="timer">timer</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="font-headline-lg text-headline-lg font-bold text-on-background" data-kpi-avg-ttf>—</span>
+            </div>
+            <p class="font-body-sm text-body-sm text-text-muted mt-1" data-kpi-avg-ttf-hint></p>
+          </div>
+          <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-tertiary shadow-sm flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-label-caps text-label-caps text-text-muted uppercase">Fill Rate</span>
+              <span class="material-symbols-outlined text-tertiary text-[20px]" data-icon="check_circle">check_circle</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="font-headline-lg text-headline-lg font-bold text-on-background" data-kpi-fill-rate>—</span>
+            </div>
+            <p class="font-body-sm text-body-sm text-text-muted mt-1" data-kpi-fill-rate-hint></p>
+          </div>
+          <div class="bg-surface border border-border rounded-DEFAULT p-4 border-l-4 border-l-info-text shadow-sm flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-label-caps text-label-caps text-text-muted uppercase">Candidates in Pipeline</span>
+              <span class="material-symbols-outlined text-info-text text-[20px]" data-icon="groups">groups</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="font-headline-lg text-headline-lg font-bold text-on-background" data-kpi-pipeline-count>—</span>
+            </div>
+            <p class="font-body-sm text-body-sm text-text-muted mt-1" data-kpi-pipeline-count-hint></p>
+          </div>
+        </div>
+
+        <!-- Main Dashboard Grid (Bento Style) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <!-- Left Column (Span 2) -->
+          <div class="lg:col-span-2 flex flex-col gap-6">
+            <!-- Top Risks Table -->
+            <div class="bg-surface border border-border rounded-DEFAULT shadow-sm flex flex-col">
+              <div class="bg-surface-alt px-5 py-3 border-b border-border flex justify-between items-center">
+                <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface flex items-center gap-2">
+                  <span class="material-symbols-outlined text-danger-text text-[20px]" data-icon="warning">warning</span>
+                  <span>Top Risks<span data-location-risk-title></span></span>
+                </h3>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-border bg-surface-bright">
+                      <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold">Requisition</th>
+                      <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold">Risk Type</th>
+                      <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold">Impact</th>
+                      <th class="px-5 py-3 font-label-caps text-label-caps text-text-muted uppercase tracking-wider font-semibold text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="font-data-tabular text-sm" data-location-risk-rows>
+                    <tr><td colspan="4" class="px-5 py-6 text-center text-body-sm text-text-muted">Loading…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Pipeline Aging -->
+            <div class="bg-surface border border-border rounded-DEFAULT shadow-sm p-5">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Pipeline Aging</h3>
+                <span class="font-label-caps text-label-caps text-text-muted uppercase">Avg days in current stage</span>
+              </div>
+              <div data-location-pipeline-aging></div>
+            </div>
+          </div>
+          <!-- Right Column (Span 1) -->
+          <div class="flex flex-col gap-6">
+            <!-- Requisition Health -->
+            <div class="bg-surface border border-border rounded-DEFAULT shadow-sm p-5">
+              <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface mb-4">Requisition Health</h3>
+              <div data-location-health-chart></div>
+            </div>
+            <!-- Source Effectiveness -->
+            <div class="bg-surface border border-border rounded-DEFAULT shadow-sm p-5 flex-1">
+              <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface mb-1">Source Effectiveness</h3>
+              <p class="font-body-sm text-body-sm text-text-muted mb-4">Company-wide — not yet broken out by location</p>
+              <div data-location-source-chart></div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
     
@@ -100,17 +205,18 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
-    <script src="../shared/renderers.js?v=36cb2e355c"></script>
-    <script src="../shared/api-client.js?v=36cb2e355c"></script>
-    <script src="../shared/ui-utils.js?v=36cb2e355c"></script>
-    <script src="../shared/tables.js?v=36cb2e355c"></script>
-    <script src="../shared/forms.js?v=36cb2e355c"></script>
-    <script src="../shared/sidebar.js?v=36cb2e355c"></script>
-    <script src="../shared/pipeline.js?v=36cb2e355c"></script>
-    <script src="../shared/routing.js?v=36cb2e355c"></script>
+    <script src="../shared/renderers.js?v=a2d6423eac"></script>
+    <script src="../shared/charts.js?v=a2d6423eac"></script>
+    <script src="../shared/api-client.js?v=a2d6423eac"></script>
+    <script src="../shared/ui-utils.js?v=a2d6423eac"></script>
+    <script src="../shared/tables.js?v=a2d6423eac"></script>
+    <script src="../shared/forms.js?v=a2d6423eac"></script>
+    <script src="../shared/sidebar.js?v=a2d6423eac"></script>
+    <script src="../shared/pipeline.js?v=a2d6423eac"></script>
+    <script src="../shared/routing.js?v=a2d6423eac"></script>
 
-  <script src="../shared/navigation.config.js?v=36cb2e355c"></script>
-    <script src="../shared/navigation.js?v=36cb2e355c"></script>
-    <script src="../shared/app.js?v=36cb2e355c"></script>
+  <script src="../shared/navigation.config.js?v=a2d6423eac"></script>
+    <script src="../shared/navigation.js?v=a2d6423eac"></script>
+    <script src="../shared/app.js?v=a2d6423eac"></script>
 </body>
 </html>
