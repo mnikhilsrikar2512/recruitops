@@ -567,6 +567,10 @@ function csvEscapeCell(value) {
 
 function applyClientPagination(table) {
   if (!table || table.closest("[data-overlay-surface]")) return;
+  /* Server-paginated pages own their own Previous/Next buttons and reload
+     from the API on each page change — never let the generic client-side
+     pager repaint over them (see data-manual-pagination). */
+  if (table.closest("[data-manual-pagination='true']")) return;
   const eligible = getEligibleTableRows(table);
   if (!eligible.length) {
     getFilterableRows(table).forEach((row) => {
@@ -1277,6 +1281,7 @@ function compareSortValues(a, b) {
 function setupSortableTables(scope = document) {
   scope.querySelectorAll("table").forEach((table) => {
     if (table.dataset.sortableBound === "true") return;
+    if (table.closest("[data-manual-pagination='true']")) return;
     table.dataset.sortableBound = "true";
     const headers = Array.from(table.querySelectorAll("thead th"));
     headers.forEach((header, columnIndex) => {
@@ -1418,6 +1423,13 @@ function setPaginationButtonActive(button, active) {
 function setupTableControlPolish() {
   document.querySelectorAll("table").forEach((table) => ensureInferredTableSurface(table));
   document.querySelectorAll("[data-layout='table-surface']").forEach((surface) => {
+    /* A page that fetches one page of rows at a time from the server (its
+       own Previous/Next buttons, wired to a reload) opts out of this
+       generic client-side-pagination takeover via data-manual-pagination;
+       otherwise this would delete those buttons the moment the table
+       starts with fewer rows than one client-side page (e.g. the initial
+       "Loading…" placeholder row). */
+    if (surface.closest("[data-manual-pagination='true']") || surface.querySelector(":scope > [data-manual-pagination='true']")) return;
     const footer = surface.querySelector("[data-layout='table-footer'], :scope > div:last-of-type");
     const filterToolbar = findFilterToolbar(surface);
     const paginationButtons = Array.from(footer?.querySelectorAll("button") || []);

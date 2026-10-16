@@ -139,6 +139,16 @@ function sampleString(name, s, seed) {
   if (/^primary_action_label$/.test(name)) return ["Review submission", "Nudge candidate", "Resolve conflict", "Schedule interview", "Submit for approval"][seed % 5];
   if (/^blockers$/.test(name)) return ["Waiting on client interview feedback.", "Candidate requested a 1-week delay before next round.", "Budget approval pending from finance.", "Offer letter stuck in legal review."][seed % 4];
   if (/^next_actions$/.test(name)) return ["Follow up with the hiring manager tomorrow.", "Schedule the next round by end of week.", "Send updated compensation details to the client.", "Chase panel feedback from yesterday's interview."][seed % 4];
+  if (/^action_type$/.test(name)) return ["user.login", "user.password_reset", "settings.update", "user.role_change", "candidate.archive", "requisition.approve", "privacy_request.created"][seed % 7];
+  if (/^ip_address$/.test(name)) return `203.0.113.${10 + (seed % 240)}`;
+  if (/^user_agent$/.test(name)) return ["Chrome on macOS", "Safari on iPhone", "Chrome on Windows", "Edge on Windows", "Firefox on macOS"][seed % 5];
+  // User Management's "Primary Role"/"Manager" columns were both showing
+  // the row's own name: primary_role_name and reporting_manager_name have
+  // no dedicated pattern below, so both fell to the generic "_name$"
+  // person-name rule using the SAME seed as full_name. Dedicated role
+  // names + an offset seed for the manager fix both collisions.
+  if (/^primary_role_name$/.test(name)) return ["Admin", "Full Access", "Recruiter", "Hiring Manager", "HR"][seed % 5];
+  if (/^reporting_manager_name$/.test(name)) return FIRST_NAMES[(seed + 6) % FIRST_NAMES.length];
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
@@ -399,6 +409,53 @@ function special(method, pathname, body) {
       (payload.items || []).forEach((item, i) => {
         item.message = NOTIFICATION_MESSAGES[i % NOTIFICATION_MESSAGES.length];
       });
+      return [200, payload];
+    }
+  }
+  /* Business Titles (Designations) showed people's names in the "Name"
+     column and "description 1/2/3" in "Description" — /master-data/
+     categories/{category}/values is a generic shared endpoint for several
+     master-data categories, so `name` can't get a single dedicated
+     sampleString() pattern (it would be wrong for other categories).
+     Scoped to the designation category only, same pattern as notifications
+     above. */
+  if (method === "GET" && pathname === "/api/v1/master-data/categories/designation/values") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      const DESIGNATION_NAMES = ["Senior Recruiter", "Talent Acquisition Specialist", "HR Business Partner", "Recruiting Coordinator", "Sourcing Specialist"];
+      const DESIGNATION_DESCRIPTIONS = ["Leads full-cycle recruiting for senior and specialist roles.", "Manages candidate sourcing and screening for assigned requisitions.", "Partners with department heads on hiring and workforce planning.", "Coordinates interview scheduling and candidate communication.", "Builds and manages sourcing pipelines across job boards and referrals."];
+      (payload.items || []).forEach((item, i) => {
+        item.name = DESIGNATION_NAMES[i % DESIGNATION_NAMES.length];
+        item.description = DESIGNATION_DESCRIPTIONS[i % DESIGNATION_DESCRIPTIONS.length];
+      });
+      return [200, payload];
+    }
+  }
+  /* Data Export/Delete Requests showed "request type 1"/"error 1" in the
+     Requests table, and because those placeholder values never matched any
+     real request_type/status enum, the row's Download/Cancel/Confirm
+     action buttons never had a reason to render either (actions() checks
+     for literal values like "company_delete" and "pending_approval").
+     request_type/status/error are too generic for a global pattern (they
+     appear on unrelated schemas too), so this is scoped to this endpoint. */
+  if (method === "GET" && pathname === "/api/v1/privacy/requests") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      const list = Array.isArray(payload) ? payload : payload.items || [];
+      const ROWS = [
+        { request_type: "company_export", status: "completed", download_ready: true, error: null },
+        { request_type: "candidate_export", status: "processing", download_ready: false, error: null },
+        { request_type: "company_delete", status: "pending_approval", download_ready: false, error: null },
+      ];
+      list.forEach((item, i) => Object.assign(item, ROWS[i % ROWS.length]));
       return [200, payload];
     }
   }
