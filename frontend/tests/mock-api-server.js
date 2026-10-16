@@ -139,6 +139,8 @@ function sampleString(name, s, seed) {
   if (/^primary_action_label$/.test(name)) return ["Review submission", "Nudge candidate", "Resolve conflict", "Schedule interview", "Submit for approval"][seed % 5];
   if (/^blockers$/.test(name)) return ["Waiting on client interview feedback.", "Candidate requested a 1-week delay before next round.", "Budget approval pending from finance.", "Offer letter stuck in legal review."][seed % 4];
   if (/^next_actions$/.test(name)) return ["Follow up with the hiring manager tomorrow.", "Schedule the next round by end of week.", "Send updated compensation details to the client.", "Chase panel feedback from yesterday's interview."][seed % 4];
+  if (/^action_type$/.test(name)) return ["user.login", "user.password_reset", "settings.update", "user.role_change", "candidate.archive", "requisition.approve", "privacy_request.created"][seed % 7];
+  if (/^ip_address$/.test(name)) return `203.0.113.${10 + (seed % 240)}`;
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
