@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Requisition Detail - RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=4266e5fbb0" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=4266e5fbb0" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=4266e5fbb0" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=4266e5fbb0" />
+  <link rel="stylesheet" href="../shared/global.css?v=c20c53daa3" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=c20c53daa3" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=c20c53daa3" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=c20c53daa3" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="requisition-detail" data-route-kind="app" data-route-title="Requisition Detail" data-route-section="Requisitions">
   
@@ -88,7 +88,11 @@
 <div class="mt-gutter grid grid-cols-1 gap-gutter lg:grid-cols-3">
 <div class="flex flex-col gap-gutter">
 <section class="rounded-lg border border-border bg-surface p-inset-card"><h2 class="font-headline-sm text-headline-sm text-on-surface">Ownership</h2><dl class="mt-2 divide-y divide-border"><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Primary owner</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="primary_owner_name">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Delivery owner</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="delivery_owner_name">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Client contact</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="primary_contact_name">—</dd></div></dl></section>
-<section class="rounded-lg border border-border bg-surface p-inset-card"><h2 class="font-headline-sm text-headline-sm text-on-surface">Details</h2><dl class="mt-2 divide-y divide-border"><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Openings</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="openings_count">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Priority</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="priority">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Employment</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="employment_type">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Work mode</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="work_mode">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Budget</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="budget">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Target close</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="target_closure_date">—</dd></div></dl></section>
+<section class="rounded-lg border border-border bg-surface p-inset-card"><h2 class="font-headline-sm text-headline-sm text-on-surface">Details</h2><dl class="mt-2 divide-y divide-border"><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Openings</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="openings_count">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Priority</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="priority">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Employment</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="employment_type">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Work mode</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="work_mode">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Budget</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="budget">—</dd></div><div class="flex justify-between gap-4 py-2"><dt class="font-body-sm text-body-sm text-text-muted">Target close</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="target_closure_date">—</dd></div></dl></section><!-- Commercial terms: margin_percent/bill_rate are gated by Visibility Rules
+     (scripts/031_visibility_rules.sql) and omitted entirely from the API
+     response for a role without access — each row, and the whole section,
+     starts hidden and is only unhidden in loadRequisitionDetail() when the
+     corresponding key is actually present on the response. --><section class="rounded-lg border border-border bg-surface p-inset-card" data-commercial-terms hidden><h2 class="font-headline-sm text-headline-sm text-on-surface">Commercial Terms</h2><dl class="mt-2 divide-y divide-border"><div class="flex justify-between gap-4 py-2" data-commercial-field="margin_percent" hidden><dt class="font-body-sm text-body-sm text-text-muted">Margin %</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="margin_percent">—</dd></div><div class="flex justify-between gap-4 py-2" data-commercial-field="bill_rate" hidden><dt class="font-body-sm text-body-sm text-text-muted">Bill rate</dt><dd class="text-right font-body-md text-body-md text-on-surface" data-api-field="bill_rate">—</dd></div></dl></section>
 </div>
 <div class="flex flex-col gap-gutter lg:col-span-2">
 <section class="rounded-lg border border-border bg-surface p-inset-card"><h2 class="font-headline-sm text-headline-sm text-on-surface">Skills</h2>
@@ -108,17 +112,17 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
-    <script src="../shared/renderers.js?v=4266e5fbb0"></script>
-    <script src="../shared/api-client.js?v=4266e5fbb0"></script>
-    <script src="../shared/ui-utils.js?v=4266e5fbb0"></script>
-    <script src="../shared/tables.js?v=4266e5fbb0"></script>
-    <script src="../shared/forms.js?v=4266e5fbb0"></script>
-    <script src="../shared/sidebar.js?v=4266e5fbb0"></script>
-    <script src="../shared/pipeline.js?v=4266e5fbb0"></script>
-    <script src="../shared/routing.js?v=4266e5fbb0"></script>
+    <script src="../shared/renderers.js?v=c20c53daa3"></script>
+    <script src="../shared/api-client.js?v=c20c53daa3"></script>
+    <script src="../shared/ui-utils.js?v=c20c53daa3"></script>
+    <script src="../shared/tables.js?v=c20c53daa3"></script>
+    <script src="../shared/forms.js?v=c20c53daa3"></script>
+    <script src="../shared/sidebar.js?v=c20c53daa3"></script>
+    <script src="../shared/pipeline.js?v=c20c53daa3"></script>
+    <script src="../shared/routing.js?v=c20c53daa3"></script>
 
-  <script src="../shared/navigation.config.js?v=4266e5fbb0"></script>
-    <script src="../shared/navigation.js?v=4266e5fbb0"></script>
-    <script src="../shared/app.js?v=4266e5fbb0"></script>
+  <script src="../shared/navigation.config.js?v=c20c53daa3"></script>
+    <script src="../shared/navigation.js?v=c20c53daa3"></script>
+    <script src="../shared/app.js?v=c20c53daa3"></script>
 </body>
 </html>

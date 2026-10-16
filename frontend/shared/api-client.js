@@ -2816,6 +2816,10 @@ async function loadClientDetail() {
   setApiField("client_owner_initials", client.client_owner_name ? personInitials(client.client_owner_name) : "—");
   setApiField("business_source_owner_name", client.business_source_owner_name);
   setApiField("business_source_owner_initials", client.business_source_owner_name ? personInitials(client.business_source_owner_name) : "—");
+  revealGatedFields(client, {
+    default_bill_rate: (value) => (value == null ? null : Number(value).toLocaleString("en-IN")),
+    markup_percent: (value) => (value == null ? null : `${value}%`),
+  });
   loadClientDetailLists(client);
   renderArchiveControl({
     kind: "client", record: client, resourcePath: `/clients/${client.id}`, permission: "client.delete.soft",
@@ -3034,6 +3038,10 @@ async function loadRequisitionDetail() {
     : null);
   setApiField("target_closure_date", requisition.target_closure_date ? formatWhen(requisition.target_closure_date).slice(0, 10) : null);
   setApiField("job_description", requisition.job_description);
+  revealGatedFields(requisition, {
+    margin_percent: (value) => (value == null ? null : `${value}%`),
+    bill_rate: (value) => (value == null ? null : `${requisition.currency_code || ""} ${money(value)}`.trim()),
+  });
   const chips = (host, list) => {
     if (!host) return;
     host.innerHTML = (list || []).length
