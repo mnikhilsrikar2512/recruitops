@@ -135,6 +135,10 @@ function sampleString(name, s, seed) {
   if (/^feedback_notes$/.test(name)) return ["Strong technical fundamentals, communicated clearly, recommend moving forward.", "Good problem-solving approach but light on system design depth.", "Confident communicator, needs a second technical round to confirm depth.", "Solid culture fit, references the team's working style well."][seed % 4];
   if (/^interviewer_name$/.test(name)) return FIRST_NAMES[(seed + 4) % FIRST_NAMES.length];
   if (/^created_by_name$/.test(name)) return FIRST_NAMES[(seed + 9) % FIRST_NAMES.length];
+  if (/^approval_type$/.test(name)) return ["requisition_approval", "offer_approval", "signing_bonus_exception", "budget_exception", "hold_extension"][seed % 5];
+  if (/^primary_action_label$/.test(name)) return ["Review submission", "Nudge candidate", "Resolve conflict", "Schedule interview", "Submit for approval"][seed % 5];
+  if (/^blockers$/.test(name)) return ["Waiting on client interview feedback.", "Candidate requested a 1-week delay before next round.", "Budget approval pending from finance.", "Offer letter stuck in legal review."][seed % 4];
+  if (/^next_actions$/.test(name)) return ["Follow up with the hiring manager tomorrow.", "Schedule the next round by end of week.", "Send updated compensation details to the client.", "Chase panel feedback from yesterday's interview."][seed % 4];
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
@@ -375,6 +379,28 @@ function special(method, pathname, body) {
         source: i < 2 ? "platform" : i < 5 ? "company" : "inferred",
       })),
     }];
+  }
+  /* Notifications: "message" is a bare free-text field with no dedicated
+     sampleString pattern, so it fell to the generic "message 1/2/3"
+     fallback on notifications-center.html. A field named just "message"
+     is too generic to give a dedicated pattern in sampleString() itself —
+     several auth-flow schemas (logout, password reset) also have a plain
+     "message" field, and those really are short confirmation strings, not
+     hiring events. So this runs the normal schema sampler for the route
+     and then overrides only the message text, scoped to this endpoint. */
+  if (method === "GET" && pathname === "/api/v1/notifications/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      const NOTIFICATION_MESSAGES = ["Candidate moved to the next pipeline stage.", "Interview feedback is ready for review.", "Offer was sent and is awaiting a response.", "A new daily update was submitted with a blocker flagged.", "Requisition approval is pending your review."];
+      (payload.items || []).forEach((item, i) => {
+        item.message = NOTIFICATION_MESSAGES[i % NOTIFICATION_MESSAGES.length];
+      });
+      return [200, payload];
+    }
   }
   return null;
 }
