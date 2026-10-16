@@ -5153,11 +5153,18 @@ async function loadMeetingFormDialog() {
   });
   const metrics = document.querySelectorAll(".workspace-surface .grid .font-headline-md");
   if (metrics.length >= 4) {
-    const overdue = items.filter((item) => /overdue/i.test(String(item.outcome_status || ""))).length;
+    const now = new Date();
+    const todayKey = now.toDateString();
+    const isOpen = (item) => !/complete|done/i.test(String(item.outcome_status || ""));
+    const dueDate = (item) => (item.scheduled_at ? new Date(item.scheduled_at) : null);
+    const overdue = items.filter((item) => isOpen(item) && dueDate(item) && dueDate(item) < now && dueDate(item).toDateString() !== todayKey).length;
+    const dueToday = items.filter((item) => isOpen(item) && dueDate(item) && dueDate(item).toDateString() === todayKey).length;
+    const upcoming = items.filter((item) => isOpen(item) && dueDate(item) && dueDate(item) > now && dueDate(item).toDateString() !== todayKey).length;
+    const completed = items.filter((item) => /complete|done/i.test(String(item.outcome_status || ""))).length;
     metrics[0].textContent = String(overdue);
-    metrics[1].textContent = String(items.length);
-    metrics[2].textContent = String(all.length);
-    metrics[3].textContent = String(items.filter((item) => /complete|done/i.test(String(item.outcome_status || ""))).length);
+    metrics[1].textContent = String(dueToday);
+    metrics[2].textContent = String(upcoming);
+    metrics[3].textContent = String(completed);
   }
 }
 
