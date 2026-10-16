@@ -29,6 +29,7 @@ TABLE_TENANCY: dict[str, str] = {
     "legal_acceptances": "tenant",  # who accepted which legal version (026)
     "pipeline_templates": "tenant",  # company default + one list per client (025)
     "cross_tenant_submission_signals": "tenant",  # salted dup-submission hashes, this tenant's own rows (030)
+    "visibility_rules": "tenant",  # tenant_id NULL = shared platform default, same convention as roles (031)
     # ---- through an office --------------------------------------------
     "agent_runs": "office:location_id",
     "approvals": "office:location_id",

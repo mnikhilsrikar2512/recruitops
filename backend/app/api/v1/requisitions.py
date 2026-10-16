@@ -92,7 +92,7 @@ def list_requisitions_endpoint(
     filters.order_by = sort_clause(sort, _REQUISITIONS_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
     filters.tenant_id = caller_tenant_id(auth_context)
     response = list_requisitions_service(engine, filters)
-    return mask_list("requisition", response, auth_context.user.role_code, engine)
+    return mask_list("requisition", response, auth_context.user.role_code, engine, caller_tenant_id(auth_context))
 
 
 @router.post("/", response_model=RequisitionResponse, status_code=201)
@@ -116,7 +116,7 @@ def get_requisition_detail_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
     response = get_requisition_detail_service(engine, requisition_id)
-    return mask_single("requisition", response, auth_context.user.role_code, engine)
+    return mask_single("requisition", response, auth_context.user.role_code, engine, caller_tenant_id(auth_context))
 
 
 @router.patch("/{requisition_id}", response_model=RequisitionResponse)

@@ -22,31 +22,37 @@ CREATE TABLE backend_sql_executions (
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_backend_sql_executions_script_key] ON backend_sql_executions (script_key);
 
-CREATE TABLE company_entities (
+CREATE TABLE cross_tenant_submission_signals (
 	id BIGINT NOT NULL IDENTITY(1,1), 
-	display_name NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	legal_name NVARCHAR(250) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	company_code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	company_type_code NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	hq_city NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	hq_state NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	country_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	time_zone NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	support_email NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	support_phone NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	website_url NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	founded_on DATE NULL, 
-	registered_address NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	internal_notes NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	is_primary BIT NOT NULL DEFAULT ((0)), 
-	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
+	tenant_id BIGINT NOT NULL, 
+	candidate_id BIGINT NOT NULL, 
+	requisition_id BIGINT NULL, 
+	application_id BIGINT NULL, 
+	email_hash CHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	phone_hash CHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	client_name_norm NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	logo_data NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	CONSTRAINT [PK__company___3213E83FC196E6AC] PRIMARY KEY CLUSTERED (id)
+	CONSTRAINT [PK_cross_tenant_submission_signals] PRIMARY KEY CLUSTERED (id)
 );
-CREATE NONCLUSTERED INDEX [IX_company_entities_status_primary] ON company_entities (status, is_primary, display_name);
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_company_entities_company_code] ON company_entities (company_code);
+CREATE NONCLUSTERED INDEX [IX_cross_tenant_signals_email] ON cross_tenant_submission_signals (client_name_norm, email_hash, created_at) WHERE ([email_hash] IS NOT NULL);
+CREATE NONCLUSTERED INDEX [IX_cross_tenant_signals_phone] ON cross_tenant_submission_signals (client_name_norm, phone_hash, created_at) WHERE ([phone_hash] IS NOT NULL);
+CREATE NONCLUSTERED INDEX [IX_cross_tenant_signals_tenant] ON cross_tenant_submission_signals (tenant_id);
+
+CREATE TABLE legal_documents (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	doc_type NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	version INTEGER NOT NULL, 
+	title NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	body NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	is_placeholder BIT NOT NULL DEFAULT ((0)), 
+	status NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
+	effective_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	published_by NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK_legal_documents] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_legal_documents_version] ON legal_documents (doc_type, version);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_legal_documents_active] ON legal_documents (doc_type) WHERE ([status]=N'active');
 
 CREATE TABLE locations (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -66,6 +72,7 @@ CREATE TABLE locations (
 	state_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	country_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	location_mapping_type NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	tenant_id BIGINT NOT NULL, 
 	CONSTRAINT [PK__location__3213E83F5740DBDD] PRIMARY KEY CLUSTERED (id)
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_locations_code] ON locations (code);
@@ -117,6 +124,14 @@ CREATE TABLE meetings (
 	CONSTRAINT [PK__meetings__3213E83FC26CF66C] PRIMARY KEY CLUSTERED (id)
 );
 
+CREATE TABLE metric_buckets (
+	code NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	label NVARCHAR(60) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	sort_order INTEGER NOT NULL, 
+	is_terminal BIT NOT NULL DEFAULT ((0)), 
+	CONSTRAINT [PK_metric_buckets] PRIMARY KEY CLUSTERED (code)
+);
+
 CREATE TABLE notifications (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	location_id BIGINT NULL, 
@@ -151,6 +166,48 @@ CREATE TABLE permissions (
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_permissions_code] ON permissions (code);
 
+CREATE TABLE privacy_audit_hold (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	tenant_id BIGINT NOT NULL, 
+	privacy_request_id BIGINT NOT NULL, 
+	source_table NVARCHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	source_id BIGINT NOT NULL, 
+	row_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	held_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	hold_until DATETIME2 NOT NULL, 
+	CONSTRAINT [PK_privacy_audit_hold] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_privacy_audit_hold_until] ON privacy_audit_hold (hold_until);
+
+CREATE TABLE privacy_requests (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	tenant_id BIGINT NOT NULL, 
+	request_type NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	candidate_id BIGINT NULL, 
+	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	reason NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	requested_by_user_id BIGINT NOT NULL, 
+	requested_by_name NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	requested_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	approval_id BIGINT NULL, 
+	approved_by_user_id BIGINT NULL, 
+	approved_at DATETIME2 NULL, 
+	approval_method NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	execute_after DATETIME2 NULL, 
+	cancelled_by_user_id BIGINT NULL, 
+	cancelled_at DATETIME2 NULL, 
+	started_at DATETIME2 NULL, 
+	completed_at DATETIME2 NULL, 
+	result_storage_key NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	result_bytes BIGINT NULL, 
+	result_expires_at DATETIME2 NULL, 
+	summary_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	error NVARCHAR(2000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	CONSTRAINT [PK_privacy_requests] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_privacy_requests_due] ON privacy_requests (status, execute_after);
+CREATE NONCLUSTERED INDEX [IX_privacy_requests_tenant] ON privacy_requests (tenant_id, requested_at);
+
 CREATE TABLE role_templates (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
@@ -174,9 +231,28 @@ CREATE TABLE roles (
 	is_system_role BIT NOT NULL DEFAULT ((0)), 
 	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
 	created_by_user_id BIGINT NULL, 
+	tenant_id BIGINT NULL, 
 	CONSTRAINT [PK__roles__3213E83F12E9F382] PRIMARY KEY CLUSTERED (id)
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_roles_code] ON roles (code);
+
+CREATE TABLE tenants (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	slug NVARCHAR(63) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	display_name NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	status NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	offer_approval_threshold DECIMAL(18, 2) NOT NULL DEFAULT ((0)), 
+	offers_signing_bonus BIT NOT NULL DEFAULT ((0)), 
+	bonus_counts_against_budget BIT NOT NULL DEFAULT ((1)), 
+	purged_at DATETIME2 NULL, 
+	audit_hold_days INTEGER NOT NULL DEFAULT ((90)), 
+	onboarding NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	setup_checklist_dismissed_at DATETIME2 NULL, 
+	CONSTRAINT [PK_tenants] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_tenants_slug] ON tenants (slug);
 
 CREATE TABLE users (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -199,12 +275,36 @@ CREATE TABLE users (
 	primary_role_id BIGINT NULL, 
 	business_title NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	created_by_user_id BIGINT NULL, 
+	tenant_id BIGINT NOT NULL, 
+	failed_login_count INTEGER NOT NULL DEFAULT ((0)), 
+	locked_until DATETIME2 NULL, 
+	email_verified_at DATETIME2 NULL, 
 	CONSTRAINT [PK__users__3213E83F483BB8ED] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_users_email] ON users (email);
 CREATE NONCLUSTERED INDEX [IX_users_location_role] ON users (location_id, primary_role_id);
+CREATE NONCLUSTERED INDEX [IX_users_tenant] ON users (tenant_id);
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_users_email] ON users (email);
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_users_employee_code] ON users (employee_code);
+
+CREATE TABLE agent_runs (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	agent_id NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	actor_user_id BIGINT NOT NULL, 
+	location_id BIGINT NULL, 
+	input_refs_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	output_draft_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	output_summary NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT ('pending'), 
+	decided_by_user_id BIGINT NULL, 
+	decided_at DATETIME2 NULL, 
+	decision_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK__agent_ru__3213E83F93FD800D] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_agent_runs_actor] ON agent_runs (actor_user_id, created_at);
+CREATE NONCLUSTERED INDEX [IX_agent_runs_agent_status] ON agent_runs (agent_id, status, created_at);
 
 CREATE TABLE approvals (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -230,25 +330,6 @@ CREATE NONCLUSTERED INDEX [IX_approvals_location] ON approvals (location_id);
 CREATE NONCLUSTERED INDEX [IX_approvals_requester] ON approvals (requester_user_id);
 CREATE NONCLUSTERED INDEX [IX_approvals_status] ON approvals (status);
 CREATE NONCLUSTERED INDEX [IX_approvals_type] ON approvals (approval_type);
-
-CREATE TABLE agent_runs (
-	id BIGINT NOT NULL IDENTITY(1,1), 
-	agent_id NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	actor_user_id BIGINT NOT NULL, 
-	location_id BIGINT NULL, 
-	input_refs_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	output_draft_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	output_summary NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
-	decided_by_user_id BIGINT NULL, 
-	decided_at DATETIME2 NULL, 
-	decision_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__agent_ru__3213E83F1A2B3C4D] PRIMARY KEY CLUSTERED (id)
-);
-CREATE NONCLUSTERED INDEX [IX_agent_runs_actor] ON agent_runs (actor_user_id, created_at);
-CREATE NONCLUSTERED INDEX [IX_agent_runs_agent_status] ON agent_runs (agent_id, status, created_at);
 
 CREATE TABLE audit_log_access_events (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -300,51 +381,12 @@ CREATE TABLE branches (
 	state_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	country_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	branch_mapping_type NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	offers_enabled BIT NULL, 
+	tenant_id BIGINT NOT NULL, 
 	CONSTRAINT [PK__branches__3213E83FE00A9463] PRIMARY KEY CLUSTERED (id)
 );
+CREATE NONCLUSTERED INDEX [IX_branches_tenant] ON branches (tenant_id);
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_branches_code] ON branches (code);
-
-CREATE TABLE candidates (
-	id BIGINT NOT NULL IDENTITY(1,1), 
-	full_name NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	email NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	phone NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	current_location NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	source NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	source_portal NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	profile_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'draft'), 
-	intake_stage NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'uploaded'), 
-	total_experience_years DECIMAL(5, 2) NULL, 
-	notice_period_days INTEGER NULL, 
-	current_ctc DECIMAL(18, 2) NULL, 
-	expected_ctc DECIMAL(18, 2) NULL, 
-	candidate_score DECIMAL(10, 2) NULL, 
-	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
-	created_by_user_id BIGINT NOT NULL, 
-	primary_owner_user_id BIGINT NULL, 
-	resume_file_name NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	resume_file_path NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	resume_uploaded_at DATETIME2 NULL, 
-	resume_parsing_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
-	resume_parsing_confidence DECIMAL(5, 2) NULL, 
-	resume_last_parsed_at DATETIME2 NULL, 
-	duplicate_check_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'not-started'), 
-	profile_expires_at DATETIME2 NULL, 
-	finalized_at DATETIME2 NULL, 
-	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	candidate_code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	current_company NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	current_designation NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	preferred_location_text NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	source_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	source_detail NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	social_profiles_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	source_owner_user_id BIGINT NULL, 
-	CONSTRAINT [PK__candidat__3213E83FCB8B82B4] PRIMARY KEY CLUSTERED (id)
-);
-CREATE NONCLUSTERED INDEX [IX_candidates_lookup] ON candidates (email, phone, intake_stage);
-CREATE UNIQUE NONCLUSTERED INDEX [UX_candidates_candidate_code] ON candidates (candidate_code) WHERE ([candidate_code] IS NOT NULL);
 
 CREATE TABLE clients (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -368,6 +410,50 @@ CREATE TABLE clients (
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UX_clients_client_code] ON clients (client_code) WHERE ([client_code] IS NOT NULL);
 
+CREATE TABLE company_entities (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	display_name NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	legal_name NVARCHAR(250) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	company_code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	company_type_code NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	hq_city NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	hq_state NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	country_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	time_zone NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	support_email NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	support_phone NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	website_url NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	founded_on DATE NULL, 
+	registered_address NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	internal_notes NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	is_primary BIT NOT NULL DEFAULT ((0)), 
+	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	logo_data NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	tenant_id BIGINT NULL, 
+	CONSTRAINT [PK__company___3213E83FC196E6AC] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_company_entities_status_primary] ON company_entities (status, is_primary, display_name);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_company_entities_company_code] ON company_entities (company_code);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_company_entities_tenant_primary] ON company_entities (tenant_id) WHERE ([is_primary]=(1) AND [tenant_id] IS NOT NULL);
+
+CREATE TABLE legal_acceptances (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	tenant_id BIGINT NOT NULL, 
+	user_id BIGINT NOT NULL, 
+	document_id BIGINT NOT NULL, 
+	doc_type NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	version INTEGER NOT NULL, 
+	on_behalf_of_company BIT NOT NULL DEFAULT ((0)), 
+	accepted_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	ip_address NVARCHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	user_agent NVARCHAR(400) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	CONSTRAINT [PK_legal_acceptances] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_legal_acceptances_tenant] ON legal_acceptances (tenant_id, doc_type, version);
+CREATE NONCLUSTERED INDEX [IX_legal_acceptances_user] ON legal_acceptances (user_id, doc_type, version);
+
 CREATE TABLE master_data_values (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	category_id BIGINT NOT NULL, 
@@ -383,10 +469,12 @@ CREATE TABLE master_data_values (
 	metadata_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	tenant_id BIGINT NULL, 
 	CONSTRAINT [PK__master_d__3213E83F25DD59C5] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_master_data_values_category_active_sort] ON master_data_values (category_id, is_active, sort_order, name);
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_master_data_values_category_code] ON master_data_values (category_id, code);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_master_data_values_template_code] ON master_data_values (category_id, code) WHERE ([tenant_id] IS NULL);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_master_data_values_tenant_code] ON master_data_values (tenant_id, category_id, code) WHERE ([tenant_id] IS NOT NULL);
 
 CREATE TABLE password_reset_tokens (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -430,6 +518,47 @@ CREATE TABLE role_template_permissions (
 	CONSTRAINT [PK__role_tem__3213E83F9C636C67] PRIMARY KEY CLUSTERED (id)
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_role_template_permissions] ON role_template_permissions (role_template_id, permission_id);
+
+CREATE TABLE stage_bucket_map (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	tenant_id BIGINT NULL, 
+	stage_key NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	metric_bucket NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	updated_by_user_id BIGINT NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK_stage_bucket_map] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_stage_bucket_map_platform] ON stage_bucket_map (stage_key) WHERE ([tenant_id] IS NULL);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_stage_bucket_map_tenant] ON stage_bucket_map (tenant_id, stage_key) WHERE ([tenant_id] IS NOT NULL);
+
+CREATE TABLE upload_idempotency (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	user_id BIGINT NOT NULL, 
+	idem_key NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	entity_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	entity_id BIGINT NOT NULL, 
+	document_id BIGINT NOT NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK_upload_idempotency] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_upload_idempotency] ON upload_idempotency (user_id, idem_key);
+
+CREATE TABLE upload_quarantine (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	tenant_id BIGINT NULL, 
+	uploaded_by_user_id BIGINT NULL, 
+	entity_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	entity_id BIGINT NOT NULL, 
+	file_name NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	storage_key NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	sha256 CHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	signature NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	scanner NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK_upload_quarantine] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_upload_quarantine_tenant] ON upload_quarantine (tenant_id, created_at);
 
 CREATE TABLE user_extra_permissions (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -478,6 +607,25 @@ CREATE TABLE user_location_roles (
 );
 CREATE NONCLUSTERED INDEX [IX_user_location_roles_location_role] ON user_location_roles (location_id, role_id);
 
+CREATE TABLE user_mfa (
+	user_id BIGINT NOT NULL, 
+	totp_secret NVARCHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	enabled_at DATETIME2 NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	last_used_step BIGINT NULL, 
+	CONSTRAINT [PK_user_mfa] PRIMARY KEY CLUSTERED (user_id)
+);
+
+CREATE TABLE user_mfa_recovery_codes (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	user_id BIGINT NOT NULL, 
+	code_hash NVARCHAR(128) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	used_at DATETIME2 NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK_user_mfa_recovery_codes] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_user_mfa_recovery_user] ON user_mfa_recovery_codes (user_id);
+
 CREATE TABLE user_notification_preferences (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	user_id BIGINT NOT NULL, 
@@ -506,8 +654,24 @@ CREATE TABLE user_sessions (
 	last_seen_at DATETIME2 NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	revoked_reason NVARCHAR(40) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	auth_kind NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'opaque'), 
 	CONSTRAINT [PK__user_ses__3213E83FBC91D666] PRIMARY KEY CLUSTERED (id)
 );
+CREATE NONCLUSTERED INDEX [IX_user_sessions_user_active] ON user_sessions (user_id, revoked_at);
+
+CREATE TABLE visibility_rules (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	entity NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	field_name NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	label NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	allowed_role_codes NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N''), 
+	updated_by_user_id BIGINT NULL, 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	tenant_id BIGINT NULL, 
+	CONSTRAINT [PK_visibility_rules] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_visibility_rules_tenant_entity_field] ON visibility_rules (tenant_id, entity, field_name);
 
 CREATE TABLE workflow_action_items (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -573,65 +737,51 @@ CREATE TABLE audit_logs (
 	CONSTRAINT [PK__audit_lo__3213E83FB9B89052] PRIMARY KEY CLUSTERED (id)
 );
 
-CREATE TABLE candidate_documents (
+CREATE TABLE candidates (
 	id BIGINT NOT NULL IDENTITY(1,1), 
-	candidate_id BIGINT NOT NULL, 
-	document_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	file_name NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	file_path NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	verification_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
-	uploaded_by_user_id BIGINT NOT NULL, 
-	verified_by_user_id BIGINT NULL, 
-	verified_at DATETIME2 NULL, 
+	full_name NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	email NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	phone NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	current_location NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	source NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	source_portal NVARCHAR(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	profile_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'draft'), 
+	intake_stage NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'uploaded'), 
+	total_experience_years DECIMAL(5, 2) NULL, 
+	notice_period_days INTEGER NULL, 
+	current_ctc DECIMAL(18, 2) NULL, 
+	expected_ctc DECIMAL(18, 2) NULL, 
+	candidate_score DECIMAL(10, 2) NULL, 
+	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
+	created_by_user_id BIGINT NOT NULL, 
+	primary_owner_user_id BIGINT NULL, 
+	resume_file_name NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	resume_file_path NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	resume_uploaded_at DATETIME2 NULL, 
+	resume_parsing_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	resume_parsing_confidence DECIMAL(5, 2) NULL, 
+	resume_last_parsed_at DATETIME2 NULL, 
+	duplicate_check_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'not-started'), 
+	profile_expires_at DATETIME2 NULL, 
+	finalized_at DATETIME2 NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__candidat__3213E83F211D328B] PRIMARY KEY CLUSTERED (id)
+	candidate_code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	current_company NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	current_designation NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	preferred_location_text NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	source_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	source_detail NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	social_profiles_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	source_owner_user_id BIGINT NULL, 
+	branch_id BIGINT NULL, 
+	version INTEGER NOT NULL DEFAULT ((1)), 
+	erased_at DATETIME2 NULL, 
+	CONSTRAINT [PK__candidat__3213E83FCB8B82B4] PRIMARY KEY CLUSTERED (id)
 );
-
-CREATE TABLE candidate_location_transfer_requests (
-	id BIGINT NOT NULL IDENTITY(1,1), 
-	candidate_id BIGINT NOT NULL, 
-	from_location_id BIGINT NOT NULL, 
-	to_location_id BIGINT NOT NULL, 
-	requested_by_user_id BIGINT NOT NULL, 
-	approval_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
-	approved_by_user_id BIGINT NULL, 
-	approval_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__candidat__3213E83F6AE51B3A] PRIMARY KEY CLUSTERED (id)
-);
-CREATE NONCLUSTERED INDEX [IX_candidate_location_transfer_requests_status] ON candidate_location_transfer_requests (approval_status, to_location_id);
-
-CREATE TABLE candidate_resume_parse_logs (
-	id BIGINT NOT NULL IDENTITY(1,1), 
-	candidate_id BIGINT NOT NULL, 
-	source_document_id BIGINT NULL, 
-	parse_job_uuid UNIQUEIDENTIFIER NOT NULL, 
-	parser_version NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	raw_text_path NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	parsed_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	field_confidence_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	duplicate_summary_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	review_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
-	reviewed_by_user_id BIGINT NULL, 
-	reviewed_at DATETIME2 NULL, 
-	failure_reason NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__candidat__3213E83FECD99E93] PRIMARY KEY CLUSTERED (id)
-);
-
-CREATE TABLE candidate_skills (
-	id BIGINT NOT NULL IDENTITY(1,1), 
-	candidate_id BIGINT NOT NULL, 
-	skill_name NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	experience_years DECIMAL(5, 2) NULL, 
-	last_used_year INTEGER NULL, 
-	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__candidat__3213E83F12D81AF2] PRIMARY KEY CLUSTERED (id)
-);
+CREATE NONCLUSTERED INDEX [IX_candidates_code] ON candidates (candidate_code);
+CREATE NONCLUSTERED INDEX [IX_candidates_lookup] ON candidates (email, phone, intake_stage);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_candidates_branch_code] ON candidates (branch_id, candidate_code) WHERE ([candidate_code] IS NOT NULL);
 
 CREATE TABLE client_access_requests (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -662,20 +812,22 @@ CREATE TABLE client_companies (
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	placement_fee_pct DECIMAL(5, 2) NULL, 
+	archived_at DATETIME2 NULL, 
+	archived_by_user_id BIGINT NULL, 
+	archive_reason NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	offers_signing_bonus BIT NULL, 
+	bonus_counts_against_budget BIT NULL, 
+	default_bill_rate DECIMAL(18, 2) NULL, 
+	markup_percent DECIMAL(5, 2) NULL, 
 	CONSTRAINT [PK__client_c__3213E83F78D7782D] PRIMARY KEY CLUSTERED (id)
 );
 
-CREATE TABLE pipeline_templates (
-	id BIGINT NOT NULL IDENTITY(1,1), 
-	client_id BIGINT NULL, 
-	location_id BIGINT NULL, 
-	template_name NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	stage_scope NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'client'), 
-	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
-	created_by_user_id BIGINT NOT NULL, 
-	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__pipeline__3213E83F6CCF6BB0] PRIMARY KEY CLUSTERED (id)
+CREATE TABLE display_id_sequences (
+	entity NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	branch_id BIGINT NOT NULL, 
+	tenant_scope NVARCHAR(40) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'DEFAULT'), 
+	next_value BIGINT NOT NULL, 
+	CONSTRAINT [PK_display_id_sequences] PRIMARY KEY CLUSTERED (entity, branch_id, tenant_scope)
 );
 
 CREATE TABLE portal_accounts (
@@ -774,6 +926,18 @@ CREATE TABLE user_branch_roles (
 );
 CREATE NONCLUSTERED INDEX [IX_user_branch_roles_branch_role] ON user_branch_roles (branch_id, role_id);
 
+CREATE TABLE user_refresh_tokens (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	session_id BIGINT NOT NULL, 
+	token_hash NVARCHAR(128) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	expires_at DATETIME2 NOT NULL, 
+	used_at DATETIME2 NULL, 
+	CONSTRAINT [PK_user_refresh_tokens] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_user_refresh_tokens_session] ON user_refresh_tokens (session_id);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_user_refresh_tokens_hash] ON user_refresh_tokens (token_hash);
+
 CREATE TABLE workflow_action_events (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	action_item_id BIGINT NULL, 
@@ -789,23 +953,86 @@ CREATE TABLE workflow_action_events (
 );
 CREATE NONCLUSTERED INDEX [IX_workflow_action_events_item] ON workflow_action_events (action_item_id, created_at);
 
-CREATE TABLE candidate_duplicate_checks (
+CREATE TABLE candidate_archives (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	tenant_id BIGINT NOT NULL, 
+	candidate_id BIGINT NOT NULL, 
+	archived_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	archived_by_user_id BIGINT NOT NULL, 
+	archive_reason NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	restored_at DATETIME2 NULL, 
+	restored_by_user_id BIGINT NULL, 
+	CONSTRAINT [PK_candidate_archives] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_candidate_archives_candidate] ON candidate_archives (candidate_id, restored_at);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_candidate_archives_open] ON candidate_archives (tenant_id, candidate_id) WHERE ([restored_at] IS NULL);
+
+CREATE TABLE candidate_documents (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	candidate_id BIGINT NOT NULL, 
-	parse_log_id BIGINT NULL, 
-	matched_candidate_id BIGINT NOT NULL, 
-	match_score DECIMAL(5, 2) NOT NULL, 
-	match_level NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	match_reason_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	decision_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
-	decided_by_user_id BIGINT NULL, 
-	decided_at DATETIME2 NULL, 
-	decision_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	document_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	file_name NVARCHAR(255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	file_path NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	verification_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	uploaded_by_user_id BIGINT NOT NULL, 
+	verified_by_user_id BIGINT NULL, 
+	verified_at DATETIME2 NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__candidat__3213E83F563839A5] PRIMARY KEY CLUSTERED (id)
+	storage_key NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	content_type NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	size_bytes BIGINT NULL, 
+	sha256 CHAR(64) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	scan_status NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	scan_signature NVARCHAR(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	scanned_at DATETIME2 NULL, 
+	CONSTRAINT [PK__candidat__3213E83F211D328B] PRIMARY KEY CLUSTERED (id)
 );
-CREATE NONCLUSTERED INDEX [IX_candidate_duplicate_checks_candidate_status] ON candidate_duplicate_checks (candidate_id, decision_status);
+
+CREATE TABLE candidate_location_transfer_requests (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	candidate_id BIGINT NOT NULL, 
+	from_location_id BIGINT NOT NULL, 
+	to_location_id BIGINT NOT NULL, 
+	requested_by_user_id BIGINT NOT NULL, 
+	approval_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	approved_by_user_id BIGINT NULL, 
+	approval_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK__candidat__3213E83F6AE51B3A] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_candidate_location_transfer_requests_status] ON candidate_location_transfer_requests (approval_status, to_location_id);
+
+CREATE TABLE candidate_resume_parse_logs (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	candidate_id BIGINT NOT NULL, 
+	source_document_id BIGINT NULL, 
+	parse_job_uuid UNIQUEIDENTIFIER NOT NULL, 
+	parser_version NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	raw_text_path NVARCHAR(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	parsed_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	field_confidence_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	duplicate_summary_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	review_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	reviewed_by_user_id BIGINT NULL, 
+	reviewed_at DATETIME2 NULL, 
+	failure_reason NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK__candidat__3213E83FECD99E93] PRIMARY KEY CLUSTERED (id)
+);
+
+CREATE TABLE candidate_skills (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	candidate_id BIGINT NOT NULL, 
+	skill_name NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	experience_years DECIMAL(5, 2) NULL, 
+	last_used_year INTEGER NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK__candidat__3213E83F12D81AF2] PRIMARY KEY CLUSTERED (id)
+);
 
 CREATE TABLE client_contacts (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -825,20 +1052,23 @@ CREATE TABLE client_contacts (
 	CONSTRAINT [PK__client_c__3213E83FC2D94F05] PRIMARY KEY CLUSTERED (id)
 );
 
-CREATE TABLE pipeline_template_stages (
+CREATE TABLE pipeline_templates (
 	id BIGINT NOT NULL IDENTITY(1,1), 
-	pipeline_template_id BIGINT NOT NULL, 
-	stage_code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	stage_name NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
-	stage_order INTEGER NOT NULL, 
-	stage_type NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'normal'), 
-	allows_rejection BIT NOT NULL DEFAULT ((1)), 
-	reminder_rule_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	client_id BIGINT NULL, 
+	location_id BIGINT NULL, 
+	template_name NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	stage_scope NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'client'), 
+	status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'active'), 
+	created_by_user_id BIGINT NOT NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__pipeline__3213E83F7B0CC4A9] PRIMARY KEY CLUSTERED (id)
+	tenant_id BIGINT NULL, 
+	client_company_id BIGINT NULL, 
+	version INTEGER NOT NULL DEFAULT ((1)), 
+	CONSTRAINT [PK__pipeline__3213E83F6CCF6BB0] PRIMARY KEY CLUSTERED (id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_pipeline_template_stages] ON pipeline_template_stages (pipeline_template_id, stage_code);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_pipeline_templates_client] ON pipeline_templates (client_company_id) WHERE ([client_company_id] IS NOT NULL AND [status]=N'active');
+CREATE UNIQUE NONCLUSTERED INDEX [UX_pipeline_templates_company_default] ON pipeline_templates (tenant_id) WHERE ([client_company_id] IS NULL AND [stage_scope]=N'company' AND [status]=N'active');
 
 CREATE TABLE portal_account_slots (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -856,23 +1086,40 @@ CREATE TABLE portal_account_slots (
 );
 CREATE NONCLUSTERED INDEX [IX_portal_account_slots_account_date] ON portal_account_slots (portal_account_id, usage_date);
 
-CREATE TABLE duplicate_review_cases (
+CREATE TABLE candidate_duplicate_checks (
 	id BIGINT NOT NULL IDENTITY(1,1), 
 	candidate_id BIGINT NOT NULL, 
-	candidate_duplicate_check_id BIGINT NULL, 
-	draft_candidate_snapshot_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	existing_candidate_snapshot_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	requested_by_user_id BIGINT NOT NULL, 
-	assigned_reviewer_user_id BIGINT NULL, 
+	parse_log_id BIGINT NULL, 
+	matched_candidate_id BIGINT NOT NULL, 
+	match_score DECIMAL(5, 2) NOT NULL, 
+	match_level NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	match_reason_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	decision_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	decided_by_user_id BIGINT NULL, 
+	decided_at DATETIME2 NULL, 
 	decision_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
-	approved_by_user_id BIGINT NULL, 
-	approved_at DATETIME2 NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
 	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
-	CONSTRAINT [PK__duplicat__3213E83F228904CD] PRIMARY KEY CLUSTERED (id)
+	CONSTRAINT [PK__candidat__3213E83F563839A5] PRIMARY KEY CLUSTERED (id)
 );
-CREATE NONCLUSTERED INDEX [IX_duplicate_review_cases_status] ON duplicate_review_cases (decision_status, requested_by_user_id);
+CREATE NONCLUSTERED INDEX [IX_candidate_duplicate_checks_candidate_status] ON candidate_duplicate_checks (candidate_id, decision_status);
+
+CREATE TABLE pipeline_template_stages (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	pipeline_template_id BIGINT NOT NULL, 
+	stage_code NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	stage_name NVARCHAR(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	stage_order INTEGER NOT NULL, 
+	stage_type NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'normal'), 
+	allows_rejection BIT NOT NULL DEFAULT ((1)), 
+	reminder_rule_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	metric_bucket NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	is_terminal BIT NOT NULL DEFAULT ((0)), 
+	CONSTRAINT [PK__pipeline__3213E83F7B0CC4A9] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_pipeline_template_stages] ON pipeline_template_stages (pipeline_template_id, stage_code);
 
 CREATE TABLE requisitions (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -911,9 +1158,15 @@ CREATE TABLE requisitions (
 	employment_type NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	work_mode NVARCHAR(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	pipeline_template_id BIGINT NULL, 
+	version INTEGER NOT NULL DEFAULT ((1)), 
+	hold_days_total INTEGER NOT NULL DEFAULT ((0)), 
+	margin_percent DECIMAL(5, 2) NULL, 
+	bill_rate DECIMAL(18, 2) NULL, 
 	CONSTRAINT [PK__requisit__3213E83FEDE3C952] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_requisitions_branch_status_close_date] ON requisitions (branch_id, status, target_close_date);
+CREATE NONCLUSTERED INDEX [IX_requisitions_code] ON requisitions (requisition_code);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_requisitions_branch_code] ON requisitions (branch_id, requisition_code) WHERE ([requisition_code] IS NOT NULL);
 
 CREATE TABLE candidate_applications (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -952,6 +1205,9 @@ CREATE TABLE candidate_applications (
 	offer_created_at DATETIME2 NULL, 
 	offer_sent_at DATETIME2 NULL, 
 	pipeline_template_id BIGINT NULL, 
+	version INTEGER NOT NULL DEFAULT ((1)), 
+	withdrawal_reason NVARCHAR(40) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	withdrawn_at DATETIME2 NULL, 
 	CONSTRAINT [PK__candidat__3213E83F5DB103C2] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_candidate_applications_requisition_stage] ON candidate_applications (requisition_id, current_stage);
@@ -986,6 +1242,24 @@ CREATE TABLE daily_updates (
 );
 CREATE NONCLUSTERED INDEX [IX_daily_updates_requisition_date] ON daily_updates (requisition_id, update_date);
 CREATE NONCLUSTERED INDEX [IX_daily_updates_user_date] ON daily_updates (submitted_by_user_id, update_date);
+
+CREATE TABLE duplicate_review_cases (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	candidate_id BIGINT NOT NULL, 
+	candidate_duplicate_check_id BIGINT NULL, 
+	draft_candidate_snapshot_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	existing_candidate_snapshot_json NVARCHAR(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	requested_by_user_id BIGINT NOT NULL, 
+	assigned_reviewer_user_id BIGINT NULL, 
+	decision_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (N'pending'), 
+	decision_notes NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	approved_by_user_id BIGINT NULL, 
+	approved_at DATETIME2 NULL, 
+	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	updated_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	CONSTRAINT [PK__duplicat__3213E83F228904CD] PRIMARY KEY CLUSTERED (id)
+);
+CREATE NONCLUSTERED INDEX [IX_duplicate_review_cases_status] ON duplicate_review_cases (decision_status, requested_by_user_id);
 
 CREATE TABLE requisition_assignments (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -1025,6 +1299,23 @@ CREATE TABLE requisition_end_clients (
 	CONSTRAINT [PK__requisit__3213E83F8B69165C] PRIMARY KEY CLUSTERED (id)
 );
 CREATE UNIQUE NONCLUSTERED INDEX [UQ_requisition_end_clients] ON requisition_end_clients (requisition_id, end_client_company_id);
+
+CREATE TABLE requisition_holds (
+	id BIGINT NOT NULL IDENTITY(1,1), 
+	requisition_id BIGINT NOT NULL, 
+	reason_code NVARCHAR(40) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	reason_note NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	previous_status NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
+	expected_resume_date DATE NULL, 
+	held_by_user_id BIGINT NOT NULL, 
+	held_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	resumed_by_user_id BIGINT NULL, 
+	resumed_at DATETIME2 NULL, 
+	resume_note NVARCHAR(1000) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	hold_days INTEGER NULL, 
+	CONSTRAINT [PK_requisition_holds] PRIMARY KEY CLUSTERED (id)
+);
+CREATE UNIQUE NONCLUSTERED INDEX [UX_requisition_holds_open] ON requisition_holds (requisition_id) WHERE ([resumed_at] IS NULL);
 
 CREATE TABLE requisition_screening_rules (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -1079,8 +1370,11 @@ CREATE TABLE candidate_stage_history (
 	changed_at DATETIME2 NOT NULL, 
 	source_type NVARCHAR(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL, 
 	created_at DATETIME2 NOT NULL DEFAULT (sysutcdatetime()), 
+	from_bucket NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
+	to_bucket NVARCHAR(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL, 
 	CONSTRAINT [PK__candidat__3213E83F44867EE0] PRIMARY KEY CLUSTERED (id)
 );
+CREATE NONCLUSTERED INDEX [IX_candidate_stage_history_app_bucket] ON candidate_stage_history (candidate_application_id, to_bucket, changed_at);
 
 CREATE TABLE interview_rounds (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -1135,6 +1429,9 @@ CREATE NONCLUSTERED INDEX [IX_report_rows_report_id] ON report_rows (report_id);
 
 -- Pass 2: foreign keys (sorted by constraint name for stable diffs)
 
+ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_assigned_to] FOREIGN KEY ([assigned_to_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
 ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [FK_approval_requests_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
@@ -1143,9 +1440,6 @@ ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_decision] FOREIGN KEY
 ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_requester] FOREIGN KEY ([requester_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[approvals] ADD CONSTRAINT [FK_approvals_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_decided_by] FOREIGN KEY ([decided_by_user_id]) REFERENCES [dbo].[users] ([id]);
-ALTER TABLE [dbo].[agent_runs] ADD CONSTRAINT [FK_agent_runs_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_accessed_user] FOREIGN KEY ([accessed_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [FK_audit_log_access_events_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
@@ -1153,6 +1447,7 @@ ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [FK_audit_logs_actor] FOREIGN KEY 
 ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [FK_audit_logs_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
 ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [FK_automation_jobs_triggered_by] FOREIGN KEY ([triggered_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[branches] ADD CONSTRAINT [FK_branches_manager_user] FOREIGN KEY ([manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[branches] ADD CONSTRAINT [FK_branches_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
 ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
 ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_feedback_recorded_by] FOREIGN KEY ([client_feedback_recorded_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_owner] FOREIGN KEY ([owner_user_id]) REFERENCES [dbo].[users] ([id]);
@@ -1160,6 +1455,10 @@ ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applicat
 ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_rejected_by] FOREIGN KEY ([rejected_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [FK_candidate_applications_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_archives] ADD CONSTRAINT [FK_candidate_archives_by] FOREIGN KEY ([archived_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_archives] ADD CONSTRAINT [FK_candidate_archives_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
+ALTER TABLE [dbo].[candidate_archives] ADD CONSTRAINT [FK_candidate_archives_restored_by] FOREIGN KEY ([restored_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidate_archives] ADD CONSTRAINT [FK_candidate_archives_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
 ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
 ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_uploaded_by] FOREIGN KEY ([uploaded_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [FK_candidate_documents_verified_by] FOREIGN KEY ([verified_by_user_id]) REFERENCES [dbo].[users] ([id]);
@@ -1179,6 +1478,7 @@ ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [FK_candidate_scre
 ALTER TABLE [dbo].[candidate_skills] ADD CONSTRAINT [FK_candidate_skills_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
 ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [FK_candidate_stage_history_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
 ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [FK_candidate_stage_history_changed_by] FOREIGN KEY ([changed_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
 ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_primary_owner] FOREIGN KEY ([primary_owner_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [FK_candidates_source_owner] FOREIGN KEY ([source_owner_user_id]) REFERENCES [dbo].[users] ([id]);
@@ -1187,6 +1487,7 @@ ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requ
 ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_requested_by] FOREIGN KEY ([requested_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [FK_client_access_requests_requesting_location] FOREIGN KEY ([requesting_location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_account_manager] FOREIGN KEY ([account_manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_archived_by] FOREIGN KEY ([archived_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
 ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [FK_client_companies_parent] FOREIGN KEY ([parent_client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[client_contacts] ADD CONSTRAINT [FK_client_contacts_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
@@ -1197,10 +1498,12 @@ ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_created_by] FOREIGN KEY (
 ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_owner] FOREIGN KEY ([client_owner_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[clients] ADD CONSTRAINT [FK_clients_parent] FOREIGN KEY ([parent_client_id]) REFERENCES [dbo].[clients] ([id]);
+ALTER TABLE [dbo].[company_entities] ADD CONSTRAINT [FK_company_entities_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
 ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_reviewed_by] FOREIGN KEY ([reviewed_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [FK_daily_updates_submitted_by] FOREIGN KEY ([submitted_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[display_id_sequences] ADD CONSTRAINT [FK_display_id_seq_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
 ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_assigned_reviewer] FOREIGN KEY ([assigned_reviewer_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_cases_candidate] FOREIGN KEY ([candidate_id]) REFERENCES [dbo].[candidates] ([id]);
@@ -1209,13 +1512,17 @@ ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [FK_duplicate_review_c
 ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_application] FOREIGN KEY ([candidate_application_id]) REFERENCES [dbo].[candidate_applications] ([id]);
 ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [FK_interview_rounds_interviewer_user] FOREIGN KEY ([interviewer_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[legal_acceptances] ADD CONSTRAINT [FK_legal_acceptances_document] FOREIGN KEY ([document_id]) REFERENCES [dbo].[legal_documents] ([id]);
 ALTER TABLE [dbo].[locations] ADD CONSTRAINT [FK_locations_location_head_user] FOREIGN KEY ([location_head_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[locations] ADD CONSTRAINT [FK_locations_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
 ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_category] FOREIGN KEY ([category_id]) REFERENCES [dbo].[master_data_categories] ([id]);
 ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_parent] FOREIGN KEY ([parent_value_id]) REFERENCES [dbo].[master_data_values] ([id]);
+ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [FK_master_data_values_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
 ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [FK_password_reset_tokens_issued_by] FOREIGN KEY ([issued_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [FK_password_reset_tokens_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[pipeline_template_stages] ADD CONSTRAINT [FK_pipeline_template_stages_template] FOREIGN KEY ([pipeline_template_id]) REFERENCES [dbo].[pipeline_templates] ([id]);
 ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_client] FOREIGN KEY ([client_id]) REFERENCES [dbo].[clients] ([id]);
+ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_client_company] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_created_by] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [FK_pipeline_templates_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [FK_portal_account_slots_approved_by] FOREIGN KEY ([approved_by_user_id]) REFERENCES [dbo].[users] ([id]);
@@ -1248,6 +1555,7 @@ ALTER TABLE [dbo].[requisition_documents_required] ADD CONSTRAINT [FK_requisitio
 ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_client] FOREIGN KEY ([client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_end_client] FOREIGN KEY ([end_client_company_id]) REFERENCES [dbo].[client_companies] ([id]);
 ALTER TABLE [dbo].[requisition_end_clients] ADD CONSTRAINT [FK_requisition_end_clients_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
+ALTER TABLE [dbo].[requisition_holds] ADD CONSTRAINT [FK_requisition_holds_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[requisition_screening_rules] ADD CONSTRAINT [FK_requisition_screening_rules_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[requisition_skill_requirements] ADD CONSTRAINT [FK_requisition_skill_requirements_requisition] FOREIGN KEY ([requisition_id]) REFERENCES [dbo].[requisitions] ([id]);
 ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [FK_requisitions_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
@@ -1266,6 +1574,13 @@ ALTER TABLE [dbo].[role_scope_rules] ADD CONSTRAINT [FK_role_scope_rules_role] F
 ALTER TABLE [dbo].[role_template_permissions] ADD CONSTRAINT [FK_role_template_permissions_permission] FOREIGN KEY ([permission_id]) REFERENCES [dbo].[permissions] ([id]);
 ALTER TABLE [dbo].[role_template_permissions] ADD CONSTRAINT [FK_role_template_permissions_template] FOREIGN KEY ([role_template_id]) REFERENCES [dbo].[role_templates] ([id]);
 ALTER TABLE [dbo].[roles] ADD CONSTRAINT [FK_roles_created_by_user] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[roles] ADD CONSTRAINT [FK_roles_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
+ALTER TABLE [dbo].[stage_bucket_map] ADD CONSTRAINT [FK_stage_bucket_map_bucket] FOREIGN KEY ([metric_bucket]) REFERENCES [dbo].[metric_buckets] ([code]);
+ALTER TABLE [dbo].[stage_bucket_map] ADD CONSTRAINT [FK_stage_bucket_map_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
+ALTER TABLE [dbo].[stage_bucket_map] ADD CONSTRAINT [FK_stage_bucket_map_user] FOREIGN KEY ([updated_by_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[upload_idempotency] ADD CONSTRAINT [FK_upload_idempotency_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[upload_quarantine] ADD CONSTRAINT [FK_upload_quarantine_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
+ALTER TABLE [dbo].[upload_quarantine] ADD CONSTRAINT [FK_upload_quarantine_user] FOREIGN KEY ([uploaded_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_branch] FOREIGN KEY ([branch_id]) REFERENCES [dbo].[branches] ([id]);
 ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
 ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [FK_user_branch_roles_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
@@ -1277,13 +1592,19 @@ ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [FK_user_invitations_user] F
 ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_role] FOREIGN KEY ([role_id]) REFERENCES [dbo].[roles] ([id]);
 ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [FK_user_location_roles_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_mfa_recovery_codes] ADD CONSTRAINT [FK_user_mfa_recovery_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_mfa] ADD CONSTRAINT [FK_user_mfa_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[user_notification_preferences] ADD CONSTRAINT [FK_user_notification_preferences_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[user_refresh_tokens] ADD CONSTRAINT [FK_user_refresh_tokens_session] FOREIGN KEY ([session_id]) REFERENCES [dbo].[user_sessions] ([id]);
 ALTER TABLE [dbo].[user_sessions] ADD CONSTRAINT [FK_user_sessions_user] FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_created_by_user] FOREIGN KEY ([created_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_default_role] FOREIGN KEY ([default_role_id]) REFERENCES [dbo].[roles] ([id]);
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_primary_role] FOREIGN KEY ([primary_role_id]) REFERENCES [dbo].[roles] ([id]);
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_reporting_manager] FOREIGN KEY ([reporting_manager_user_id]) REFERENCES [dbo].[users] ([id]);
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [FK_users_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
+ALTER TABLE [dbo].[visibility_rules] ADD CONSTRAINT [FK_visibility_rules_tenant] FOREIGN KEY ([tenant_id]) REFERENCES [dbo].[tenants] ([id]);
+ALTER TABLE [dbo].[visibility_rules] ADD CONSTRAINT [FK_visibility_rules_updated_by] FOREIGN KEY ([updated_by_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_actor] FOREIGN KEY ([actor_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_item] FOREIGN KEY ([action_item_id]) REFERENCES [dbo].[workflow_action_items] ([id]);
 ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
