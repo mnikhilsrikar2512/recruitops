@@ -150,11 +150,18 @@ function sampleString(name, s, seed) {
   if (/^primary_role_name$/.test(name)) return ["Admin", "Full Access", "Recruiter", "Hiring Manager", "HR"][seed % 5];
   if (/^reporting_manager_name$/.test(name)) return FIRST_NAMES[(seed + 6) % FIRST_NAMES.length];
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
+  if (/^screening_status$/.test(name)) return ["pending", "in_progress", "cleared"][seed % 3];
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
   if (/priority$/.test(name)) return ["high", "standard", "critical"][seed % 3];
   if (/currency/.test(name)) return "INR";
   if (/phone/.test(name)) return `+91 98000 0000${seed % 10}`;
+  // branch_code feeds entityBadgeHtml()'s branch pill (candidate/requisition/
+  // application cards sitewide) via branchCodeLabel(), which strips a
+  // trailing numeric suffix. The generic "_code$" rule below returns
+  // "CODE-101", which strips down to the literal word "CODE" — a real
+  // branch code is a short location code instead.
+  if (/^branch_code$/.test(name)) return ["BLR", "PUN", "HYD", "MUM", "DEL"][seed % 5];
   if (/(^|_)code$/.test(name)) return `CODE-${100 + seed}`;
   if (/file_?name/.test(name)) return `${FIRST_NAMES[seed % FIRST_NAMES.length].toLowerCase().replace(/\s+/g, "_")}_resume.pdf`;
   if (/^skills$|_skills$/.test(name)) return SKILLS[seed % SKILLS.length];
@@ -173,7 +180,7 @@ function sampleString(name, s, seed) {
   if (/entity_type/.test(name)) return ENTITY_TYPES[seed % ENTITY_TYPES.length];
   if (/age_label/.test(name)) return `${2 + ((seed * 3) % 58)}d`;
   if (/match_reasons/.test(name)) return MATCH_REASONS[seed % MATCH_REASONS.length];
-  if (/change_reason/.test(name)) return ["Panel feedback pending", "Candidate requested reschedule", "Budget approval needed", "Moved per client request", "Scheduling conflict resolved"][seed % 5];
+  if (/change_reason|^stage_reason$/.test(name)) return ["Panel feedback pending", "Candidate requested reschedule", "Budget approval needed", "Moved per client request", "Scheduling conflict resolved"][seed % 5];
   if (/^address$/.test(name)) return STREET_ADDRESSES[seed % STREET_ADDRESSES.length];
   if (/^summary$/.test(name)) return SUMMARIES[seed % SUMMARIES.length];
   if (/full_name|_name$|^name$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
@@ -574,6 +581,79 @@ function special(method, pathname, body) {
       const payload = sample(resSchema.schema);
       (payload.rows || []).forEach((row, i) => { row.source = SOURCE_CHANNELS[i % SOURCE_CHANNELS.length]; });
       if (payload.best_source) payload.best_source = SOURCE_CHANNELS[0];
+      return [200, payload];
+    }
+  }
+  /* Agent Workbench showed the same person-name collision one layer
+     further: AgentInfo.name has no dedicated pattern so it fell to the
+     generic "_name$" sampler ("Vikram Shah" as an AI agent's name), and
+     AgentRunResponse.status fell to the generic status$ fallback
+     (open/active/pending) even though the real run lifecycle —
+     confirmed from agentRunStatusMeta() and agentsStatusVisible() in
+     renderers.js/api-client.js — is only pending/accepted/rejected/failed.
+     Only 3 real agents exist in this product (resume_screener,
+     daily_brief, inbox_triage — the same ids the ai.agent.* permission
+     codes name), so the catalog and its runs are built from that fixed
+     list instead of guessed. */
+  const AGENT_CATALOG = [
+    { id: "resume_screener", name: "Resume Screener", job: "Screens resumes against a requisition's must-have and good-to-have skills and ranks matches.", where_used: "Candidate Screening, Agent Workbench", output: "A ranked shortlist with match notes per candidate.", required_permission: "ai.agent.resume_screener" },
+    { id: "daily_brief", name: "Daily Brief", job: "Summarizes a recruiter's open requisitions, stale pipeline items, and today's priorities.", where_used: "Daily Review, Agent Workbench", output: "A short daily priority brief.", required_permission: "ai.agent.daily_brief" },
+    { id: "inbox_triage", name: "Inbox Triage", job: "Triages the approvals and notifications inbox and flags what needs attention first.", where_used: "Daily Ops & Inbox, Agent Workbench", output: "A prioritized triage list with suggested next actions.", required_permission: "ai.agent.inbox_triage" },
+  ];
+  const AGENT_RUN_STATUSES = ["pending", "accepted", "rejected"];
+  const AGENT_OUTPUT_SUMMARIES = {
+    resume_screener: ["Ranked 8 candidates against the Data Analyst requisition; top match scored 92%.", "Screened 5 new resumes for Product Designer — 2 strong matches flagged."],
+    daily_brief: ["3 requisitions need attention today; 2 candidates are overdue for a stage update.", "Your pipeline is healthy — 1 stale requisition flagged for follow-up."],
+    inbox_triage: ["2 approvals pending over 24h; prioritized the signing-bonus exception first.", "Inbox triaged: 1 urgent notification, 3 routine updates."],
+  };
+  if (method === "GET" && pathname === "/api/v1/agents/") {
+    return [200, { items: AGENT_CATALOG }];
+  }
+  if (method === "GET" && pathname === "/api/v1/agents/runs") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        const agent = AGENT_CATALOG[i % AGENT_CATALOG.length];
+        item.agent_id = agent.id;
+        item.status = AGENT_RUN_STATUSES[i % AGENT_RUN_STATUSES.length];
+        item.output_summary = AGENT_OUTPUT_SUMMARIES[agent.id][i % AGENT_OUTPUT_SUMMARIES[agent.id].length];
+      });
+      return [200, payload];
+    }
+  }
+  /* Client Directory's "Active"/"Onboarding" filter tabs never matched
+     anything — ClientResponse.status also falls to the generic
+     open/active/pending status$ fallback, and "onboarding" (the tab the
+     page itself offers) was never one of those three values, so that
+     tab was dead on arrival. Scoped to the clients list/detail endpoints
+     only; real client statuses are active/onboarding/inactive. */
+  const CLIENT_STATUSES = ["active", "active", "active", "onboarding", "inactive"];
+  if (method === "GET" && pathname === "/api/v1/clients/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        item.status = CLIENT_STATUSES[(item.id || i + 1) % CLIENT_STATUSES.length];
+      });
+      return [200, payload];
+    }
+  }
+  const clientDetailMatch = /^\/api\/v1\/clients\/(\d+)$/.exec(pathname);
+  if (method === "GET" && clientDetailMatch) {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      payload.status = CLIENT_STATUSES[Number(clientDetailMatch[1]) % CLIENT_STATUSES.length];
       return [200, payload];
     }
   }

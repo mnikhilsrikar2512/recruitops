@@ -390,6 +390,15 @@ async function syncUserPermissions({ force = false } = {}) {
       try {
         if (typeof buildSidebarNav === "function") buildSidebarNav();
         if (typeof buildMobileNav === "function") buildMobileNav();
+        /* decorateShell() runs enforceSidebarRBAC() once, synchronously, at
+           boot — before this permissions fetch has resolved. With a stale or
+           empty cached session.permissions (e.g. right after login) that
+           first pass can hide action buttons (Create Requisition, Add
+           Candidate, …) by label text, and nothing re-ran it once the real
+           permissions arrived, so a fully-permissioned user could be stuck
+           with those buttons permanently hidden on a page. Re-run it here
+           whenever permissions actually change. */
+        if (typeof enforceSidebarRBAC === "function") enforceSidebarRBAC();
       } catch { /* nav re-render is best-effort */ }
     }
     if (changed) document.dispatchEvent(new CustomEvent("recruitops:permissions-changed", { detail: next }));
@@ -763,8 +772,15 @@ const SIDEBAR_PERMISSION_MAP = {
   "role-dashboard.html": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr", "dashboard.view_admin"],
 };
 
+/* Runs once at boot (inside decorateShell(), before /permissions/me has
+   resolved) and again whenever syncUserPermissions() detects a real
+   permissions change. Every branch resets display before re-testing, so a
+   stale/empty first pass (hiding everything) is correctly reversed once the
+   real permissions arrive — this function only ever hides on a prior call,
+   it never un-hid anything on its own. */
 function enforceSidebarRBAC() {
   document.querySelectorAll(".sidebar-nav a.nav-link, .sidebar-nav .sidebar-cta-link").forEach((link) => {
+    link.style.display = "";
     const href = link.getAttribute("href") || "";
     const page = href.split("/").pop();
     const required = SIDEBAR_PERMISSION_MAP[page];
@@ -774,6 +790,7 @@ function enforceSidebarRBAC() {
   });
   /* Hide entire nav groups if all children are hidden */
   document.querySelectorAll(".sidebar-nav details.nav-group").forEach((group) => {
+    group.style.display = "";
     const visibleLinks = group.querySelectorAll("a.nav-link:not([style*='display: none'])");
     const hasCTA = group.querySelector(".sidebar-cta-link:not([style*='display: none'])");
     if (visibleLinks.length === 0 && !hasCTA) {
@@ -782,6 +799,7 @@ function enforceSidebarRBAC() {
   });
   /* Enforce data-rbac attributes on buttons and links */
   document.querySelectorAll("[data-rbac]").forEach((el) => {
+    el.style.display = "";
     const required = el.dataset.rbac;
     if (required && !hasAnyPermission(...required.split(","))) {
       el.style.display = "none";
@@ -803,9 +821,17 @@ function enforceSidebarRBAC() {
       "Submit": "daily_update.create_main",
     };
     document.querySelectorAll("button, a").forEach((el) => {
+      // A leading icon (<span class="material-symbols-outlined">domain_add</span>)
+      // contributes its ligature name as real text — "domain_add Add Client" —
+      // so matching with startsWith() missed every button whose icon comes
+      // before its label (Client Directory's "Add Client" was one: it was
+      // never hidden for any persona, regardless of client.create). includes()
+      // matches both icon-before and icon-after button markup.
       const text = (el.textContent || "").trim();
+      if (!Object.keys(actionPermMap).some((label) => text.includes(label))) return;
+      el.style.display = "";
       for (const [label, perm] of Object.entries(actionPermMap)) {
-        if (text.startsWith(label) && !hasPermission(perm)) {
+        if (text.includes(label) && !hasPermission(perm)) {
           el.style.display = "none";
         }
       }
@@ -1048,10 +1074,10 @@ async function submitContact() {
   const clientId = queryInt("client_id");
   const payload = {
     client_id: clientId,
-    contact_name: firstValueOf(["contact_name"], [/contact name/i]),
-    email: firstValueOf(["email"], [/email/i]),
-    phone: firstValueOf(["phone"], [/phone/i]),
-    designation: firstValueOf(["designation"], [/designation/i]),
+    contact_name: firstValueOf(["contact_name", "contact-name"], [/full name/i, /contact name/i]),
+    email: firstValueOf(["email", "contact-email"], [/email/i]),
+    phone: firstValueOf(["phone", "contact-phone-primary"], [/primary phone/i, /phone/i]),
+    designation: firstValueOf(["designation", "contact-role"], [/role\s*\/\s*title/i, /role/i, /title/i, /designation/i]),
     is_primary_contact: true,
   };
   if (!payload.contact_name) { showLiveError(new Error("Contact name is required.")); return; }
@@ -2579,17 +2605,27 @@ async function loadReassignOwnerDialog() {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadClients() {
-  const payload = await apiRequest("/clients/?page_size=100");
+  /* ClientResponse only carries location_id, not a resolved location
+     name — the table used to show "—" in that column for every client
+     because it was reading item.location_name, a field that never
+     existed on this endpoint. Resolve it from /locations/ instead of
+     leaving the column permanently blank. */
+  const [payload, locationsPayload] = await Promise.all([
+    apiRequest("/clients/?page_size=100"),
+    apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
+  ]);
+  const locationNames = new Map((locationsPayload.items || []).map((loc) => [loc.id, loc.location_name]));
   fillExistingTable(payload.items || [], (row, item) => {
+    const locationName = locationNames.get(item.location_id) || "—";
     const cells = row.querySelectorAll("td");
     paintPlainCell(cells[0], item.client_name);
-    paintPlainCell(cells[1], item.location_name);
+    paintPlainCell(cells[1], locationName);
     paintPlainCell(cells[2], item.client_owner_name || item.owner_name);
     paintPlainCell(cells[3], item.industry);
     paintStatusChip(cells[4], item.status);
     paintPlainCell(cells[5], item.updated_at ? `Updated ${formatWhen(item.updated_at)}` : "—");
     row.dataset.filterStatus = String(item.status || "active").toLowerCase();
-    row.dataset.filterLocation = item.location_name || "";
+    row.dataset.filterLocation = locationName === "—" ? "" : locationName;
     row.dataset.filterIndustry = item.industry || "";
     row.dataset.filterOwner = item.client_owner_name || item.owner_name || "";
     row.dataset.route = `client-detail.html?client_id=${item.id}`;
