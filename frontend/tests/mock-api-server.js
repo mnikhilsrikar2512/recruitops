@@ -120,6 +120,21 @@ function sampleString(name, s, seed) {
   if (/^platform_name$/.test(name)) return ["Naukri — Premium", "LinkedIn Recruiter", "Indeed Employer", "Monster Jobs", "Shine Pro"][seed % 5];
   if (/^company_type_code$/.test(name)) return ["recruitment-agency", "staffing", "consulting", "other"][seed % 4];
   if (/^login_identifier$/.test(name)) return `recruiting${1 + (seed % 4)}@${["naukri", "linkedin", "indeed", "monster", "shine"][seed % 5]}.recruitops.in`;
+  // Interview fields: round_type/round_name/decision/feedback_* had no
+  // dedicated pattern and fell to the generic "<field name> <seed>"
+  // fallback (literally "round type 1", "decision 1", "feedback notes 1"
+  // on screen). interviewer_name and created_by_name, meanwhile, matched
+  // the same generic "_name$" person-name pattern as candidate_name with
+  // the same seed, so an interview showed the same person as candidate,
+  // interviewer, and "scheduled by". Dedicated patterns + offset seeds fix
+  // both ahead of the generic rules below.
+  if (/^round_type$/.test(name)) return ["Technical", "Managerial", "HR", "Screening", "Culture Fit"][seed % 5];
+  if (/^round_name$/.test(name)) return ["Technical Round 1", "Technical Round 2", "Managerial Round", "HR Round", "Screening Call", "Culture Fit Round"][seed % 6];
+  if (/^decision$/.test(name)) return ["strong_yes", "yes", "no", "strong_no"][seed % 4];
+  if (/^feedback_status$/.test(name)) return ["pending", "submitted"][seed % 2];
+  if (/^feedback_notes$/.test(name)) return ["Strong technical fundamentals, communicated clearly, recommend moving forward.", "Good problem-solving approach but light on system design depth.", "Confident communicator, needs a second technical round to confirm depth.", "Solid culture fit, references the team's working style well."][seed % 4];
+  if (/^interviewer_name$/.test(name)) return FIRST_NAMES[(seed + 4) % FIRST_NAMES.length];
+  if (/^created_by_name$/.test(name)) return FIRST_NAMES[(seed + 9) % FIRST_NAMES.length];
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
