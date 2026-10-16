@@ -1378,7 +1378,7 @@ function renderStageListEditor(host, { url, title, intro, canEdit }) {
     const li = document.createElement("li");
     li.className = "flex flex-wrap items-center gap-2";
     li.innerHTML = `<input aria-label="Stage name" data-stage-name value="${escapeHtml(stage.name)}" maxlength="100" class="flex-1 min-w-[160px] bg-surface-alt border border-border rounded px-2 py-1.5 text-sm" ${canEdit ? "" : "disabled"}/>
-      <select aria-label="Counts as" data-stage-bucket class="bg-surface-alt border border-border rounded px-2 py-1.5 text-sm" ${canEdit ? "" : "disabled"}>${bucketOptions(stage.bucket)}</select>
+      <select aria-label="Counts as" data-stage-bucket data-no-filter class="bg-surface-alt border border-border rounded px-2 py-1.5 text-sm" ${canEdit ? "" : "disabled"}>${bucketOptions(stage.bucket)}</select>
       ${canEdit ? '<button type="button" data-stage-up aria-label="Move up" class="px-2 py-1 border border-border rounded text-xs">↑</button><button type="button" data-stage-remove aria-label="Remove stage" class="px-2 py-1 border border-border rounded text-xs">Remove</button>' : ""}`;
     li.querySelector("[data-stage-up]")?.addEventListener("click", () => { if (li.previousElementSibling) rows.insertBefore(li, li.previousElementSibling); });
     li.querySelector("[data-stage-remove]")?.addEventListener("click", () => li.remove());
@@ -3035,7 +3035,7 @@ async function loadWorkAssignment() {
               <div class="w-10 h-10 rounded-full ${a.assignment_type === "primary_owner" ? "bg-primary-container text-on-primary" : "bg-secondary-container text-on-secondary-container"} font-bold flex items-center justify-center shrink-0 text-sm">${escapeLiveHtml(initials(a.assigned_user_name))}</div>
               <div>
                 <p class="font-semibold text-on-surface">${escapeLiveHtml(a.assigned_user_name || "Unknown")}</p>
-                <p class="text-text-muted font-body-sm text-[11px]">${escapeLiveHtml(a.assignment_type || "contributor")}</p>
+                <p class="text-text-muted font-body-sm text-[11px]">${escapeLiveHtml(titleFromCode(a.assignment_type || "contributor"))}</p>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -3067,7 +3067,6 @@ async function loadWorkAssignment() {
         <p class="font-body-sm text-body-sm text-text-muted mt-1">Assign team members across requisitions. Owner transfers require the primary-owner assignment type.</p>
         ${canManageAssignments ? "" : '<p class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-surface-dim border border-border px-3 py-1.5 font-body-sm text-[12px] text-text-muted"><span class="material-symbols-outlined text-[15px]">lock</span>Read-only — you can view assignments but not change them</p>'}
       </div>
-      <span class="inline-flex items-center rounded-full bg-success-bg px-2.5 py-1 font-label-caps text-label-caps text-success-text">Live API data</span>
     </div>
     <div class="bg-surface border border-border rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-sm">
       <div class="flex items-center gap-2">
@@ -3586,8 +3585,7 @@ async function loadPortalAccounts() {
         <p class="font-body-sm text-body-sm text-text-muted mt-1">Shared job-portal credentials, ownership, and usage-slot scheduling for the sourcing team.</p>
       </div>
       <div class="flex items-center gap-3">
-        <span class="inline-flex items-center rounded-full bg-success-bg px-2.5 py-1 font-label-caps text-label-caps text-success-text">Live API data</span>
-        ${canManage ? '<button type="button" id="portal-add-btn" class="h-10 px-4 bg-primary-container text-on-primary-container hover:bg-primary-hover rounded-DEFAULT flex items-center gap-2 font-headline-sm text-headline-sm transition-colors"><span class="material-symbols-outlined text-[18px]">add</span> Add Account</button>' : '<span class="inline-flex items-center gap-1.5 rounded-lg bg-surface-dim border border-border px-3 py-1.5 font-body-sm text-[12px] text-text-muted"><span class="material-symbols-outlined text-[15px]">lock</span>Read-only</span>'}
+        ${canManage ?  '<button type="button" id="portal-add-btn" class="h-10 px-4 bg-primary-container text-on-primary-container hover:bg-primary-hover rounded-DEFAULT flex items-center gap-2 font-headline-sm text-headline-sm transition-colors"><span class="material-symbols-outlined text-[18px]">add</span> Add Account</button>' : '<span class="inline-flex items-center gap-1.5 rounded-lg bg-surface-dim border border-border px-3 py-1.5 font-body-sm text-[12px] text-text-muted"><span class="material-symbols-outlined text-[15px]">lock</span>Read-only</span>'}
       </div>
     </div>
     <div class="bg-surface border border-border rounded-DEFAULT overflow-hidden">

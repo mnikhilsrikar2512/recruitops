@@ -116,6 +116,10 @@ function sampleString(name, s, seed) {
   if (/^consultant$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
   if (/^requisition$/.test(name)) return JOB_TITLES[seed % JOB_TITLES.length];
   if (/^department$/.test(name)) return ["Engineering", "Sales", "Finance", "Operations", "Marketing"][seed % 5];
+  if (/^assignment_type$/.test(name)) return ["primary_owner", "contributor", "recruiter", "sourcer"][seed % 4];
+  if (/^platform_name$/.test(name)) return ["Naukri — Premium", "LinkedIn Recruiter", "Indeed Employer", "Monster Jobs", "Shine Pro"][seed % 5];
+  if (/^company_type_code$/.test(name)) return ["recruitment-agency", "staffing", "consulting", "other"][seed % 4];
+  if (/^login_identifier$/.test(name)) return `recruiting${1 + (seed % 4)}@${["naukri", "linkedin", "indeed", "monster", "shine"][seed % 5]}.recruitops.in`;
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
@@ -331,8 +335,40 @@ function special(method, pathname, body) {
   if (method === "GET" && datasetMatch) {
     return [200, reportDataset(datasetMatch[1])];
   }
+  /* Hiring-stage list endpoints (stage-bucket-map, tenant-setup, client
+     detail) have a `name`/`example_label` field that collides with the
+     generic person-name sampler, and a `metric_bucket` field with no
+     dedicated pattern — both fell through to literal placeholder text
+     ("Vikram Shah" as a stage name, "metric bucket 1"). Give them a
+     realistic hiring-stage shape instead. */
+  const STAGE_NAMES = ["Sourced", "Screening", "Interview", "Offer", "Joined", "Rejected", "Withdrawn"];
+  const STAGE_BUCKETS = ["sourced", "screened", "interview", "offer", "joined", "rejected", "withdrawn"];
+  if (method === "GET" && /^\/api\/v1\/settings\/stage-lists\/(company|clients\/\d+)$/.test(pathname)) {
+    return [200, {
+      source: /clients\//.test(pathname) ? "company" : "platform",
+      stages: STAGE_NAMES.map((name, i) => ({ name, bucket: STAGE_BUCKETS[i] })),
+    }];
+  }
+  if (method === "GET" && pathname === "/api/v1/settings/stage-buckets") {
+    return [200, {
+      buckets: STAGE_BUCKET_CHOICES_MOCK,
+      stages: STAGE_NAMES.map((name, i) => ({
+        stage_key: name.toLowerCase(),
+        example_label: name,
+        applications: (i * 3 + 1) % 9,
+        metric_bucket: STAGE_BUCKETS[i],
+        source: i < 2 ? "platform" : i < 5 ? "company" : "inferred",
+      })),
+    }];
+  }
   return null;
 }
+const STAGE_BUCKET_CHOICES_MOCK = [
+  { code: "sourced", label: "Sourced" }, { code: "screened", label: "Screened" },
+  { code: "submitted", label: "Submitted" }, { code: "interview", label: "Interview" },
+  { code: "offer", label: "Offer" }, { code: "joined", label: "Joined (closes)" },
+  { code: "rejected", label: "Rejected (closes)" }, { code: "withdrawn", label: "Withdrawn (closes)" },
+];
 
 function reportDataset(name) {
   const n = (seed) => 1 + ((seed * 2654435761) % 2147483647);
