@@ -7456,13 +7456,26 @@ async function bootPage() {
 
   /* RBAC: Block access to unauthorized pages. The gate map now lives in
      navigation.config.js (NAV_PAGE_PERMISSIONS) — this file no longer
-     duplicates it. Deep-link gating behavior is unchanged. */
+     duplicates it.
+
+     This used to only pop a dismissible "Access Denied" overlay
+     (showAccessDenied) and then return, leaving the user sitting on the
+     bare, unloaded page shell behind it once they clicked "Got it" —
+     nothing on the page ever rendered, since the route's own loader never
+     ran. Meanwhile a proper, fully-built access-denied.html page already
+     existed in pages/ (same "you don't have permission" message, plus Go
+     to Home / Go back actions) but nothing anywhere in the app ever
+     linked to it — a sitewide nav/IA audit turned up zero references to
+     it at all. Redirect to that page instead, the same way
+     enforceLegalAcceptance() above redirects to legal-acceptance.html,
+     so a denied deep link lands somewhere real rather than behind a
+     overlay with nothing underneath it. */
   if (!PUBLIC_ROUTES.has(route)) {
     const pagePermMap = (window.NAV_CONFIG && window.NAV_CONFIG.pagePermissions) || {};
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {
       hidePageLoader();
-      showAccessDenied("access this page");
+      window.location.href = pageHref("access-denied.html");
       return;
     }
   }
