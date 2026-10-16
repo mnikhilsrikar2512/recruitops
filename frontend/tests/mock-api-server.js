@@ -459,6 +459,67 @@ function special(method, pathname, body) {
       return [200, payload];
     }
   }
+  /* Role Management and the Role Permissions Editor showed the same
+     collision bug class as above, in four places at once: every role's
+     "Name" fell to the generic person-name sampler (so every role was
+     literally named "Vikram Shah"), "status" fell to the generic
+     active/pending/open fallback (roles don't have a "pending" status),
+     and the permission catalog plus a role's own granted-permission list
+     both fell to literal placeholder text ("permission codes 1"). All of
+     this is scoped to these three endpoints — ALL_CODES (computed above
+     from the real backend + navigation.config.js permission codes) gives
+     a real catalog to build from instead of guessing. */
+  const ROLE_CATALOG = [
+    { code: "admin", name: "Admin", description: "Full control-plane access across every module.", is_system_role: true },
+    { code: "manager", name: "Full Access", description: "Operates every page end to end; used for sweeps and support.", is_system_role: true },
+    { code: "recruiter", name: "Recruiter", description: "Owns candidate sourcing, screening, and pipeline movement.", is_system_role: false },
+    { code: "hiring_manager", name: "Hiring Manager", description: "Reviews candidates and approves offers for their requisitions.", is_system_role: false },
+    { code: "hr", name: "HR", description: "Manages users, onboarding, and company-wide policy settings.", is_system_role: false },
+    { code: "interviewer", name: "Interviewer", description: "Submits interview feedback and scorecards only.", is_system_role: false },
+  ];
+  const roleCatalogEntry = (id) => ROLE_CATALOG[((Number(id) || 1) - 1 + ROLE_CATALOG.length * 100) % ROLE_CATALOG.length];
+  if (method === "GET" && pathname === "/api/v1/roles/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        Object.assign(item, roleCatalogEntry(item.id || i + 1), { status: "active" });
+      });
+      return [200, payload];
+    }
+  }
+  const roleDetailMatch = /^\/api\/v1\/roles\/(\d+)$/.exec(pathname);
+  if (method === "GET" && roleDetailMatch) {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      Object.assign(payload, roleCatalogEntry(roleDetailMatch[1]), { status: "active" });
+      return [200, payload];
+    }
+  }
+  const rolePermsMatch = /^\/api\/v1\/roles\/(\d+)\/permissions$/.exec(pathname);
+  if (method === "GET" && rolePermsMatch) {
+    const roleId = Number(rolePermsMatch[1]);
+    const entry = roleCatalogEntry(roleId);
+    const codes = entry.code === "admin" || entry.code === "manager"
+      ? ALL_CODES
+      : ALL_CODES.filter((c, i) => (i + roleId) % 3 !== 0);
+    return [200, { role_id: roleId, permission_codes: codes, scope_rules: {} }];
+  }
+  if (method === "GET" && pathname === "/api/v1/permissions/") {
+    return [200, {
+      items: ALL_CODES.map((code) => {
+        const [moduleName, ...rest] = code.split(".");
+        return { code, module_name: moduleName, action_name: rest.join(".") || moduleName };
+      }),
+    }];
+  }
   return null;
 }
 const STAGE_BUCKET_CHOICES_MOCK = [
