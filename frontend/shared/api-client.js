@@ -2137,7 +2137,17 @@ async function loadUsers() {
 }
 
 async function loadUserDetail() {
-  const user = await detailFromRoute(["user_id", "id"], "/users/?page_size=1", (id) => `/users/${id}`);
+  let user;
+  try {
+    user = await detailFromRoute(["user_id", "id"], "/users/?page_size=1", (id) => `/users/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!user) return;
   setFirstText("[data-user-name]", user.full_name);
   setFirstText("[data-user-role]", user.primary_role_name || user.role || "—");
@@ -2691,7 +2701,17 @@ function renderArchiveControl({ kind, record, resourcePath, permission, anchor }
 }
 
 async function loadClientDetail() {
-  const client = await detailFromRoute(["client_id", "id"], "/clients/?page_size=1", (id) => `/clients/${id}`);
+  let client;
+  try {
+    client = await detailFromRoute(["client_id", "id"], "/clients/?page_size=1", (id) => `/clients/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!client) return;
   const surface = document.querySelector("[data-client-detail]") || document.querySelector(".workspace-surface");
   setFirstText("[data-client-detail] h1", client.client_name);
@@ -2891,7 +2911,17 @@ function openDesignationDialog(existing, dialogHost, tableWrap) {
 }
 
 async function loadRequisitionDetail() {
-  const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
+  let requisition;
+  try {
+    requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!requisition) return;
   const surface = document.querySelector(".workspace-surface");
   document.querySelectorAll("[data-requisition-title]").forEach((node) => { node.textContent = requisition.title || "Requisition"; });
@@ -3020,7 +3050,7 @@ function renderRequisitionHoldPanel(surface, requisition) {
 }
 
 async function loadAssignmentHistoryDrawer() {
-  const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
+  const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`).catch(() => null);
   const host = document.querySelector("[data-assignment-history-list]");
   if (!requisition) { if (host) host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">No requisition selected.</p>'; return; }
   const payload = await apiRequest(`/requisitions/${requisition.id}/assignments`).catch(() => []);
@@ -3266,7 +3296,17 @@ async function loadCandidates() {
 }
 
 async function loadCandidateDetail() {
-  const candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?page_size=1", (id) => `/candidates/${id}`);
+  let candidate;
+  try {
+    candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?page_size=1", (id) => `/candidates/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!candidate) return;
   setFirstText("[data-candidate-name]", candidate.full_name);
   setFirstText("[data-candidate-email]", candidate.email);
@@ -7483,11 +7523,19 @@ async function bootPage() {
   /* Per-branch offer streamlining: on branches with offer tracking off,
      offer pages deep-linked directly get a clear denial instead of a
      half-functional screen. The toggle is branch configuration (managed
-     in Locations), not a permission, so admins are gated like everyone. */
+     in Locations), not a permission, so admins are gated like everyone.
+
+     This used the same overlay-and-strand pattern as the RBAC page-gate
+     above (showAccessDenied(), then return into a page whose loader never
+     ran) — same bug, same fix: redirect to access-denied.html instead.
+     The copy here is branch-config-specific rather than a permission
+     mismatch, so it's passed through as a `reason` query param that the
+     page swaps in over its generic text. */
   if (["offer-management", "offer-create-dialog", "join-tracker"].includes(route)
     && typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
     hidePageLoader();
-    showAccessDenied("track offers — offer tracking is disabled for this branch and offers are handed off to the client directly");
+    const reason = "track offers — offer tracking is disabled for this branch and offers are handed off to the client directly";
+    window.location.href = pageHref("access-denied.html") + "?reason=" + encodeURIComponent(reason);
     return;
   }
 
