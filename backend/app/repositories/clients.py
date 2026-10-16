@@ -36,6 +36,8 @@ class ClientRecord:
     # Phase 4.13: None = use the company setting
     offers_signing_bonus: bool | None = None
     bonus_counts_against_budget: bool | None = None
+    default_bill_rate: float | None = None
+    markup_percent: float | None = None
 
 
 @dataclass
@@ -78,6 +80,8 @@ def _map_client(row: RowMapping) -> ClientRecord:
         archived_at=row.get("archived_at"),
         archive_reason=row.get("archive_reason"),
         offers_signing_bonus=_tri(row.get("offers_signing_bonus")),
+        default_bill_rate=float(row["default_bill_rate"]) if row.get("default_bill_rate") is not None else None,
+        markup_percent=float(row["markup_percent"]) if row.get("markup_percent") is not None else None,
         bonus_counts_against_budget=_tri(row.get("bonus_counts_against_budget")),
     )
 
@@ -129,6 +133,8 @@ def list_clients(engine: Engine, filters: ClientListFilters) -> tuple[list[Clien
             c.archive_reason,
             c.offers_signing_bonus,
             c.bonus_counts_against_budget,
+            c.default_bill_rate,
+            c.markup_percent,
             COUNT(*) OVER() AS total_count
           FROM dbo.client_companies AS c
           LEFT JOIN dbo.users AS source_owner
@@ -197,7 +203,9 @@ def _client_select_sql() -> str:
           c.archived_at,
           c.archive_reason,
           c.offers_signing_bonus,
-          c.bonus_counts_against_budget
+          c.bonus_counts_against_budget,
+          c.default_bill_rate,
+          c.markup_percent
         FROM dbo.client_companies AS c
         LEFT JOIN dbo.users AS source_owner
           ON source_owner.id = c.account_manager_user_id
@@ -231,7 +239,9 @@ def create_client(engine: Engine, payload: ClientCreate) -> ClientRecord:
           status,
           account_manager_user_id,
           notes,
-          placement_fee_pct
+          placement_fee_pct,
+          default_bill_rate,
+          markup_percent
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -242,7 +252,9 @@ def create_client(engine: Engine, payload: ClientCreate) -> ClientRecord:
           :status,
           :client_owner_user_id,
           :notes,
-          :placement_fee_pct
+          :placement_fee_pct,
+          :default_bill_rate,
+          :markup_percent
         );
         """
     )
@@ -259,6 +271,8 @@ def create_client(engine: Engine, payload: ClientCreate) -> ClientRecord:
                 "client_owner_user_id": payload.client_owner_user_id,
                 "notes": payload.notes,
                 "placement_fee_pct": payload.placement_fee_pct,
+                "default_bill_rate": payload.default_bill_rate,
+                "markup_percent": payload.markup_percent,
                 "created_by_user_id": payload.created_by_user_id,
             },
         ).scalar_one()
@@ -279,6 +293,8 @@ def update_client(engine: Engine, client_id: int, payload: ClientUpdate) -> Clie
           status = COALESCE(:status, status),
           notes = CASE WHEN :has_notes = 1 THEN :notes ELSE notes END,
           placement_fee_pct = CASE WHEN :has_fee = 1 THEN :placement_fee_pct ELSE placement_fee_pct END,
+          default_bill_rate = CASE WHEN :has_default_bill_rate = 1 THEN :default_bill_rate ELSE default_bill_rate END,
+          markup_percent = CASE WHEN :has_markup_percent = 1 THEN :markup_percent ELSE markup_percent END,
           offers_signing_bonus = CASE WHEN :has_bonus = 1 THEN :offers_signing_bonus ELSE offers_signing_bonus END,
           bonus_counts_against_budget = CASE WHEN :has_counts = 1 THEN :bonus_counts ELSE bonus_counts_against_budget END,
           updated_at = SYSUTCDATETIME()
@@ -300,6 +316,10 @@ def update_client(engine: Engine, client_id: int, payload: ClientUpdate) -> Clie
                 "notes": payload.notes,
                 "has_fee": 1 if "placement_fee_pct" in payload.model_fields_set else 0,
                 "placement_fee_pct": payload.placement_fee_pct,
+                "has_default_bill_rate": 1 if "default_bill_rate" in payload.model_fields_set else 0,
+                "default_bill_rate": payload.default_bill_rate,
+                "has_markup_percent": 1 if "markup_percent" in payload.model_fields_set else 0,
+                "markup_percent": payload.markup_percent,
                 "has_bonus": 1 if "offers_signing_bonus" in payload.model_fields_set else 0,
                 "offers_signing_bonus": None if payload.offers_signing_bonus is None else int(payload.offers_signing_bonus),
                 "has_counts": 1 if "bonus_counts_against_budget" in payload.model_fields_set else 0,

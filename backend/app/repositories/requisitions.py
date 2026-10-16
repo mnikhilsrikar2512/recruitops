@@ -52,6 +52,8 @@ class RequisitionRecord:
     budget_min: float | None = None
     budget_max: float | None = None
     currency_code: str | None = None
+    margin_percent: float | None = None
+    bill_rate: float | None = None
     hold_days_total: int = 0
 
 
@@ -106,6 +108,8 @@ def _requisition_select_sql() -> str:
           r.budget_min,
           r.budget_max,
           r.currency_code,
+          r.margin_percent,
+          r.bill_rate,
           r.hold_days_total
         FROM dbo.requisitions AS r
         LEFT JOIN dbo.branches AS b
@@ -153,6 +157,8 @@ def _map_requisition(row: RowMapping, must_have_skills: list[str], good_to_have_
         budget_min=float(row["budget_min"]) if row.get("budget_min") is not None else None,
         budget_max=float(row["budget_max"]) if row.get("budget_max") is not None else None,
         currency_code=row.get("currency_code"),
+        margin_percent=float(row["margin_percent"]) if row.get("margin_percent") is not None else None,
+        bill_rate=float(row["bill_rate"]) if row.get("bill_rate") is not None else None,
         hold_days_total=int(row.get("hold_days_total") or 0),
     )
 
@@ -334,7 +340,9 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
           important_notes,
           budget_min,
           budget_max,
-          currency_code
+          currency_code,
+          margin_percent,
+          bill_rate
         )
         OUTPUT INSERTED.id
         VALUES (
@@ -353,7 +361,9 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
           :preferred_update_time_text,
           :budget_min,
           :budget_max,
-          :currency_code
+          :currency_code,
+          :margin_percent,
+          :bill_rate
         );
         """
     )
@@ -384,6 +394,8 @@ def create_requisition(engine: Engine, payload: RequisitionCreate) -> Requisitio
                 "budget_min": payload.budget_min,
                 "budget_max": payload.budget_max,
                 "currency_code": payload.currency_code,
+                "margin_percent": payload.margin_percent,
+                "bill_rate": payload.bill_rate,
             },
         ).scalar_one()
         _replace_requisition_skills(connection, int(requisition_id), payload.must_have_skills, payload.good_to_have_skills)
@@ -412,6 +424,8 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
           budget_min = CASE WHEN :has_budget_min = 1 THEN :budget_min ELSE budget_min END,
           budget_max = CASE WHEN :has_budget_max = 1 THEN :budget_max ELSE budget_max END,
           currency_code = CASE WHEN :has_currency_code = 1 THEN :currency_code ELSE currency_code END,
+          margin_percent = CASE WHEN :has_margin_percent = 1 THEN :margin_percent ELSE margin_percent END,
+          bill_rate = CASE WHEN :has_bill_rate = 1 THEN :bill_rate ELSE bill_rate END,
           important_notes = CASE
             WHEN :has_preferred_update_time_text = 1 THEN :preferred_update_time_text
             ELSE important_notes
@@ -453,6 +467,10 @@ def update_requisition(engine: Engine, requisition_id: int, payload: Requisition
                 "budget_max": payload.budget_max,
                 "has_currency_code": 1 if "currency_code" in payload.model_fields_set else 0,
                 "currency_code": payload.currency_code,
+                "has_margin_percent": 1 if "margin_percent" in payload.model_fields_set else 0,
+                "margin_percent": payload.margin_percent,
+                "has_bill_rate": 1 if "bill_rate" in payload.model_fields_set else 0,
+                "bill_rate": payload.bill_rate,
                 "has_pipeline_template_id": 1 if "stage_template_id" in payload.model_fields_set else 0,
                 "pipeline_template_id": payload.stage_template_id,
             },

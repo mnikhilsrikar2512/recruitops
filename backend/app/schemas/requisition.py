@@ -78,6 +78,9 @@ class RequisitionCreate(BaseModel):
     # Phase 4.8: pay range for the role; offers above budget_max need approval.
     budget_min: Decimal | None = Field(default=None, ge=0)
     budget_max: Decimal | None = Field(default=None, ge=0)
+    # Visibility Rules (scripts/031_visibility_rules.sql): gated per role.
+    margin_percent: Decimal | None = Field(default=None, ge=0, le=100)
+    bill_rate: Decimal | None = Field(default=None, ge=0)
     currency_code: str | None = Field(default=None, min_length=3, max_length=10)
 
     @model_validator(mode="after")
@@ -116,6 +119,9 @@ class RequisitionUpdate(BaseModel):
     # Phase 4.8: pay range for the role; offers above budget_max need approval.
     budget_min: Decimal | None = Field(default=None, ge=0)
     budget_max: Decimal | None = Field(default=None, ge=0)
+    # Visibility Rules (scripts/031_visibility_rules.sql): gated per role.
+    margin_percent: Decimal | None = Field(default=None, ge=0, le=100)
+    bill_rate: Decimal | None = Field(default=None, ge=0)
     currency_code: str | None = Field(default=None, min_length=3, max_length=10)
 
     @model_validator(mode="after")
@@ -218,6 +224,11 @@ class RequisitionResponse(BaseModel):
     budget_min: float | None = None
     budget_max: float | None = None
     currency_code: str | None = None
+    # Visibility Rules (scripts/031_visibility_rules.sql): gated per role —
+    # masked out entirely (not nulled) for roles without access by
+    # mask_single/mask_list in app/services/visibility.py.
+    margin_percent: float | None = None
+    bill_rate: float | None = None
     # Phase 4.12: the open hold (reason, who, since when) and paused days
     active_hold: dict | None = None
     hold_days_total: int = 0

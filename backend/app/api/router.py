@@ -28,6 +28,7 @@ from app.api.v1 import (
     signup,
     system,
     users,
+    visibility,
     workflow_actions,
 )
 
@@ -60,3 +61,4 @@ api_router.include_router(legal.router, prefix="/legal", tags=["legal"])
 api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])
 api_router.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
 api_router.include_router(signup.router, prefix="/signup", tags=["signup"])
+api_router.include_router(visibility.router, prefix="/visibility-rules", tags=["visibility-rules"])
