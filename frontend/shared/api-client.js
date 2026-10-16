@@ -2137,7 +2137,17 @@ async function loadUsers() {
 }
 
 async function loadUserDetail() {
-  const user = await detailFromRoute(["user_id", "id"], "/users/?page_size=1", (id) => `/users/${id}`);
+  let user;
+  try {
+    user = await detailFromRoute(["user_id", "id"], "/users/?page_size=1", (id) => `/users/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!user) return;
   setFirstText("[data-user-name]", user.full_name);
   setFirstText("[data-user-role]", user.primary_role_name || user.role || "—");
@@ -2364,13 +2374,105 @@ async function loadRoles() {
   });
 }
 
+/* Visibility Rules — which roles can see requisition margin/bill rate and
+   client default rate/markup, company-wide (scripts/031_visibility_rules.sql,
+   GET/PUT /visibility-rules). Used to be a stub: it called GET /roles/ and
+   rendered the roles list mislabeled as rule rows, with no real field
+   matrix anywhere — the page's own UI (role columns, toggles) implied a
+   feature that didn't exist in the backend. This renders the real field ×
+   role matrix and saves it for real. */
+let visibilityRulesState = null; /* last-loaded server state, for Reset */
+
+function _visibilityFieldKey(field) {
+  return `${field.entity}.${field.field_name}`;
+}
+
+function _renderVisibilityMatrix(host, data) {
+  const headRow = host.querySelector("[data-vis-head-row]");
+  const body = host.querySelector("[data-vis-body]");
+  const template = body?.querySelector("[data-row-template]");
+  if (!headRow || !body || !template) return;
+
+  headRow.querySelectorAll("th[data-vis-role-col]").forEach((th) => th.remove());
+  data.roles.forEach((role) => {
+    const th = document.createElement("th");
+    th.className = "font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold text-center";
+    th.textContent = role.name;
+    th.dataset.visRoleCol = role.code;
+    headRow.appendChild(th);
+  });
+
+  body.querySelectorAll("tr:not([data-row-template])").forEach((row) => row.remove());
+  const canWrite = hasPermission("visibility_rules.write");
+  data.fields.forEach((field) => {
+    const row = template.cloneNode(true);
+    row.removeAttribute("hidden");
+    row.removeAttribute("data-row-template");
+    row.dataset.visFieldKey = _visibilityFieldKey(field);
+    row.querySelector("[data-vis-field-label]").textContent = field.label;
+    data.roles.forEach((role) => {
+      const td = document.createElement("td");
+      td.className = "px-4 py-2 text-center";
+      const label = document.createElement("label");
+      label.className = "relative inline-flex items-center cursor-pointer";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "sr-only peer";
+      input.checked = field.allowed_role_codes.includes(role.code);
+      input.disabled = !canWrite;
+      input.dataset.visRole = role.code;
+      const track = document.createElement("div");
+      track.className = "w-9 h-5 bg-outline-variant rounded-full peer peer-checked:bg-primary-container peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all shadow-sm";
+      label.append(input, track);
+      td.appendChild(label);
+      row.appendChild(td);
+    });
+    body.appendChild(row);
+  });
+
+  const countEl = host.querySelector("[data-vis-rule-count]");
+  if (countEl) countEl.textContent = `${data.fields.length} rules`;
+  const saveBtn = host.querySelector("[data-vis-save]");
+  if (saveBtn) saveBtn.hidden = !canWrite;
+  const resetBtn = host.querySelector("[data-vis-reset]");
+  if (resetBtn) resetBtn.hidden = !canWrite;
+}
+
 async function loadVisibilityRules() {
-  const roles = await apiRequest("/roles/?page_size=50").catch(() => ({ items: [] }));
-  fillExistingTable(roles.items || [], (row, item) => {
-    const cells = row.querySelectorAll("td");
-    setCellValue(cells[0], item.role_name || item.name || "—");
-    setCellValue(cells[1], "Global");
-    setCellValue(cells[2], item.status || "active");
+  const host = document.querySelector("[data-visibility-rules]");
+  if (!host) return;
+  const data = await apiRequest("/visibility-rules/").catch((err) => {
+    showLiveError(err);
+    return null;
+  });
+  if (!data) return;
+  visibilityRulesState = data;
+  _renderVisibilityMatrix(host, data);
+
+  const statusEl = host.querySelector("[data-vis-status]");
+  host.querySelector("[data-vis-reset]")?.addEventListener("click", () => {
+    if (visibilityRulesState) _renderVisibilityMatrix(host, visibilityRulesState);
+    if (statusEl) statusEl.textContent = "";
+  });
+  host.querySelector("[data-vis-save]")?.addEventListener("click", async () => {
+    const rules = Array.from(host.querySelectorAll("[data-vis-field-key]")).map((row) => {
+      const [entity, fieldName] = row.dataset.visFieldKey.split(".");
+      const allowed = Array.from(row.querySelectorAll("input[data-vis-role]"))
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.visRole);
+      return { entity, field_name: fieldName, allowed_role_codes: allowed };
+    });
+    if (statusEl) statusEl.textContent = "Saving…";
+    try {
+      const saved = await apiRequest("/visibility-rules/", { method: "PUT", body: { rules } });
+      visibilityRulesState = saved;
+      _renderVisibilityMatrix(host, saved);
+      if (statusEl) statusEl.textContent = "Saved.";
+      showToast("Visibility rules saved", "Changes apply to the next API response for each role.");
+    } catch (err) {
+      if (statusEl) statusEl.textContent = "";
+      showLiveError(err);
+    }
   });
 }
 
@@ -2691,7 +2793,17 @@ function renderArchiveControl({ kind, record, resourcePath, permission, anchor }
 }
 
 async function loadClientDetail() {
-  const client = await detailFromRoute(["client_id", "id"], "/clients/?page_size=1", (id) => `/clients/${id}`);
+  let client;
+  try {
+    client = await detailFromRoute(["client_id", "id"], "/clients/?page_size=1", (id) => `/clients/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!client) return;
   const surface = document.querySelector("[data-client-detail]") || document.querySelector(".workspace-surface");
   setFirstText("[data-client-detail] h1", client.client_name);
@@ -2891,7 +3003,17 @@ function openDesignationDialog(existing, dialogHost, tableWrap) {
 }
 
 async function loadRequisitionDetail() {
-  const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
+  let requisition;
+  try {
+    requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!requisition) return;
   const surface = document.querySelector(".workspace-surface");
   document.querySelectorAll("[data-requisition-title]").forEach((node) => { node.textContent = requisition.title || "Requisition"; });
@@ -3020,7 +3142,7 @@ function renderRequisitionHoldPanel(surface, requisition) {
 }
 
 async function loadAssignmentHistoryDrawer() {
-  const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`);
+  const requisition = await detailFromRoute(["requisition_id", "id"], "/requisitions/?page_size=1", (id) => `/requisitions/${id}`).catch(() => null);
   const host = document.querySelector("[data-assignment-history-list]");
   if (!requisition) { if (host) host.innerHTML = '<p class="font-body-sm text-body-sm text-text-muted">No requisition selected.</p>'; return; }
   const payload = await apiRequest(`/requisitions/${requisition.id}/assignments`).catch(() => []);
@@ -3266,7 +3388,17 @@ async function loadCandidates() {
 }
 
 async function loadCandidateDetail() {
-  const candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?page_size=1", (id) => `/candidates/${id}`);
+  let candidate;
+  try {
+    candidate = await detailFromRoute(["candidate_id", "id"], "/candidates/?page_size=1", (id) => `/candidates/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      hidePageLoader();
+      window.location.href = pageHref("not-found.html");
+      return;
+    }
+    throw err;
+  }
   if (!candidate) return;
   setFirstText("[data-candidate-name]", candidate.full_name);
   setFirstText("[data-candidate-email]", candidate.email);
@@ -7483,11 +7615,19 @@ async function bootPage() {
   /* Per-branch offer streamlining: on branches with offer tracking off,
      offer pages deep-linked directly get a clear denial instead of a
      half-functional screen. The toggle is branch configuration (managed
-     in Locations), not a permission, so admins are gated like everyone. */
+     in Locations), not a permission, so admins are gated like everyone.
+
+     This used the same overlay-and-strand pattern as the RBAC page-gate
+     above (showAccessDenied(), then return into a page whose loader never
+     ran) — same bug, same fix: redirect to access-denied.html instead.
+     The copy here is branch-config-specific rather than a permission
+     mismatch, so it's passed through as a `reason` query param that the
+     page swaps in over its generic text. */
   if (["offer-management", "offer-create-dialog", "join-tracker"].includes(route)
     && typeof branchOffersEnabled === "function" && !branchOffersEnabled()) {
     hidePageLoader();
-    showAccessDenied("track offers — offer tracking is disabled for this branch and offers are handed off to the client directly");
+    const reason = "track offers — offer tracking is disabled for this branch and offers are handed off to the client directly";
+    window.location.href = pageHref("access-denied.html") + "?reason=" + encodeURIComponent(reason);
     return;
   }
 

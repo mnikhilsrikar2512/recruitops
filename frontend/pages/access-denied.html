@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Access Denied - RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=fd83ab3be8" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=fd83ab3be8" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=fd83ab3be8" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=fd83ab3be8" />
+  <link rel="stylesheet" href="../shared/global.css?v=4266e5fbb0" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=4266e5fbb0" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=4266e5fbb0" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=4266e5fbb0" />
 </head>
 <body class="min-h-screen bg-background text-on-background antialiased" data-route-id="access-denied" data-route-kind="utility" data-route-title="Access Denied" data-route-section="System">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -17,9 +17,9 @@
       <div class="auth-card">
         <div class="mx-auto w-full max-w-lg rounded-2xl border border-border bg-surface p-8 shadow-sm">
           <span class="material-symbols-outlined text-[32px] text-danger-text" aria-hidden="true">lock</span>
-          <h1 class="mt-3 font-headline-lg text-headline-lg text-on-surface">You don't have access to this page</h1>
-          <p class="mt-2 font-body-md text-body-md text-on-surface-variant">Your role doesn't include the permission this page or action needs.</p>
-          <ul class="mt-4 list-disc space-y-1 pl-5 font-body-sm text-body-sm text-text-muted"><li>Your role may not cover this area.</li><li>The record may belong to an office you aren't assigned to.</li><li>Ask your company admin to review your role if you think you should have access.</li></ul>
+          <h1 class="mt-3 font-headline-lg text-headline-lg text-on-surface" data-access-denied-title>You don't have access to this page</h1>
+          <p class="mt-2 font-body-md text-body-md text-on-surface-variant" data-access-denied-reason>Your role doesn't include the permission this page or action needs.</p>
+          <ul class="mt-4 list-disc space-y-1 pl-5 font-body-sm text-body-sm text-text-muted" data-access-denied-hints><li>Your role may not cover this area.</li><li>The record may belong to an office you aren't assigned to.</li><li>Ask your company admin to review your role if you think you should have access.</li></ul>
           <div class="mt-6 flex flex-wrap gap-2">
             <a href="home.html" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-on-primary">Go to Home</a>
             <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-on-surface" data-history-back>Go back</button>
@@ -29,15 +29,30 @@
     </section>
   </main>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
-    <script src="../shared/renderers.js?v=fd83ab3be8"></script>
-    <script src="../shared/api-client.js?v=fd83ab3be8"></script>
-    <script src="../shared/ui-utils.js?v=fd83ab3be8"></script>
-    <script src="../shared/tables.js?v=fd83ab3be8"></script>
-    <script src="../shared/forms.js?v=fd83ab3be8"></script>
-    <script src="../shared/sidebar.js?v=fd83ab3be8"></script>
-    <script src="../shared/pipeline.js?v=fd83ab3be8"></script>
-    <script src="../shared/routing.js?v=fd83ab3be8"></script>
+    <script src="../shared/renderers.js?v=4266e5fbb0"></script>
+    <script src="../shared/api-client.js?v=4266e5fbb0"></script>
+    <script src="../shared/ui-utils.js?v=4266e5fbb0"></script>
+    <script src="../shared/tables.js?v=4266e5fbb0"></script>
+    <script src="../shared/forms.js?v=4266e5fbb0"></script>
+    <script src="../shared/sidebar.js?v=4266e5fbb0"></script>
+    <script src="../shared/pipeline.js?v=4266e5fbb0"></script>
+    <script src="../shared/routing.js?v=4266e5fbb0"></script>
 
-  <script src="../shared/app.js?v=fd83ab3be8"></script>
+  <script src="../shared/app.js?v=4266e5fbb0"></script>
+  <script>
+    /* Some denials aren't a permission mismatch — e.g. a branch with a
+       feature toggled off (offer tracking, etc). Those gates pass a
+       `reason` query param instead of relying on the generic copy above. */
+    (function () {
+      try {
+        const reason = new URLSearchParams(window.location.search).get("reason");
+        if (!reason) return;
+        const reasonEl = document.querySelector("[data-access-denied-reason]");
+        const hintsEl = document.querySelector("[data-access-denied-hints]");
+        if (reasonEl) reasonEl.textContent = "You don't have permission to " + reason + ".";
+        if (hintsEl) hintsEl.innerHTML = "<li>Ask your company admin to review this if you think it should be available.</li>";
+      } catch (err) { /* non-fatal: generic copy stays */ }
+    })();
+  </script>
 </body>
 </html>

@@ -43,6 +43,7 @@ from app.services.requisitions import (
 )
 from app.services.auth import AuthContext
 from app.services import scope
+from app.services.visibility import mask_list, mask_single
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
 
@@ -90,7 +91,8 @@ def list_requisitions_endpoint(
     )
     filters.order_by = sort_clause(sort, _REQUISITIONS_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
     filters.tenant_id = caller_tenant_id(auth_context)
-    return list_requisitions_service(engine, filters)
+    response = list_requisitions_service(engine, filters)
+    return mask_list("requisition", response, auth_context.user.role_code, engine)
 
 
 @router.post("/", response_model=RequisitionResponse, status_code=201)
@@ -109,10 +111,12 @@ def create_requisition_endpoint(
 def get_requisition_detail_endpoint(
     _auth: object = Depends(require_permissions("requisition.read")),
     _in_scope: object = Depends(_scope_requisition),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     requisition_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> RequisitionResponse:
-    return get_requisition_detail_service(engine, requisition_id)
+    response = get_requisition_detail_service(engine, requisition_id)
+    return mask_single("requisition", response, auth_context.user.role_code, engine)
 
 
 @router.patch("/{requisition_id}", response_model=RequisitionResponse)

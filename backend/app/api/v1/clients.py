@@ -38,6 +38,7 @@ from app.services.clients import (
     update_client_service,
 )
 from app.services.auth import AuthContext
+from app.services.visibility import mask_list, mask_single
 from app.services import scope
 
 router = APIRouter(dependencies=[Depends(get_current_auth_context)])
@@ -82,7 +83,8 @@ def list_clients_endpoint(
     )
     filters.order_by = sort_clause(sort, _CLIENTS_SORT, "updated_at DESC, id DESC") + (", id DESC" if sort else "")
     filters.tenant_id = caller_tenant_id(auth_context)
-    return list_clients_service(engine, filters)
+    response = list_clients_service(engine, filters)
+    return mask_list("client", response, auth_context.user.role_code, engine)
 
 
 @router.post("/", response_model=ClientResponse, status_code=201)
@@ -105,9 +107,10 @@ def get_client_detail_endpoint(
     client_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> ClientResponse:
-    return get_client_detail_service(
+    response = get_client_detail_service(
         engine, client_id, include_archived=caller_has_permission(engine, auth_context, "client.delete.soft")
     )
+    return mask_single("client", response, auth_context.user.role_code, engine)
 
 
 @router.post("/{client_id}/archive", response_model=ClientResponse)

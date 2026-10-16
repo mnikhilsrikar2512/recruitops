@@ -315,6 +315,17 @@ function adminCodes() {
   return [...new Set([...codes, "scope.company"])];
 }
 const ALL_CODES = [...new Set([...permissionCatalog(), ...navCodes()])].sort();
+
+/* Visibility Rules in-memory state — mirrors the real backend's seed
+   (scripts/031_visibility_rules.sql: admin-only until an admin changes
+   it). Mutated by the PUT handler below so a save/reload round-trip in
+   a Playwright check sees its own change, not a reset default. */
+const VISIBILITY_RULES_STATE = [
+  { entity: "requisition", field_name: "margin_percent", label: "Margin %", allowed_role_codes: ["admin"] },
+  { entity: "requisition", field_name: "bill_rate", label: "Bill Rate", allowed_role_codes: ["admin"] },
+  { entity: "client", field_name: "default_bill_rate", label: "Default Bill Rate", allowed_role_codes: ["admin"] },
+  { entity: "client", field_name: "markup_percent", label: "Markup %", allowed_role_codes: ["admin"] },
+];
 const PERSONAS = {
   /* control plane only — denied execution pages by design */
   admin: { role_code: "admin", role_name: "Admin", permissions: adminCodes() },
@@ -834,6 +845,36 @@ function handleApi(req, res, rawBody) {
     return sendJson(res, 401, { detail: "Missing bearer token" });
   }
 
+  /* Visibility Rules (scripts/031_visibility_rules.sql on the real
+     backend): which roles can see requisition margin/bill rate and
+     client default rate/markup. A genuinely new route this round, not
+     yet in tests/openapi.json (that snapshot is regenerated from the
+     real backend via scripts/export_openapi.py, which needs the
+     backend's own Python environment — not available in this sandbox),
+     so matchRoute() below would 404 it before special() ever got a
+     chance to answer. Handled here, ahead of the contract check,
+     instead of waiting on a snapshot regen. Remove this block once
+     openapi.json has been regenerated and move the two handlers back
+     into special() like every other endpoint. */
+  if (url.pathname === "/api/v1/visibility-rules/" && (method === "GET" || method === "PUT")) {
+    if (method === "PUT") {
+      const updates = Array.isArray(body?.rules) ? body.rules : [];
+      updates.forEach((rule) => {
+        const existing = VISIBILITY_RULES_STATE.find((f) => f.entity === rule.entity && f.field_name === rule.field_name);
+        if (existing) existing.allowed_role_codes = Array.isArray(rule.allowed_role_codes) ? rule.allowed_role_codes : [];
+      });
+    }
+    return sendJson(res, 200, {
+      fields: VISIBILITY_RULES_STATE.map((f) => ({ ...f })),
+      roles: [
+        { code: "admin", name: "Admin" },
+        { code: "recruiter", name: "Recruiter" },
+        { code: "hiring_manager", name: "Hiring Manager" },
+        { code: "manager", name: "Full Access" },
+      ],
+    });
+  }
+
   const hits = matchRoute(url.pathname);
   if (!hits.length) {
     violation("unknown-path", method, url.pathname, "no backend route", page);
@@ -899,6 +940,7 @@ http.createServer((req, res) => {
     violations = [];
     const m = /persona=(\w+)/.exec(req.url);
     if (m && PERSONAS[m[1]]) persona = m[1];
+    VISIBILITY_RULES_STATE.forEach((f) => { f.allowed_role_codes = ["admin"]; });
     return sendJson(res, 200, { ok: true, persona });
   }
   if (req.url.startsWith("/api/")) {

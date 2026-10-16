@@ -41,6 +41,9 @@ class ClientCreate(BaseModel):
     client_owner_user_id: int = Field(ge=1)
     business_source_owner_user_id: int = Field(ge=1)
     placement_fee_pct: float | None = Field(default=None, ge=0, le=100)
+    # Visibility Rules (scripts/031_visibility_rules.sql): gated per role.
+    default_bill_rate: float | None = Field(default=None, ge=0)
+    markup_percent: float | None = Field(default=None, ge=0, le=100)
     status: ClientStatus = "active"
     notes: str | None = None
     created_by_user_id: int | None = Field(default=None, ge=1)
@@ -68,6 +71,9 @@ class ClientUpdate(BaseModel):
     client_owner_user_id: int | None = Field(default=None, ge=1)
     business_source_owner_user_id: int | None = Field(default=None, ge=1)
     placement_fee_pct: float | None = Field(default=None, ge=0, le=100)
+    # Visibility Rules (scripts/031_visibility_rules.sql): gated per role.
+    default_bill_rate: float | None = Field(default=None, ge=0)
+    markup_percent: float | None = Field(default=None, ge=0, le=100)
     status: ClientStatus | None = None
     notes: str | None = None
     # Phase 4.13: true/false overrides the company; null = use the company setting
@@ -170,6 +176,11 @@ class ClientResponse(BaseModel):
     archive_reason: str | None = None
     offers_signing_bonus: bool | None = None
     bonus_counts_against_budget: bool | None = None
+    # Visibility Rules (scripts/031_visibility_rules.sql): gated per role —
+    # masked out entirely (not nulled) for roles without access by
+    # mask_single/mask_list in app/services/visibility.py.
+    default_bill_rate: float | None = None
+    markup_percent: float | None = None
 
 
 class ClientListResponse(BaseModel):
