@@ -1832,6 +1832,16 @@
       "title": "Candidate Id",
       "type": "integer"
      },
+     "cross_tenant_flag": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CrossTenantFlagResponse"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "current_stage": {
       "title": "Current Stage",
       "type": "string"
@@ -3148,6 +3158,18 @@
       ],
       "title": "Created By User Id"
      },
+     "default_bill_rate": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Bill Rate"
+     },
      "industry": {
       "anyOf": [
        {
@@ -3164,6 +3186,19 @@
       "minimum": 1.0,
       "title": "Location Id",
       "type": "integer"
+     },
+     "markup_percent": {
+      "anyOf": [
+       {
+        "maximum": 100.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Markup Percent"
      },
      "notes": {
       "anyOf": [
@@ -3340,6 +3375,17 @@
       ],
       "title": "Created By User Id"
      },
+     "default_bill_rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Bill Rate"
+     },
      "id": {
       "title": "Id",
       "type": "integer"
@@ -3358,6 +3404,17 @@
      "location_id": {
       "title": "Location Id",
       "type": "integer"
+     },
+     "markup_percent": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Markup Percent"
      },
      "notes": {
       "anyOf": [
@@ -3638,6 +3695,18 @@
       ],
       "title": "Client Owner User Id"
      },
+     "default_bill_rate": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Bill Rate"
+     },
      "industry": {
       "anyOf": [
        {
@@ -3649,6 +3718,19 @@
        }
       ],
       "title": "Industry"
+     },
+     "markup_percent": {
+      "anyOf": [
+       {
+        "maximum": 100.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Markup Percent"
      },
      "notes": {
       "anyOf": [
@@ -4127,6 +4209,36 @@
      "locations"
     ],
     "title": "CompanySummaryResponse",
+    "type": "object"
+   },
+   "CrossTenantFlagResponse": {
+    "description": "030: another company may have already submitted a matching\ncandidate to a client with this name recently. Never names the\nother company or exposes any of its data \u2014 see\nservices/cross_tenant_signals.py.",
+    "properties": {
+     "flagged": {
+      "title": "Flagged",
+      "type": "boolean"
+     },
+     "most_recent_days_ago": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Most Recent Days Ago"
+     },
+     "other_vendor_submissions": {
+      "default": 0,
+      "title": "Other Vendor Submissions",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "flagged"
+    ],
+    "title": "CrossTenantFlagResponse",
     "type": "object"
    },
    "CurrentSessionResponse": {
@@ -9933,6 +10045,22 @@
       ],
       "title": "Acceptable Career Gap Months"
      },
+     "bill_rate": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bill Rate"
+     },
      "budget_max": {
       "anyOf": [
        {
@@ -10040,6 +10168,23 @@
       "minimum": 1.0,
       "title": "Location Id",
       "type": "integer"
+     },
+     "margin_percent": {
+      "anyOf": [
+       {
+        "maximum": 100.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Margin Percent"
      },
      "must_have_skills": {
       "items": {
@@ -10513,6 +10658,17 @@
       ],
       "title": "Active Hold"
      },
+     "bill_rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bill Rate"
+     },
      "branch_code": {
       "anyOf": [
        {
@@ -10644,6 +10800,17 @@
      "location_id": {
       "title": "Location Id",
       "type": "integer"
+     },
+     "margin_percent": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Margin Percent"
      },
      "must_have_skills": {
       "items": {
@@ -10904,6 +11071,22 @@
       ],
       "title": "Acceptable Career Gap Months"
      },
+     "bill_rate": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bill Rate"
+     },
      "budget_max": {
       "anyOf": [
        {
@@ -11009,6 +11192,23 @@
        }
       ],
       "title": "Job Description"
+     },
+     "margin_percent": {
+      "anyOf": [
+       {
+        "maximum": 100.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Margin Percent"
      },
      "must_have_skills": {
       "anyOf": [
@@ -13190,6 +13390,120 @@
      "company_status"
     ],
     "title": "VerifyResponse",
+    "type": "object"
+   },
+   "VisibilityRoleOption": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "name"
+    ],
+    "title": "VisibilityRoleOption",
+    "type": "object"
+   },
+   "VisibilityRuleField": {
+    "properties": {
+     "allowed_role_codes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Allowed Role Codes",
+      "type": "array"
+     },
+     "entity": {
+      "title": "Entity",
+      "type": "string"
+     },
+     "field_name": {
+      "title": "Field Name",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "entity",
+     "field_name",
+     "label",
+     "allowed_role_codes"
+    ],
+    "title": "VisibilityRuleField",
+    "type": "object"
+   },
+   "VisibilityRuleUpdate": {
+    "properties": {
+     "allowed_role_codes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Allowed Role Codes",
+      "type": "array"
+     },
+     "entity": {
+      "title": "Entity",
+      "type": "string"
+     },
+     "field_name": {
+      "title": "Field Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "entity",
+     "field_name"
+    ],
+    "title": "VisibilityRuleUpdate",
+    "type": "object"
+   },
+   "VisibilityRulesBulkUpdate": {
+    "properties": {
+     "rules": {
+      "items": {
+       "$ref": "#/components/schemas/VisibilityRuleUpdate"
+      },
+      "title": "Rules",
+      "type": "array"
+     }
+    },
+    "required": [
+     "rules"
+    ],
+    "title": "VisibilityRulesBulkUpdate",
+    "type": "object"
+   },
+   "VisibilityRulesResponse": {
+    "properties": {
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/VisibilityRuleField"
+      },
+      "title": "Fields",
+      "type": "array"
+     },
+     "roles": {
+      "items": {
+       "$ref": "#/components/schemas/VisibilityRoleOption"
+      },
+      "title": "Roles",
+      "type": "array"
+     }
+    },
+    "required": [
+     "fields",
+     "roles"
+    ],
+    "title": "VisibilityRulesResponse",
     "type": "object"
    },
    "WithdrawalReasonRow": {
@@ -23035,6 +23349,76 @@
     "summary": "Move User Endpoint",
     "tags": [
      "users"
+    ]
+   }
+  },
+  "/api/v1/visibility-rules/": {
+   "get": {
+    "operationId": "get_visibility_rules_endpoint_api_v1_visibility_rules__get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VisibilityRulesResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Visibility Rules Endpoint",
+    "tags": [
+     "visibility-rules"
+    ]
+   },
+   "put": {
+    "operationId": "update_visibility_rules_endpoint_api_v1_visibility_rules__put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VisibilityRulesBulkUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VisibilityRulesResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Visibility Rules Endpoint",
+    "tags": [
+     "visibility-rules"
     ]
    }
   },
