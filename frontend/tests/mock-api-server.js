@@ -359,8 +359,37 @@ function special(method, pathname, body) {
   if (method === "GET" && pathname === "/api/v1/legal/acceptances") {
     return [200, { items: [], pending: [], company_pending: [] }];
   }
+  /* GET /legal/documents has no dedicated handler before this, so doc_type
+     fell to the generic sampler and never produced the literal "tos" /
+     "privacy" / "dpa" values every page that reads it (signup.html's
+     Agreements checkboxes, legal.html, legal-acceptance.html) switches on —
+     those pages showed random job titles ("Data Analyst", "Product
+     Designer"...) as the agreement names instead of Terms of Service /
+     Privacy Policy / the DPA. */
+  if (method === "GET" && pathname === "/api/v1/legal/documents") {
+    const docs = [
+      { doc_type: "tos", title: "Terms of Service", version: 3, is_placeholder: false },
+      { doc_type: "privacy", title: "Privacy Policy", version: 2, is_placeholder: false },
+      { doc_type: "dpa", title: "Data Processing Addendum", version: 1, is_placeholder: true },
+    ];
+    return [200, { items: docs.map((d) => ({
+      ...d,
+      effective_at: "2026-08-01T00:00:00.000Z",
+      body: d.is_placeholder
+        ? "Draft text — this document has not been finalized by Legal yet."
+        : `This ${d.title} governs use of the RecruitOps platform (version ${d.version}).`,
+    })) }];
+  }
   if (method === "GET" && pathname === "/api/v1/permissions/me") {
     return [200, { user_id: 1, role_code: p.role_code, permissions: p.permissions }];
+  }
+  /* "message" is too generic a field name to pattern globally (several
+     unrelated response shapes reuse it), so SignupAccepted.message fell to
+     the catch-all "<field name> <seed>" fallback and showed the literal
+     text "message 1" after a successful signup instead of a real
+     confirmation. Scoped to this one endpoint. */
+  if (method === "POST" && pathname === "/api/v1/signup/") {
+    return [202, { message: "Check your email to confirm your address and finish setting up your company.", dev_verify_token: "dev-verify-token-1" }];
   }
   /* The generic /reports/datasets/{name} endpoint is used by SLA Tracker
      and the Custom Report Builder preview. Its response schema is too
@@ -784,7 +813,24 @@ function handleApi(req, res, rawBody) {
   }
   calls.push({ method, url: url.pathname + url.search, page, body: method === "GET" ? undefined : body });
 
-  if (!req.headers.authorization && !/\/auth\/(login|password\/(forgot|reset|setup))$/.test(url.pathname) && url.pathname !== "/api/v1/health") {
+  /* Routes reachable before a session exists: password sign-in, the forgot/
+     reset/setup password flow, the MFA code challenge during login (the only
+     credential at that point is the short-lived mfa_token the page already
+     carries, not a bearer token), the health check, and the entire anonymous
+     signup flow (viewing the agreements to accept, creating the account,
+     confirming the verification-email token, and that flow's own MFA
+     enrollment step). This allowlist was missing /legal/documents and every
+     /signup/* route — the signup page's "Agreements" checkboxes, the signup
+     form's own submit, email verification, and signup's MFA enrollment all
+     401'd immediately, which defaultUnauthorizedHandler() in api-client.js
+     treats as "session revoked" and hard-redirects to login.html. The net
+     effect: nobody could complete signup, and any persona with MFA enabled
+     got silently bounced back to the login page mid-challenge with no error
+     shown. Worth confirming the real backend's equivalent allowlist (not
+     this mock) has the same routes — if it has the same gap, that's a
+     production-blocking bug for every new signup and every MFA sign-in. */
+  const PUBLIC_API_PATHS = /^\/api\/v1\/(auth\/(login|password\/(forgot|reset|setup)|mfa\/challenge)|legal\/documents|signup\/.*)$/;
+  if (!req.headers.authorization && !PUBLIC_API_PATHS.test(url.pathname) && url.pathname !== "/api/v1/health") {
     return sendJson(res, 401, { detail: "Missing bearer token" });
   }
 

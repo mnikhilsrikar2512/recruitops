@@ -7391,6 +7391,12 @@ async function bootPage() {
     "delivery-work-queue": loadDeliveryWorkQueue,
     "support-workspace": async () => {
       // Support page - static help content, except a live backend health check
+      // and the "Current Session Context" card, which used to hardcode
+      // "Regional Recruiter" / "North America - East" for every user on
+      // every company — paint the real signed-in session instead.
+      const session = RecruitOpsLive.session || readSession();
+      setFirstText("[data-session-role-name]", session?.role_name || session?.role || "—");
+      setFirstText("[data-session-location-name]", session?.location_name || "—");
       const statusEl = document.querySelector("[data-health-status]");
       const iconEl = document.querySelector("[data-health-icon]");
       if (statusEl) {
