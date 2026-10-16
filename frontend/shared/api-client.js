@@ -390,6 +390,15 @@ async function syncUserPermissions({ force = false } = {}) {
       try {
         if (typeof buildSidebarNav === "function") buildSidebarNav();
         if (typeof buildMobileNav === "function") buildMobileNav();
+        /* decorateShell() runs enforceSidebarRBAC() once, synchronously, at
+           boot — before this permissions fetch has resolved. With a stale or
+           empty cached session.permissions (e.g. right after login) that
+           first pass can hide action buttons (Create Requisition, Add
+           Candidate, …) by label text, and nothing re-ran it once the real
+           permissions arrived, so a fully-permissioned user could be stuck
+           with those buttons permanently hidden on a page. Re-run it here
+           whenever permissions actually change. */
+        if (typeof enforceSidebarRBAC === "function") enforceSidebarRBAC();
       } catch { /* nav re-render is best-effort */ }
     }
     if (changed) document.dispatchEvent(new CustomEvent("recruitops:permissions-changed", { detail: next }));
@@ -763,8 +772,15 @@ const SIDEBAR_PERMISSION_MAP = {
   "role-dashboard.html": ["dashboard.view_recruiter", "dashboard.view_manager", "dashboard.view_hr", "dashboard.view_admin"],
 };
 
+/* Runs once at boot (inside decorateShell(), before /permissions/me has
+   resolved) and again whenever syncUserPermissions() detects a real
+   permissions change. Every branch resets display before re-testing, so a
+   stale/empty first pass (hiding everything) is correctly reversed once the
+   real permissions arrive — this function only ever hides on a prior call,
+   it never un-hid anything on its own. */
 function enforceSidebarRBAC() {
   document.querySelectorAll(".sidebar-nav a.nav-link, .sidebar-nav .sidebar-cta-link").forEach((link) => {
+    link.style.display = "";
     const href = link.getAttribute("href") || "";
     const page = href.split("/").pop();
     const required = SIDEBAR_PERMISSION_MAP[page];
@@ -774,6 +790,7 @@ function enforceSidebarRBAC() {
   });
   /* Hide entire nav groups if all children are hidden */
   document.querySelectorAll(".sidebar-nav details.nav-group").forEach((group) => {
+    group.style.display = "";
     const visibleLinks = group.querySelectorAll("a.nav-link:not([style*='display: none'])");
     const hasCTA = group.querySelector(".sidebar-cta-link:not([style*='display: none'])");
     if (visibleLinks.length === 0 && !hasCTA) {
@@ -782,6 +799,7 @@ function enforceSidebarRBAC() {
   });
   /* Enforce data-rbac attributes on buttons and links */
   document.querySelectorAll("[data-rbac]").forEach((el) => {
+    el.style.display = "";
     const required = el.dataset.rbac;
     if (required && !hasAnyPermission(...required.split(","))) {
       el.style.display = "none";
@@ -803,9 +821,17 @@ function enforceSidebarRBAC() {
       "Submit": "daily_update.create_main",
     };
     document.querySelectorAll("button, a").forEach((el) => {
+      // A leading icon (<span class="material-symbols-outlined">domain_add</span>)
+      // contributes its ligature name as real text — "domain_add Add Client" —
+      // so matching with startsWith() missed every button whose icon comes
+      // before its label (Client Directory's "Add Client" was one: it was
+      // never hidden for any persona, regardless of client.create). includes()
+      // matches both icon-before and icon-after button markup.
       const text = (el.textContent || "").trim();
+      if (!Object.keys(actionPermMap).some((label) => text.includes(label))) return;
+      el.style.display = "";
       for (const [label, perm] of Object.entries(actionPermMap)) {
-        if (text.startsWith(label) && !hasPermission(perm)) {
+        if (text.includes(label) && !hasPermission(perm)) {
           el.style.display = "none";
         }
       }
@@ -1048,10 +1074,10 @@ async function submitContact() {
   const clientId = queryInt("client_id");
   const payload = {
     client_id: clientId,
-    contact_name: firstValueOf(["contact_name"], [/contact name/i]),
-    email: firstValueOf(["email"], [/email/i]),
-    phone: firstValueOf(["phone"], [/phone/i]),
-    designation: firstValueOf(["designation"], [/designation/i]),
+    contact_name: firstValueOf(["contact_name", "contact-name"], [/full name/i, /contact name/i]),
+    email: firstValueOf(["email", "contact-email"], [/email/i]),
+    phone: firstValueOf(["phone", "contact-phone-primary"], [/primary phone/i, /phone/i]),
+    designation: firstValueOf(["designation", "contact-role"], [/role\s*\/\s*title/i, /role/i, /title/i, /designation/i]),
     is_primary_contact: true,
   };
   if (!payload.contact_name) { showLiveError(new Error("Contact name is required.")); return; }
@@ -2579,17 +2605,27 @@ async function loadReassignOwnerDialog() {
    ═══════════════════════════════════════════════════════════════ */
 
 async function loadClients() {
-  const payload = await apiRequest("/clients/?page_size=100");
+  /* ClientResponse only carries location_id, not a resolved location
+     name — the table used to show "—" in that column for every client
+     because it was reading item.location_name, a field that never
+     existed on this endpoint. Resolve it from /locations/ instead of
+     leaving the column permanently blank. */
+  const [payload, locationsPayload] = await Promise.all([
+    apiRequest("/clients/?page_size=100"),
+    apiRequest("/locations/?page_size=100").catch(() => ({ items: [] })),
+  ]);
+  const locationNames = new Map((locationsPayload.items || []).map((loc) => [loc.id, loc.location_name]));
   fillExistingTable(payload.items || [], (row, item) => {
+    const locationName = locationNames.get(item.location_id) || "—";
     const cells = row.querySelectorAll("td");
     paintPlainCell(cells[0], item.client_name);
-    paintPlainCell(cells[1], item.location_name);
+    paintPlainCell(cells[1], locationName);
     paintPlainCell(cells[2], item.client_owner_name || item.owner_name);
     paintPlainCell(cells[3], item.industry);
     paintStatusChip(cells[4], item.status);
     paintPlainCell(cells[5], item.updated_at ? `Updated ${formatWhen(item.updated_at)}` : "—");
     row.dataset.filterStatus = String(item.status || "active").toLowerCase();
-    row.dataset.filterLocation = item.location_name || "";
+    row.dataset.filterLocation = locationName === "—" ? "" : locationName;
     row.dataset.filterIndustry = item.industry || "";
     row.dataset.filterOwner = item.client_owner_name || item.owner_name || "";
     row.dataset.route = `client-detail.html?client_id=${item.id}`;
@@ -4435,20 +4471,192 @@ async function loadMyWorkDashboard() {
 
 /* ═══════════════════════════════════════════════════════════════
    LOCATION DASHBOARD
-   ═══════════════════════════════════════════════════════════════ */async function loadLocationDashboard() {
-  const locationId = queryInt("location_id") || currentLocationId();
-  const [location, requisitions, candidates] = await Promise.all([
-    apiRequest(`/locations/${locationId}`).catch(() => ({})),
+   Rebuilt in F.5 round 8 — this page used to be almost entirely static
+   markup (hardcoded KPI numbers, a fake "New York Hub / London Office"
+   picker, a risk table with no data behind it). Every widget below is
+   now driven by real endpoints: requisitions + offers for the KPI strip
+   (reusing the same timeToFillRecords()/daysBetween() helpers the
+   reports suite uses), /pipeline/board for pipeline aging and the
+   candidate-in-pipeline count, and the same "stale open requisition"
+   signal role-dashboard.html already uses for its own risk widget, so
+   Top Risks and Requisition Health bucket by actual age rather than a
+   made-up compliance score. Source Effectiveness has no location-level
+   backend support yet, so it stays on the real company-wide
+   /reports/source-effectiveness dataset with an honest "company-wide"
+   label rather than faking a location breakdown.
+   ═══════════════════════════════════════════════════════════════ */
+function locationRiskBucket(days) {
+  if (days > 45) return { key: "critical", label: "Critical", impact: "High" };
+  if (days > 20) return { key: "at_risk", label: "At Risk", impact: "Medium" };
+  return { key: "healthy", label: "Healthy", impact: "Low" };
+}
+
+async function loadLocationDashboard() {
+  const select = document.getElementById("location-dashboard-select");
+  const locationsPayload = await apiRequest("/locations/?page_size=100").catch(() => ({ items: [] }));
+  const locations = (locationsPayload.items || []).filter((loc) => loc.status !== "inactive");
+  const requestedId = queryInt("location_id");
+  const activeLocation = locations.find((loc) => Number(loc.id) === Number(requestedId))
+    || locations.find((loc) => Number(loc.id) === Number(currentLocationId()))
+    || locations[0];
+  const locationId = activeLocation?.id ?? null;
+
+  if (select) {
+    select.innerHTML = locations.length
+      ? locations.map((loc) => `<option value="${loc.id}" ${Number(loc.id) === Number(locationId) ? "selected" : ""}>${escapeLiveHtml(loc.location_name)}</option>`).join("")
+      : `<option>No locations found</option>`;
+    if (!select.dataset.wired) {
+      select.dataset.wired = "true";
+      select.addEventListener("change", () => {
+        const params = new URLSearchParams(window.location.search);
+        params.set("location_id", select.value);
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      });
+    }
+  }
+  if (!activeLocation) {
+    setFirstText("[data-location-subtitle]", "No locations found for this company yet.");
+    return;
+  }
+  setFirstText("[data-location-subtitle]", `${activeLocation.location_code ? `${activeLocation.location_code} · ` : ""}${activeLocation.location_head_name ? `Led by ${activeLocation.location_head_name}` : "No location head assigned"}`);
+  setFirstText("[data-location-risk-title]", `: ${activeLocation.location_name}`);
+
+  const [requisitionsPayload, offersPayload, boardPayload, sourceReport] = await Promise.all([
     apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
-    apiRequest("/candidates/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest("/offers/?page_size=100").catch(() => ({ items: [] })),
+    apiRequest(`/pipeline/board?location_id=${locationId}`).catch(() => []),
+    apiRequest("/reports/source-effectiveness").catch(() => null),
   ]);
-  setFirstText("[data-location-name]", location.location_name || location.name || "Location");
-  const reqItems = (requisitions.items || []).filter((r) => !locationId || r.location_id === locationId);
-  const candItems = (candidates.items || []).filter((c) => !locationId || c.location_id === locationId);
-  fillDashboardMetrics([
-    { label: "Active Reqs", value: reqItems.length, hint: "Open requisitions" },
-    { label: "Candidates", value: candItems.length, hint: "Total candidates" },
-  ]);
+  const allReqs = requisitionsPayload.items || [];
+  const locationReqs = allReqs.filter((r) => Number(r.location_id) === Number(locationId));
+  const offers = offersPayload.items || [];
+  const board = (Array.isArray(boardPayload) ? boardPayload : boardPayload.items || []).filter((item) => Number(item.location_id) === Number(locationId));
+
+  /* ── KPI: Active Requisitions ── */
+  const openStatuses = new Set(["open", "draft", "on-hold"]);
+  const activeReqs = locationReqs.filter((r) => openStatuses.has(String(r.status || "open")));
+  const onHold = activeReqs.filter((r) => r.status === "on-hold").length;
+  setFirstText("[data-kpi-active-reqs]", String(activeReqs.length));
+  setFirstText("[data-kpi-active-reqs-hint]", onHold ? `${onHold} on hold` : locationReqs.length ? "None on hold" : "No requisitions at this location");
+
+  /* ── KPI: Avg Time to Hire (reuses the reports-suite helper) ── */
+  const ttfRecords = timeToFillRecords(locationReqs, offers);
+  const avgTtf = ttfRecords.length ? Math.round(ttfRecords.reduce((sum, r) => sum + r.days, 0) / ttfRecords.length) : null;
+  setFirstText("[data-kpi-avg-ttf]", avgTtf != null ? `${avgTtf}d` : "—");
+  setFirstText("[data-kpi-avg-ttf-hint]", ttfRecords.length ? `Across ${ttfRecords.length} filled role${ttfRecords.length === 1 ? "" : "s"}` : "No filled roles yet");
+
+  /* ── KPI: Fill Rate ── */
+  const filledOrClosed = locationReqs.filter((r) => r.status === "filled" || r.status === "closed").length;
+  const fillRate = locationReqs.length ? Math.round((filledOrClosed / locationReqs.length) * 100) : null;
+  setFirstText("[data-kpi-fill-rate]", fillRate != null ? `${fillRate}%` : "—");
+  setFirstText("[data-kpi-fill-rate-hint]", locationReqs.length ? `${filledOrClosed} of ${locationReqs.length} requisitions filled` : "No requisitions yet");
+
+  /* ── KPI: Candidates in Pipeline ── */
+  const activeBoard = board.filter((item) => !["Rejected", "Withdrawn", "Joined"].includes(item.current_stage));
+  setFirstText("[data-kpi-pipeline-count]", String(activeBoard.length));
+  setFirstText("[data-kpi-pipeline-count-hint]", board.length ? `${board.length} total in pipeline` : "No active candidates");
+
+  /* ── Top Risks: open requisitions aging past 20/45 days, same signal
+     role-dashboard.html's "stale requisitions" widget uses ── */
+  const now = Date.now();
+  const risky = activeReqs
+    .map((r) => ({ ...r, days: daysBetween(r.created_at, now), bucket: locationRiskBucket(daysBetween(r.created_at, now)) }))
+    .filter((r) => r.bucket.key !== "healthy")
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 6);
+  const riskBody = document.querySelector("[data-location-risk-rows]");
+  if (riskBody) {
+    riskBody.innerHTML = risky.length
+      ? risky.map((r) => {
+          const overdue = r.target_closure_date && new Date(r.target_closure_date).getTime() < now;
+          const riskType = overdue ? "Past Target Date" : "Stale Pipeline";
+          const impactClass = r.bucket.key === "critical" ? "text-danger-text" : "text-warning-text";
+          const chipClass = r.bucket.key === "critical" ? "bg-danger-bg text-danger-text border border-danger-text/20" : "bg-warning-bg text-warning-text border border-warning-text/20";
+          return `<tr class="border-b border-border hover:bg-highlight-soft transition-colors bg-surface cursor-pointer" data-route="requisition-detail.html?requisition_id=${r.id}">
+            <td class="px-5 py-3">
+              <div class="font-medium text-on-surface">${escapeLiveHtml(r.requisition_code || `REQ-${r.id}`)}</div>
+              <div class="text-xs text-text-muted font-body-sm">${escapeLiveHtml(r.title || "—")}</div>
+            </td>
+            <td class="px-5 py-3"><span class="inline-flex items-center px-2 py-1 rounded-sm text-xs font-medium ${chipClass}">${escapeLiveHtml(riskType)}</span></td>
+            <td class="px-5 py-3"><div class="flex items-center gap-1 ${impactClass}"><span class="w-2 h-2 rounded-full ${r.bucket.key === "critical" ? "bg-danger-text" : "bg-warning-text"}"></span> ${r.bucket.impact} · ${r.days}d open</div></td>
+            <td class="px-5 py-3 text-right"><a href="requisition-detail.html?requisition_id=${r.id}" class="text-primary hover:text-primary-hover font-medium">Review</a></td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="4" class="px-5 py-6 text-center text-body-sm text-text-muted">No requisitions at risk right now.</td></tr>`;
+  }
+
+  /* ── Pipeline Aging: avg days since stage_updated_at, grouped by the
+     stages that actually have candidates right now (not a fixed list) ── */
+  const stageGroups = new Map();
+  board.forEach((item) => {
+    const stage = item.current_stage || "Unspecified";
+    if (!stageGroups.has(stage)) stageGroups.set(stage, []);
+    stageGroups.get(stage).push(daysBetween(item.stage_updated_at || item.last_activity_at, now));
+  });
+  const agingHost = document.querySelector("[data-location-pipeline-aging]");
+  if (agingHost) {
+    const stageRows = Array.from(stageGroups.entries()).map(([stage, days]) => ({
+      stage, avgDays: Math.round(days.reduce((sum, d) => sum + d, 0) / days.length), count: days.length,
+    }));
+    if (!stageRows.length) {
+      agingHost.innerHTML = `<p class="font-body-sm text-body-sm text-text-muted">No active pipeline candidates at this location.</p>`;
+    } else {
+      const maxDays = Math.max(...stageRows.map((r) => r.avgDays), 1);
+      agingHost.innerHTML = `<div class="space-y-4">${stageRows.map((r) => `
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-body-sm text-on-surface">${escapeLiveHtml(r.stage)} <span class="text-text-muted">(${r.count})</span></span>
+            <span class="font-data-tabular font-medium ${r.avgDays > 14 ? "text-warning-text" : ""}">${r.avgDays} day${r.avgDays === 1 ? "" : "s"}</span>
+          </div>
+          <div class="w-full bg-surface-alt rounded-full h-2">
+            <div class="${r.avgDays > 14 ? "bg-warning-text" : "bg-primary"} h-2 rounded-full" style="width: ${Math.round((r.avgDays / maxDays) * 100)}%"></div>
+          </div>
+        </div>`).join("")}</div>`;
+    }
+  }
+
+  /* ── Requisition Health: donut of the same risk buckets as Top Risks ── */
+  const healthHost = document.querySelector("[data-location-health-chart]");
+  if (healthHost && window.RoCharts) {
+    const buckets = { healthy: 0, at_risk: 0, critical: 0 };
+    activeReqs.forEach((r) => { buckets[locationRiskBucket(daysBetween(r.created_at, now)).key] += 1; });
+    window.RoCharts.donut(healthHost, {
+      segments: [
+        { label: "Healthy", value: buckets.healthy, color: window.RoCharts.STATUS.good },
+        { label: "At Risk", value: buckets.at_risk, color: window.RoCharts.STATUS.warning },
+        { label: "Critical", value: buckets.critical, color: window.RoCharts.STATUS.critical },
+      ],
+      empty: "No active requisitions at this location.",
+      centerLabel: "Open Reqs",
+    });
+  }
+
+  /* ── Source Effectiveness: real company-wide dataset (no per-location
+     breakdown exists on the backend yet — see note above) ── */
+  const sourceHost = document.querySelector("[data-location-source-chart]");
+  if (sourceHost && window.RoCharts) {
+    const rows = (sourceReport?.rows || []).slice().sort((a, b) => (b.candidates || 0) - (a.candidates || 0)).slice(0, 6);
+    window.RoCharts.bar(sourceHost, {
+      items: rows.map((row, i) => ({ label: row.source, value: row.candidates || 0, color: window.RoCharts.CATEGORICAL[i % window.RoCharts.CATEGORICAL.length] })),
+      empty: "No candidate source data available yet.",
+      labelHeader: "Source",
+      valueHeader: "Candidates",
+      ariaLabel: "Candidates by source, company-wide",
+    });
+  }
+
+  wireReportExportButtons({
+    title: `Location Performance — ${activeLocation.location_name}`,
+    subtitle: "Requisitions flagged as stale or past their target close date",
+    filePrefix: "location-dashboard",
+    columns: [
+      { key: "requisition_code", label: "Requisition" },
+      { key: "title", label: "Title" },
+      { key: "days", label: "Days Open", numeric: true },
+      { key: "impact", label: "Impact" },
+    ],
+    rows: risky.map((r) => ({ requisition_code: r.requisition_code || `REQ-${r.id}`, title: r.title, days: r.days, impact: r.bucket.impact })),
+  });
 }
 
 
@@ -7183,6 +7391,12 @@ async function bootPage() {
     "delivery-work-queue": loadDeliveryWorkQueue,
     "support-workspace": async () => {
       // Support page - static help content, except a live backend health check
+      // and the "Current Session Context" card, which used to hardcode
+      // "Regional Recruiter" / "North America - East" for every user on
+      // every company — paint the real signed-in session instead.
+      const session = RecruitOpsLive.session || readSession();
+      setFirstText("[data-session-role-name]", session?.role_name || session?.role || "—");
+      setFirstText("[data-session-location-name]", session?.location_name || "—");
       const statusEl = document.querySelector("[data-health-status]");
       const iconEl = document.querySelector("[data-health-icon]");
       if (statusEl) {
@@ -7242,13 +7456,26 @@ async function bootPage() {
 
   /* RBAC: Block access to unauthorized pages. The gate map now lives in
      navigation.config.js (NAV_PAGE_PERMISSIONS) — this file no longer
-     duplicates it. Deep-link gating behavior is unchanged. */
+     duplicates it.
+
+     This used to only pop a dismissible "Access Denied" overlay
+     (showAccessDenied) and then return, leaving the user sitting on the
+     bare, unloaded page shell behind it once they clicked "Got it" —
+     nothing on the page ever rendered, since the route's own loader never
+     ran. Meanwhile a proper, fully-built access-denied.html page already
+     existed in pages/ (same "you don't have permission" message, plus Go
+     to Home / Go back actions) but nothing anywhere in the app ever
+     linked to it — a sitewide nav/IA audit turned up zero references to
+     it at all. Redirect to that page instead, the same way
+     enforceLegalAcceptance() above redirects to legal-acceptance.html,
+     so a denied deep link lands somewhere real rather than behind a
+     overlay with nothing underneath it. */
   if (!PUBLIC_ROUTES.has(route)) {
     const pagePermMap = (window.NAV_CONFIG && window.NAV_CONFIG.pagePermissions) || {};
     const required = pagePermMap[route];
     if (required && !hasAnyPermission(...required)) {
       hidePageLoader();
-      showAccessDenied("access this page");
+      window.location.href = pageHref("access-denied.html");
       return;
     }
   }

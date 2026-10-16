@@ -103,33 +103,55 @@
   document.body.insertAdjacentHTML("afterbegin", navHTML);
   document.body.insertAdjacentHTML("beforeend", footerHTML);
 
-  /* ═══ SCROLL REVEAL ═══ */
-  const revealObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("visible");
-          /* Animate counters inside */
-          entry.target.querySelectorAll("[data-count]").forEach((el) => {
-            const target = parseInt(el.dataset.count, 10);
-            const suffix = el.dataset.suffix || "";
-            let current = 0;
-            const step = Math.max(1, Math.floor(target / 20));
-            if (el.textContent && el.textContent !== "0" && el.textContent !== "0" + suffix) {
-              return;
+  /* ═══ SCROLL REVEAL ═══
+     These elements start at opacity:0 in CSS and only reach opacity:1 once
+     this observer marks them "visible" as the user scrolls them into view.
+     There was no fallback: if IntersectionObserver isn't available, or this
+     script throws before reaching this point, or simply never loads (ad
+     blocker, strict CSP, flaky network, JS disabled), almost every section
+     below the hero on every marketing/product-tour page stays permanently
+     invisible — not broken-looking, just blank, which is worse. Wrapped in
+     try/catch with an immediate "show everything" fallback on any failure,
+     and feature-detect IntersectionObserver itself rather than assuming it
+     exists. */
+  const revealTargets = document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right, .reveal-pop");
+  function showAllReveals() {
+    revealTargets.forEach((el) => el.classList.add("visible"));
+  }
+  try {
+    if (!("IntersectionObserver" in window)) {
+      showAllReveals();
+    } else {
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible");
+              /* Animate counters inside */
+              entry.target.querySelectorAll("[data-count]").forEach((el) => {
+                const target = parseInt(el.dataset.count, 10);
+                const suffix = el.dataset.suffix || "";
+                let current = 0;
+                const step = Math.max(1, Math.floor(target / 20));
+                if (el.textContent && el.textContent !== "0" && el.textContent !== "0" + suffix) {
+                  return;
+                }
+                const timer = setInterval(() => {
+                  current += step;
+                  if (current >= target) { current = target; clearInterval(timer); }
+                  el.textContent = current + suffix;
+                }, 30);
+              });
             }
-            const timer = setInterval(() => {
-              current += step;
-              if (current >= target) { current = target; clearInterval(timer); }
-              el.textContent = current + suffix;
-            }, 30);
           });
-        }
-      });
-    },
-    { threshold: 0.15, rootMargin: "0px 0px -40px 0px" }
-  );
-  document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right, .reveal-pop").forEach((el) => revealObserver.observe(el));
+        },
+        { threshold: 0.15, rootMargin: "0px 0px -40px 0px" }
+      );
+      revealTargets.forEach((el) => revealObserver.observe(el));
+    }
+  } catch (err) {
+    showAllReveals();
+  }
 
   /* ═══ NAV SCROLL SHADOW ═══ */
   window.addEventListener("scroll", () => {

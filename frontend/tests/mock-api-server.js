@@ -150,11 +150,18 @@ function sampleString(name, s, seed) {
   if (/^primary_role_name$/.test(name)) return ["Admin", "Full Access", "Recruiter", "Hiring Manager", "HR"][seed % 5];
   if (/^reporting_manager_name$/.test(name)) return FIRST_NAMES[(seed + 6) % FIRST_NAMES.length];
   if (/_at$|_date$|deadline|date$/.test(name)) return new Date(Date.UTC(2026, 8, 1 + (seed % 25), 9, 30)).toISOString();
+  if (/^screening_status$/.test(name)) return ["pending", "in_progress", "cleared"][seed % 3];
   if (/status$/.test(name)) return ["open", "active", "pending"][seed % 3];
   if (/stage$/.test(name)) return ["Sourced", "Screening", "Interview", "Offer"][seed % 4];
   if (/priority$/.test(name)) return ["high", "standard", "critical"][seed % 3];
   if (/currency/.test(name)) return "INR";
   if (/phone/.test(name)) return `+91 98000 0000${seed % 10}`;
+  // branch_code feeds entityBadgeHtml()'s branch pill (candidate/requisition/
+  // application cards sitewide) via branchCodeLabel(), which strips a
+  // trailing numeric suffix. The generic "_code$" rule below returns
+  // "CODE-101", which strips down to the literal word "CODE" — a real
+  // branch code is a short location code instead.
+  if (/^branch_code$/.test(name)) return ["BLR", "PUN", "HYD", "MUM", "DEL"][seed % 5];
   if (/(^|_)code$/.test(name)) return `CODE-${100 + seed}`;
   if (/file_?name/.test(name)) return `${FIRST_NAMES[seed % FIRST_NAMES.length].toLowerCase().replace(/\s+/g, "_")}_resume.pdf`;
   if (/^skills$|_skills$/.test(name)) return SKILLS[seed % SKILLS.length];
@@ -173,7 +180,7 @@ function sampleString(name, s, seed) {
   if (/entity_type/.test(name)) return ENTITY_TYPES[seed % ENTITY_TYPES.length];
   if (/age_label/.test(name)) return `${2 + ((seed * 3) % 58)}d`;
   if (/match_reasons/.test(name)) return MATCH_REASONS[seed % MATCH_REASONS.length];
-  if (/change_reason/.test(name)) return ["Panel feedback pending", "Candidate requested reschedule", "Budget approval needed", "Moved per client request", "Scheduling conflict resolved"][seed % 5];
+  if (/change_reason|^stage_reason$/.test(name)) return ["Panel feedback pending", "Candidate requested reschedule", "Budget approval needed", "Moved per client request", "Scheduling conflict resolved"][seed % 5];
   if (/^address$/.test(name)) return STREET_ADDRESSES[seed % STREET_ADDRESSES.length];
   if (/^summary$/.test(name)) return SUMMARIES[seed % SUMMARIES.length];
   if (/full_name|_name$|^name$/.test(name)) return FIRST_NAMES[seed % FIRST_NAMES.length];
@@ -352,8 +359,37 @@ function special(method, pathname, body) {
   if (method === "GET" && pathname === "/api/v1/legal/acceptances") {
     return [200, { items: [], pending: [], company_pending: [] }];
   }
+  /* GET /legal/documents has no dedicated handler before this, so doc_type
+     fell to the generic sampler and never produced the literal "tos" /
+     "privacy" / "dpa" values every page that reads it (signup.html's
+     Agreements checkboxes, legal.html, legal-acceptance.html) switches on —
+     those pages showed random job titles ("Data Analyst", "Product
+     Designer"...) as the agreement names instead of Terms of Service /
+     Privacy Policy / the DPA. */
+  if (method === "GET" && pathname === "/api/v1/legal/documents") {
+    const docs = [
+      { doc_type: "tos", title: "Terms of Service", version: 3, is_placeholder: false },
+      { doc_type: "privacy", title: "Privacy Policy", version: 2, is_placeholder: false },
+      { doc_type: "dpa", title: "Data Processing Addendum", version: 1, is_placeholder: true },
+    ];
+    return [200, { items: docs.map((d) => ({
+      ...d,
+      effective_at: "2026-08-01T00:00:00.000Z",
+      body: d.is_placeholder
+        ? "Draft text — this document has not been finalized by Legal yet."
+        : `This ${d.title} governs use of the RecruitOps platform (version ${d.version}).`,
+    })) }];
+  }
   if (method === "GET" && pathname === "/api/v1/permissions/me") {
     return [200, { user_id: 1, role_code: p.role_code, permissions: p.permissions }];
+  }
+  /* "message" is too generic a field name to pattern globally (several
+     unrelated response shapes reuse it), so SignupAccepted.message fell to
+     the catch-all "<field name> <seed>" fallback and showed the literal
+     text "message 1" after a successful signup instead of a real
+     confirmation. Scoped to this one endpoint. */
+  if (method === "POST" && pathname === "/api/v1/signup/") {
+    return [202, { message: "Check your email to confirm your address and finish setting up your company.", dev_verify_token: "dev-verify-token-1" }];
   }
   /* The generic /reports/datasets/{name} endpoint is used by SLA Tracker
      and the Custom Report Builder preview. Its response schema is too
@@ -456,6 +492,197 @@ function special(method, pathname, body) {
         { request_type: "company_delete", status: "pending_approval", download_ready: false, error: null },
       ];
       list.forEach((item, i) => Object.assign(item, ROWS[i % ROWS.length]));
+      return [200, payload];
+    }
+  }
+  /* Role Management and the Role Permissions Editor showed the same
+     collision bug class as above, in four places at once: every role's
+     "Name" fell to the generic person-name sampler (so every role was
+     literally named "Vikram Shah"), "status" fell to the generic
+     active/pending/open fallback (roles don't have a "pending" status),
+     and the permission catalog plus a role's own granted-permission list
+     both fell to literal placeholder text ("permission codes 1"). All of
+     this is scoped to these three endpoints — ALL_CODES (computed above
+     from the real backend + navigation.config.js permission codes) gives
+     a real catalog to build from instead of guessing. */
+  const ROLE_CATALOG = [
+    { code: "admin", name: "Admin", description: "Full control-plane access across every module.", is_system_role: true },
+    { code: "manager", name: "Full Access", description: "Operates every page end to end; used for sweeps and support.", is_system_role: true },
+    { code: "recruiter", name: "Recruiter", description: "Owns candidate sourcing, screening, and pipeline movement.", is_system_role: false },
+    { code: "hiring_manager", name: "Hiring Manager", description: "Reviews candidates and approves offers for their requisitions.", is_system_role: false },
+    { code: "hr", name: "HR", description: "Manages users, onboarding, and company-wide policy settings.", is_system_role: false },
+    { code: "interviewer", name: "Interviewer", description: "Submits interview feedback and scorecards only.", is_system_role: false },
+  ];
+  const roleCatalogEntry = (id) => ROLE_CATALOG[((Number(id) || 1) - 1 + ROLE_CATALOG.length * 100) % ROLE_CATALOG.length];
+  if (method === "GET" && pathname === "/api/v1/roles/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        Object.assign(item, roleCatalogEntry(item.id || i + 1), { status: "active" });
+      });
+      return [200, payload];
+    }
+  }
+  const roleDetailMatch = /^\/api\/v1\/roles\/(\d+)$/.exec(pathname);
+  if (method === "GET" && roleDetailMatch) {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      Object.assign(payload, roleCatalogEntry(roleDetailMatch[1]), { status: "active" });
+      return [200, payload];
+    }
+  }
+  const rolePermsMatch = /^\/api\/v1\/roles\/(\d+)\/permissions$/.exec(pathname);
+  if (method === "GET" && rolePermsMatch) {
+    const roleId = Number(rolePermsMatch[1]);
+    const entry = roleCatalogEntry(roleId);
+    const codes = entry.code === "admin" || entry.code === "manager"
+      ? ALL_CODES
+      : ALL_CODES.filter((c, i) => (i + roleId) % 3 !== 0);
+    return [200, { role_id: roleId, permission_codes: codes, scope_rules: {} }];
+  }
+  if (method === "GET" && pathname === "/api/v1/permissions/") {
+    return [200, {
+      items: ALL_CODES.map((code) => {
+        const [moduleName, ...rest] = code.split(".");
+        return { code, module_name: moduleName, action_name: rest.join(".") || moduleName };
+      }),
+    }];
+  }
+  /* Requisitions showed the same collision one layer down: the generic
+     /status$/ sampleString pattern returns "open" / "active" / "pending"
+     — a set shared by many unrelated schemas — but a requisition's real
+     status lifecycle is open / draft / on-hold / filled / closed
+     (confirmed from how requisition-detail.html, status-update-dialog.html
+     and the role-dashboard "stale requisitions" widget all branch on it).
+     "active" and "pending" aren't real requisition statuses, so 2 of every
+     3 requisitions were silently invisible to any `status === "open"`
+     check sitewide — including the location-dashboard rebuild's KPI
+     strip. Scoped to requisitions only; every other `status$` field
+     (offers, roles, locations, …) is untouched. */
+  const REQUISITION_STATUSES = ["open", "open", "open", "on-hold", "filled", "closed", "draft"];
+  if (method === "GET" && pathname === "/api/v1/requisitions/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        item.status = REQUISITION_STATUSES[(item.id || i + 1) % REQUISITION_STATUSES.length];
+      });
+      return [200, payload];
+    }
+  }
+  const requisitionDetailMatch = /^\/api\/v1\/requisitions\/(\d+)$/.exec(pathname);
+  if (method === "GET" && requisitionDetailMatch) {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      payload.status = REQUISITION_STATUSES[Number(requisitionDetailMatch[1]) % REQUISITION_STATUSES.length];
+      return [200, payload];
+    }
+  }
+  /* Source Effectiveness (and the location-dashboard widget that reuses
+     this same endpoint) showed "source 1" / "source 2" — SourceEffectivenessRow.source
+     has no dedicated pattern, and a bare "source" is too generic for one:
+     StageBucketResponse/StageListResponse also have a field literally named
+     "source" but meaning something else entirely ("platform"/"company"/
+     "inferred" — already handled by their own special() cases above), so
+     this stays scoped to the source-effectiveness report only. */
+  const SOURCE_CHANNELS = ["LinkedIn", "Employee Referral", "Naukri", "Company Website", "Indeed", "Agency", "Direct Application"];
+  if (method === "GET" && pathname === "/api/v1/reports/source-effectiveness") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.rows || []).forEach((row, i) => { row.source = SOURCE_CHANNELS[i % SOURCE_CHANNELS.length]; });
+      if (payload.best_source) payload.best_source = SOURCE_CHANNELS[0];
+      return [200, payload];
+    }
+  }
+  /* Agent Workbench showed the same person-name collision one layer
+     further: AgentInfo.name has no dedicated pattern so it fell to the
+     generic "_name$" sampler ("Vikram Shah" as an AI agent's name), and
+     AgentRunResponse.status fell to the generic status$ fallback
+     (open/active/pending) even though the real run lifecycle —
+     confirmed from agentRunStatusMeta() and agentsStatusVisible() in
+     renderers.js/api-client.js — is only pending/accepted/rejected/failed.
+     Only 3 real agents exist in this product (resume_screener,
+     daily_brief, inbox_triage — the same ids the ai.agent.* permission
+     codes name), so the catalog and its runs are built from that fixed
+     list instead of guessed. */
+  const AGENT_CATALOG = [
+    { id: "resume_screener", name: "Resume Screener", job: "Screens resumes against a requisition's must-have and good-to-have skills and ranks matches.", where_used: "Candidate Screening, Agent Workbench", output: "A ranked shortlist with match notes per candidate.", required_permission: "ai.agent.resume_screener" },
+    { id: "daily_brief", name: "Daily Brief", job: "Summarizes a recruiter's open requisitions, stale pipeline items, and today's priorities.", where_used: "Daily Review, Agent Workbench", output: "A short daily priority brief.", required_permission: "ai.agent.daily_brief" },
+    { id: "inbox_triage", name: "Inbox Triage", job: "Triages the approvals and notifications inbox and flags what needs attention first.", where_used: "Daily Ops & Inbox, Agent Workbench", output: "A prioritized triage list with suggested next actions.", required_permission: "ai.agent.inbox_triage" },
+  ];
+  const AGENT_RUN_STATUSES = ["pending", "accepted", "rejected"];
+  const AGENT_OUTPUT_SUMMARIES = {
+    resume_screener: ["Ranked 8 candidates against the Data Analyst requisition; top match scored 92%.", "Screened 5 new resumes for Product Designer — 2 strong matches flagged."],
+    daily_brief: ["3 requisitions need attention today; 2 candidates are overdue for a stage update.", "Your pipeline is healthy — 1 stale requisition flagged for follow-up."],
+    inbox_triage: ["2 approvals pending over 24h; prioritized the signing-bonus exception first.", "Inbox triaged: 1 urgent notification, 3 routine updates."],
+  };
+  if (method === "GET" && pathname === "/api/v1/agents/") {
+    return [200, { items: AGENT_CATALOG }];
+  }
+  if (method === "GET" && pathname === "/api/v1/agents/runs") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        const agent = AGENT_CATALOG[i % AGENT_CATALOG.length];
+        item.agent_id = agent.id;
+        item.status = AGENT_RUN_STATUSES[i % AGENT_RUN_STATUSES.length];
+        item.output_summary = AGENT_OUTPUT_SUMMARIES[agent.id][i % AGENT_OUTPUT_SUMMARIES[agent.id].length];
+      });
+      return [200, payload];
+    }
+  }
+  /* Client Directory's "Active"/"Onboarding" filter tabs never matched
+     anything — ClientResponse.status also falls to the generic
+     open/active/pending status$ fallback, and "onboarding" (the tab the
+     page itself offers) was never one of those three values, so that
+     tab was dead on arrival. Scoped to the clients list/detail endpoints
+     only; real client statuses are active/onboarding/inactive. */
+  const CLIENT_STATUSES = ["active", "active", "active", "onboarding", "inactive"];
+  if (method === "GET" && pathname === "/api/v1/clients/") {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      (payload.items || []).forEach((item, i) => {
+        item.status = CLIENT_STATUSES[(item.id || i + 1) % CLIENT_STATUSES.length];
+      });
+      return [200, payload];
+    }
+  }
+  const clientDetailMatch = /^\/api\/v1\/clients\/(\d+)$/.exec(pathname);
+  if (method === "GET" && clientDetailMatch) {
+    const hit = matchRoute(pathname).find((h) => h.route.ops.get);
+    const op = hit && hit.route.ops.get;
+    const firstResponse = op && op.responses && Object.entries(op.responses)[0];
+    const resSchema = firstResponse && firstResponse[1].content && firstResponse[1].content["application/json"];
+    if (resSchema) {
+      const payload = sample(resSchema.schema);
+      payload.status = CLIENT_STATUSES[Number(clientDetailMatch[1]) % CLIENT_STATUSES.length];
       return [200, payload];
     }
   }
@@ -586,7 +813,24 @@ function handleApi(req, res, rawBody) {
   }
   calls.push({ method, url: url.pathname + url.search, page, body: method === "GET" ? undefined : body });
 
-  if (!req.headers.authorization && !/\/auth\/(login|password\/(forgot|reset|setup))$/.test(url.pathname) && url.pathname !== "/api/v1/health") {
+  /* Routes reachable before a session exists: password sign-in, the forgot/
+     reset/setup password flow, the MFA code challenge during login (the only
+     credential at that point is the short-lived mfa_token the page already
+     carries, not a bearer token), the health check, and the entire anonymous
+     signup flow (viewing the agreements to accept, creating the account,
+     confirming the verification-email token, and that flow's own MFA
+     enrollment step). This allowlist was missing /legal/documents and every
+     /signup/* route — the signup page's "Agreements" checkboxes, the signup
+     form's own submit, email verification, and signup's MFA enrollment all
+     401'd immediately, which defaultUnauthorizedHandler() in api-client.js
+     treats as "session revoked" and hard-redirects to login.html. The net
+     effect: nobody could complete signup, and any persona with MFA enabled
+     got silently bounced back to the login page mid-challenge with no error
+     shown. Worth confirming the real backend's equivalent allowlist (not
+     this mock) has the same routes — if it has the same gap, that's a
+     production-blocking bug for every new signup and every MFA sign-in. */
+  const PUBLIC_API_PATHS = /^\/api\/v1\/(auth\/(login|password\/(forgot|reset|setup)|mfa\/challenge)|legal\/documents|signup\/.*)$/;
+  if (!req.headers.authorization && !PUBLIC_API_PATHS.test(url.pathname) && url.pathname !== "/api/v1/health") {
     return sendJson(res, 401, { detail: "Missing bearer token" });
   }
 
