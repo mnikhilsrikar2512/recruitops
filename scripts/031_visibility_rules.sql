@@ -71,7 +71,15 @@ IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = N'UQ_visibility_rules_
   ALTER TABLE dbo.visibility_rules DROP CONSTRAINT UQ_visibility_rules_entity_field;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = N'UQ_visibility_rules_tenant_entity_field')
+/* backend/db/schema.sql (dump_schema.py) represents this constraint as a
+   plain unique INDEX, not a sys.key_constraints row, on a database seeded
+   straight from that snapshot (e.g. CI's throwaway container) -- check
+   sys.indexes, which covers both forms, or this collides with the one
+   schema.sql already created. */
+IF NOT EXISTS (
+  SELECT 1 FROM sys.indexes
+  WHERE name = N'UQ_visibility_rules_tenant_entity_field' AND object_id = OBJECT_ID(N'dbo.visibility_rules')
+)
   ALTER TABLE dbo.visibility_rules ADD CONSTRAINT UQ_visibility_rules_tenant_entity_field UNIQUE (tenant_id, entity, field_name);
 GO
 
