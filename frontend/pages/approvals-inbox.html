@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Approvals Inbox - RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=7725423992" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=7725423992" />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=7725423992" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=7725423992" />
+  <link rel="stylesheet" href="../shared/global.css?v=57fb81e860" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=57fb81e860" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=57fb81e860" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=57fb81e860" />
 </head>
   <body class="bg-background text-on-background antialiased" data-route-id="approvals-inbox" data-route-kind="app" data-route-title="Approvals Inbox" data-route-section="Approvals">
   
@@ -76,7 +76,7 @@
     
     <section class="shell-card">
       <div class="workspace-surface">
-      <div class="max-w-7xl mx-auto space-y-6"> <!-- Page Header & Metric Strip --> <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4"> <div> <h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Approvals Inbox</h2> <p class="font-body-md text-text-muted max-w-2xl">Review and action pending requests across requisitions, offers, and exceptions.</p> </div> <div class="flex flex-wrap lg:flex-nowrap gap-4 items-stretch"> <!-- Metrics --> <div class="bg-surface border border-border rounded-lg p-4 min-w-[160px]"> <div class="font-label-caps text-label-caps text-text-muted mb-1 flex items-center gap-1.5"> <span class="material-symbols-outlined text-[16px]">inbox</span> Total Pending </div> <div class="font-headline-md text-headline-md text-on-surface">—</div> </div> <div class="bg-danger-bg border border-danger-text/20 rounded-lg p-4 min-w-[160px]"> <div class="font-label-caps text-label-caps text-danger-text mb-1 flex items-center gap-1.5"> <span class="material-symbols-outlined text-[16px]">timer</span> Overdue SLA </div> <div class="font-headline-md text-headline-md text-danger-text">—</div> </div> <div class="bg-info-bg border border-info-text/20 rounded-lg p-4 min-w-[160px]"> <div class="font-label-caps text-label-caps text-info-text mb-1 flex items-center gap-1.5"> <span class="material-symbols-outlined text-[16px]">pending_actions</span> Awaiting My Review </div> <div class="font-headline-md text-headline-md text-info-text">—</div> </div> </div> </div> <!-- Queue Surface (Card) --> <div class="bg-surface border border-border rounded-lg flex flex-col"> <!-- Tools / Filters Bar --> <div class="bg-surface-alt border-b border-border p-4 flex flex-col sm:flex-row gap-4 items-center justify-between"><!-- Mobile Tabs (Visible only on mobile/tablet since topbar covers desktop) -->
+      <div class="max-w-7xl mx-auto space-y-6"> <!-- Page Header & Metric Strip --> <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4"> <div> <h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Approvals Inbox</h2> <p class="font-body-md text-text-muted max-w-2xl">Review and action pending requests across requisitions, offers, and exceptions.</p> </div> <div class="flex flex-wrap lg:flex-nowrap gap-4 items-stretch"> <!-- Metrics --> <div data-layout="metric-card" class="bg-surface border border-border rounded-lg p-4 min-w-[160px]"> <div class="font-label-caps text-label-caps text-text-muted mb-1 flex items-center gap-1.5"> <span class="material-symbols-outlined text-[16px]">inbox</span> Total Pending </div> <div class="font-headline-md text-headline-md text-on-surface">—</div> </div> <div data-layout="metric-card" class="bg-danger-bg border border-danger-text/20 rounded-lg p-4 min-w-[160px]"> <div class="font-label-caps text-label-caps text-danger-text mb-1 flex items-center gap-1.5"> <span class="material-symbols-outlined text-[16px]">timer</span> Overdue SLA </div> <div class="font-headline-md text-headline-md text-danger-text">—</div> </div> <div data-layout="metric-card" class="bg-info-bg border border-info-text/20 rounded-lg p-4 min-w-[160px]"> <div class="font-label-caps text-label-caps text-info-text mb-1 flex items-center gap-1.5"> <span class="material-symbols-outlined text-[16px]">pending_actions</span> Awaiting My Review </div> <div class="font-headline-md text-headline-md text-info-text">—</div> </div> </div> </div> <!-- Queue Surface (Card) --> <div class="bg-surface border border-border rounded-lg flex flex-col"> <!-- Tools / Filters Bar --> <div class="bg-surface-alt border-b border-border p-4 flex flex-col sm:flex-row gap-4 items-center justify-between"><!-- Mobile Tabs (Visible only on mobile/tablet since topbar covers desktop) -->
       <div class="flex md:hidden border border-border rounded-lg bg-surface p-1 w-full sm:w-auto" role="tablist" aria-label="Approval status">
         <button type="button" role="tab" aria-selected="true" data-approval-tab="pending" class="flex-1 px-4 py-1.5 text-sm font-data-tabular bg-secondary-container text-on-secondary-container rounded-md">Pending (<span data-approval-count="pending">0</span>)</button>
         <button type="button" role="tab" aria-selected="false" data-approval-tab="actioned" class="flex-1 px-4 py-1.5 text-sm font-data-tabular text-text-muted hover:bg-highlight-soft rounded-md">Actioned (<span data-approval-count="actioned">0</span>)</button>
@@ -98,17 +98,17 @@
     </div>
     <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
     
-    <script src="../shared/renderers.js?v=7725423992"></script>
-    <script src="../shared/api-client.js?v=7725423992"></script>
-    <script src="../shared/ui-utils.js?v=7725423992"></script>
-    <script src="../shared/tables.js?v=7725423992"></script>
-    <script src="../shared/forms.js?v=7725423992"></script>
-    <script src="../shared/sidebar.js?v=7725423992"></script>
-    <script src="../shared/pipeline.js?v=7725423992"></script>
-    <script src="../shared/routing.js?v=7725423992"></script>
+    <script src="../shared/renderers.js?v=57fb81e860"></script>
+    <script src="../shared/api-client.js?v=57fb81e860"></script>
+    <script src="../shared/ui-utils.js?v=57fb81e860"></script>
+    <script src="../shared/tables.js?v=57fb81e860"></script>
+    <script src="../shared/forms.js?v=57fb81e860"></script>
+    <script src="../shared/sidebar.js?v=57fb81e860"></script>
+    <script src="../shared/pipeline.js?v=57fb81e860"></script>
+    <script src="../shared/routing.js?v=57fb81e860"></script>
 
-  <script src="../shared/navigation.config.js?v=7725423992"></script>
-    <script src="../shared/navigation.js?v=7725423992"></script>
-    <script src="../shared/app.js?v=7725423992"></script>
+  <script src="../shared/navigation.config.js?v=57fb81e860"></script>
+    <script src="../shared/navigation.js?v=57fb81e860"></script>
+    <script src="../shared/app.js?v=57fb81e860"></script>
 </body>
 </html>

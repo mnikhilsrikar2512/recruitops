@@ -1739,21 +1739,6 @@ function followUpTimingMeta(item) {
     return { label: formatWhen(item.follow_up_due_date).slice(0, 10), priority: "Medium", status: "Upcoming", dateClass: "text-on-surface", priorityClass: "bg-warning-bg text-warning-text border-highlight-soft" };
   }
   return { label: formatWhen(item.follow_up_due_date).slice(0, 10), priority: "Low", status: "Upcoming", dateClass: "text-on-surface", priorityClass: "bg-info-bg text-info-text border-outline-variant" };
-}function renderFollowUpRow(item, index) {
-  const timing = followUpTimingMeta(item);
-  return `<div class="flex items-center gap-4 p-4 ${index === 0 ? "" : "border-t border-border"} transition-colors hover:bg-highlight-soft" data-live-follow-up-row="true" data-follow-up-id="${item.id}">
-    <div class="min-w-0 flex-1">
-      <div class="mb-1 flex items-center gap-2">
-        <h4 class="truncate font-body-md font-semibold text-on-surface">${escapeLiveHtml(item.title || "Follow-up")}</h4>
-        <span class="inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-[10px] font-semibold ${timing.priorityClass}">${escapeLiveHtml(timing.status)}</span>
-      </div>
-      <p class="font-body-sm text-text-muted">${escapeLiveHtml(item.contact_name || item.client_name || "No contact")}</p>
-      <p class="mt-0.5 truncate font-body-sm text-text-muted text-[11px]">${escapeLiveHtml(item.notes || "No notes")}</p>
-    </div>
-    <div class="flex shrink-0 items-center gap-3">
-      <span class="${timing.dateClass} font-data-tabular text-[11px]">${escapeLiveHtml(timing.label)}</span>
-    </div>
-  </div>`;
 }
 
 function startOfWeekMonday(date) {
