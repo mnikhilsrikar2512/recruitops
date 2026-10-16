@@ -2374,13 +2374,105 @@ async function loadRoles() {
   });
 }
 
+/* Visibility Rules — which roles can see requisition margin/bill rate and
+   client default rate/markup, company-wide (scripts/031_visibility_rules.sql,
+   GET/PUT /visibility-rules). Used to be a stub: it called GET /roles/ and
+   rendered the roles list mislabeled as rule rows, with no real field
+   matrix anywhere — the page's own UI (role columns, toggles) implied a
+   feature that didn't exist in the backend. This renders the real field ×
+   role matrix and saves it for real. */
+let visibilityRulesState = null; /* last-loaded server state, for Reset */
+
+function _visibilityFieldKey(field) {
+  return `${field.entity}.${field.field_name}`;
+}
+
+function _renderVisibilityMatrix(host, data) {
+  const headRow = host.querySelector("[data-vis-head-row]");
+  const body = host.querySelector("[data-vis-body]");
+  const template = body?.querySelector("[data-row-template]");
+  if (!headRow || !body || !template) return;
+
+  headRow.querySelectorAll("th[data-vis-role-col]").forEach((th) => th.remove());
+  data.roles.forEach((role) => {
+    const th = document.createElement("th");
+    th.className = "font-label-caps text-label-caps text-text-muted py-3 px-4 font-semibold text-center";
+    th.textContent = role.name;
+    th.dataset.visRoleCol = role.code;
+    headRow.appendChild(th);
+  });
+
+  body.querySelectorAll("tr:not([data-row-template])").forEach((row) => row.remove());
+  const canWrite = hasPermission("visibility_rules.write");
+  data.fields.forEach((field) => {
+    const row = template.cloneNode(true);
+    row.removeAttribute("hidden");
+    row.removeAttribute("data-row-template");
+    row.dataset.visFieldKey = _visibilityFieldKey(field);
+    row.querySelector("[data-vis-field-label]").textContent = field.label;
+    data.roles.forEach((role) => {
+      const td = document.createElement("td");
+      td.className = "px-4 py-2 text-center";
+      const label = document.createElement("label");
+      label.className = "relative inline-flex items-center cursor-pointer";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "sr-only peer";
+      input.checked = field.allowed_role_codes.includes(role.code);
+      input.disabled = !canWrite;
+      input.dataset.visRole = role.code;
+      const track = document.createElement("div");
+      track.className = "w-9 h-5 bg-outline-variant rounded-full peer peer-checked:bg-primary-container peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all shadow-sm";
+      label.append(input, track);
+      td.appendChild(label);
+      row.appendChild(td);
+    });
+    body.appendChild(row);
+  });
+
+  const countEl = host.querySelector("[data-vis-rule-count]");
+  if (countEl) countEl.textContent = `${data.fields.length} rules`;
+  const saveBtn = host.querySelector("[data-vis-save]");
+  if (saveBtn) saveBtn.hidden = !canWrite;
+  const resetBtn = host.querySelector("[data-vis-reset]");
+  if (resetBtn) resetBtn.hidden = !canWrite;
+}
+
 async function loadVisibilityRules() {
-  const roles = await apiRequest("/roles/?page_size=50").catch(() => ({ items: [] }));
-  fillExistingTable(roles.items || [], (row, item) => {
-    const cells = row.querySelectorAll("td");
-    setCellValue(cells[0], item.role_name || item.name || "—");
-    setCellValue(cells[1], "Global");
-    setCellValue(cells[2], item.status || "active");
+  const host = document.querySelector("[data-visibility-rules]");
+  if (!host) return;
+  const data = await apiRequest("/visibility-rules/").catch((err) => {
+    showLiveError(err);
+    return null;
+  });
+  if (!data) return;
+  visibilityRulesState = data;
+  _renderVisibilityMatrix(host, data);
+
+  const statusEl = host.querySelector("[data-vis-status]");
+  host.querySelector("[data-vis-reset]")?.addEventListener("click", () => {
+    if (visibilityRulesState) _renderVisibilityMatrix(host, visibilityRulesState);
+    if (statusEl) statusEl.textContent = "";
+  });
+  host.querySelector("[data-vis-save]")?.addEventListener("click", async () => {
+    const rules = Array.from(host.querySelectorAll("[data-vis-field-key]")).map((row) => {
+      const [entity, fieldName] = row.dataset.visFieldKey.split(".");
+      const allowed = Array.from(row.querySelectorAll("input[data-vis-role]"))
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.visRole);
+      return { entity, field_name: fieldName, allowed_role_codes: allowed };
+    });
+    if (statusEl) statusEl.textContent = "Saving…";
+    try {
+      const saved = await apiRequest("/visibility-rules/", { method: "PUT", body: { rules } });
+      visibilityRulesState = saved;
+      _renderVisibilityMatrix(host, saved);
+      if (statusEl) statusEl.textContent = "Saved.";
+      showToast("Visibility rules saved", "Changes apply to the next API response for each role.");
+    } catch (err) {
+      if (statusEl) statusEl.textContent = "";
+      showLiveError(err);
+    }
   });
 }
 
