@@ -4245,7 +4245,7 @@ async function loadDailyUpdateDetail() {
 }
 
 async function loadDailyReview() {
-  const [myWork, pipeline, interviews, offers, actions, notifications, updates] = await Promise.all([
+  const [myWork, pipeline, interviews, offers, actions, notifications, updates, requisitions] = await Promise.all([
     apiRequest("/dashboards/my-work").catch(() => ({})),
     apiRequest("/pipeline/board").catch(() => []),
     apiRequest("/interviews/?page_size=50").catch(() => ({ items: [] })),
@@ -4253,10 +4253,18 @@ async function loadDailyReview() {
     apiRequest("/workflow-actions/queue?page_size=20").catch(() => ({ items: [] })),
     apiRequest("/notifications/?page_size=10").catch(() => ({ items: [] })),
     apiRequest("/daily-updates/?page_size=20").catch(() => ({ items: [] })),
+    apiRequest("/requisitions/?page_size=100").catch(() => ({ items: [] })),
   ]);
   const pipelineItems = Array.isArray(pipeline) ? pipeline : pipeline.items || [];
   const interviewItems = interviews.items || [];
   const offerItems = offers.items || [];
+  /* Avg time-to-hire (reuses the same timeToFillRecords()/daysBetween()
+     helper location-dashboard.html's KPI strip already uses) — this card
+     always showed "—" before because nothing ever computed or passed
+     avgFillDays into renderDailyReviewQuickStats(). */
+  const requisitionItems = requisitions.items || [];
+  const ttfRecords = timeToFillRecords(requisitionItems, offerItems);
+  const avgFillDays = ttfRecords.length ? Math.round(ttfRecords.reduce((sum, r) => sum + r.days, 0) / ttfRecords.length) : null;
   const pendingOffers = offerItems.filter((item) => {
     const status = String(item.offer_status || item.application_status || "").toLowerCase();
     return status && !/accepted|rejected|declined|joined|withdrawn/.test(status);
@@ -4273,6 +4281,7 @@ async function loadDailyReview() {
   renderDailyReviewQuickStats(myWork, pipelineItems, {
     interviews: thisWeekInterviews.length,
     offers: branchOffersEnabled() ? pendingOffers.length : 0,
+    avgFillDays,
   });
   renderDailyReviewPipelineActivity(pipelineItems.slice(0, 5));
   const actionItems = (actions.items || []).slice(0, 5).map((item) => ({
