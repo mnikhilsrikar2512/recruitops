@@ -165,6 +165,31 @@ function setFirstText(selector, value) {
 
 function setApiField(name, value) {
   setFirstText(`[data-api-field="${name}"]`, value ?? "—");
+}
+
+/* Fields gated by Visibility Rules (scripts/031_visibility_rules.sql) are
+   OMITTED entirely from the API response for a role without access, not
+   nulled — so "the key isn't on the object" means "hidden from you" and
+   must stay hidden, while "the key is present but null" means "visible to
+   you, just not set yet" and should render as "—" like any other field.
+   `entity` is the API response object; `fieldFormatters` maps each gated
+   field name to a `(rawValue) => displayString|null` formatter. Each row
+   (marked `data-commercial-field="<name>"`) and the enclosing section
+   (marked `data-commercial-terms`) start `hidden` in the page markup and
+   are only unhidden here, per field, when that key actually exists. */
+function revealGatedFields(entity, fieldFormatters) {
+  let anyVisible = false;
+  for (const [fieldName, formatter] of Object.entries(fieldFormatters)) {
+    const row = document.querySelector(`[data-commercial-field="${fieldName}"]`);
+    const present = entity != null && Object.prototype.hasOwnProperty.call(entity, fieldName);
+    if (row) row.hidden = !present;
+    if (present) {
+      anyVisible = true;
+      setApiField(fieldName, formatter(entity[fieldName]));
+    }
+  }
+  const section = document.querySelector("[data-commercial-terms]");
+  if (section) section.hidden = !anyVisible;
 }function setStackedCell(td, title, subtitle) {
   if (!td) return;
   const titleNode = td.querySelector(".font-headline-sm, .font-semibold, p.font-headline-sm, span.font-medium, .truncate");

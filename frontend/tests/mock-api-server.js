@@ -339,6 +339,30 @@ const PERSONAS = {
 };
 let persona = process.env.MOCK_PERSONA || "admin";
 
+/* Mirrors app/services/visibility.py's masking: a gated field is present on
+   the mock response only when the current persona's role_code is in that
+   field's VISIBILITY_RULES_STATE row — so toggling a rule on the real
+   visibility-rules.html page (which mutates this same array) also changes
+   what requisition-detail.html/client-detail.html show, same as the real
+   backend's JSONResponse(exclude=hidden) omission. */
+function gatedFieldAllowed(entity, fieldName) {
+  const rule = VISIBILITY_RULES_STATE.find((r) => r.entity === entity && r.field_name === fieldName);
+  const roleCode = (PERSONAS[persona] || PERSONAS.admin).role_code;
+  return !rule || rule.allowed_role_codes.includes(roleCode);
+}
+function applyGatedRequisitionFields(item) {
+  if (gatedFieldAllowed("requisition", "margin_percent")) item.margin_percent = 18.5;
+  else delete item.margin_percent;
+  if (gatedFieldAllowed("requisition", "bill_rate")) item.bill_rate = 4500;
+  else delete item.bill_rate;
+}
+function applyGatedClientFields(item) {
+  if (gatedFieldAllowed("client", "default_bill_rate")) item.default_bill_rate = 5200;
+  else delete item.default_bill_rate;
+  if (gatedFieldAllowed("client", "markup_percent")) item.markup_percent = 22;
+  else delete item.markup_percent;
+}
+
 /* ── Call log ────────────────────────────────────────────────── */
 let calls = [];
 let violations = [];
@@ -588,6 +612,7 @@ function special(method, pathname, body) {
       const payload = sample(resSchema.schema);
       (payload.items || []).forEach((item, i) => {
         item.status = REQUISITION_STATUSES[(item.id || i + 1) % REQUISITION_STATUSES.length];
+        applyGatedRequisitionFields(item);
       });
       return [200, payload];
     }
@@ -601,6 +626,7 @@ function special(method, pathname, body) {
     if (resSchema) {
       const payload = sample(resSchema.schema);
       payload.status = REQUISITION_STATUSES[Number(requisitionDetailMatch[1]) % REQUISITION_STATUSES.length];
+      applyGatedRequisitionFields(payload);
       return [200, payload];
     }
   }
@@ -681,6 +707,7 @@ function special(method, pathname, body) {
       const payload = sample(resSchema.schema);
       (payload.items || []).forEach((item, i) => {
         item.status = CLIENT_STATUSES[(item.id || i + 1) % CLIENT_STATUSES.length];
+        applyGatedClientFields(item);
       });
       return [200, payload];
     }
@@ -694,6 +721,7 @@ function special(method, pathname, body) {
     if (resSchema) {
       const payload = sample(resSchema.schema);
       payload.status = CLIENT_STATUSES[Number(clientDetailMatch[1]) % CLIENT_STATUSES.length];
+      applyGatedClientFields(payload);
       return [200, payload];
     }
   }
