@@ -1376,7 +1376,7 @@ function workloadStatus(utilization) {
 
 function teamWorkloadStatusColor(utilization) {
   const value = Number(utilization) || 0;
-  if (value > 85) return (window.RoCharts && window.RoCharts.STATUS.critical) || "#a63d33";
+  if (value > 85) return (window.RoCharts && window.RoCharts.STATUS.critical) || "#A1392C";
   if (value >= 40) return "#2a78d6";
   return (window.RoCharts && window.RoCharts.STATUS.good) || "#217a46";
 }

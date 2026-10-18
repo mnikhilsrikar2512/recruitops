@@ -1643,7 +1643,7 @@ async function loadLocations() {
         ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">Active</span>'
         : v.status === 'inactive'
           ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">Inactive</span>'
-          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold">' + escapeHtml(v.status) + '</span>';
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold">' + escapeHtml(titleFromCode(v.status) || v.status) + '</span>';
       const headCell = v.location_head_name
         ? '<td class="px-4 py-3 text-on-surface">' + escapeHtml(v.location_head_name) + '</td>'
         : '<td class="px-4 py-3 text-text-muted italic">Unassigned</td>';
@@ -4464,7 +4464,7 @@ async function loadDashboards() {
         return `<div class="flex items-center gap-3 min-w-0">
           <span class="w-[168px] shrink-0 text-[12px] leading-snug text-on-surface" title="${escapeLiveHtml(label)}">${escapeLiveHtml(label)}</span>
           <div class="flex-1 h-2.5 rounded bg-[#f1f2f0] overflow-hidden">
-            <div class="h-full rounded" style="width:${pct}%;background:#1e293b;opacity:0.78"></div>
+            <div class="h-full rounded" style="width:${pct}%;background:#A3542F;opacity:0.78"></div>
           </div>
           <span class="w-8 shrink-0 text-right text-[12px] font-semibold tabular-nums text-on-surface">${count}</span>
         </div>`;
@@ -5491,18 +5491,32 @@ async function loadMeetingFormDialog() {
   const all = payload.items || [];
   const follow = all.filter((item) => /follow/i.test(String(item.meeting_type || item.outcome_status || item.title || "")));
   const items = follow.length ? follow : all;
+  /* Meetings have no "priority" field at all, so item.priority was always
+     undefined and this column silently fell back to the meeting-type label
+     (e.g. "Follow Up") on every single row. followUpTimingMeta() derives a
+     real priority/status from follow_up_due_date (the correct deadline
+     field -- scheduled_at is when the meeting itself happens, not the
+     follow-up's due date) and was already written for this page but never
+     wired in. */
   fillExistingTable(items, (row, item) => {
+    const timing = followUpTimingMeta(item);
+    const isDone = /complete|done/i.test(String(item.outcome_status || ""));
     const cells = row.querySelectorAll("td");
     setStackedCell(cells[0], item.title || "Follow-up", item.notes || item.meeting_type || "");
-    setCellValue(cells[1], item.priority || titleFromCode(item.meeting_type) || "—");
-    setCellValue(cells[2], item.scheduled_at ? formatWhen(item.scheduled_at) : "—");
+    if (typeof paintPriorityBadge === "function") paintPriorityBadge(cells[1], timing.priority);
+    else setCellValue(cells[1], timing.priority);
+    const dueNode = cells[2]?.querySelector("span") || cells[2];
+    if (dueNode) {
+      dueNode.textContent = isDone && item.scheduled_at ? formatWhen(item.scheduled_at) : timing.label;
+      dueNode.className = isDone ? "text-text-muted" : timing.dateClass;
+    }
     setStackedCell(cells[3], item.contact_name || item.client_name || "—", item.meeting_type || "");
     if (typeof paintPersonCell === "function") paintPersonCell(cells[4], item.owner_name || item.created_by_name);
     else setCellValue(cells[4], item.owner_name || item.created_by_name || "—");
     setCellValue(cells[5], item.outcome_status || item.status || "Open");
     row.dataset.recordId = item.id || "";
-    row.dataset.filterStatus = String(item.outcome_status || item.status || "open").toLowerCase();
-    row.dataset.filterPriority = String(item.priority || "").toLowerCase();
+    row.dataset.filterStatus = isDone ? "completed" : timing.status.toLowerCase().replace(/\s+/g, "-");
+    row.dataset.filterPriority = timing.priority.toLowerCase();
     row.dataset.filterOwner = item.owner_name || item.created_by_name || "";
     row.dataset.filterRelated = item.meeting_type || item.client_name || "";
     row.dataset.route = `follow-up-form-dialog.html?id=${item.id}`;
@@ -5510,14 +5524,12 @@ async function loadMeetingFormDialog() {
   });
   const metrics = document.querySelectorAll(".workspace-surface .grid .font-headline-md");
   if (metrics.length >= 4) {
-    const now = new Date();
-    const todayKey = now.toDateString();
-    const isOpen = (item) => !/complete|done/i.test(String(item.outcome_status || ""));
-    const dueDate = (item) => (item.scheduled_at ? new Date(item.scheduled_at) : null);
-    const overdue = items.filter((item) => isOpen(item) && dueDate(item) && dueDate(item) < now && dueDate(item).toDateString() !== todayKey).length;
-    const dueToday = items.filter((item) => isOpen(item) && dueDate(item) && dueDate(item).toDateString() === todayKey).length;
-    const upcoming = items.filter((item) => isOpen(item) && dueDate(item) && dueDate(item) > now && dueDate(item).toDateString() !== todayKey).length;
-    const completed = items.filter((item) => /complete|done/i.test(String(item.outcome_status || ""))).length;
+    const isDone = (item) => /complete|done/i.test(String(item.outcome_status || ""));
+    const statusOf = (item) => followUpTimingMeta(item).status;
+    const overdue = items.filter((item) => !isDone(item) && statusOf(item) === "Overdue").length;
+    const dueToday = items.filter((item) => !isDone(item) && statusOf(item) === "Due Today").length;
+    const upcoming = items.filter((item) => !isDone(item) && statusOf(item) === "Upcoming").length;
+    const completed = items.filter(isDone).length;
     metrics[0].textContent = String(overdue);
     metrics[1].textContent = String(dueToday);
     metrics[2].textContent = String(upcoming);

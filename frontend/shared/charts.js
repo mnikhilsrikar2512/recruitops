@@ -13,8 +13,8 @@
   "use strict";
 
   const CATEGORICAL = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"];
-  const STATUS = { good: "#217a46", warning: "#8a6a1f", critical: "#a63d33", neutral: "#6e7476" };
-  const INK = { primary: "#1a1d20", secondary: "#4b5257", muted: "#898781", grid: "#e7e7e4", baseline: "#c9c9c5" };
+  const STATUS = { good: "#217a46", warning: "#8a6a1f", critical: "#A1392C", neutral: "#726F66" };
+  const INK = { primary: "#2B2823", secondary: "#4b5257", muted: "#898781", grid: "#e7e7e4", baseline: "#c9c9c5" };
 
   function esc(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

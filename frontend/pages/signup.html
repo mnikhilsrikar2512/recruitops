@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Sign up — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=56b6eea4d6" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=56b6eea4d6" />
-  <link rel="stylesheet" href="../shared/landing.css?v=56b6eea4d6" />
+  <link rel="stylesheet" href="../shared/global.css?v=0e78e5efc0" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=0e78e5efc0" />
+  <link rel="stylesheet" href="../shared/landing.css?v=0e78e5efc0" />
   <style>
     .login-split { display:flex; min-height:100vh; }
-    .login-left { flex:1; background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
+    .login-left { flex:1; background:linear-gradient(135deg,#A3542F 0%,#8A4526 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
     .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .login-back-home:hover { color:#1e293b; }
+    .login-back-home:hover { color:#A3542F; }
     @media(max-width:1024px){ .login-left{display:none;} }
   </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=56b6eea4d6" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=56b6eea4d6" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=0e78e5efc0" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=0e78e5efc0" />
 </head>
 <body data-route-id="signup" data-route-kind="auth" data-route-title="Sign up" data-route-section="Authentication">
   <main>
@@ -44,67 +44,67 @@
       <!-- Right: Form -->
       <div class="login-right">
         <div style="width:100%;max-width:440px">
-          <a href="../index.html" class="login-back-home" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#6E7476;text-decoration:none;margin-bottom:20px">
+          <a href="../index.html" class="login-back-home" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#726F66;text-decoration:none;margin-bottom:20px">
             <span class="material-symbols-outlined" style="font-size:16px">arrow_back</span>
             Back to homepage
           </a>
           <a href="../index.html" class="lg:hidden flex items-center gap-2 mb-8 justify-center" style="text-decoration:none" aria-label="RecruitOps home">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#1e293b;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
-            <span style="font-size:18px;font-weight:700;color:#1e293b">RecruitOps</span>
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#A3542F;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
+            <span style="font-size:18px;font-weight:700;color:#A3542F">RecruitOps</span>
           </a>
           <div class="bg-surface border border-border rounded-lg" style="box-shadow:0 4px 24px rgba(39,48,56,0.06)">
             <div style="padding:20px 24px;border-bottom:1px solid #E7E7E4">
               <h2 style="font-size:20px;font-weight:700;color:#17201C">Create your company's RecruitOps account</h2>
-              <p style="font-size:13px;color:#6E7476;margin-top:4px">You'll be the first admin. Add offices, clients and your team afterwards.</p>
+              <p style="font-size:13px;color:#726F66;margin-top:4px">You'll be the first admin. Add offices, clients and your team afterwards.</p>
             </div>
             <div style="padding:24px;position:relative">
               <form class="flex flex-col gap-4" id="signup-form" novalidate>
                 <div class="flex flex-col gap-1.5">
                   <label style="font-size:12px;font-weight:600;color:#4B5257" for="company_name">Company name</label>
-                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">domain</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="company_name" required minlength="2" maxlength="150" autocomplete="organization" placeholder="Acme Staffing"/></div>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">domain</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="company_name" required minlength="2" maxlength="150" autocomplete="organization" placeholder="Acme Staffing"/></div>
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label style="font-size:12px;font-weight:600;color:#4B5257" for="admin_name">Your name</label>
-                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">person</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="admin_name" required minlength="2" maxlength="150" autocomplete="name" placeholder="Jane Doe"/></div>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">person</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="admin_name" required minlength="2" maxlength="150" autocomplete="name" placeholder="Jane Doe"/></div>
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label style="font-size:12px;font-weight:600;color:#4B5257" for="email">Work email</label>
-                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">mail</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="email" type="email" required autocomplete="email" placeholder="name@company.com"/></div>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">mail</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="email" type="email" required autocomplete="email" placeholder="name@company.com"/></div>
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label style="font-size:12px;font-weight:600;color:#4B5257" for="password">Password</label>
-                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">lock</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 44px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="password" type="password" required minlength="12" autocomplete="new-password" placeholder="At least 12 characters"/><button type="button" class="ro-password-toggle" data-password-toggle aria-label="Show password"><span class="material-symbols-outlined" style="font-size:18px">visibility</span></button></div>
-                  <span style="font-size:12px;color:#6E7476">At least 12 characters; common or leaked passwords are refused.</span>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">lock</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 44px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="password" type="password" required minlength="12" autocomplete="new-password" placeholder="At least 12 characters"/><button type="button" class="ro-password-toggle" data-password-toggle aria-label="Show password"><span class="material-symbols-outlined" style="font-size:18px">visibility</span></button></div>
+                  <span style="font-size:12px;color:#726F66">At least 12 characters; common or leaked passwords are refused.</span>
                 </div>
                 <div class="flex flex-col gap-1.5">
-                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="city">City of your head office <span style="font-weight:400;color:#6E7476">(optional)</span></label>
-                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#6E7476">location_on</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#1a1d20;min-height:44px" id="city" maxlength="100" placeholder="Bengaluru"/></div>
+                  <label style="font-size:12px;font-weight:600;color:#4B5257" for="city">City of your head office <span style="font-weight:400;color:#726F66">(optional)</span></label>
+                  <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">location_on</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="city" maxlength="100" placeholder="Bengaluru"/></div>
                 </div>
                 <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden"><label>Website<input id="website" tabindex="-1" autocomplete="off"/></label></div>
-                <fieldset class="flex flex-col gap-2" id="legal-boxes" style="font-size:13px;color:#4B5257"><legend style="font-size:12px;font-weight:600;color:#4B5257">Agreements</legend><p style="color:#6E7476">Loading the current documents…</p></fieldset>
-                <button style="width:100%;background:#1e293b;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;min-height:44px" type="submit"><span>Create account</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span></button>
+                <fieldset class="flex flex-col gap-2" id="legal-boxes" style="font-size:13px;color:#4B5257"><legend style="font-size:12px;font-weight:600;color:#4B5257">Agreements</legend><p style="color:#726F66">Loading the current documents…</p></fieldset>
+                <button style="width:100%;background:#A3542F;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;min-height:44px" type="submit"><span>Create account</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span></button>
               </form>
               <p id="msg" role="alert" class="hidden" style="margin-top:16px;border-radius:8px;padding:10px 12px;font-size:13px"></p>
             </div>
             <div style="background:#fafaf9;padding:12px 24px;border-top:1px solid #E7E7E4;display:flex;justify-content:flex-end;align-items:center">
-              <a href="legal.html?doc=tos" style="font-size:13px;color:#6E7476;text-decoration:none;margin-right:auto">Terms</a><a href="legal.html?doc=privacy" style="font-size:13px;color:#6E7476;text-decoration:none;margin-right:16px">Privacy</a><a href="support-workspace.html" style="font-size:13px;color:#6E7476;text-decoration:none">Need help?</a>
+              <a href="legal.html?doc=tos" style="font-size:13px;color:#726F66;text-decoration:none;margin-right:auto">Terms</a><a href="legal.html?doc=privacy" style="font-size:13px;color:#726F66;text-decoration:none;margin-right:16px">Privacy</a><a href="support-workspace.html" style="font-size:13px;color:#726F66;text-decoration:none">Need help?</a>
             </div>
           </div>
-          <p class="text-center mt-6" style="font-size:13px;color:#6E7476">Already have an account? <a href="login.html" style="color:#1e293b;font-weight:600;text-decoration:none">Sign in</a></p>
+          <p class="text-center mt-6" style="font-size:13px;color:#726F66">Already have an account? <a href="login.html" style="color:#A3542F;font-weight:600;text-decoration:none">Sign in</a></p>
         </div>
       </div>
     </div>
   </main>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
-  <script src="../shared/renderers.js?v=56b6eea4d6"></script>
-  <script src="../shared/api-client.js?v=56b6eea4d6"></script>
-  <script src="../shared/ui-utils.js?v=56b6eea4d6"></script>
-  <script src="../shared/tables.js?v=56b6eea4d6"></script>
-  <script src="../shared/forms.js?v=56b6eea4d6"></script>
-  <script src="../shared/sidebar.js?v=56b6eea4d6"></script>
-  <script src="../shared/pipeline.js?v=56b6eea4d6"></script>
-  <script src="../shared/routing.js?v=56b6eea4d6"></script>
-  <script src="../shared/app.js?v=56b6eea4d6"></script>
+  <script src="../shared/renderers.js?v=0e78e5efc0"></script>
+  <script src="../shared/api-client.js?v=0e78e5efc0"></script>
+  <script src="../shared/ui-utils.js?v=0e78e5efc0"></script>
+  <script src="../shared/tables.js?v=0e78e5efc0"></script>
+  <script src="../shared/forms.js?v=0e78e5efc0"></script>
+  <script src="../shared/sidebar.js?v=0e78e5efc0"></script>
+  <script src="../shared/pipeline.js?v=0e78e5efc0"></script>
+  <script src="../shared/routing.js?v=0e78e5efc0"></script>
+  <script src="../shared/app.js?v=0e78e5efc0"></script>
   <script>
   (function () {
     function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -117,9 +117,9 @@
     apiRequest("/legal/documents").then(function (data) {
       boxes.innerHTML = '<legend style="font-size:12px;font-weight:600;color:#4B5257">Agreements</legend>' + (data.items || []).map(function (d) {
         versions[d.doc_type] = d.version;
-        return '<label class="flex items-start gap-2"><input type="checkbox" required data-doc="' + esc(d.doc_type) + '" class="mt-1 h-4 w-4"/><span>I accept the <a href="legal.html?doc=' + esc(d.doc_type) + '" target="_blank" rel="noopener" style="color:#1e293b;text-decoration:underline">' + esc(NAMES[d.doc_type] || d.title) + "</a> (version " + esc(d.version) + ")" + (d.is_placeholder ? ' <em style="color:#6E7476">— draft text</em>' : "") + "</span></label>";
+        return '<label class="flex items-start gap-2"><input type="checkbox" required data-doc="' + esc(d.doc_type) + '" class="mt-1 h-4 w-4"/><span>I accept the <a href="legal.html?doc=' + esc(d.doc_type) + '" target="_blank" rel="noopener" style="color:#A3542F;text-decoration:underline">' + esc(NAMES[d.doc_type] || d.title) + "</a> (version " + esc(d.version) + ")" + (d.is_placeholder ? ' <em style="color:#726F66">— draft text</em>' : "") + "</span></label>";
       }).join("");
-    }).catch(function () { boxes.innerHTML = '<p style="color:#A63D33">Couldn\'t load the agreements. Reload the page.</p>'; });
+    }).catch(function () { boxes.innerHTML = '<p style="color:#A1392C">Couldn\'t load the agreements. Reload the page.</p>'; });
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       var unchecked = Array.prototype.some.call(boxes.querySelectorAll("[data-doc]"), function (b) { return !b.checked; });
