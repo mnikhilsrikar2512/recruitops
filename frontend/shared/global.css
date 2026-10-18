@@ -5390,3 +5390,32 @@ body[data-route-kind="auth"] details summary {
 body[data-route-kind="auth"] details summary:hover {
   color: #7D4458 !important;
 }
+
+/* Desktop-only compaction: the 44px input/button height above (set for a
+   comfortable mobile touch target) adds up to more height than a
+   sign-in/sign-up card needs on a laptop screen -- signup.html in
+   particular measured ~930px of content against an ~800px viewport,
+   forcing a whole-page scroll for a form that should fit on one screen.
+   Same selectors as above, so source order (this block comes later)
+   decides the winner at equal specificity; only takes effect at 768px+,
+   so phones keep the full 44px touch target untouched. */
+@media (min-width: 768px) {
+  body[data-route-kind="auth"] input[type="email"],
+  body[data-route-kind="auth"] input[type="password"],
+  body[data-route-kind="auth"] input[type="text"],
+  body[data-route-kind="auth"] input#mfa-code,
+  body[data-route-kind="auth"] input#mfa-recovery,
+  body[data-route-kind="auth"] input[name="code"] {
+    min-height: 34px !important;
+    font-size: 13px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+  body[data-route-kind="auth"] button[type="submit"],
+  body[data-route-kind="auth"] #mfa-begin,
+  body[data-route-kind="auth"] #mfa-confirm {
+    min-height: 34px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+}
