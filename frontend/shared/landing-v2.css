@@ -25,7 +25,7 @@
   transform: translate3d(38px, 48px, -140px) rotate(-6deg);
   opacity: .55;
 }
-.tilt-stack > .tilt-wrap { position: relative; z-index: 1; }
+.tilt-stack .tilt-card { position: relative; z-index: 1; }
 
 /* Dashed orbit ring behind the hero visual, for depth */
 .mk-halo {
