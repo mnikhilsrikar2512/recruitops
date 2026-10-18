@@ -354,34 +354,41 @@
       position: fixed;
       inset: 0 auto 0 0;
       width: var(--ro-sidebar);
-      background: #fafaf9;
+      background: #ffffff;
       border-right: 1px solid var(--ro-border);
-      padding: 16px;
+      /* Depth: a card-like elevation against the warm paper canvas, not
+         just a 1px seam -- "too plain/flat" feedback on the sidebar. */
+      box-shadow: 1px 0 0 rgba(43, 40, 35, 0.02), 6px 0 24px -12px rgba(43, 40, 35, 0.10);
+      padding: 18px 14px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
       transition: width 180ms ease;
       z-index: 40;
       overflow-y: auto;
     }
     .sidebar-brand {
       display: grid;
-      grid-template-columns: 32px minmax(0, 1fr);
+      grid-template-columns: 34px minmax(0, 1fr);
       align-items: center;
       gap: 10px;
+      padding: 0 4px 16px;
+      margin: 0 -4px;
+      border-bottom: 1px solid var(--ro-border);
       color: #2B2823;
       text-decoration: none;
     }
     .sidebar-mark {
       display: grid;
       place-items: center;
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 10px;
-      background: #A3542F;
+      background: linear-gradient(160deg, #A3542F, #8A4526);
       color: #FAFAF9;
       font-weight: 800;
       letter-spacing: -0.03em;
+      box-shadow: 0 4px 10px -2px rgba(163, 84, 47, 0.45);
     }
     .sidebar-brand-copy {
       min-width: 0;
@@ -399,7 +406,7 @@
     }
     .sidebar-nav {
       display: grid;
-      gap: 6px;
+      gap: 10px;
       min-width: 0;
     }
     .nav-group {
@@ -410,18 +417,20 @@
       grid-template-columns: 22px minmax(0, 1fr) 18px;
       align-items: center;
       gap: 8px;
-      min-height: 34px;
-      border-radius: 10px;
+      min-height: 36px;
+      padding: 0 6px;
+      border-radius: 8px;
       color: #2B2823;
       cursor: pointer;
       list-style: none;
       user-select: none;
+      transition: background-color 120ms ease;
     }
     .nav-group-toggle::-webkit-details-marker {
       display: none;
     }
     .nav-group-toggle:hover {
-      background: rgba(163, 84, 47, 0.06);
+      background: rgba(163, 84, 47, 0.07);
     }
     .nav-group-icon,
     .nav-group-chevron,
@@ -434,46 +443,75 @@
       font-size: 20px;
       line-height: 1;
     }
+    .nav-group-icon {
+      color: #A3542F;
+    }
     .nav-group-label {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 12.5px;
+      font-weight: 750;
+      letter-spacing: 0.01em;
     }
     .nav-group-chevron {
-      color: #575E63;
+      color: #9C9284;
       transition: transform 160ms ease;
     }
     .nav-group[open] > .nav-group-toggle .nav-group-chevron {
       transform: rotate(180deg);
     }
+    /* Submenu rail: a thin vertical guide behind the indented children,
+       so the group -> child relationship reads at a glance instead of
+       relying on indentation alone. */
     .nav-sub {
       display: grid;
-      gap: 3px;
-      margin: 3px 0 6px 30px;
+      gap: 2px;
+      margin: 4px 0 4px 11px;
+      padding-left: 19px;
+      border-left: 1px solid var(--ro-border);
       min-width: 0;
     }
     .nav-link {
       display: grid;
-      grid-template-columns: 22px minmax(0, 1fr);
+      grid-template-columns: 20px minmax(0, 1fr);
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       min-height: 32px;
       padding: 6px 8px;
-      border-radius: 10px;
-      color: #A3542F;
+      border-radius: 7px;
+      /* Submenu items default to quiet ink, not the accent color -- every
+         sub-item used to render in solid clay even when not the current
+         page, which read as "the whole submenu is a different colour
+         than the menu." Accent is now reserved for hover/active only. */
+      color: #55504A;
       text-decoration: none;
       line-height: 1.2;
+      font-weight: 550;
+      transition: background-color 120ms ease, color 120ms ease;
+    }
+    .nav-link .material-symbols-outlined {
+      font-size: 18px;
+      width: 20px;
+      min-width: 20px;
+      color: #9C9284;
+      transition: color 120ms ease;
     }
     .nav-link:hover {
-      background: rgba(31, 74, 60, 0.08);
+      background: rgba(163, 84, 47, 0.08);
+      color: #A3542F;
+    }
+    .nav-link:hover .material-symbols-outlined {
       color: #A3542F;
     }
     .nav-link.is-active {
       background: #A3542F;
       color: #ffffff;
-      box-shadow: 0 8px 18px rgba(31, 74, 60, 0.16);
+      font-weight: 650;
+      box-shadow: 0 6px 14px -4px rgba(163, 84, 47, 0.45);
+    }
+    .nav-link.is-active .material-symbols-outlined {
+      color: #ffffff;
     }
     .sidebar-label {
       min-width: 0;
@@ -2880,10 +2918,10 @@
     }
     .app-sidebar {
       width: var(--ro-sidebar);
-      background: #fafaf9 !important;
+      background: #ffffff !important;
       backdrop-filter: none;
       border-right-color: var(--ro-border);
-      box-shadow: none;
+      box-shadow: 1px 0 0 rgba(43, 40, 35, 0.02), 6px 0 24px -12px rgba(43, 40, 35, 0.10) !important;
     }
     .app-shell[data-sidebar-collapsed="true"] .app-sidebar {
       width: var(--ro-sidebar-offset, 72px);
@@ -2900,37 +2938,43 @@
     }
     .sidebar-mark,
     .marketing-logo-mark {
-      border-radius: 8px;
-      background: #A3542F;
-      box-shadow: none;
+      border-radius: 10px;
+      background: linear-gradient(160deg, #A3542F, #8A4526);
+      box-shadow: 0 4px 10px -2px rgba(163, 84, 47, 0.45);
     }
     .sidebar-brand-name,
     .marketing-logo {
       font-weight: 800;
     }
     .nav-group-toggle,
-    .nav-link,
     .sidebar-logout,
     .sidebar-cta-link,
     .topbar-action {
       border-radius: 8px !important;
     }
-    .nav-link:hover,
+    .nav-link {
+      border-radius: 7px !important;
+    }
     .nav-group-toggle:hover {
-      background: rgba(163, 84, 47, 0.06);
+      background: rgba(163, 84, 47, 0.07);
+    }
+    .nav-link:hover {
+      background: rgba(163, 84, 47, 0.08);
+      color: #A3542F;
     }
     .nav-link.is-active {
       background: #A3542F !important;
-      box-shadow: none;
+      color: #ffffff;
+      box-shadow: 0 6px 14px -4px rgba(163, 84, 47, 0.45) !important;
     }
     .sidebar-cta-link {
       display: none !important;
     }
     .app-topbar {
       min-height: 56px;
-      background: #fafaf9 !important;
+      background: #ffffff !important;
       border-bottom-color: var(--ro-border);
-      box-shadow: none;
+      box-shadow: 0 1px 0 rgba(43, 40, 35, 0.02), 0 10px 20px -16px rgba(43, 40, 35, 0.14) !important;
     }
     .app-canvas {
       padding: 22px;
@@ -5221,4 +5265,119 @@ body[data-route-id="pipeline-board"] [data-layout="pipeline-filter-bar"] input {
   ::view-transition-new(root) {
     animation-duration: 0.01ms !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Auth surfaces -- depth, consistency, focus states
+   Addresses "dated / too plain after the recolor / layout & flow"
+   feedback on login, signup and the shared split-panel pattern
+   (forgot-password, mfa-enroll, mfa-challenge, signup-verify).
+   Scoped by [data-route-kind="auth"] + !important so these win
+   over each page's own inline <style> block and inline attributes
+   without touching the markup.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Left context panel: real depth instead of a flat fill */
+body[data-route-kind="auth"] .login-left {
+  background:
+    radial-gradient(ellipse 70% 60% at 100% 0%, rgba(255, 255, 255, 0.14), transparent 60%),
+    radial-gradient(ellipse 60% 55% at 0% 100%, rgba(0, 0, 0, 0.18), transparent 62%),
+    var(--ro-atmosphere-noise),
+    linear-gradient(155deg, #B35F38 0%, #A3542F 45%, #7E3F22 100%) !important;
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat !important;
+  background-size: 100% 100%, 100% 100%, 180px 180px, 100% 100% !important;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.1) !important;
+}
+body[data-route-kind="auth"] .login-left .absolute.rounded-full {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+body[data-route-kind="auth"] .login-left .w-8.h-8.rounded-lg {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+}
+body[data-route-kind="auth"] .login-left .flex.flex-col.gap-3 {
+  gap: 16px !important;
+}
+body[data-route-kind="auth"] .login-left h1 {
+  letter-spacing: -0.01em;
+}
+body[data-route-kind="auth"] .login-left .landing-nav-brand .ro-logo {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.22));
+}
+
+/* Right column form card: match the sidebar/topbar elevation language */
+body[data-route-kind="auth"] .login-right .bg-surface.border.border-border.rounded-lg {
+  border-radius: 14px !important;
+  border-color: #ECE7DF !important;
+  box-shadow:
+    0 1px 0 rgba(43, 40, 35, 0.02),
+    0 24px 48px -22px rgba(43, 40, 35, 0.2) !important;
+  overflow: hidden;
+}
+body[data-route-kind="auth"] .login-right .bg-surface.border.border-border.rounded-lg > div:first-child {
+  background: linear-gradient(180deg, #ffffff 0%, #fcfbfa 100%);
+}
+body[data-route-kind="auth"] .login-right h2 {
+  letter-spacing: -0.01em;
+}
+
+/* Inputs: unify sizing + radius across every auth page, add real focus states */
+body[data-route-kind="auth"] input[type="email"],
+body[data-route-kind="auth"] input[type="password"],
+body[data-route-kind="auth"] input[type="text"],
+body[data-route-kind="auth"] input#mfa-code,
+body[data-route-kind="auth"] input#mfa-recovery,
+body[data-route-kind="auth"] input[name="code"] {
+  border-radius: 9px !important;
+  min-height: 44px !important;
+  font-size: 14px !important;
+  border-color: #E2DED7 !important;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+  box-sizing: border-box;
+}
+body[data-route-kind="auth"] input:focus,
+body[data-route-kind="auth"] input:focus-visible {
+  outline: none !important;
+  border-color: #A3542F !important;
+  box-shadow: 0 0 0 3px rgba(163, 84, 47, 0.15) !important;
+}
+
+/* Buttons: hover/active lift, consistent radius across every auth page */
+body[data-route-kind="auth"] button[type="submit"],
+body[data-route-kind="auth"] #mfa-begin,
+body[data-route-kind="auth"] #mfa-confirm {
+  border-radius: 9px !important;
+  min-height: 44px !important;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  box-shadow: 0 4px 12px -4px rgba(163, 84, 47, 0.4);
+}
+body[data-route-kind="auth"] button[type="submit"]:hover:not(:disabled),
+body[data-route-kind="auth"] #mfa-begin:hover,
+body[data-route-kind="auth"] #mfa-confirm:hover {
+  background: #8A4526 !important;
+  box-shadow: 0 8px 20px -6px rgba(163, 84, 47, 0.5);
+  transform: translateY(-1px);
+}
+body[data-route-kind="auth"] button[type="submit"]:active:not(:disabled),
+body[data-route-kind="auth"] #mfa-begin:active,
+body[data-route-kind="auth"] #mfa-confirm:active {
+  transform: translateY(0);
+}
+body[data-route-kind="auth"] button[type="submit"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Secondary links + back-home affordance */
+body[data-route-kind="auth"] .login-back-home,
+body[data-route-kind="auth"] .login-right a {
+  transition: color 120ms ease;
+}
+body[data-route-kind="auth"] details summary {
+  transition: color 120ms ease;
+}
+body[data-route-kind="auth"] details summary:hover {
+  color: #A3542F !important;
 }
