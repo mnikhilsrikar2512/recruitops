@@ -3,9 +3,9 @@
    nav/footer/buttons/hero effects). Load after landing.css. */
 :root {
   --mk-ink: #17201C;
-  --mk-primary: #1e293b;
+  --mk-primary: #A3542F;
   --mk-text: #4B5257;
-  --mk-muted: #6E7476;
+  --mk-muted: #726F66;
   --mk-line: #E7E7E4;
   --mk-surface: #ffffff;
   --mk-alt: #FAFBF8;
@@ -48,9 +48,9 @@ body[data-route-kind="marketing"] { font-family: "Manrope", sans-serif; color: v
 .mk-actions .btn-primary .material-symbols-outlined, .mk-actions .btn-secondary .material-symbols-outlined { font-size: 20px; }
 .mk-note { margin-top: 20px; font-size: 13px; color: var(--mk-muted); display: inline-flex; align-items: center; gap: 6px; }
 .mk-note .material-symbols-outlined { font-size: 16px; color: var(--mk-primary); }
-.mk-orb-1 { width: 384px; height: 384px; top: -192px; left: -192px; background: #1e293b; }
-.mk-orb-2 { width: 320px; height: 320px; top: 80px; right: -160px; background: #334155; }
-.mk-orb-3 { width: 256px; height: 256px; bottom: 0; left: 33%; background: #64748b; opacity: 0.12; }
+.mk-orb-1 { width: 384px; height: 384px; top: -192px; left: -192px; background: #A3542F; }
+.mk-orb-2 { width: 320px; height: 320px; top: 80px; right: -160px; background: #BF6F42; }
+.mk-orb-3 { width: 256px; height: 256px; bottom: 0; left: 33%; background: #726F66; opacity: 0.12; }
 
 /* Sections */
 .mk-section { padding: 96px 24px; position: relative; }
@@ -120,12 +120,12 @@ a.mk-card { display: block; text-decoration: none; color: inherit; }
 .mk-chip { background: var(--mk-alt); border: 1px solid var(--mk-line); border-radius: 8px; padding: 9px; display: flex; gap: 8px; align-items: center; }
 .mk-chip + .mk-chip { margin-top: 8px; }
 .mk-avatar { width: 24px; height: 24px; border-radius: 999px; flex: none; background: #d8dee6; }
-.mk-avatar.a { background: #cfe0d6; } .mk-avatar.b { background: #e9dcc0; } .mk-avatar.c { background: #d5dbe8; }
+.mk-avatar.a { background: #cfe0d6; } .mk-avatar.b { background: #e9dcc0; } .mk-avatar.c { background: #E8DCC8; }
 .mk-lines { flex: 1; display: grid; gap: 5px; }
 .mk-lines i { display: block; height: 6px; border-radius: 99px; background: #e4e6e3; }
 .mk-lines i:first-child { width: 80%; background: #cfd4d1; }
 .mk-lines i:last-child { width: 55%; }
-.mk-chip.focus { border-color: var(--mk-primary); box-shadow: 0 0 0 3px rgba(30, 41, 59, .08); background: #fff; }
+.mk-chip.focus { border-color: var(--mk-primary); box-shadow: 0 0 0 3px rgba(163, 84, 47, .08); background: #fff; }
 .mk-rows { display: grid; gap: 8px; }
 .mk-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--mk-line); border-radius: 10px; background: var(--mk-surface); }
 .mk-row strong { display: block; font-size: 13px; font-weight: 700; color: var(--mk-ink); }
@@ -164,15 +164,15 @@ a.mk-card { display: block; text-decoration: none; color: inherit; }
 .mk-prevnext a.next { text-align: right; }
 
 /* Dark CTA (same gradient + grid as the original) */
-.mk-cta { position: relative; overflow: hidden; text-align: center; padding: 96px 24px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #cbd5e1; }
+.mk-cta { position: relative; overflow: hidden; text-align: center; padding: 96px 24px; background: linear-gradient(135deg, #A3542F 0%, #8A4526 100%); color: #E3DACD; }
 .mk-cta h2 { color: #fff; margin-bottom: 14px; }
-.mk-cta p { max-width: 560px; margin: 0 auto; color: #cbd5e1; font-size: 16px; line-height: 1.65; }
+.mk-cta p { max-width: 560px; margin: 0 auto; color: #E3DACD; font-size: 16px; line-height: 1.65; }
 .mk-cta .btn-secondary { border-color: #fff; }
 .mk-btn-outline-light { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 16px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: none; border: 1px solid rgba(255, 255, 255, .35); transition: border-color .2s ease, background .2s ease; }
 .mk-btn-outline-light:hover { border-color: #fff; background: rgba(255,255,255,.06); }
 .mk-dark-cards .mk-card { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.10); text-align: left; }
 .mk-dark-cards .mk-card h3 { color: #fff; }
-.mk-dark-cards .mk-card p { color: #aab6c4; }
+.mk-dark-cards .mk-card p { color: #A69A86; }
 .mk-dark-cards .mk-icon { background: rgba(255,255,255,.08); color: #fff; }
 
 /* FAQ */
@@ -184,7 +184,7 @@ a.mk-card { display: block; text-decoration: none; color: inherit; }
 .mk-faq details[open] summary::after { transform: rotate(180deg); }
 .mk-faq details p { padding: 0 0 18px; font-size: 14px; line-height: 1.65; }
 
-:focus-visible { outline: 3px solid #334155; outline-offset: 3px; }
+:focus-visible { outline: 3px solid #BF6F42; outline-offset: 3px; }
 
 @media (max-width: 1080px) {
   .mk-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
