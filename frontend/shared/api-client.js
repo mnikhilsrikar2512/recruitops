@@ -6739,7 +6739,7 @@ async function renderPortalUsageReport() {
       surface.innerHTML = '<p class="text-body-sm text-text-muted py-6 text-center">No portal usage recorded in the last 6 weeks.</p>';
       return;
     }
-    const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     const headCells = weeks.map((w) => `<th class="px-3 py-2 text-right text-label-caps font-bold text-text-muted uppercase tracking-wider">Wk of ${fmt(w)}</th>`).join("");
     const maxHours = Math.max(1, ...platforms.flatMap((p) => p.weeks.map((w) => w.booked_hours)));
     const bodyRows = platforms.map((platform) => {

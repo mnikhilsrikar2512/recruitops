@@ -724,7 +724,7 @@ function renderDailyReviewQuickStats(myWork, pipelineItems, extra = {}) {
   }
   const dateNode = document.querySelector(".workspace-surface h2")?.nextElementSibling;
   if (dateNode && /daily recruitment operations digest/i.test(dateNode.textContent || "")) {
-    dateNode.textContent = `What needs a decision today · ${new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`;
+    dateNode.textContent = `What needs a decision today · ${new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
   }
 }
 
@@ -1253,9 +1253,9 @@ function formatOfferMoney(amount, currency) {
   if (Number.isNaN(value)) return String(amount);
   const code = String(currency || "USD").toUpperCase();
   try {
-    return `${new Intl.NumberFormat("en-US", { style: "currency", currency: code, maximumFractionDigits: 0 }).format(value)}/yr`;
+    return `${new Intl.NumberFormat("en-IN", { style: "currency", currency: code, maximumFractionDigits: 0 }).format(value)}/yr`;
   } catch {
-    return `${code} ${Math.round(value).toLocaleString("en-US")}/yr`;
+    return `${code} ${Math.round(value).toLocaleString("en-IN")}/yr`;
   }
 }
 
@@ -1263,7 +1263,7 @@ function formatOfferDate(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function offerStatusMeta(status) {
