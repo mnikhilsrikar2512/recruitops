@@ -1521,7 +1521,16 @@
       position: fixed;
       right: 16px;
       bottom: 16px;
-      z-index: 80;
+      /* Toasts are feedback for an action the person just took — they must
+         stay visible above EVERY other layer, including a full-screen
+         dialog/modal (.pipeline-flow-modal: 90, .ro-notes-dialog: 80) and
+         the mobile bottom nav (.bottom-nav: 100), or a confirmation can
+         silently render hidden behind whatever is already open. Found
+         during a sitewide z-index sweep: #toast-root is the shared toast
+         container used by shared/ui-utils.js's showToast()/
+         showToastWithAction() on ~85 pages, so this was a systemic risk,
+         not a one-page bug. */
+      z-index: 101;
       display: grid;
       gap: 10px;
     }
