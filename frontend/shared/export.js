@@ -56,7 +56,7 @@
  <Styles>
   <Style ss:ID="title"><Font ss:Size="14" ss:Bold="1" ss:Color="#2B2823"/></Style>
   <Style ss:ID="subtitle"><Font ss:Size="10" ss:Color="#726F66"/></Style>
-  <Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#A3542F" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>
+  <Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#7D4458" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>
   <Style ss:ID="rowEven"><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/></Style>
   <Style ss:ID="rowOdd"><Interior ss:Color="#FAFAF9" ss:Pattern="Solid"/></Style>
  </Styles>

@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Sign In — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=4c961f233c" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=4c961f233c" />
-  <link rel="stylesheet" href="../shared/landing.css?v=4c961f233c" />
+  <link rel="stylesheet" href="../shared/global.css?v=f436a40dd4" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=f436a40dd4" />
+  <link rel="stylesheet" href="../shared/landing.css?v=f436a40dd4" />
   <style>
     .login-split { display:flex; min-height:100vh; }
-    .login-left { flex:1; background:#A3542F; display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
+    .login-left { flex:1; background:#7D4458; display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
     .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .login-back-home:hover { color:#A3542F; }
+    .login-back-home:hover { color:#7D4458; }
     @media(max-width:1024px){ .login-left{display:none;} }
   </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=4c961f233c" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=4c961f233c" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=f436a40dd4" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=f436a40dd4" />
 </head>
 <body data-route-id="login" data-route-kind="auth" data-route-title="Sign In" data-route-section="Authentication">
   <main>
@@ -50,8 +50,8 @@
             Back to homepage
           </a>
           <a href="../index.html" class="lg:hidden flex items-center gap-2 mb-8 justify-center" style="text-decoration:none" aria-label="RecruitOps home">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#A3542F;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
-            <span style="font-size:18px;font-weight:700;color:#A3542F">RecruitOps</span>
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#7D4458;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
+            <span style="font-size:18px;font-weight:700;color:#7D4458">RecruitOps</span>
           </a>
           <div class="bg-surface border border-border rounded-lg" style="box-shadow:0 4px 24px rgba(39,48,56,0.06)">
             <div style="padding:20px 24px;border-bottom:1px solid #E7E7E4">
@@ -69,14 +69,14 @@
                   <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">mail</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 12px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="email" name="email" placeholder="name@company.com" required type="email"/></div>
                 </div>
                 <div class="flex flex-col gap-1.5">
-                  <div class="flex justify-between items-center"><label style="font-size:12px;font-weight:600;color:#4B5257" for="password">Password</label><a href="forgot-password.html" style="font-size:13px;color:#A3542F;text-decoration:none">Forgot password?</a></div>
+                  <div class="flex justify-between items-center"><label style="font-size:12px;font-weight:600;color:#4B5257" for="password">Password</label><a href="forgot-password.html" style="font-size:13px;color:#7D4458;text-decoration:none">Forgot password?</a></div>
                   <div style="position:relative"><span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#726F66">lock</span><input style="width:100%;background:#fff;border:1px solid #E7E7E4;border-radius:8px;padding:12px 44px 12px 40px;font-size:16px;color:#2B2823;min-height:44px" id="password" name="password" placeholder="Enter your password" required type="password"/><button type="button" class="ro-password-toggle" data-password-toggle aria-label="Show password"><span class="material-symbols-outlined" style="font-size:18px">visibility</span></button></div>
                 </div>
-                <button style="width:100%;background:#A3542F;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;min-height:44px" id="submit-btn" type="submit"><span>Sign In</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span></button>
+                <button style="width:100%;background:#7D4458;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;min-height:44px" id="submit-btn" type="submit"><span>Sign In</span><span class="material-symbols-outlined" style="font-size:20px">arrow_forward</span></button>
               </form>
               <div class="hidden absolute inset-0 bg-surface/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4 rounded-b-lg" id="loading-overlay" hidden aria-hidden="true">
-                <svg class="ro-logo ro-logo--spin" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:40px;height:40px;color:#A3542F"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg>
-                <p style="font-size:12px;font-weight:600;color:#A3542F">Authenticating...</p>
+                <svg class="ro-logo ro-logo--spin" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:40px;height:40px;color:#7D4458"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg>
+                <p style="font-size:12px;font-weight:600;color:#7D4458">Authenticating...</p>
               </div>
             </div>
             <div style="background:#fafaf9;padding:12px 24px;border-top:1px solid #E7E7E4;display:flex;justify-content:flex-end;align-items:center">
@@ -84,21 +84,21 @@
             </div>
           </div>
           <div class="flex items-center justify-center gap-2 mt-6" style="color:#726F66;font-size:13px">
-            <span class="w-2 h-2 rounded-full" style="background:#A3542F"></span> All systems operational
+            <span class="w-2 h-2 rounded-full" style="background:#7D4458"></span> All systems operational
           </div>
-          <p class="text-center mt-6" style="font-size:13px;color:#726F66">Don't have an account? <a href="signup.html" style="color:#A3542F;font-weight:600;text-decoration:none">Sign up</a></p>
+          <p class="text-center mt-6" style="font-size:13px;color:#726F66">Don't have an account? <a href="signup.html" style="color:#7D4458;font-weight:600;text-decoration:none">Sign up</a></p>
         </div>
       </div>
     </div>
   </main>
-  <script src="../shared/renderers.js?v=4c961f233c"></script>
-  <script src="../shared/api-client.js?v=4c961f233c"></script>
-    <script src="../shared/ui-utils.js?v=4c961f233c"></script>
-    <script src="../shared/tables.js?v=4c961f233c"></script>
-    <script src="../shared/forms.js?v=4c961f233c"></script>
-    <script src="../shared/sidebar.js?v=4c961f233c"></script>
-    <script src="../shared/pipeline.js?v=4c961f233c"></script>
-    <script src="../shared/routing.js?v=4c961f233c"></script>
+  <script src="../shared/renderers.js?v=f436a40dd4"></script>
+  <script src="../shared/api-client.js?v=f436a40dd4"></script>
+    <script src="../shared/ui-utils.js?v=f436a40dd4"></script>
+    <script src="../shared/tables.js?v=f436a40dd4"></script>
+    <script src="../shared/forms.js?v=f436a40dd4"></script>
+    <script src="../shared/sidebar.js?v=f436a40dd4"></script>
+    <script src="../shared/pipeline.js?v=f436a40dd4"></script>
+    <script src="../shared/routing.js?v=f436a40dd4"></script>
 
   <script>
     (function () {
@@ -111,6 +111,6 @@
       }
     })();
   </script>
-  <script src="../shared/app.js?v=4c961f233c"></script>
+  <script src="../shared/app.js?v=f436a40dd4"></script>
 </body>
 </html>
