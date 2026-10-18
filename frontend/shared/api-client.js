@@ -4464,7 +4464,7 @@ async function loadDashboards() {
         return `<div class="flex items-center gap-3 min-w-0">
           <span class="w-[168px] shrink-0 text-[12px] leading-snug text-on-surface" title="${escapeLiveHtml(label)}">${escapeLiveHtml(label)}</span>
           <div class="flex-1 h-2.5 rounded bg-[#f1f2f0] overflow-hidden">
-            <div class="h-full rounded" style="width:${pct}%;background:#A3542F;opacity:0.78"></div>
+            <div class="h-full rounded" style="width:${pct}%;background:#7D4458;opacity:0.78"></div>
           </div>
           <span class="w-8 shrink-0 text-right text-[12px] font-semibold tabular-nums text-on-surface">${count}</span>
         </div>`;

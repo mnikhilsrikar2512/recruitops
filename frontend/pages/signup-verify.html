@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Finish setting up — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=0e78e5efc0" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=0e78e5efc0" />
-  <link rel="stylesheet" href="../shared/landing.css?v=0e78e5efc0" />
+  <link rel="stylesheet" href="../shared/global.css?v=bf360be884" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=bf360be884" />
+  <link rel="stylesheet" href="../shared/landing.css?v=bf360be884" />
   <style>
     .login-split { display:flex; min-height:100vh; }
-    .login-left { flex:1; background:linear-gradient(135deg,#A3542F 0%,#8A4526 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
+    .login-left { flex:1; background:linear-gradient(135deg,#7D4458 0%,#5F3444 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
     .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .login-back-home:hover { color:#A3542F; }
+    .login-back-home:hover { color:#7D4458; }
     @media(max-width:1024px){ .login-left{display:none;} }
   </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=0e78e5efc0" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=0e78e5efc0" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=bf360be884" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=bf360be884" />
 </head>
 <body data-route-id="signup-verify" data-route-kind="auth" data-route-title="Finish setting up" data-route-section="Authentication">
   <main>
@@ -43,8 +43,8 @@
             Back to homepage
           </a>
           <a href="../index.html" class="lg:hidden flex items-center gap-2 mb-8 justify-center" style="text-decoration:none" aria-label="RecruitOps home">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#A3542F;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
-            <span style="font-size:18px;font-weight:700;color:#A3542F">RecruitOps</span>
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:#7D4458;color:#fff"><svg class="ro-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:22px;height:22px"><circle class="ro-logo-ring" cx="24" cy="24" r="17" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="55 14 17 14" stroke-dashoffset="10" pathLength="100"/><circle cx="24" cy="24" r="6.5" fill="currentColor"/></svg></div>
+            <span style="font-size:18px;font-weight:700;color:#7D4458">RecruitOps</span>
           </a>
           <div class="bg-surface border border-border rounded-lg" style="box-shadow:0 4px 24px rgba(39,48,56,0.06)">
             <div style="padding:20px 24px;border-bottom:1px solid #E7E7E4">
@@ -59,15 +59,15 @@
     </div>
   </main>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
-  <script src="../shared/renderers.js?v=0e78e5efc0"></script>
-  <script src="../shared/api-client.js?v=0e78e5efc0"></script>
-  <script src="../shared/ui-utils.js?v=0e78e5efc0"></script>
-  <script src="../shared/tables.js?v=0e78e5efc0"></script>
-  <script src="../shared/forms.js?v=0e78e5efc0"></script>
-  <script src="../shared/sidebar.js?v=0e78e5efc0"></script>
-  <script src="../shared/pipeline.js?v=0e78e5efc0"></script>
-  <script src="../shared/routing.js?v=0e78e5efc0"></script>
-  <script src="../shared/app.js?v=0e78e5efc0"></script>
+  <script src="../shared/renderers.js?v=bf360be884"></script>
+  <script src="../shared/api-client.js?v=bf360be884"></script>
+  <script src="../shared/ui-utils.js?v=bf360be884"></script>
+  <script src="../shared/tables.js?v=bf360be884"></script>
+  <script src="../shared/forms.js?v=bf360be884"></script>
+  <script src="../shared/sidebar.js?v=bf360be884"></script>
+  <script src="../shared/pipeline.js?v=bf360be884"></script>
+  <script src="../shared/routing.js?v=bf360be884"></script>
+  <script src="../shared/app.js?v=bf360be884"></script>
   <script>
   (function () {
     function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -77,20 +77,20 @@
     var step = document.getElementById("step");
     var token = new URLSearchParams(location.search).get("token");
     var setupToken = null;
-    function done(text) { step.innerHTML = "<p>" + esc(text) + '</p><a href="login.html" style="margin-top:16px;display:inline-block;background:#A3542F;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">Sign in</a>'; }
+    function done(text) { step.innerHTML = "<p>" + esc(text) + '</p><a href="login.html" style="margin-top:16px;display:inline-block;background:#7D4458;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">Sign in</a>'; }
     async function startMfa() {
       var s = await apiRequest("/signup/mfa/start", { method: "POST", body: JSON.stringify({ setup_token: setupToken }) });
       step.innerHTML = '<h2 style="font-size:16px;font-weight:700;color:#17201C">Set up two-step verification</h2><p style="margin-top:6px;color:#726F66">Admins sign in with a password and a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…).</p>' +
-        '<ol style="margin-top:14px;padding-left:20px;display:flex;flex-direction:column;gap:10px;list-style:decimal"><li>In the app, add an account with this key: <code style="background:#fafaf9;border-radius:4px;padding:4px 8px;font-family:monospace">' + esc(s.secret) + '</code> (or <a style="color:#A3542F;text-decoration:underline" data-otpauth-link>open it in your authenticator</a>).</li>' +
+        '<ol style="margin-top:14px;padding-left:20px;display:flex;flex-direction:column;gap:10px;list-style:decimal"><li>In the app, add an account with this key: <code style="background:#fafaf9;border-radius:4px;padding:4px 8px;font-family:monospace">' + esc(s.secret) + '</code> (or <a style="color:#7D4458;text-decoration:underline" data-otpauth-link>open it in your authenticator</a>).</li>' +
         '<li><label>Enter the 6-digit code it shows: <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" style="margin-left:8px;width:120px;border:1px solid #E7E7E4;border-radius:8px;padding:8px 10px;font-size:14px"/></label></li></ol>' +
-        '<button type="button" id="mfa-confirm" style="margin-top:16px;background:#A3542F;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Confirm and activate</button>';
+        '<button type="button" id="mfa-confirm" style="margin-top:16px;background:#7D4458;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Confirm and activate</button>';
       var otpLink = step.querySelector("[data-otpauth-link]");
       if (otpLink) otpLink.setAttribute("href", s.otpauth_uri || "#");
       document.getElementById("mfa-confirm").addEventListener("click", async function () {
         try {
           var code = document.getElementById("mfa-code").value.trim();
           var r = await apiRequest("/signup/mfa/confirm", { method: "POST", body: JSON.stringify({ setup_token: setupToken, code: code }) });
-          step.innerHTML = '<h2 style="font-size:16px;font-weight:700;color:#17201C">Your company is ' + (r.company_status === "active" ? "ready" : "almost ready") + '</h2><p style="margin-top:6px;color:#4B5257">Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone.</p><pre style="margin-top:10px;background:#fafaf9;border-radius:8px;padding:12px;font-family:monospace;font-size:13px">' + esc((r.recovery_codes || []).join("\n")) + '</pre><a href="login.html" style="margin-top:16px;display:inline-block;background:#A3542F;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">Sign in</a>';
+          step.innerHTML = '<h2 style="font-size:16px;font-weight:700;color:#17201C">Your company is ' + (r.company_status === "active" ? "ready" : "almost ready") + '</h2><p style="margin-top:6px;color:#4B5257">Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone.</p><pre style="margin-top:10px;background:#fafaf9;border-radius:8px;padding:12px;font-family:monospace;font-size:13px">' + esc((r.recovery_codes || []).join("\n")) + '</pre><a href="login.html" style="margin-top:16px;display:inline-block;background:#7D4458;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">Sign in</a>';
         } catch (error) { say(errText(error, "That didn't work. Check the code and try again."), false); }
       });
     }
@@ -105,7 +105,7 @@
         history.replaceState(null, "", "signup-verify.html");
         if (r.next === "mfa" && r.setup_token) { setupToken = r.setup_token; return startMfa(); }
         done("Your email is confirmed and your company is active.");
-      }).catch(function (error) { step.innerHTML = "<p style=\"color:#4B5257\">" + esc(errText(error, "This link didn't work.")) + '</p><p style="margin-top:8px"><a style="color:#A3542F;text-decoration:underline" href="signup.html">Back to sign-up</a></p>'; });
+      }).catch(function (error) { step.innerHTML = "<p style=\"color:#4B5257\">" + esc(errText(error, "This link didn't work.")) + '</p><p style="margin-top:8px"><a style="color:#7D4458;text-decoration:underline" href="signup.html">Back to sign-up</a></p>'; });
     }
 
   })();

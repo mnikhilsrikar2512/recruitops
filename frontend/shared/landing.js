@@ -174,14 +174,28 @@
     });
   }
   if (parallaxHeadings.length) {
-    const DEPTH = 28; // px of drift across the entry band
+    /* Kept well under every section heading's own margin-bottom
+       (12-20px across the shared marketing CSS) so the drift can
+       never visually overlap the text that follows it, even at the
+       very start of a heading's entry (progress 0, full drift). */
+    const DEPTH = 10; // px of drift across the entry band
     let ticking = false;
     const updateHeadingParallax = () => {
       ticking = false;
       const vh = window.innerHeight;
+      /* No in/out-of-range skip here on purpose: the progress formula below
+         already clamps to 0 (far below the viewport, not yet entered) or 1
+         (far above the viewport, long since passed) for any rect — so it's
+         always safe to recompute, not just a micro-optimization to skip.
+         Skipping used to leave an element's transform frozen at whatever
+         value the last in-range frame had set, and a fast/instant scroll
+         (an anchor jump, the End key, a flicked trackpad) can land exactly
+         mid-transition right as the element crosses out of range — which
+         visibly offset that heading, overlapping the text below it, for
+         the rest of the session. Always recomputing keeps every heading's
+         transform consistent with its current position. */
       for (const h of parallaxHeadings) {
         const rect = h.getBoundingClientRect();
-        if (rect.bottom < -80 || rect.top > vh + 80) continue;
         /* 0 entering at the bottom edge → 1 settled in the upper third */
         const progress = Math.min(1, Math.max(0, (vh - rect.top) / (vh * 0.85)));
         h.style.transform = `translateY(${((1 - progress) * DEPTH).toFixed(1)}px)`;

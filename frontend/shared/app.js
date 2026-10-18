@@ -2697,7 +2697,7 @@ function setupVisualPassChrome() {
     if (label.length < 1 || label.length > 3) return;
     let hash = 0;
     for (let i = 0; i < label.length; i += 1) hash = (hash * 31 + label.charCodeAt(i)) % 5;
-    const fills = ["#A3542F", "#BF6F42", "#6B3419", "#8A4526", "#1e3a4c"];
+    const fills = ["#7D4458", "#BF6F42", "#6B3419", "#5F3444", "#1e3a4c"];
     el.style.background = fills[hash];
     el.style.color = "#ffffff";
     el.style.borderColor = "transparent";
@@ -2846,7 +2846,7 @@ if (document.readyState !== "loading") setupPagePanLock();
    ═══════════════════════════════════════════════════════════════ */
 function renderLineChart(container, data, options = {}) {
   if (!container || !data.length) return;
-  const { width = 400, height = 120, color = "#A3542F", label = "" } = options;
+  const { width = 400, height = 120, color = "#7D4458", label = "" } = options;
   const max = Math.max(...data.map(d => d.value), 1);
   const min = Math.min(...data.map(d => d.value), 0);
   const range = max - min || 1;
@@ -2881,7 +2881,7 @@ function renderLineChart(container, data, options = {}) {
 
 function renderBarChart(container, data, options = {}) {
   if (!container || !data.length) return;
-  const { width = 420, height = 168, color = "#A3542F" } = options;
+  const { width = 420, height = 168, color = "#7D4458" } = options;
   const max = Math.max(...data.map(d => d.value), 1);
   const padX = 16;
   const padTop = 22;
@@ -2913,7 +2913,7 @@ function renderBarChart(container, data, options = {}) {
 
 function renderDonutChart(container, data, options = {}) {
   if (!container || !data.length) return;
-  const { size = 120, colors = ["#A3542F", "#4B5257", "#726F66", "#A0A4A8", "#D4D8D6"] } = options;
+  const { size = 120, colors = ["#7D4458", "#4B5257", "#726F66", "#A0A4A8", "#D4D8D6"] } = options;
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const r = size / 2 - 10;
   const cx = size / 2;
@@ -2940,7 +2940,7 @@ function renderDonutChart(container, data, options = {}) {
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       ${arcs.map(a => `<path d="${a.path}" fill="${a.color}" />`).join("")}
       <circle cx="${cx}" cy="${cy}" r="${r * 0.55}" fill="#ffffff"/>
-      <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="14" font-weight="600" fill="#A3542F">${total}</text>
+      <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="14" font-weight="600" fill="#7D4458">${total}</text>
       <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="9" fill="#726F66">total</text>
     </svg>
     <div class="flex flex-wrap gap-2 mt-2">
