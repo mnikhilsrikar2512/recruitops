@@ -160,11 +160,15 @@
 .mk-stat:hover strong { animation: statPulse .5s ease; }
 @keyframes statPulse { 50% { transform: scale(1.06); } }
 
-/* ── Top scroll-progress indicator ── */
+/* ── Top scroll-progress indicator ──
+   Sits just under the fixed nav (64px tall, z-index 50), never over it —
+   .landing-nav's background is only 70% opaque, so a bar at z-index 60
+   and top:0 used to paint a solid line across the top of the translucent
+   header instead of appearing as a clean strip below it. */
 #mkScrollProgress {
-  position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+  position: fixed; top: 66px; left: 0; height: 3px; width: 0%;
   background: linear-gradient(90deg, var(--mk-primary), #B98DA3);
-  z-index: 60; transition: width .1s linear;
+  z-index: 45; transition: width .1s linear;
   pointer-events: none;
 }
 
