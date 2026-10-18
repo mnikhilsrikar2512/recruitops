@@ -405,3 +405,36 @@ html, body {
 .text-warning-text { color: #8A6A1F; }
 .text-info-text { color: #4B5257; }
 .border-border { border-color: #E7E7E4; }
+
+/* -- Auth-flow pages (login, signup, forgot-password, signup-verify,
+   mfa-challenge, mfa-enroll, active-sessions) -- compact card --
+   These pages share the `.login-right` split layout and a
+   `.bg-surface.border.border-border.rounded-lg` card. Card/header/footer
+   padding and label/gap sizing here are large enough (tuned for mobile)
+   that on a typical laptop viewport (~800px tall) the card needs more
+   height than fits, forcing the whole page to scroll -- signup.html, the
+   worst case with 5 fields plus 3 legal checkboxes, measured ~930px of
+   content against an 816px viewport. !important is required because
+   inline styles otherwise win; the rule only applies at 768px+, so phones
+   are untouched. Input/button height and font-size are handled separately
+   in global.css's `[data-route-kind="auth"]` block (same selectors, a
+   later desktop-only override), since a higher-specificity rule already
+   there was winning over anything set here. */
+@media (min-width: 768px) {
+  .login-right { padding: 10px 24px !important; }
+  .login-back-home { margin-bottom: 8px !important; }
+  .bg-surface.border.border-border.rounded-lg > div:first-child { padding: 10px 24px !important; }
+  .bg-surface.border.border-border.rounded-lg > div:first-child h2 { font-size: 18px !important; }
+  .bg-surface.border.border-border.rounded-lg > div:nth-child(2) { padding: 12px 24px !important; }
+  .bg-surface.border.border-border.rounded-lg > div:last-child { padding: 7px 24px !important; }
+  .login-right label { font-size: 11px !important; }
+  .login-right .flex-col.gap-4 { gap: 6px !important; }
+  .login-right .flex-col.gap-1\.5 { gap: 2px !important; }
+  .login-right > div > p.text-center { margin-top: 10px !important; }
+  /* The legal-agreements checkboxes (signup only) are the fieldset's own
+     content, so they need their own, smaller rule rather than the shared
+     `.login-right label` one above. */
+  #legal-boxes { gap: 3px !important; }
+  #legal-boxes legend { font-size: 11px !important; margin-bottom: 0 !important; }
+  #legal-boxes label { font-size: 11.5px !important; line-height: 1.25 !important; }
+}
