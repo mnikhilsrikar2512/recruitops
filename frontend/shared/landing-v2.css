@@ -9,6 +9,63 @@
    .reveal* (scroll entrance) machinery already wired up in landing.js.
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── Hero: animated pipeline-flow illustration, behind the headline ──
+   A genuine motion-graphic hero illustration (not just scroll-reveal):
+   the same 5 stages shown in the pipeline-board mockup below the hero
+   (Sourced → Screening → Interview → Offer → Hired), laid out as a wide
+   wave of connected nodes with small particles continuously flowing
+   along the curves between them, and each node getting a soft pulse
+   ring. Faded out in the middle via a mask so it never fights the
+   headline/paragraph for legibility — it only really shows in the
+   hero's upper/lower margins and at the edges, same spirit as the
+   existing .hero-grid dot pattern it sits alongside. Colors come from
+   --mk-primary so this stays in step with the site's palette rather
+   than a hardcoded hex. */
+.hero-flow {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  opacity: .62;
+  mask-image: radial-gradient(ellipse 58% 44% at 50% 42%, transparent 0%, transparent 28%, black 76%);
+  -webkit-mask-image: radial-gradient(ellipse 58% 44% at 50% 42%, transparent 0%, transparent 28%, black 76%);
+}
+.hero-flow svg { width: 100%; height: 100%; display: block; }
+.hero-flow-line {
+  fill: none; stroke: var(--mk-primary); stroke-width: 1.6;
+  stroke-linecap: round; stroke-dasharray: 2 10; opacity: .4;
+}
+.hero-flow-dot { fill: var(--mk-primary); }
+.hero-flow-pulse {
+  fill: none; stroke: var(--mk-primary); stroke-width: 2; opacity: .5;
+  transform-box: fill-box; transform-origin: center;
+  animation: heroFlowPulse 3.2s ease-out infinite;
+}
+.hero-flow-label {
+  font-size: 15px; fill: var(--mk-primary); text-anchor: middle;
+  opacity: .55; font-weight: 600;
+}
+.hero-flow-particle {
+  fill: #fff; stroke: var(--mk-primary); stroke-width: 1.5;
+  filter: drop-shadow(0 0 4px rgba(125, 68, 88, .5));
+  offset-rotate: 0deg;
+  animation: heroFlowParticle 4.6s linear infinite;
+}
+@keyframes heroFlowPulse {
+  0% { transform: scale(.55); opacity: .55; }
+  70% { opacity: 0; }
+  100% { transform: scale(2); opacity: 0; }
+}
+@keyframes heroFlowParticle {
+  0% { offset-distance: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+@media (max-width: 900px) {
+  /* The hero is already tight on mobile (shorter, single column) --
+     this illustration needs the spare vertical margin a wide desktop
+     hero has, so it's dropped rather than squeezed in. */
+  .hero-flow { display: none; }
+}
+
 /* ── Hero: stacked 3D depth behind the tilt card ── */
 .tilt-stack { position: relative; }
 .tilt-stack-back {
@@ -199,4 +256,6 @@
   .mk-link:hover .material-symbols-outlined, .mk-feature-chips .chip:hover, .mk-feature-pill:hover { transform: none; }
   .mk-stat:hover strong { animation: none; }
   #mkScrollProgress { transition: none; }
+  .hero-flow-pulse { animation: none; opacity: 0; }
+  .hero-flow-particle { animation: none; display: none; }
 }
