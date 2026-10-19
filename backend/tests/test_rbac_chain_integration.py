@@ -63,7 +63,7 @@ class TestPermissionAliases:
 
 
 # Seed admin candidates: repo dev DB uses the seed user, CI uses the seeded CI admin
-ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
+ADMIN_EMAIL_CANDIDATES = ["ci.admin@recruitops-test.com", "admin@executiveconnection.com"]
 ADMIN_PASSWORD = "admin123"
 # user.read is deliberately granted: the historical bypass aliased role.read to
 # accept user.read, so any user who could list users could also list roles.

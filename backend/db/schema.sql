@@ -75,7 +75,7 @@ CREATE TABLE locations (
 	tenant_id BIGINT NOT NULL, 
 	CONSTRAINT [PK__location__3213E83F5740DBDD] PRIMARY KEY CLUSTERED (id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_locations_code] ON locations (code);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_locations_tenant_code] ON locations (tenant_id, code);
 
 CREATE TABLE master_data_categories (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -386,7 +386,7 @@ CREATE TABLE branches (
 	CONSTRAINT [PK__branches__3213E83FE00A9463] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_branches_tenant] ON branches (tenant_id);
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_branches_code] ON branches (code);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_branches_tenant_code] ON branches (tenant_id, code);
 
 CREATE TABLE clients (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -1609,3 +1609,118 @@ ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_ev
 ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [FK_workflow_action_events_item] FOREIGN KEY ([action_item_id]) REFERENCES [dbo].[workflow_action_items] ([id]);
 ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_assigned_user] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[users] ([id]);
 ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [FK_workflow_action_items_location] FOREIGN KEY ([location_id]) REFERENCES [dbo].[locations] ([id]);
+
+-- Pass 3: CHECK constraints (not reflected by SQLAlchemy on SQL Server,
+-- so read directly from sys.check_constraints; sorted by name for stable diffs)
+
+ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [CK_approval_requests_priority] CHECK ([priority]=N'critical' OR [priority]=N'high' OR [priority]=N'medium' OR [priority]=N'low');
+ALTER TABLE [dbo].[approval_requests] ADD CONSTRAINT [CK_approval_requests_status] CHECK ([status]=N'cancelled' OR [status]=N'rejected' OR [status]=N'approved' OR [status]=N'in-review' OR [status]=N'pending');
+ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [CK_audit_log_access_events_access_type] CHECK ([access_type]=N'locked-report-read' OR [access_type]=N'scope-bypass' OR [access_type]=N'export' OR [access_type]=N'view');
+ALTER TABLE [dbo].[audit_log_access_events] ADD CONSTRAINT [CK_audit_log_access_events_source_type] CHECK ([source_type]=N'dashboard' OR [source_type]=N'requisition' OR [source_type]=N'candidate' OR [source_type]=N'report' OR [source_type]=N'audit-log');
+ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [CK_audit_logs_new_values_json] CHECK ([new_values_json] IS NULL OR isjson([new_values_json])=(1));
+ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [CK_audit_logs_old_values_json] CHECK ([old_values_json] IS NULL OR isjson([old_values_json])=(1));
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [CK_automation_jobs_input_json] CHECK ([input_json] IS NULL OR isjson([input_json])=(1));
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [CK_automation_jobs_job_type] CHECK ([job_type]=N'notification-batch' OR [job_type]=N'priority-queue-rebuild' OR [job_type]=N'report-generation' OR [job_type]=N'duplicate-check' OR [job_type]=N'resume-parse');
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [CK_automation_jobs_output_json] CHECK ([output_json] IS NULL OR isjson([output_json])=(1));
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [CK_automation_jobs_scope_type] CHECK ([scope_type]=N'candidate' OR [scope_type]=N'report' OR [scope_type]=N'user' OR [scope_type]=N'branch' OR [scope_type]=N'system');
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [CK_automation_jobs_status] CHECK ([status]=N'cancelled' OR [status]=N'failed' OR [status]=N'completed' OR [status]=N'running' OR [status]=N'queued');
+ALTER TABLE [dbo].[automation_jobs] ADD CONSTRAINT [CK_automation_jobs_warning_json] CHECK ([warning_json] IS NULL OR isjson([warning_json])=(1));
+ALTER TABLE [dbo].[branches] ADD CONSTRAINT [CK_branches_branch_mapping_type] CHECK ([branch_mapping_type] IS NULL OR ([branch_mapping_type]=N'both' OR [branch_mapping_type]=N'operational-team' OR [branch_mapping_type]=N'legal-entity'));
+ALTER TABLE [dbo].[branches] ADD CONSTRAINT [CK_branches_status] CHECK ([status]=N'planned' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [CK_candidate_applications_application_status] CHECK ([application_status]=N'closed' OR [application_status]=N'withdrawn' OR [application_status]=N'joined' OR [application_status]=N'rejected' OR [application_status]=N'on-hold' OR [application_status]=N'active');
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [CK_candidate_applications_client_feedback_status] CHECK ([client_feedback_status] IS NULL OR ([client_feedback_status]=N'duplicate-acknowledged' OR [client_feedback_status]=N'needs-more-profiles' OR [client_feedback_status]=N'hold' OR [client_feedback_status]=N'negative' OR [client_feedback_status]=N'positive' OR [client_feedback_status]=N'pending'));
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [CK_candidate_applications_rejection_side] CHECK ([rejection_side]=N'none' OR [rejection_side]=N'client' OR [rejection_side]=N'internal');
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [CK_candidate_applications_risk_flags_json] CHECK ([risk_flags_json] IS NULL OR isjson([risk_flags_json])=(1));
+ALTER TABLE [dbo].[candidate_applications] ADD CONSTRAINT [CK_candidate_applications_screening_status] CHECK ([screening_status]=N'failed' OR [screening_status]=N'passed' OR [screening_status]=N'in-progress' OR [screening_status]=N'pending');
+ALTER TABLE [dbo].[candidate_documents] ADD CONSTRAINT [CK_candidate_documents_verification_status] CHECK ([verification_status]=N'not-required' OR [verification_status]=N'rejected' OR [verification_status]=N'verified' OR [verification_status]=N'pending');
+ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [CK_candidate_duplicate_checks_decision_status] CHECK ([decision_status]=N'cancelled' OR [decision_status]=N'merge-into-existing' OR [decision_status]=N'continue-as-new' OR [decision_status]=N'pending');
+ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [CK_candidate_duplicate_checks_match_level] CHECK ([match_level]=N'exact' OR [match_level]=N'likely' OR [match_level]=N'possible' OR [match_level]=N'low');
+ALTER TABLE [dbo].[candidate_duplicate_checks] ADD CONSTRAINT [CK_candidate_duplicate_checks_reason_json] CHECK ([match_reason_json] IS NULL OR isjson([match_reason_json])=(1));
+ALTER TABLE [dbo].[candidate_location_transfer_requests] ADD CONSTRAINT [CK_candidate_location_transfer_requests_approval_status] CHECK ([approval_status]=N'cancelled' OR [approval_status]=N'rejected' OR [approval_status]=N'approved' OR [approval_status]=N'pending');
+ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [CK_candidate_resume_parse_logs_conf_json] CHECK ([field_confidence_json] IS NULL OR isjson([field_confidence_json])=(1));
+ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [CK_candidate_resume_parse_logs_duplicate_json] CHECK ([duplicate_summary_json] IS NULL OR isjson([duplicate_summary_json])=(1));
+ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [CK_candidate_resume_parse_logs_parsed_json] CHECK (isjson([parsed_json])=(1));
+ALTER TABLE [dbo].[candidate_resume_parse_logs] ADD CONSTRAINT [CK_candidate_resume_parse_logs_review_status] CHECK ([review_status]=N'rejected' OR [review_status]=N'reviewed' OR [review_status]=N'pending');
+ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [CK_candidate_screening_checks_check_type] CHECK ([check_type]=N'other' OR [check_type]=N'notice-period' OR [check_type]=N'compensation' OR [check_type]=N'document' OR [check_type]=N'employment-gap' OR [check_type]=N'experience' OR [check_type]=N'must-have-skill');
+ALTER TABLE [dbo].[candidate_screening_checks] ADD CONSTRAINT [CK_candidate_screening_checks_result] CHECK ([result]=N'not-applicable' OR [result]=N'partial' OR [result]=N'fail' OR [result]=N'pass');
+ALTER TABLE [dbo].[candidate_stage_history] ADD CONSTRAINT [CK_candidate_stage_history_source_type] CHECK ([source_type]=N'interview' OR [source_type]=N'screening' OR [source_type]=N'client-feedback' OR [source_type]=N'automation' OR [source_type]=N'manual' OR [source_type]=N'stage-list-change' OR [source_type]=N'reopen');
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [CK_candidates_duplicate_check_status] CHECK ([duplicate_check_status]=N'blocked' OR [duplicate_check_status]=N'merged' OR [duplicate_check_status]=N'cleared' OR [duplicate_check_status]=N'in-review' OR [duplicate_check_status]=N'not-started');
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [CK_candidates_intake_stage] CHECK ([intake_stage]=N'finalized' OR [intake_stage]=N'ready-to-save' OR [intake_stage]=N'duplicate-review' OR [intake_stage]=N'needs-review' OR [intake_stage]=N'parsed' OR [intake_stage]=N'uploaded');
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [CK_candidates_profile_status] CHECK ([profile_status]=N'archived' OR [profile_status]=N'active' OR [profile_status]=N'draft');
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [CK_candidates_resume_parsing_status] CHECK ([resume_parsing_status]=N'failed' OR [resume_parsing_status]=N'needs-review' OR [resume_parsing_status]=N'parsed' OR [resume_parsing_status]=N'pending' OR [resume_parsing_status]=N'erased');
+ALTER TABLE [dbo].[candidates] ADD CONSTRAINT [CK_candidates_status] CHECK ([status]=N'on-hold' OR [status]=N'hired' OR [status]=N'rejected' OR [status]=N'inactive' OR [status]=N'active' OR [status]=N'erased');
+ALTER TABLE [dbo].[client_access_requests] ADD CONSTRAINT [CK_client_access_requests_approval_status] CHECK ([approval_status]=N'cancelled' OR [approval_status]=N'rejected' OR [approval_status]=N'approved' OR [approval_status]=N'pending');
+ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [CK_client_companies_relationship_type] CHECK ([relationship_type]=N'end-client' OR [relationship_type]=N'direct-client');
+ALTER TABLE [dbo].[client_companies] ADD CONSTRAINT [CK_client_companies_status] CHECK ([status]=N'prospect' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[client_contacts] ADD CONSTRAINT [CK_client_contacts_status] CHECK ([status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [CK_clients_relationship_type] CHECK ([relationship_type]=N'end-client' OR [relationship_type]=N'direct-client');
+ALTER TABLE [dbo].[clients] ADD CONSTRAINT [CK_clients_status] CHECK ([status]=N'prospect' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[company_entities] ADD CONSTRAINT [CK_company_entities_status] CHECK ([status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [CK_daily_updates_hiring_type_json] CHECK ([hiring_type_summary_json] IS NULL OR isjson([hiring_type_summary_json])=(1));
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [CK_daily_updates_movements_json] CHECK ([candidate_movements_json] IS NULL OR isjson([candidate_movements_json])=(1));
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [CK_daily_updates_priority_json] CHECK ([high_priority_roles_json] IS NULL OR isjson([high_priority_roles_json])=(1));
+ALTER TABLE [dbo].[daily_updates] ADD CONSTRAINT [CK_daily_updates_submission_status] CHECK ([submission_status]=N'reviewed' OR [submission_status]=N'submitted' OR [submission_status]=N'draft');
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [CK_duplicate_review_cases_decision_status] CHECK ([decision_status]=N'discarded' OR [decision_status]=N'rejected' OR [decision_status]=N'approved' OR [decision_status]=N'override-requested' OR [decision_status]=N'compare-required' OR [decision_status]=N'pending');
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [CK_duplicate_review_cases_draft_snapshot] CHECK ([draft_candidate_snapshot_json] IS NULL OR isjson([draft_candidate_snapshot_json])=(1));
+ALTER TABLE [dbo].[duplicate_review_cases] ADD CONSTRAINT [CK_duplicate_review_cases_existing_snapshot] CHECK ([existing_candidate_snapshot_json] IS NULL OR isjson([existing_candidate_snapshot_json])=(1));
+ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [CK_interview_rounds_round_type] CHECK ([round_type]=N'client' OR [round_type]=N'manager' OR [round_type]=N'internal');
+ALTER TABLE [dbo].[interview_rounds] ADD CONSTRAINT [CK_interview_rounds_status] CHECK ([status]=N'no-show' OR [status]=N'cancelled' OR [status]=N'rescheduled' OR [status]=N'completed' OR [status]=N'scheduled');
+ALTER TABLE [dbo].[legal_documents] ADD CONSTRAINT [CK_legal_documents_status] CHECK ([status]=N'superseded' OR [status]=N'active');
+ALTER TABLE [dbo].[legal_documents] ADD CONSTRAINT [CK_legal_documents_type] CHECK ([doc_type]=N'dpa' OR [doc_type]=N'privacy' OR [doc_type]=N'tos');
+ALTER TABLE [dbo].[locations] ADD CONSTRAINT [CK_locations_location_mapping_type] CHECK ([location_mapping_type] IS NULL OR ([location_mapping_type]=N'both' OR [location_mapping_type]=N'operational-team' OR [location_mapping_type]=N'legal-entity'));
+ALTER TABLE [dbo].[locations] ADD CONSTRAINT [CK_locations_status] CHECK ([status]=N'planned' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[master_data_values] ADD CONSTRAINT [CK_master_data_values_metadata_json] CHECK ([metadata_json] IS NULL OR isjson([metadata_json])=(1));
+ALTER TABLE [dbo].[password_reset_tokens] ADD CONSTRAINT [CK_password_reset_tokens_purpose] CHECK ([purpose]=N'admin-reset' OR [purpose]=N'first-password-setup' OR [purpose]=N'forgot-password' OR [purpose]=N'signup-verify');
+ALTER TABLE [dbo].[pipeline_template_stages] ADD CONSTRAINT [CK_pipeline_template_stages_reminder_rule_json] CHECK ([reminder_rule_json] IS NULL OR isjson([reminder_rule_json])=(1));
+ALTER TABLE [dbo].[pipeline_template_stages] ADD CONSTRAINT [CK_pipeline_template_stages_stage_type] CHECK ([stage_type]=N'hold' OR [stage_type]=N'joining' OR [stage_type]=N'rejection' OR [stage_type]=N'normal');
+ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [CK_pipeline_templates_stage_scope] CHECK ([stage_scope]=N'location' OR [stage_scope]=N'company' OR [stage_scope]=N'client');
+ALTER TABLE [dbo].[pipeline_templates] ADD CONSTRAINT [CK_pipeline_templates_status] CHECK ([status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [CK_portal_account_slots_status] CHECK ([status]=N'expired' OR [status]=N'cancelled' OR [status]=N'completed' OR [status]=N'approved' OR [status]=N'planned');
+ALTER TABLE [dbo].[portal_account_slots] ADD CONSTRAINT [CK_portal_account_slots_time_range] CHECK ([end_time]>[start_time]);
+ALTER TABLE [dbo].[portal_accounts] ADD CONSTRAINT [CK_portal_accounts_ownership_type] CHECK ([ownership_type]=N'client-owned' OR [ownership_type]=N'user-owned' OR [ownership_type]=N'company-shared');
+ALTER TABLE [dbo].[portal_accounts] ADD CONSTRAINT [CK_portal_accounts_status] CHECK ([status]=N'locked' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[privacy_requests] ADD CONSTRAINT [CK_privacy_requests_status] CHECK ([status]=N'failed' OR [status]=N'rejected' OR [status]=N'cancelled' OR [status]=N'completed' OR [status]=N'processing' OR [status]=N'scheduled' OR [status]=N'pending_approval');
+ALTER TABLE [dbo].[privacy_requests] ADD CONSTRAINT [CK_privacy_requests_type] CHECK ([request_type]=N'candidate_erase' OR [request_type]=N'candidate_export' OR [request_type]=N'company_delete' OR [request_type]=N'company_export');
+ALTER TABLE [dbo].[pipeline_template_stages] ADD CONSTRAINT [CK_pts_metric_bucket] CHECK ([metric_bucket] IS NULL OR ([metric_bucket]=N'withdrawn' OR [metric_bucket]=N'rejected' OR [metric_bucket]=N'joined' OR [metric_bucket]=N'offer' OR [metric_bucket]=N'interview' OR [metric_bucket]=N'submitted' OR [metric_bucket]=N'screened' OR [metric_bucket]=N'sourced'));
+ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [CK_recruiter_daily_updates_hiring_type_json] CHECK ([hiring_type_summary_json] IS NULL OR isjson([hiring_type_summary_json])=(1));
+ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [CK_recruiter_daily_updates_movements_json] CHECK ([candidate_movements_json] IS NULL OR isjson([candidate_movements_json])=(1));
+ALTER TABLE [dbo].[recruiter_daily_updates] ADD CONSTRAINT [CK_recruiter_daily_updates_priority_json] CHECK ([high_priority_roles_json] IS NULL OR isjson([high_priority_roles_json])=(1));
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [CK_report_locks_period] CHECK ([period_end]>=[period_start]);
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [CK_report_locks_scope] CHECK ([report_scope]=N'branch' OR [report_scope]=N'recruiter' OR [report_scope]=N'hr' OR [report_scope]=N'manager' OR [report_scope]=N'admin');
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [CK_report_locks_status] CHECK ([lock_status]=N'reopened' OR [lock_status]=N'locked' OR [lock_status]=N'open');
+ALTER TABLE [dbo].[report_locks] ADD CONSTRAINT [CK_report_locks_type] CHECK ([report_type]=N'monthly' OR [report_type]=N'weekly');
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [CK_report_rows_employment_type] CHECK ([employment_type] IS NULL OR ([employment_type]=N'permanent' OR [employment_type]=N'contract'));
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [CK_report_rows_scope] CHECK ([report_scope]=N'recruiter' OR [report_scope]=N'hr' OR [report_scope]=N'manager' OR [report_scope]=N'admin');
+ALTER TABLE [dbo].[report_rows] ADD CONSTRAINT [CK_report_rows_type] CHECK ([report_type]=N'monthly' OR [report_type]=N'weekly');
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [CK_reports_period] CHECK ([period_end]>=[period_start]);
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [CK_reports_rules_json] CHECK ([report_rules_json] IS NULL OR isjson([report_rules_json])=(1));
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [CK_reports_scope] CHECK ([report_scope]=N'branch' OR [report_scope]=N'recruiter' OR [report_scope]=N'hr' OR [report_scope]=N'manager' OR [report_scope]=N'admin');
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [CK_reports_status] CHECK ([status]=N'locked' OR [status]=N'published' OR [status]=N'in-review' OR [status]=N'generated' OR [status]=N'draft');
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [CK_reports_summary_json] CHECK (isjson([summary_json])=(1));
+ALTER TABLE [dbo].[reports] ADD CONSTRAINT [CK_reports_type] CHECK ([report_type]=N'monthly' OR [report_type]=N'weekly');
+ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [CK_requisition_assignments_status] CHECK ([status]=N'removed' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[requisition_assignments] ADD CONSTRAINT [CK_requisition_assignments_type] CHECK ([assignment_type]=N'support' OR [assignment_type]=N'contributor' OR [assignment_type]=N'delivery_owner' OR [assignment_type]=N'primary_owner');
+ALTER TABLE [dbo].[requisition_documents_required] ADD CONSTRAINT [CK_requisition_documents_required_document_type] CHECK ([document_type]=N'other' OR [document_type]=N'government-id' OR [document_type]=N'offer-copy' OR [document_type]=N'relieving-letter' OR [document_type]=N'payslip' OR [document_type]=N'resume');
+ALTER TABLE [dbo].[requisition_screening_rules] ADD CONSTRAINT [CK_requisition_screening_rules_comp_json] CHECK ([compensation_rules_json] IS NULL OR isjson([compensation_rules_json])=(1));
+ALTER TABLE [dbo].[requisition_screening_rules] ADD CONSTRAINT [CK_requisition_screening_rules_document_json] CHECK ([document_rules_json] IS NULL OR isjson([document_rules_json])=(1));
+ALTER TABLE [dbo].[requisition_screening_rules] ADD CONSTRAINT [CK_requisition_screening_rules_location_json] CHECK ([location_rules_json] IS NULL OR isjson([location_rules_json])=(1));
+ALTER TABLE [dbo].[requisition_skill_requirements] ADD CONSTRAINT [CK_requisition_skill_requirements_skill_type] CHECK ([skill_type]=N'good-to-have' OR [skill_type]=N'must-have');
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [CK_requisitions_hiring_type] CHECK ([hiring_type]=N'external' OR [hiring_type]=N'internal');
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [CK_requisitions_priority] CHECK ([priority]=N'critical' OR [priority]=N'high' OR [priority]=N'medium' OR [priority]=N'low');
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [CK_requisitions_status] CHECK ([status]=N'cancelled' OR [status]=N'closed' OR [status]=N'on-hold' OR [status]=N'open' OR [status]=N'draft');
+ALTER TABLE [dbo].[requisitions] ADD CONSTRAINT [CK_requisitions_structured_jd_json] CHECK ([structured_jd_json] IS NULL OR isjson([structured_jd_json])=(1));
+ALTER TABLE [dbo].[role_templates] ADD CONSTRAINT [CK_role_templates_status] CHECK ([status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[tenants] ADD CONSTRAINT [CK_tenants_offer_approval_threshold] CHECK ([offer_approval_threshold]>=(0));
+ALTER TABLE [dbo].[tenants] ADD CONSTRAINT [CK_tenants_status] CHECK ([status]=N'archived' OR [status]=N'suspended' OR [status]=N'active' OR [status]=N'pending');
+ALTER TABLE [dbo].[user_branch_roles] ADD CONSTRAINT [CK_user_branch_roles_status] CHECK ([status]=N'ended' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[user_extra_permissions] ADD CONSTRAINT [CK_user_extra_permissions_status] CHECK ([status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [CK_user_invitations_delivery_method] CHECK ([credential_delivery_method]=N'setup-instructions-only' OR [credential_delivery_method]=N'manual-share' OR [credential_delivery_method]=N'email-credentials');
+ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [CK_user_invitations_setup_method] CHECK ([credential_setup_method]=N'setup-link' OR [credential_setup_method]=N'system-generated-password' OR [credential_setup_method]=N'temporary-password');
+ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [CK_user_invitations_status] CHECK ([invite_status]=N'cancelled' OR [invite_status]=N'expired' OR [invite_status]=N'accepted' OR [invite_status]=N'sent' OR [invite_status]=N'draft');
+ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [CK_user_location_roles_status] CHECK ([status]=N'ended' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [CK_users_hierarchy_level] CHECK ([hierarchy_level]=N'L5' OR [hierarchy_level]=N'L4' OR [hierarchy_level]=N'L3' OR [hierarchy_level]=N'L2' OR [hierarchy_level]=N'L1');
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [CK_users_password_setup_status] CHECK ([password_setup_status]=N'pending-setup' OR [password_setup_status]=N'active' OR [password_setup_status]=N'setup-complete' OR [password_setup_status]=N'reset-required' OR [password_setup_status]=N'invited');
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [CK_users_status] CHECK ([status]=N'pending' OR [status]=N'suspended' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [CK_workflow_action_events_payload] CHECK ([payload_json] IS NULL OR isjson([payload_json])=(1));
+ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [CK_workflow_action_items_priority] CHECK ([priority]=N'critical' OR [priority]=N'high' OR [priority]=N'normal' OR [priority]=N'low');
+ALTER TABLE [dbo].[workflow_action_items] ADD CONSTRAINT [CK_workflow_action_items_status] CHECK ([status]=N'cancelled' OR [status]=N'dismissed' OR [status]=N'resolved' OR [status]=N'in-progress' OR [status]=N'open');

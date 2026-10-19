@@ -36,7 +36,7 @@ def _db_reachable() -> bool:
         return False
 
 
-ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
+ADMIN_EMAIL_CANDIDATES = ["ci.admin@recruitops-test.com", "admin@executiveconnection.com"]
 ADMIN_PASSWORD = "admin123"
 
 

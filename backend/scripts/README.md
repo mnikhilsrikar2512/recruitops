@@ -40,9 +40,15 @@ after schema changes and commit the result:
 cd backend && .venv/bin/python scripts/dump_schema.py
 ```
 
-The dump writes two passes (tables first, then foreign keys as
-`ALTER TABLE ... ADD CONSTRAINT`) so circular FK dependencies
-(`locations ↔ roles ↔ users`) replay cleanly into an empty database.
+The dump writes three passes (tables, then foreign keys, then CHECK
+constraints, all as `ALTER TABLE ... ADD CONSTRAINT`) so circular FK
+dependencies (`locations ↔ roles ↔ users`) replay cleanly into an empty
+database. CHECK constraints get their own pass because SQLAlchemy's table
+reflection doesn't surface them on SQL Server -- without it, a CHECK
+constraint added straight against a live database is invisible here and can
+silently drift from what the application code actually writes to that
+column. Re-run this after any schema change, including adding or editing a
+CHECK constraint, and commit the result.
 
 ## CI seed
 
@@ -102,13 +108,52 @@ permission, and its API check bypass covers databases seeded by other means.
 
 ## Migrations
 
-Numbered SQL scripts in the repo-root `scripts/` directory, applied with
-`sqlcmd -i` in order; each is idempotent and verified by its own tail checks:
+Numbered scripts in the repo-root `scripts/` directory, each idempotent and
+safe to re-run. Most are SQL, applied with `sqlcmd -i` in order:
 
 - `005_create_approvals_table.sql` — approvals table + demo rows
 - `006_create_agent_runs_table.sql` — `agent_runs` table for V1 agents
 - `007_grant_ai_permissions.sql` — `ai.*` permission codes + role backfill
   (see above)
+- `008_sync_admin_permissions.py` — backfills the system Admin role's
+  `role_permissions` to the current `ADMIN_PERMISSION_CODES`
+  (`app/core/rbac.py`). Run with `.venv/bin/python scripts/008_sync_admin_permissions.py`
+  (Python, not `sqlcmd`, because it reads the permission list directly from
+  code instead of duplicating it in SQL). Any database that existed before a
+  code was added to `ADMIN_PERMISSION_CODES` needs this re-run, or routes
+  gated on the new code 403 for an account that's supposed to have full
+  access — `scripts/seed_ci.py` only seeds a brand-new database with the
+  *current* list; it does not backfill an existing one.
+- `009_scope_office_codes_per_tenant.sql` — converts `UQ_branches_code` and
+  `UQ_locations_code` from a global unique index on `code` alone to a
+  composite unique index on `(tenant_id, code)`. Without this, two
+  different companies could never both use a code like `HO` for their head
+  office — exactly what `tests/test_company_isolation_db.py` expects to be
+  allowed. Safe to run against an existing database: a composite index is
+  always satisfied by data that already passed the single-column one, so
+  no cleanup is needed first.
+- `010_widen_lifecycle_check_constraints.sql` — widens three CHECK
+  constraints to allow values the app already writes but that were never
+  added when the feature shipped: `CK_password_reset_tokens_purpose` now
+  also allows `signup-verify` (self-serve signup email verification,
+  Phase 5.2), `CK_candidate_stage_history_source_type` now also allows
+  `stage-list-change` (a client stage-list remap, Phase 4.10-4.13), and
+  `CK_candidates_status` now also allows `erased` (privacy erase
+  fulfillment, Phase 5.3). Idempotent — drops and re-adds each constraint
+  unconditionally, then verifies the new value is present in the stored
+  definition.
+- `011_widen_remaining_lifecycle_check_constraints.sql` — widens two more
+  CHECK constraints that 010 missed: `CK_candidate_stage_history_source_type`
+  now also allows `reopen` (reopening a withdrawn application,
+  `app/repositories/pipeline.py`), and `CK_candidates_resume_parsing_status`
+  now also allows `erased` (privacy erase fulfillment, Phase 5.3,
+  `app/services/candidate_erasure.py`). Idempotent, same pattern as 010.
+
+Note: `005_create_approvals_table.sql`, `006_create_agent_runs_table.sql`,
+and `007_grant_ai_permissions.sql` are referenced above but are not
+actually present in this repo (apply only from `scripts/README.md` history
+if you still have a copy, or treat their tables/grants as already applied
+if your database has them). Don't re-guess and recreate them blind.
 
 `backend/db/schema.sql` stays tables-only by design — permission rows are data
 and belong to `seed_ci.py` / migrations.

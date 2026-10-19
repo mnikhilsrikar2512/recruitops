@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Set up two-step verification — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=c9352c1264" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=c9352c1264" />
-  <link rel="stylesheet" href="../shared/landing.css?v=c9352c1264" />
+  <link rel="stylesheet" href="../shared/global.css?v=e901852af1" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=e901852af1" />
+  <link rel="stylesheet" href="../shared/landing.css?v=e901852af1" />
   <style>
     .login-split { display:flex; min-height:100vh; }
-    .login-left { flex:1; background:linear-gradient(135deg,#7D4458 0%,#5F3444 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
+    .login-left { flex:1; background:linear-gradient(135deg,#3F5D43 0%,#2E4530 100%); display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
     .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .login-back-home:hover { color:#7D4458; }
+    .login-back-home:hover { color:#3F5D43; }
     @media(max-width:1024px){ .login-left{display:none;} }
   </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=c9352c1264" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=c9352c1264" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=e901852af1" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=e901852af1" />
 </head>
 <body data-route-id="mfa-enroll" data-route-kind="app" data-route-title="Set up two-step verification" data-route-section="Account">
   <main>
@@ -30,35 +30,35 @@
           <div style="padding:24px;position:relative">
             <p class="hidden" role="alert" id="mfa-message" style="font-size:13px;padding:10px 12px;border-radius:4px;margin-bottom:16px"></p>
             <div id="mfa-state" style="font-size:13px;color:#4B5257;margin-bottom:16px">Checking…</div>
-            <div id="mfa-start" class="hidden"><button type="button" id="mfa-begin" style="width:100%;background:#7D4458;color:#fff;border:none;padding:12px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer">Set up an authenticator</button></div>
+            <div id="mfa-start" class="hidden"><button type="button" id="mfa-begin" style="width:100%;background:#3F5D43;color:#fff;border:none;padding:12px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer">Set up an authenticator</button></div>
             <form id="mfa-verify-form" class="hidden flex flex-col gap-4">
               <p style="font-size:13px;color:#4B5257">1. In your authenticator app, add an account using this key (or open the link on your phone):</p>
               <code id="mfa-secret" style="display:block;padding:10px;background:#F4F5F2;border-radius:4px;font-size:15px;letter-spacing:0.1em;word-break:break-all"></code>
-              <a id="mfa-uri" href="#" style="font-size:12px;color:#7D4458;word-break:break-all">Open in authenticator app</a>
+              <a id="mfa-uri" href="#" style="font-size:12px;color:#3F5D43;word-break:break-all">Open in authenticator app</a>
               <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#726F66" for="mfa-code">2. Enter the 6-digit code it shows</label>
               <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="width:100%;padding:10px 12px;border:1px solid #D6D9D4;border-radius:4px;font-size:16px;letter-spacing:0.15em" />
-              <button type="submit" style="width:100%;background:#7D4458;color:#fff;border:none;padding:12px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer">Turn on two-step verification</button>
+              <button type="submit" style="width:100%;background:#3F5D43;color:#fff;border:none;padding:12px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer">Turn on two-step verification</button>
             </form>
             <div id="mfa-codes" class="hidden">
               <p style="font-size:13px;color:#4B5257;margin-bottom:8px"><strong>Save these recovery codes now.</strong> Each works once if you lose your phone. They won't be shown again.</p>
               <pre id="mfa-code-list" style="padding:12px;background:#F4F5F2;border-radius:4px;font-size:14px;line-height:1.8"></pre>
             </div>
-            <a href="my-profile.html" style="display:block;margin-top:16px;font-size:12px;color:#7D4458">Back to My Profile</a>
+            <a href="my-profile.html" style="display:block;margin-top:16px;font-size:12px;color:#3F5D43">Back to My Profile</a>
           </div>
         </div>
       </div>
     </div>
   </main>
-  <script src="../shared/renderers.js?v=c9352c1264"></script>
-  <script src="../shared/api-client.js?v=c9352c1264"></script>
-    <script src="../shared/ui-utils.js?v=c9352c1264"></script>
-    <script src="../shared/tables.js?v=c9352c1264"></script>
-    <script src="../shared/forms.js?v=c9352c1264"></script>
-    <script src="../shared/sidebar.js?v=c9352c1264"></script>
-    <script src="../shared/pipeline.js?v=c9352c1264"></script>
-    <script src="../shared/routing.js?v=c9352c1264"></script>
+  <script src="../shared/renderers.js?v=e901852af1"></script>
+  <script src="../shared/api-client.js?v=e901852af1"></script>
+    <script src="../shared/ui-utils.js?v=e901852af1"></script>
+    <script src="../shared/tables.js?v=e901852af1"></script>
+    <script src="../shared/forms.js?v=e901852af1"></script>
+    <script src="../shared/sidebar.js?v=e901852af1"></script>
+    <script src="../shared/pipeline.js?v=e901852af1"></script>
+    <script src="../shared/routing.js?v=e901852af1"></script>
 
-  <script src="../shared/app.js?v=c9352c1264"></script>
+  <script src="../shared/app.js?v=e901852af1"></script>
 
   <script>
   (function () {

@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 
 from app.api.deps import get_current_auth_context, get_engine, reject_unknown_query_params
-from app.core import rate_limit
+from app.core import net, rate_limit
 from app.core.config import settings
 from app.core.tokens import REFRESH_COOKIE, REFRESH_COOKIE_PATH
 from app.schemas.auth import (
@@ -53,12 +53,10 @@ router = APIRouter()
 
 
 def _resolve_ip_address(request: Request) -> str | None:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip() or None
-    if request.client:
-        return request.client.host
-    return None
+    """The address recorded on login/session audit records -- resolved the
+    same trust-aware way as rate limiting (app.core.net), so this can't be
+    forged via a client-supplied X-Forwarded-For header either."""
+    return net.client_ip(request)
 
 
 def _set_refresh_cookie(response: Response, raw: str) -> None:

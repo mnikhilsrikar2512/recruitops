@@ -82,6 +82,12 @@
           <a href="${prefix}use-cases.html">Use cases</a>
         </div>
         <div class="landing-footer-col">
+          <h4>Use cases</h4>
+          <a href="${prefix}use-cases.html#agencies">Recruitment agencies</a>
+          <a href="${prefix}use-cases.html#in-house">In-house teams</a>
+          <a href="${prefix}use-cases.html#multi-office">Multi-office teams</a>
+        </div>
+        <div class="landing-footer-col">
           <h4>Account</h4>
           <a href="${prefix}signup.html">Create your account</a>
           <a href="${prefix}login.html">Sign in</a>
@@ -207,23 +213,16 @@
     updateHeadingParallax();
   }
 
-  /* ═══ MOUSE PARALLAX ON HERO ORBS ═══ */
+  /* ═══ HERO ORBS: calm ambient float only ═══
+     Used to also drag each orb toward the cursor on mousemove (up to
+     ±42px in any direction) — that's what made the hero background feel
+     like it was being dragged around. Removed entirely; the orbs now
+     only do the gentle CSS keyframe bob (float-slow/float-medium,
+     vertical only, already applied via class in markup) plus a slow
+     opacity breathe, both declared in landing.css. */
   const hero = document.querySelector(".landing-hero");
   if (hero && !reduceMotion) {
-    const orbs = hero.querySelectorAll(".orb");
-    orbs.forEach((orb) => orb.classList.add("parallax-orb"));
-    hero.addEventListener("mousemove", (e) => {
-      const rect = hero.getBoundingClientRect();
-      const nx = (e.clientX - rect.left) / rect.width - 0.5;
-      const ny = (e.clientY - rect.top) / rect.height - 0.5;
-      orbs.forEach((orb, i) => {
-        const depth = (i + 1) * 14;
-        orb.style.transform = `translate(${(-nx * depth).toFixed(1)}px, ${(-ny * depth).toFixed(1)}px)`;
-      });
-    });
-    hero.addEventListener("mouseleave", () => {
-      orbs.forEach((orb) => (orb.style.transform = ""));
-    });
+    hero.querySelectorAll(".orb").forEach((orb) => orb.classList.add("orb-breathe"));
   }
 
   /* ═══ 3D TILT ON PRODUCT PREVIEW ═══ */
@@ -244,6 +243,24 @@
       card.style.transform = "";
     });
   });
+
+  /* ═══ SCROLL PROGRESS BAR ═══ */
+  (function () {
+    var bar = document.getElementById("mkScrollProgress");
+    if (!bar) return;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      var doc = document.documentElement;
+      var max = doc.scrollHeight - doc.clientHeight;
+      var pct = max > 0 ? Math.min(100, Math.max(0, (doc.scrollTop / max) * 100)) : 0;
+      bar.style.width = pct + "%";
+    }
+    window.addEventListener("scroll", function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  })();
 
   /* ═══ MOBILE MENU ═══ */
   const burger = document.getElementById("navBurger");

@@ -42,6 +42,12 @@ def test_long_uncommon_passphrase_is_accepted() -> None:
 @pytest.fixture
 def limits_on(monkeypatch):
     monkeypatch.setattr(settings, "rate_limit_enabled", True)
+    # Simulate sitting behind one trusted reverse proxy (the real staging/
+    # production topology -- see app/core/net.py) so these tests can still
+    # vary the caller's IP via X-Forwarded-For. Without this, the header is
+    # untrusted by default and every request here would share one bucket
+    # (the TestClient's fixed direct-peer address).
+    monkeypatch.setattr(settings, "trusted_proxy_count", 1)
     rate_limit.reset_rate_limits()
     yield
     rate_limit.reset_rate_limits()
@@ -82,6 +88,41 @@ def test_forgot_password_is_limited_per_account(limits_on, monkeypatch) -> None:
         for n in range(4)
     ]
     assert codes[:3] == [200] * 3 and codes[3] == 429
+
+
+# ---- 3.7b client-IP spoofing (X-Forwarded-For trust boundary) -----------------
+
+def test_spoofed_forwarded_for_is_ignored_with_no_trusted_proxy(limits_on, monkeypatch) -> None:
+    """Without a configured trusted proxy (the default), a client setting
+    its own X-Forwarded-For must not get a fresh rate-limit bucket per
+    request -- that would make the login IP limit meaningless."""
+    monkeypatch.setattr(settings, "trusted_proxy_count", 0)
+    monkeypatch.setattr("app.api.v1.auth.login_service", _fake_login)
+    client = TestClient(create_application(), raise_server_exceptions=False)
+    codes = [
+        client.post(f"{API}/auth/login", json={"email": f"user{n}@example.com", "password": "x"},
+                    headers={"X-Forwarded-For": f"203.0.113.{n}"}).status_code
+        for n in range(6)
+    ]
+    # Every request lands in the same (direct-peer) bucket despite the
+    # forged header claiming a different IP each time.
+    assert codes[:5] == [401] * 5 and codes[5] == 429
+
+
+def test_trusted_proxy_hop_is_used_not_the_client_supplied_prefix(limits_on) -> None:
+    """With one trusted proxy configured, the IP used for rate limiting is
+    the entry that proxy appended (the real client, as far as our own
+    infrastructure can vouch for) -- never anything the client prepended
+    onto the header itself."""
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "headers": [(b"x-forwarded-for", b"9.9.9.9, 203.0.113.55")],
+        "client": ("10.0.0.1", 12345),
+    }
+    request = Request(scope)
+    assert rate_limit.client_ip(request) == "203.0.113.55"
 
 
 # ---- 3.8 perimeter -------------------------------------------------------------

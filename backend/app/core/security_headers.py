@@ -7,6 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
+from app.core import net
 from app.core.config import settings
 
 _DOC_PATHS = ("/docs", "/redoc", "/openapi.json")
@@ -22,7 +23,7 @@ _API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        if settings.is_production and request.headers.get("x-forwarded-proto", "https") == "http":
+        if settings.is_production and not net.is_forwarded_https(request):
             return RedirectResponse(request.url.replace(scheme="https"), status_code=308)
         response = await call_next(request)
         for name, value in _BASE_HEADERS.items():

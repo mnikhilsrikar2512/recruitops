@@ -30,7 +30,7 @@ from app.main import create_application
 
 
 # Seed admin candidates: repo dev DB uses the seed user, CI uses the seeded CI admin
-ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
+ADMIN_EMAIL_CANDIDATES = ["ci.admin@recruitops-test.com", "admin@executiveconnection.com"]
 ADMIN_PASSWORD = "admin123"
 
 
@@ -74,7 +74,36 @@ def daily_chain(client):
     admin_headers = {"Authorization": f"Bearer {login.json()['token']}"}
     admin_user_id = login.json()["user"]["id"]
 
+    # Don't assume branch id 1 is the admin's own primary location -- office
+    # ids are assigned dynamically (migration 009 made office codes
+    # tenant-scoped rather than global), so fetch the admin's real
+    # primary_location_id and use it everywhere a location is needed in
+    # this fixture/tests, keeping every requisition's location_id and every
+    # test user's primary_location_id consistent with _assert_user_in_location.
+    admin_detail = client.get(f"/api/v1/users/{admin_user_id}", headers=admin_headers)
+    assert admin_detail.status_code == 200, admin_detail.text
+    location_id = admin_detail.json()["primary_location_id"]
+    assert location_id is not None, "seed admin has no primary_location_id"
+
     suffix = uuid.uuid4().hex[:8]
+
+    # Don't assume client id 1 exists or belongs to the admin's real
+    # location either -- create a client scoped to location_id so the
+    # requisitions below satisfy _assert_client_and_contacts' location
+    # check, the same way location_id itself was fixed above.
+    new_client = client.post(
+        "/api/v1/clients/",
+        headers=admin_headers,
+        json={
+            "client_name": f"Daily Chain Client {suffix}",
+            "location_id": location_id,
+            "client_owner_user_id": admin_user_id,
+            "business_source_owner_user_id": admin_user_id,
+        },
+    )
+    assert new_client.status_code == 201, new_client.text
+    client_id = new_client.json()["id"]
+
     role = client.post(
         "/api/v1/roles/",
         headers=admin_headers,
@@ -101,7 +130,7 @@ def daily_chain(client):
             "full_name": "Daily Integration Recruiter",
             "email": f"daily-it-{suffix}@example.com",
             "employee_code": f"DAILYIT-{suffix}",
-            "primary_location_id": 1,
+            "primary_location_id": location_id,
             "primary_role_id": role_id,
         },
     )
@@ -133,6 +162,8 @@ def daily_chain(client):
         "user_headers": user_headers,
         "user_id": user_id,
         "suffix": suffix,
+        "location_id": location_id,
+        "client_id": client_id,
     }
 
     client.post(
@@ -155,8 +186,8 @@ class TestDailyUpdateChain:
             "/api/v1/requisitions/",
             headers=daily_chain["admin_headers"],
             json={
-                "client_id": 1,
-                "location_id": 1,
+                "client_id": daily_chain["client_id"],
+                "location_id": daily_chain["location_id"],
                 "title": f"Daily Chain Test {daily_chain['suffix']}",
                 "primary_owner_user_id": daily_chain["admin_user_id"],
                 "openings_count": 1,
@@ -211,8 +242,8 @@ class TestDailyUpdateChain:
             "/api/v1/requisitions/",
             headers=daily_chain["admin_headers"],
             json={
-                "client_id": 1,
-                "location_id": 1,
+                "client_id": daily_chain["client_id"],
+                "location_id": daily_chain["location_id"],
                 "title": f"Daily Submit Test {daily_chain['suffix']}",
                 "primary_owner_user_id": daily_chain["admin_user_id"],
                 "openings_count": 1,
@@ -270,8 +301,8 @@ class TestDailyUpdateChain:
             "/api/v1/requisitions/",
             headers=daily_chain["admin_headers"],
             json={
-                "client_id": 1,
-                "location_id": 1,
+                "client_id": daily_chain["client_id"],
+                "location_id": daily_chain["location_id"],
                 "title": f"Daily Link Guard {daily_chain['suffix']}",
                 "primary_owner_user_id": daily_chain["admin_user_id"],
                 "openings_count": 1,

@@ -213,34 +213,58 @@ def main() -> None:
                 """
             )
         )
+        tenant_id = connection.execute(
+            text("SELECT id FROM dbo.tenants WHERE slug = N'default'")
+        ).scalar_one()
+
         # Location: user creation validates primary_location_id against
         # dbo.branches (see location_exists), so the branch IS the location row.
+        # branches.code is NOT globally unique across tenants, so this and
+        # every lookup/insert below is scoped to this tenant's own rows --
+        # an unscoped "code = N'HO'" lookup can silently match a DIFFERENT
+        # tenant's office on a database that already has other companies in
+        # it (every environment except a throwaway, brand-new CI database).
         location_id = connection.execute(
             text(
                 """
-                IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HO')
+                IF NOT EXISTS (SELECT 1 FROM dbo.branches WHERE code = N'HO' AND tenant_id = :tenant_id)
                 BEGIN
                     INSERT INTO dbo.branches (name, code, location, status, tenant_id)
                     OUTPUT INSERTED.id
-                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
+                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', :tenant_id);
                 END
                 ELSE
                 BEGIN
-                    SELECT id FROM dbo.branches WHERE code = N'HO';
+                    SELECT id FROM dbo.branches WHERE code = N'HO' AND tenant_id = :tenant_id;
                 END
                 """
-            )
+            ),
+            {"tenant_id": tenant_id},
         ).scalar_one()
 
-        # Mirror into dbo.locations for consumers that read the locations table
+        # Mirror into dbo.locations for consumers that read the locations
+        # table -- forcing the SAME id as the branches row (the same
+        # IDENTITY_INSERT pattern app/services/provisioning.py uses), not a
+        # plain INSERT that gets its own auto-generated id. A plain INSERT
+        # only happens to line up with location_id on an empty database
+        # where both tables' IDENTITY counters start at 1 in lockstep; on
+        # any database that already has other tenants' rows in either
+        # table, the ids diverge and every dbo.users.location_id insert
+        # using this branch id fails FK_users_location, exactly as it did
+        # against this local database.
         connection.execute(
             text(
                 """
-                IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE code = N'HO')
-                    INSERT INTO dbo.locations (name, code, location, status, tenant_id)
-                    VALUES (N'Head Office', N'HO', N'Head Office', N'active', (SELECT id FROM dbo.tenants WHERE slug = N'default'));
+                IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
+                BEGIN
+                    SET IDENTITY_INSERT dbo.locations ON;
+                    INSERT INTO dbo.locations (id, name, code, location, status, tenant_id)
+                    VALUES (:id, N'Head Office', N'HO', N'Head Office', N'active', :tenant_id);
+                    SET IDENTITY_INSERT dbo.locations OFF;
+                END
                 """
-            )
+            ),
+            {"id": location_id, "tenant_id": tenant_id},
         )
 
         # Permission catalog (id is IDENTITY — no explicit ids)

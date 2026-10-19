@@ -3,7 +3,7 @@
    nav/footer/buttons/hero effects). Load after landing.css. */
 :root {
   --mk-ink: #17201C;
-  --mk-primary: #7D4458;
+  --mk-primary: #3F5D43;
   --mk-text: #4B5257;
   --mk-muted: #726F66;
   --mk-line: #E7E7E4;
@@ -16,9 +16,9 @@
   --mk-sand: #F7F0E1;
   --mk-sand-ink: #8A6A1F;
   --mk-shadow: 0 20px 80px rgba(43, 40, 35, 0.16);
-  --mk-clay-wash-1: rgba(125, 68, 88, 0.09);
-  --mk-clay-wash-2: rgba(125, 68, 88, 0.16);
-  --mk-clay-wash-3: rgba(125, 68, 88, 0.24);
+  --mk-clay-wash-1: rgba(63, 93, 67, 0.09);
+  --mk-clay-wash-2: rgba(63, 93, 67, 0.16);
+  --mk-clay-wash-3: rgba(63, 93, 67, 0.24);
   --mk-max: 1152px;
 }
 body[data-route-kind="marketing"] { font-family: "Manrope", sans-serif; color: var(--mk-text); }
@@ -51,7 +51,7 @@ body[data-route-kind="marketing"] { font-family: "Manrope", sans-serif; color: v
 .mk-actions .btn-primary .material-symbols-outlined, .mk-actions .btn-secondary .material-symbols-outlined { font-size: 20px; }
 .mk-note { margin-top: 20px; font-size: 13px; color: var(--mk-muted); display: inline-flex; align-items: center; gap: 6px; }
 .mk-note .material-symbols-outlined { font-size: 16px; color: var(--mk-primary); }
-.mk-orb-1 { width: 384px; height: 384px; top: -192px; left: -192px; background: #7D4458; }
+.mk-orb-1 { width: 384px; height: 384px; top: -192px; left: -192px; background: #3F5D43; }
 .mk-orb-2 { width: 320px; height: 320px; top: 80px; right: -160px; background: #BF6F42; }
 .mk-orb-3 { width: 256px; height: 256px; bottom: 0; left: 33%; background: #726F66; opacity: 0.12; }
 
@@ -70,16 +70,16 @@ body[data-route-kind="marketing"] { font-family: "Manrope", sans-serif; color: v
 .mk-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .mk-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .mk-card { background: var(--mk-surface); border: 1px solid var(--mk-line); border-radius: 14px; padding: 24px; box-shadow: 0 1px 0 rgba(43, 40, 35, 0.02), 0 14px 32px -22px rgba(43, 40, 35, 0.18); transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s cubic-bezier(0.22,1,0.36,1), border-color 0.3s ease; }
-.mk-card:hover { transform: translateY(-4px); border-color: rgba(125, 68, 88, 0.28); box-shadow: 0 22px 48px -18px rgba(43, 40, 35, 0.22); }
+.mk-card:hover { transform: translateY(-4px); border-color: rgba(63, 93, 67, 0.28); box-shadow: 0 22px 48px -18px rgba(43, 40, 35, 0.22); }
 a.mk-card { display: block; text-decoration: none; color: inherit; }
 .mk-card h3 { margin: 14px 0 6px; }
 .mk-card p { font-size: 14px; line-height: 1.6; color: var(--mk-text); }
-.mk-icon { width: 42px; height: 42px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--mk-clay-wash-1); color: var(--mk-primary); flex: none; box-shadow: inset 0 0 0 1px rgba(125, 68, 88, 0.1); }
+.mk-icon { width: 42px; height: 42px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--mk-clay-wash-1); color: var(--mk-primary); flex: none; box-shadow: inset 0 0 0 1px rgba(63, 93, 67, 0.1); }
 .mk-icon .material-symbols-outlined { font-size: 20px; }
 .mk-icon.t2 { background: var(--mk-clay-wash-2); }
 .mk-icon.t3 { background: var(--mk-clay-wash-3); color: var(--mk-primary); }
-.mk-icon.dark { background: linear-gradient(160deg, #7D4458, #5F3444); color: #fff; box-shadow: 0 4px 10px -2px rgba(125, 68, 88, 0.45); }
-.mk-num { width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #7D4458, #5F3444); color: #fff; font-weight: 800; font-size: 17px; box-shadow: 0 4px 10px -2px rgba(125, 68, 88, 0.45); }
+.mk-icon.dark { background: linear-gradient(160deg, #3F5D43, #2E4530); color: #fff; box-shadow: 0 4px 10px -2px rgba(63, 93, 67, 0.45); }
+.mk-num { width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #3F5D43, #2E4530); color: #fff; font-weight: 800; font-size: 17px; box-shadow: 0 4px 10px -2px rgba(63, 93, 67, 0.45); }
 .mk-list { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; }
 .mk-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--mk-text); line-height: 1.55; }
 .mk-list li::before { content: "check_circle"; font-family: "Material Symbols Outlined"; font-size: 18px; line-height: 1.25; color: var(--mk-primary); flex: none; font-feature-settings: "liga"; -webkit-font-feature-settings: "liga"; }
@@ -128,7 +128,7 @@ a.mk-card { display: block; text-decoration: none; color: inherit; }
 .mk-lines i { display: block; height: 6px; border-radius: 99px; background: #e4e6e3; }
 .mk-lines i:first-child { width: 80%; background: #cfd4d1; }
 .mk-lines i:last-child { width: 55%; }
-.mk-chip.focus { border-color: var(--mk-primary); box-shadow: 0 0 0 3px rgba(125, 68, 88, .08); background: #fff; }
+.mk-chip.focus { border-color: var(--mk-primary); box-shadow: 0 0 0 3px rgba(63, 93, 67, .08); background: #fff; }
 .mk-rows { display: grid; gap: 8px; }
 .mk-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--mk-line); border-radius: 10px; background: var(--mk-surface); }
 .mk-row strong { display: block; font-size: 13px; font-weight: 700; color: var(--mk-ink); }
@@ -167,7 +167,7 @@ a.mk-card { display: block; text-decoration: none; color: inherit; }
 .mk-prevnext a.next { text-align: right; }
 
 /* Dark CTA (same gradient + grid as the original) */
-.mk-cta { position: relative; overflow: hidden; text-align: center; padding: 96px 24px; background: linear-gradient(135deg, #7D4458 0%, #5F3444 100%); color: #E3DACD; }
+.mk-cta { position: relative; overflow: hidden; text-align: center; padding: 96px 24px; background: linear-gradient(135deg, #3F5D43 0%, #2E4530 100%); color: #E3DACD; }
 .mk-cta h2 { color: #fff; margin-bottom: 20px; }
 .mk-cta p { max-width: 560px; margin: 0 auto; color: #E3DACD; font-size: 16px; line-height: 1.65; }
 .mk-cta .btn-secondary { border-color: #fff; }

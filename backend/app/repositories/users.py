@@ -323,7 +323,15 @@ def create_user(engine: Engine, payload: UserCreate, password_hash: str) -> User
                 "password_hash": password_hash,
                 "status": payload.status,
                 "primary_role_id": payload.primary_role_id,
-                "hierarchy_level": "recruiter",
+                # L1 (lowest tier): every other creation path (self-serve
+                # signup/provisioning, the CI/staging seeds) uses the same
+                # "L1".."L5" convention -- "recruiter" here was a stale
+                # placeholder from before that convention existed, and
+                # fails any hierarchy_level CHECK constraint the others
+                # satisfy. Role-derived scoping/promotion is a separate,
+                # not-yet-built feature; L1 is the correct default until
+                # that exists.
+                "hierarchy_level": "L1",
                 "reporting_manager_user_id": payload.reporting_manager_user_id,
                 "primary_location_id": payload.primary_location_id,
             },

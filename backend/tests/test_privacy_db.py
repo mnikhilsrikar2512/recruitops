@@ -42,8 +42,8 @@ def _make_company(connection, label: str) -> dict:
                   "VALUES (:n, :c, N'Test', N'active', :t)", n=f"{MARK} {label} office", c=f"P{tag[:6]}", t=tenant)
     role = _one(connection, "SELECT TOP (1) id FROM dbo.roles WHERE code = N'admin' AND tenant_id IS NULL")
     user = _one(connection, "INSERT INTO dbo.users (full_name, email, employee_code, password_hash, password_setup_status, status, "
-                "default_role_id, hierarchy_level, tenant_id) OUTPUT INSERTED.id VALUES (:n, :e, :code, N'x', N'completed', N'active', "
-                ":r, N'admin', :t)",
+                "default_role_id, hierarchy_level, tenant_id) OUTPUT INSERTED.id VALUES (:n, :e, :code, N'x', N'setup-complete', N'active', "
+                ":r, N'L5', :t)",
                 n=f"{MARK} {label} admin", e=f"priv-{label}-{tag}@example.test", code=f"PRIV-{label}-{tag}", r=role, t=tenant)
     client_id = _one(connection, "INSERT INTO dbo.client_companies (branch_id, name, relationship_type, status) OUTPUT INSERTED.id "
                      "VALUES (:b, :n, N'direct-client', N'active')", b=branch, n=f"{MARK} {label} client")
