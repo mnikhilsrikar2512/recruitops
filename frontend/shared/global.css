@@ -3419,9 +3419,6 @@
       left: 0;
       right: 0;
       z-index: 50;
-      background: #ffffff !important;
-      backdrop-filter: none;
-      box-shadow: none;
     }
     body[data-route-kind="marketing"] :is(section, header, footer) {
       border-color: rgba(203, 212, 208, 0.82) !important;

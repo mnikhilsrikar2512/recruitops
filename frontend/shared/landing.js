@@ -82,6 +82,12 @@
           <a href="${prefix}use-cases.html">Use cases</a>
         </div>
         <div class="landing-footer-col">
+          <h4>Use cases</h4>
+          <a href="${prefix}use-cases.html#agencies">Recruitment agencies</a>
+          <a href="${prefix}use-cases.html#in-house">In-house teams</a>
+          <a href="${prefix}use-cases.html#multi-office">Multi-office teams</a>
+        </div>
+        <div class="landing-footer-col">
           <h4>Account</h4>
           <a href="${prefix}signup.html">Create your account</a>
           <a href="${prefix}login.html">Sign in</a>

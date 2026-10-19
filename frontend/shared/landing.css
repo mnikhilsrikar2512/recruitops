@@ -10,12 +10,16 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Nav ── */
 .landing-nav {
   position: fixed !important; top: 0; left: 0; right: 0; z-index: 50;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(16px);
-  border-bottom: 1px solid #E7E7E4; transition: box-shadow 0.3s;
+  background: transparent; border-bottom: 1px solid transparent;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   max-width: 100%;
   overflow: clip;
 }
-.landing-nav.scrolled { box-shadow: 0 4px 20px rgba(36,72,60,0.06); }
+.landing-nav.scrolled {
+  background: rgba(255,255,255,0.82); backdrop-filter: blur(16px);
+  border-bottom-color: #E7E7E4;
+  box-shadow: 0 4px 20px rgba(36,72,60,0.06);
+}
 .landing-nav-inner {
   max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px;
   display: flex; align-items: center; justify-content: space-between;
@@ -84,6 +88,10 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
   .landing-nav-links { display: none; }
   .landing-nav-actions .btn-nav-ghost { display: none; }
 }
+@media (max-width: 860px) {
+  .landing-footer-main { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+  .landing-footer-brand { grid-column: 1 / -1; max-width: 420px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .mobile-menu, .mobile-menu.open { transition: none; }
   .mobile-menu-list li { transition: none; opacity: 1; transform: none; }
@@ -92,7 +100,7 @@ body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; 
 /* ── Footer ── */
 .landing-footer { background: #fff; border-top: 1px solid #E7E7E4; }
 .landing-footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.landing-footer-main { padding: 64px 0 48px; display: grid; grid-template-columns: minmax(220px, 1.3fr) repeat(3, minmax(120px, 1fr)); column-gap: 40px; row-gap: 40px; align-items: start; }
+.landing-footer-main { padding: 64px 0 48px; display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 1fr)); column-gap: 32px; row-gap: 40px; align-items: start; }
 .landing-footer-brand { max-width: 320px; padding-right: 8px; }
 .landing-footer-brand p { font-size: 13px; color: #726F66; line-height: 1.65; margin: 14px 0 24px; }
 .landing-footer-col { border: none !important; background: transparent !important; box-shadow: none !important; outline: none !important; border-radius: 0 !important; }

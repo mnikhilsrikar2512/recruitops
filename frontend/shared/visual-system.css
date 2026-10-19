@@ -270,11 +270,6 @@ body[data-route-kind="auth"] input {
 }
 
 /* Landing polish */
-.landing-nav {
-  background: #ffffff !important;
-  backdrop-filter: none !important;
-}
-
 .landing-hero {
   min-height: min(72vh, 720px);
   min-height: min(72dvh, 720px);
