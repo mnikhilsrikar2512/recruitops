@@ -6,8 +6,8 @@
   --ro-border: #e7e7e4;
   --ro-text: #2B2823;
   --ro-muted: #726F66;
-  --ro-primary: #7D4458;
-  --ro-primary-hover: #5F3444;
+  --ro-primary: #3F5D43;
+  --ro-primary-hover: #2E4530;
   --ro-success: #217a46;
   --ro-warning: #8a6a1f;
   --ro-danger: #A1392C;
@@ -20,5 +20,5 @@
   --ro-sidebar: 248px;
   --ro-motion: 160ms;
   --ro-font: "Inter", "Manrope", sans-serif;
-  --ro-focus: 2px solid #7D4458;
+  --ro-focus: 2px solid #3F5D43;
 }

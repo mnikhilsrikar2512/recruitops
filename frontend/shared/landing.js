@@ -245,6 +245,24 @@
     });
   });
 
+  /* ═══ SCROLL PROGRESS BAR ═══ */
+  (function () {
+    var bar = document.getElementById("mkScrollProgress");
+    if (!bar) return;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      var doc = document.documentElement;
+      var max = doc.scrollHeight - doc.clientHeight;
+      var pct = max > 0 ? Math.min(100, Math.max(0, (doc.scrollTop / max) * 100)) : 0;
+      bar.style.width = pct + "%";
+    }
+    window.addEventListener("scroll", function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  })();
+
   /* ═══ MOBILE MENU ═══ */
   const burger = document.getElementById("navBurger");
   const mobileMenu = document.getElementById("mobileMenu");

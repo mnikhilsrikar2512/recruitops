@@ -7,11 +7,11 @@
       --ro-border: #e2e0da;
       --ro-text: #2b2823;
       --ro-muted: #726f66;
-      --ro-primary: #7d4458;
-      --ro-primary-hover: #5f3444;
-      --ro-accent: #7d4458;
+      --ro-primary: #3F5D43;
+      --ro-primary-hover: #2E4530;
+      --ro-accent: #3F5D43;
       --ro-attention: #8a6a1f;
-      --ro-focus: rgba(125, 68, 88, 0.20);
+      --ro-focus: rgba(63, 93, 67, 0.20);
       --ro-shadow: 0 1px 2px rgba(20, 18, 14, 0.04);
       --ro-soft-shadow: 0 1px 2px rgba(20, 18, 14, 0.03), 0 8px 20px -12px rgba(20, 18, 14, 0.10);
       --ro-elevation-raised: 0 2px 4px rgba(20, 18, 14, 0.04), 0 14px 32px -16px rgba(20, 18, 14, 0.14);
@@ -153,7 +153,7 @@
     }
     .toggle-track.on {
       border-color: var(--ro-primary);
-      background: #7D4458;
+      background: #3F5D43;
     }
     .toggle-track.on::after {
       transform: translateX(18px);
@@ -217,7 +217,7 @@
     }
     .app-shell[data-sidebar-collapsed="true"] .app-sidebar .nav-group:has([aria-current="page"]) > .nav-group-toggle,
     .app-shell[data-sidebar-collapsed="true"] .app-sidebar .nav-group.is-genie-open > .nav-group-toggle {
-      background: #7D4458;
+      background: #3F5D43;
       color: #ffffff;
     }
     .app-shell[data-sidebar-collapsed="true"] .app-sidebar .nav-link,
@@ -282,15 +282,15 @@
       min-height: 36px;
       padding: 6px 10px;
       border-radius: 8px;
-      color: #7D4458;
+      color: #3F5D43;
       text-decoration: none;
     }
     .sidebar-genie .nav-link:hover {
-      background: rgba(125, 68, 88, 0.06);
+      background: rgba(63, 93, 67, 0.06);
     }
     .sidebar-genie .nav-link.is-active,
     .sidebar-genie .nav-link[aria-current="page"] {
-      background: #7D4458;
+      background: #3F5D43;
       color: #ffffff;
     }
     .sidebar-genie .sidebar-label {
@@ -384,11 +384,11 @@
       width: 34px;
       height: 34px;
       border-radius: 10px;
-      background: linear-gradient(160deg, #7D4458, #5F3444);
+      background: linear-gradient(160deg, #3F5D43, #2E4530);
       color: #FAFAF9;
       font-weight: 800;
       letter-spacing: -0.03em;
-      box-shadow: 0 4px 10px -2px rgba(125, 68, 88, 0.45);
+      box-shadow: 0 4px 10px -2px rgba(63, 93, 67, 0.45);
     }
     .sidebar-brand-copy {
       min-width: 0;
@@ -430,7 +430,7 @@
       display: none;
     }
     .nav-group-toggle:hover {
-      background: rgba(125, 68, 88, 0.07);
+      background: rgba(63, 93, 67, 0.07);
     }
     .nav-group-icon,
     .nav-group-chevron,
@@ -444,7 +444,7 @@
       line-height: 1;
     }
     .nav-group-icon {
-      color: #7D4458;
+      color: #3F5D43;
     }
     .nav-group-label {
       overflow: hidden;
@@ -498,17 +498,17 @@
       transition: color 120ms ease;
     }
     .nav-link:hover {
-      background: rgba(125, 68, 88, 0.08);
-      color: #7D4458;
+      background: rgba(63, 93, 67, 0.08);
+      color: #3F5D43;
     }
     .nav-link:hover .material-symbols-outlined {
-      color: #7D4458;
+      color: #3F5D43;
     }
     .nav-link.is-active {
-      background: #7D4458;
+      background: #3F5D43;
       color: #ffffff;
       font-weight: 650;
-      box-shadow: 0 6px 14px -4px rgba(125, 68, 88, 0.45);
+      box-shadow: 0 6px 14px -4px rgba(63, 93, 67, 0.45);
     }
     .nav-link.is-active .material-symbols-outlined {
       color: #ffffff;
@@ -622,8 +622,8 @@
       display: none;
     }
     .topbar-action:hover {
-      border-color: rgba(125, 68, 88, 0.22);
-      background: rgba(125, 68, 88, 0.05);
+      border-color: rgba(63, 93, 67, 0.22);
+      background: rgba(63, 93, 67, 0.05);
       box-shadow: none;
     }
     .sidebar-logout {
@@ -1977,7 +1977,7 @@
       color: #ffffff !important;
     }
     [data-hover-contrast-guard="true"]:hover {
-      background-color: #7D4458 !important;
+      background-color: #3F5D43 !important;
       border-color: rgba(43, 40, 35, 0.32) !important;
     }
     .notification-read {
@@ -2525,7 +2525,7 @@
       min-width: 0;
     }
     [data-layout="table-surface"] {
-      box-shadow: 0 12px 28px rgba(125, 68, 88, 0.04);
+      box-shadow: 0 12px 28px rgba(63, 93, 67, 0.04);
     }
     [data-layout="table-surface"] thead tr,
     [data-layout="table-surface"] .table-header-row {
@@ -2535,7 +2535,7 @@
       transition: background-color 160ms ease, box-shadow 160ms ease;
     }
     [data-layout="table-surface"] tbody tr:hover {
-      box-shadow: inset 0 0 0 9999px rgba(125, 68, 88, 0.035);
+      box-shadow: inset 0 0 0 9999px rgba(63, 93, 67, 0.035);
     }
     [data-layout="table-footer"] {
       display: flex;
@@ -2804,7 +2804,7 @@
       min-width: 0;
     }
     [data-layout="timeline-surface"] {
-      box-shadow: 0 12px 28px rgba(125, 68, 88, 0.04);
+      box-shadow: 0 12px 28px rgba(63, 93, 67, 0.04);
     }
     [data-layout="intake-toolbar"] {
       position: sticky;
@@ -2948,8 +2948,8 @@
     .sidebar-mark,
     .marketing-logo-mark {
       border-radius: 10px;
-      background: linear-gradient(160deg, #7D4458, #5F3444);
-      box-shadow: 0 4px 10px -2px rgba(125, 68, 88, 0.45);
+      background: linear-gradient(160deg, #3F5D43, #2E4530);
+      box-shadow: 0 4px 10px -2px rgba(63, 93, 67, 0.45);
     }
     .sidebar-brand-name,
     .marketing-logo {
@@ -2965,16 +2965,16 @@
       border-radius: 7px !important;
     }
     .nav-group-toggle:hover {
-      background: rgba(125, 68, 88, 0.07);
+      background: rgba(63, 93, 67, 0.07);
     }
     .nav-link:hover {
-      background: rgba(125, 68, 88, 0.08);
-      color: #7D4458;
+      background: rgba(63, 93, 67, 0.08);
+      color: #3F5D43;
     }
     .nav-link.is-active {
-      background: #7D4458 !important;
+      background: #3F5D43 !important;
       color: #ffffff;
-      box-shadow: 0 6px 14px -4px rgba(125, 68, 88, 0.45) !important;
+      box-shadow: 0 6px 14px -4px rgba(63, 93, 67, 0.45) !important;
     }
     .sidebar-cta-link {
       display: none !important;
@@ -3056,12 +3056,12 @@
        both the checkmark SVG (via currentColor) and the focus ring it
        derives from the same value. */
     :is(input[type="checkbox"], input[type="radio"]) {
-      color: #7D4458 !important;
+      color: #3F5D43 !important;
     }
     :is(input, select, textarea):focus {
-      border-color: #7D4458 !important;
+      border-color: #3F5D43 !important;
       box-shadow: 0 0 0 3px var(--ro-focus) !important;
-      outline: 2px solid #7D4458 !important;
+      outline: 2px solid #3F5D43 !important;
       outline-offset: 1px;
     }
     :is(button, a[href][class*="rounded"], a[href][class*="bg-"], a[href][class*="border"]) {
@@ -3089,7 +3089,7 @@
     :is(.workspace-surface, [data-overlay-surface="true"]) :is(button, a[href])[class*="bg-success-bg"] {
       background: #E8F3EC !important;
       border-color: rgba(36, 72, 60, 0.16) !important;
-      color: #7D4458 !important;
+      color: #3F5D43 !important;
       box-shadow: none !important;
     }
     :is(.workspace-surface, [data-overlay-surface="true"]) :is(button, a[href])[class*="hover:bg-warning-text"]:hover {
@@ -3111,20 +3111,20 @@
       box-shadow: none !important;
     }
     :is(.workspace-surface, [data-overlay-surface="true"]) :is(button, a[href])[class*="hover:bg-success-text"]:hover {
-      background: #7D4458 !important;
-      border-color: #7D4458 !important;
+      background: #3F5D43 !important;
+      border-color: #3F5D43 !important;
       color: #ffffff !important;
       box-shadow: none !important;
     }
     :is(.workspace-surface, [data-overlay-surface="true"]) :is(button, a[href])[class~="bg-surface-alt"][class~="text-primary"] {
       background: #FAFAF9 !important;
       border-color: #D8D2C6 !important;
-      color: #7D4458 !important;
+      color: #3F5D43 !important;
       box-shadow: none !important;
     }
     :is(.workspace-surface, [data-overlay-surface="true"]) :is(button, a[href])[class*="hover:bg-primary"]:hover {
-      background: #5F3444 !important;
-      border-color: #5F3444 !important;
+      background: #2E4530 !important;
+      border-color: #2E4530 !important;
       color: #ffffff !important;
       box-shadow: none !important;
     }
@@ -3139,12 +3139,12 @@
     body[data-route-id="daily-review"] .workspace-surface .divide-y > .flex > button[class~="bg-surface-alt"][class~="text-primary"] {
       background: #FAFAF9 !important;
       border-color: #D8D2C6 !important;
-      color: #7D4458 !important;
+      color: #3F5D43 !important;
       box-shadow: none !important;
     }
     body[data-route-id="daily-review"] .workspace-surface .divide-y > .flex > button[class*="hover:bg-primary"]:hover {
-      background: #7D4458 !important;
-      border-color: #7D4458 !important;
+      background: #3F5D43 !important;
+      border-color: #3F5D43 !important;
       color: #ffffff !important;
       box-shadow: none !important;
     }
@@ -3384,13 +3384,13 @@
       box-shadow: none !important;
     }
     :is(.bg-primary, .bg-primary-container, button[class~="bg-primary"], button[class~="bg-primary-container"], a[class~="bg-primary"], a[class~="bg-primary-container"]) {
-      background: linear-gradient(135deg, #7D4458, #7D4458) !important;
+      background: linear-gradient(135deg, #3F5D43, #3F5D43) !important;
       border-color: rgba(43, 40, 35, 0.28) !important;
       color: #ffffff !important;
       box-shadow: 0 14px 30px rgba(43, 40, 35, 0.16) !important;
     }
     :is(.text-primary, .text-primary-container) {
-      color: #7D4458 !important;
+      color: #3F5D43 !important;
     }
     .toast {
       border-radius: 8px;
@@ -3457,7 +3457,7 @@
       border-radius: 8px !important;
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 249, 248, 0.96)),
-        linear-gradient(135deg, rgba(43, 40, 35, 0.08), rgba(125, 68, 88, 0.1)) !important;
+        linear-gradient(135deg, rgba(43, 40, 35, 0.08), rgba(63, 93, 67, 0.1)) !important;
       box-shadow: 0 28px 72px rgba(18, 32, 27, 0.12) !important;
     }
     body[data-route-kind="marketing"] .landing-canvas section:has([data-alt*="dashboard"]) .soft-glow::before {
@@ -3483,20 +3483,20 @@
       height: 38%;
       border-radius: 8px;
       background:
-        linear-gradient(90deg, #7D4458 0 20%, transparent 20% 25%, #7D4458 25% 48%, transparent 48% 53%, #8A6A1F 53% 70%, transparent 70% 75%, #A1392C 75% 100%),
+        linear-gradient(90deg, #3F5D43 0 20%, transparent 20% 25%, #3F5D43 25% 48%, transparent 48% 53%, #8A6A1F 53% 70%, transparent 70% 75%, #A1392C 75% 100%),
         linear-gradient(180deg, transparent 0 18%, rgba(43, 40, 35, 0.09) 18% 19%, transparent 19% 38%, rgba(43, 40, 35, 0.09) 38% 39%, transparent 39% 58%, rgba(43, 40, 35, 0.09) 58% 59%, transparent 59% 78%, rgba(43, 40, 35, 0.09) 78% 79%, transparent 79%);
       opacity: 0.9;
       box-shadow:
         -180px -6px 0 -68px rgba(43, 40, 35, 0.12),
         0 -58px 0 -45px rgba(43, 40, 35, 0.95),
-        0 118px 0 -96px rgba(125, 68, 88, 0.18);
+        0 118px 0 -96px rgba(63, 93, 67, 0.18);
     }
     body[data-route-kind="marketing"] .landing-canvas section:has([data-alt*="dashboard"]) [data-alt*="dashboard"] {
       display: none !important;
     }
     body[data-route-kind="marketing"] .landing-canvas section.bg-primary-container {
       color: #ffffff !important;
-      background: linear-gradient(135deg, #7D4458 0%, #7D4458 100%) !important;
+      background: linear-gradient(135deg, #3F5D43 0%, #3F5D43 100%) !important;
     }
     body[data-route-kind="marketing"] .landing-canvas section.bg-primary-container :is(h1, h2, h3) {
       color: #ffffff !important;
@@ -3512,7 +3512,7 @@
       overflow: hidden;
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 249, 248, 0.92)),
-        linear-gradient(135deg, rgba(43, 40, 35, 0.08), rgba(125, 68, 88, 0.12)) !important;
+        linear-gradient(135deg, rgba(43, 40, 35, 0.08), rgba(63, 93, 67, 0.12)) !important;
     }
     body[data-route-kind="marketing"] .landing-canvas [data-alt*="dashboard"]::before {
       content: "";
@@ -3540,12 +3540,12 @@
       height: 52%;
       border-radius: 8px;
       background:
-        linear-gradient(90deg, #7D4458 0 22%, transparent 22% 26%, #7D4458 26% 48%, transparent 48% 52%, #8A6A1F 52% 70%, transparent 70% 74%, #A1392C 74% 100%),
+        linear-gradient(90deg, #3F5D43 0 22%, transparent 22% 26%, #3F5D43 26% 48%, transparent 48% 52%, #8A6A1F 52% 70%, transparent 70% 74%, #A1392C 74% 100%),
         linear-gradient(180deg, transparent 0 18%, rgba(43, 40, 35, 0.08) 18% 19%, transparent 19% 38%, rgba(43, 40, 35, 0.08) 38% 39%, transparent 39% 58%, rgba(43, 40, 35, 0.08) 58% 59%, transparent 59% 78%, rgba(43, 40, 35, 0.08) 78% 79%, transparent 79%);
       opacity: 0.82;
       box-shadow:
         0 -44px 0 -34px rgba(43, 40, 35, 0.92),
-        0 112px 0 -96px rgba(125, 68, 88, 0.16);
+        0 112px 0 -96px rgba(63, 93, 67, 0.16);
     }
     body[data-route-kind="marketing"] .landing-canvas .h-\[600px\] {
       height: 500px !important;
@@ -4582,7 +4582,7 @@ body:not([data-route-kind="app"]) .bottom-nav {
 }
 .bottom-nav-item.active,
 .bottom-nav-item:active {
-  color: #7D4458;
+  color: #3F5D43;
 }
 .bottom-nav-item .material-symbols-outlined {
   font-size: 22px;
@@ -4699,11 +4699,11 @@ body[data-route-kind="app"] .workspace-surface {
   min-height: 44px;
 }
 .workspace-surface .rounded-full.bg-primary.text-primary {
-  background: #7D4458 !important;
+  background: #3F5D43 !important;
   color: #ffffff !important;
 }
 .workspace-surface tbody tr:nth-child(4n+1) .rounded-full.bg-primary {
-  background: #7D4458 !important;
+  background: #3F5D43 !important;
 }
 .workspace-surface tbody tr:nth-child(4n+2) .rounded-full.bg-primary,
 .workspace-surface tbody tr:nth-child(4n+2) .rounded-full.bg-surface-dim {
@@ -4716,7 +4716,7 @@ body[data-route-kind="app"] .workspace-surface {
   color: #ffffff !important;
 }
 .workspace-surface tbody tr:nth-child(4n+4) .rounded-full.bg-primary {
-  background: #5F3444 !important;
+  background: #2E4530 !important;
   color: #ffffff !important;
 }
 .workspace-surface [class*="px-1.5"][class*="text-[10px]"],
@@ -4736,7 +4736,7 @@ body[data-route-kind="app"] .workspace-surface {
   text-decoration: none;
 }
 .workspace-surface a.text-primary:not([class*="bg-"]):hover {
-  color: #5F3444 !important;
+  color: #2E4530 !important;
   text-decoration: underline;
 }
 body[data-route-kind="auth"] .landing-nav,
@@ -4797,7 +4797,7 @@ body[data-route-kind="auth"]::before {
   gap: 6px;
   padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(125, 68, 88, 0.88);
+  background: rgba(63, 93, 67, 0.88);
   color: #E3DACD;
   font-size: 11px;
   box-shadow: 0 4px 16px rgba(43, 40, 35, 0.24);
@@ -5292,7 +5292,7 @@ body[data-route-kind="auth"] .login-left {
     radial-gradient(ellipse 70% 60% at 100% 0%, rgba(255, 255, 255, 0.14), transparent 60%),
     radial-gradient(ellipse 60% 55% at 0% 100%, rgba(0, 0, 0, 0.18), transparent 62%),
     var(--ro-atmosphere-noise),
-    linear-gradient(155deg, #8F5870 0%, #7D4458 45%, #4A2C39 100%) !important;
+    linear-gradient(155deg, #527357 0%, #3F5D43 45%, #26391F 100%) !important;
   background-repeat: no-repeat, no-repeat, repeat, no-repeat !important;
   background-size: 100% 100%, 100% 100%, 180px 180px, 100% 100% !important;
   box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.1) !important;
@@ -5348,8 +5348,8 @@ body[data-route-kind="auth"] input[name="code"] {
 body[data-route-kind="auth"] input:focus,
 body[data-route-kind="auth"] input:focus-visible {
   outline: none !important;
-  border-color: #7D4458 !important;
-  box-shadow: 0 0 0 3px rgba(125, 68, 88, 0.15) !important;
+  border-color: #3F5D43 !important;
+  box-shadow: 0 0 0 3px rgba(63, 93, 67, 0.15) !important;
 }
 
 /* Buttons: hover/active lift, consistent radius across every auth page */
@@ -5359,13 +5359,13 @@ body[data-route-kind="auth"] #mfa-confirm {
   border-radius: 9px !important;
   min-height: 44px !important;
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
-  box-shadow: 0 4px 12px -4px rgba(125, 68, 88, 0.4);
+  box-shadow: 0 4px 12px -4px rgba(63, 93, 67, 0.4);
 }
 body[data-route-kind="auth"] button[type="submit"]:hover:not(:disabled),
 body[data-route-kind="auth"] #mfa-begin:hover,
 body[data-route-kind="auth"] #mfa-confirm:hover {
-  background: #5F3444 !important;
-  box-shadow: 0 8px 20px -6px rgba(125, 68, 88, 0.5);
+  background: #2E4530 !important;
+  box-shadow: 0 8px 20px -6px rgba(63, 93, 67, 0.5);
   transform: translateY(-1px);
 }
 body[data-route-kind="auth"] button[type="submit"]:active:not(:disabled),
@@ -5388,7 +5388,7 @@ body[data-route-kind="auth"] details summary {
   transition: color 120ms ease;
 }
 body[data-route-kind="auth"] details summary:hover {
-  color: #7D4458 !important;
+  color: #3F5D43 !important;
 }
 
 /* Desktop-only compaction: the 44px input/button height above (set for a
