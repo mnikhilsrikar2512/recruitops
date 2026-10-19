@@ -132,6 +132,16 @@ safe to re-run. Most are SQL, applied with `sqlcmd -i` in order:
   allowed. Safe to run against an existing database: a composite index is
   always satisfied by data that already passed the single-column one, so
   no cleanup is needed first.
+- `010_widen_lifecycle_check_constraints.sql` — widens three CHECK
+  constraints to allow values the app already writes but that were never
+  added when the feature shipped: `CK_password_reset_tokens_purpose` now
+  also allows `signup-verify` (self-serve signup email verification,
+  Phase 5.2), `CK_candidate_stage_history_source_type` now also allows
+  `stage-list-change` (a client stage-list remap, Phase 4.10-4.13), and
+  `CK_candidates_status` now also allows `erased` (privacy erase
+  fulfillment, Phase 5.3). Idempotent — drops and re-adds each constraint
+  unconditionally, then verifies the new value is present in the stored
+  definition.
 
 Note: `005_create_approvals_table.sql`, `006_create_agent_runs_table.sql`,
 and `007_grant_ai_permissions.sql` are referenced above but are not

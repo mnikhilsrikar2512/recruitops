@@ -75,7 +75,7 @@ CREATE TABLE locations (
 	tenant_id BIGINT NOT NULL, 
 	CONSTRAINT [PK__location__3213E83F5740DBDD] PRIMARY KEY CLUSTERED (id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_locations_code] ON locations (code);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_locations_tenant_code] ON locations (tenant_id, code);
 
 CREATE TABLE master_data_categories (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -386,7 +386,7 @@ CREATE TABLE branches (
 	CONSTRAINT [PK__branches__3213E83FE00A9463] PRIMARY KEY CLUSTERED (id)
 );
 CREATE NONCLUSTERED INDEX [IX_branches_tenant] ON branches (tenant_id);
-CREATE UNIQUE NONCLUSTERED INDEX [UQ_branches_code] ON branches (code);
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_branches_tenant_code] ON branches (tenant_id, code);
 
 CREATE TABLE clients (
 	id BIGINT NOT NULL IDENTITY(1,1), 
@@ -1718,6 +1718,7 @@ ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [CK_user_invitations_deliver
 ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [CK_user_invitations_setup_method] CHECK ([credential_setup_method]=N'setup-link' OR [credential_setup_method]=N'system-generated-password' OR [credential_setup_method]=N'temporary-password');
 ALTER TABLE [dbo].[user_invitations] ADD CONSTRAINT [CK_user_invitations_status] CHECK ([invite_status]=N'cancelled' OR [invite_status]=N'expired' OR [invite_status]=N'accepted' OR [invite_status]=N'sent' OR [invite_status]=N'draft');
 ALTER TABLE [dbo].[user_location_roles] ADD CONSTRAINT [CK_user_location_roles_status] CHECK ([status]=N'ended' OR [status]=N'inactive' OR [status]=N'active');
+ALTER TABLE [dbo].[users] ADD CONSTRAINT [CK_users_hierarchy_level] CHECK ([hierarchy_level]=N'L5' OR [hierarchy_level]=N'L4' OR [hierarchy_level]=N'L3' OR [hierarchy_level]=N'L2' OR [hierarchy_level]=N'L1');
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [CK_users_password_setup_status] CHECK ([password_setup_status]=N'pending-setup' OR [password_setup_status]=N'active' OR [password_setup_status]=N'setup-complete' OR [password_setup_status]=N'reset-required' OR [password_setup_status]=N'invited');
 ALTER TABLE [dbo].[users] ADD CONSTRAINT [CK_users_status] CHECK ([status]=N'pending' OR [status]=N'suspended' OR [status]=N'inactive' OR [status]=N'active');
 ALTER TABLE [dbo].[workflow_action_events] ADD CONSTRAINT [CK_workflow_action_events_payload] CHECK ([payload_json] IS NULL OR isjson([payload_json])=(1));
