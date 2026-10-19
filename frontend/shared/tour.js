@@ -141,6 +141,122 @@
         { selector: "#company-stage-list", title: "Your company's default hiring stages",
           body: "Used for internal hiring and any client that hasn't set its own list. Each client can override this from their own page." }
       ]
+    },
+    "client-directory": {
+      label: "Clients",
+      steps: [
+        { text: "Add Client", title: "Add a client",
+          body: "A short form for the company's name, location, and primary contact. New clients start out on your company's default hiring stages." },
+        { selector: "table", title: "Every account in one place",
+          body: "Owner, industry, and status at a glance. Open any row for that client's requisitions, contacts, and commercial terms." },
+        { selector: "[title=\"New Requisition\"]", title: "Raise a req without leaving the list",
+          body: "Hover any row to start a new requisition for that client directly from here." }
+      ]
+    },
+    "offer-management": {
+      label: "Offers",
+      steps: [
+        { text: "Create Offer", title: "Send a new offer",
+          body: "Captures compensation and routes it for a second approval automatically when it's above your company's threshold." },
+        { selector: "table", title: "Track every offer's status",
+          body: "Draft, Pending Approval, Sent, Accepted, or Declined, with the date each one moved, so nothing sits unanswered." },
+        { text: "Export List", title: "Export what you're viewing",
+          body: "Pulls whichever offers are currently showing, respecting any filters you've applied." }
+      ]
+    },
+    "interview-scheduler": {
+      label: "Interviews",
+      steps: [
+        { selector: "h1", title: "Where every interview lives",
+          body: "Every scheduled round for your requisitions appears here, updated the moment someone logs feedback." },
+        { selector: "[data-interview-list]", title: "Status and feedback, inline",
+          body: "Completed, upcoming, or awaiting feedback — each round shows its outcome without opening a separate page." }
+      ]
+    },
+    "daily-review": {
+      label: "Daily Review",
+      steps: [
+        { selector: "[data-route=\"daily-updates-submission.html\"]", title: "Submit today's update",
+          body: "Opens the daily update form — what got done today, any blockers, and what's next." },
+        { text: "View All", title: "Every follow-up, not just today's",
+          body: "Jumps to the full Follow-Ups list, so nothing scheduled for later quietly slips past." }
+      ]
+    },
+    "daily-updates-submission": {
+      label: "Submit Update",
+      steps: [
+        { selector: "#update-summary", title: "Today's summary",
+          body: "A short narrative of what happened today — accomplishments, pipeline health, and anything that needs context." },
+        { selector: "[data-route-submit=\"true\"]", title: "Submit when ready",
+          body: "Save Draft keeps it private until you're ready. Submit Update sends it straight to your manager's review queue." }
+      ]
+    },
+    "follow-ups": {
+      label: "Follow-Ups",
+      steps: [
+        { selector: "[data-route=\"follow-up-form-dialog.html\"]", title: "Log a follow-up",
+          body: "Set a reminder — send an assessment, check in with a client, anything that can't be forgotten — with a due date and an owner." },
+        { selector: "table", title: "Nothing falls through",
+          body: "Overdue items are flagged automatically, so a forgotten follow-up never quietly disappears." }
+      ]
+    },
+    "audit-log-viewer": {
+      label: "Audit Log",
+      steps: [
+        { selector: "#audit-filters", title: "Narrow it down",
+          body: "Filter by date, action type, or who did it — handy when you're tracing one specific change." },
+        { selector: "table", title: "Every change, who made it, and when",
+          body: "Click Details on any row for the full before-and-after of that action." }
+      ]
+    },
+    "data-export-delete-request": {
+      label: "Data Export & Delete Requests",
+      steps: [
+        { selector: "#privacy-export", title: "Export your data",
+          body: "Requests a full export of your company's data. It's prepared in the background and you'll get a link once it's ready." },
+        { text: "Request deletion", title: "Request deletion",
+          body: "Starts the process to permanently delete your company's data. If other admins exist, they're notified before it goes any further." }
+      ]
+    },
+    "portal-accounts": {
+      label: "Portal Accounts",
+      steps: [
+        { selector: "table", title: "Shared sourcing logins, tracked",
+          body: "Each shared job-board account shows who owns it, which branch it's tied to, and how much it's been used today." },
+        { selector: "#portal-add-btn", title: "Add a shared account",
+          body: "Only shown if you can manage portal accounts — set the platform, login, and who owns it." },
+        { selector: "[data-slot-account]", title: "Book a usage slot",
+          body: "Reserve a time window on a shared account, so two people don't log in and lock each other out." }
+      ]
+    },
+    "stage-bucket-map": {
+      label: "Hiring Stages",
+      steps: [
+        { selector: "#company-stage-list", title: "Your company's default stages",
+          body: "Add, rename, or reorder stages here — any client without its own list uses this one." },
+        { selector: "table", title: "Keep reports accurate",
+          body: "Every stage counts toward one reporting bucket. A stage with no match is flagged here so it never throws off Time to Fill or Placements." }
+      ]
+    },
+    "work-assignment": {
+      label: "Work Assignment",
+      steps: [
+        { text: "Assign Member", title: "Add someone to a req",
+          body: "Pick from your available team — their role here (Owner, Reviewer, Coordinator…) decides what they're responsible for on this requisition." },
+        { selector: "select", title: "Switch requisitions",
+          body: "Everything below reflects whichever requisition is selected here." }
+      ]
+    },
+    "my-profile": {
+      label: "My Profile",
+      steps: [
+        { selector: "#profile-details-form", title: "Your details",
+          body: "Name, contact info, and how you appear to teammates across the app." },
+        { selector: "#profile-password-form", title: "Change your password",
+          body: "Update it any time — you'll need your current password to confirm." },
+        { selector: "a[href=\"mfa-enroll.html\"]", title: "Turn on two-factor",
+          body: "Adds a second step at login for extra protection on your account." }
+      ]
     }
   };
 
