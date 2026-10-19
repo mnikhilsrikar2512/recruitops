@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Sign In — RecruitOps</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../shared/global.css?v=c5c3199dae" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=c5c3199dae" />
-  <link rel="stylesheet" href="../shared/landing.css?v=c5c3199dae" />
+  <link rel="stylesheet" href="../shared/global.css?v=e901852af1" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=e901852af1" />
+  <link rel="stylesheet" href="../shared/landing.css?v=e901852af1" />
   <style>
     .login-split { display:flex; min-height:100vh; }
     .login-left { flex:1; background:#3F5D43; display:flex; flex-direction:column; justify-content:center; padding:48px; position:relative; overflow:hidden; }
@@ -15,8 +15,8 @@
     .login-back-home:hover { color:#3F5D43; }
     @media(max-width:1024px){ .login-left{display:none;} }
   </style>
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=c5c3199dae" />
-  <link rel="stylesheet" href="../shared/tailwind.css?v=c5c3199dae" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=e901852af1" />
+  <link rel="stylesheet" href="../shared/tailwind.css?v=e901852af1" />
 </head>
 <body data-route-id="login" data-route-kind="auth" data-route-title="Sign In" data-route-section="Authentication">
   <main>
@@ -83,22 +83,22 @@
               <a href="legal.html?doc=tos" style="font-size:13px;color:#726F66;text-decoration:none;margin-right:auto">Terms</a><a href="legal.html?doc=privacy" style="font-size:13px;color:#726F66;text-decoration:none;margin-right:16px">Privacy</a><a href="support-workspace.html" style="font-size:13px;color:#726F66;text-decoration:none">Need help?</a>
             </div>
           </div>
-          <div class="flex items-center justify-center gap-2 mt-6" style="color:#726F66;font-size:13px">
-            <span class="w-2 h-2 rounded-full" style="background:#3F5D43"></span> All systems operational
+          <div class="flex items-center justify-center gap-2 mt-6" style="color:#726F66;font-size:13px" id="systemStatus">
+            <span class="w-2 h-2 rounded-full" style="background:#C9C4B8" id="systemStatusDot"></span> <span id="systemStatusText">Checking status&hellip;</span>
           </div>
           <p class="text-center mt-6" style="font-size:13px;color:#726F66">Don't have an account? <a href="signup.html" style="color:#3F5D43;font-weight:600;text-decoration:none">Sign up</a></p>
         </div>
       </div>
     </div>
   </main>
-  <script src="../shared/renderers.js?v=c5c3199dae"></script>
-  <script src="../shared/api-client.js?v=c5c3199dae"></script>
-    <script src="../shared/ui-utils.js?v=c5c3199dae"></script>
-    <script src="../shared/tables.js?v=c5c3199dae"></script>
-    <script src="../shared/forms.js?v=c5c3199dae"></script>
-    <script src="../shared/sidebar.js?v=c5c3199dae"></script>
-    <script src="../shared/pipeline.js?v=c5c3199dae"></script>
-    <script src="../shared/routing.js?v=c5c3199dae"></script>
+  <script src="../shared/renderers.js?v=e901852af1"></script>
+  <script src="../shared/api-client.js?v=e901852af1"></script>
+    <script src="../shared/ui-utils.js?v=e901852af1"></script>
+    <script src="../shared/tables.js?v=e901852af1"></script>
+    <script src="../shared/forms.js?v=e901852af1"></script>
+    <script src="../shared/sidebar.js?v=e901852af1"></script>
+    <script src="../shared/pipeline.js?v=e901852af1"></script>
+    <script src="../shared/routing.js?v=e901852af1"></script>
 
   <script>
     (function () {
@@ -111,6 +111,21 @@
       }
     })();
   </script>
-  <script src="../shared/app.js?v=c5c3199dae"></script>
+  <script src="../shared/app.js?v=e901852af1"></script>
+  <script>
+  (function () {
+    /* Real /health check instead of a hardcoded "All systems operational" claim. */
+    var dot = document.getElementById("systemStatusDot");
+    var text = document.getElementById("systemStatusText");
+    if (!dot || !text || typeof apiRequest !== "function") return;
+    apiRequest("/health").then(function () {
+      dot.style.background = "#3F5D43";
+      text.textContent = "All systems operational";
+    }).catch(function () {
+      dot.style.background = "#B04A3A";
+      text.textContent = "Having trouble reaching our servers";
+    });
+  })();
+  </script>
 </body>
 </html>
