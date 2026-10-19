@@ -4,16 +4,25 @@ Usage:
     .venv/bin/python scripts/dump_schema.py
 
 Reads connection settings from backend/.env, reflects all tables in the
-configured database, and writes the DDL in two passes so circular foreign-key
-dependencies (e.g. locations <-> roles <-> users) cannot break replay:
+configured database, and writes the DDL in three passes so circular
+foreign-key dependencies (e.g. locations <-> roles <-> users) cannot break
+replay:
 
   pass 1 — every CREATE TABLE (foreign keys omitted)
   pass 2 — every ALTER TABLE ... ADD CONSTRAINT for the foreign keys
+  pass 3 — every ALTER TABLE ... ADD CONSTRAINT for CHECK constraints
+
+Pass 3 exists because SQLAlchemy's table reflection does not surface CHECK
+constraints on SQL Server -- without it, a CHECK constraint added directly
+against a live database (instead of through this dump + a committed
+migration) is invisible here and can silently drift from what the
+application code actually writes (see scripts/README.md's migrations
+section for how a drift like that should be caught and fixed instead).
 """
 
 from pathlib import Path
 
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.schema import CreateIndex, CreateTable, ForeignKeyConstraint
 
 import sys
@@ -83,9 +92,31 @@ def main() -> None:
             fk_count += 1
     lines.append("")
 
+    lines.append("-- Pass 3: CHECK constraints (not reflected by SQLAlchemy on SQL Server,")
+    lines.append("-- so read directly from sys.check_constraints; sorted by name for stable diffs)")
+    lines.append("")
+    with engine.connect() as connection:
+        check_rows = connection.execute(
+            text(
+                """
+                SELECT cc.name AS constraint_name, t.name AS table_name, cc.definition AS definition
+                FROM sys.check_constraints AS cc
+                JOIN sys.tables AS t ON t.object_id = cc.parent_object_id
+                ORDER BY cc.name
+                """
+            )
+        ).fetchall()
+    for row in check_rows:
+        lines.append(
+            f"ALTER TABLE [dbo].[{row.table_name}] ADD CONSTRAINT [{row.constraint_name}] "
+            f"CHECK {row.definition};"
+        )
+    lines.append("")
+
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Wrote {len(tables)} tables and {fk_count} foreign keys to {OUTPUT}")
+    print(f"Wrote {len(tables)} tables, {fk_count} foreign keys, and {len(check_rows)} "
+          f"check constraints to {OUTPUT}")
 
 
 if __name__ == "__main__":

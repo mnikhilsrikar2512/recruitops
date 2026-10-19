@@ -6,10 +6,13 @@ portal accounts, work assignment. It does not run recruiting; an admin who
 also recruits holds an execution role in addition.
 
 The Admin system role (roles.tenant_id IS NULL, code 'admin') holds exactly
-ADMIN_PERMISSION_CODES. scripts/011_admin_seed.sql writes the same list into
-the database; tests/test_admin_seed.py keeps the two in step. Nothing in the
-API checks the role code: admins pass routes through these grants like every
-other user (plan 2.5).
+ADMIN_PERMISSION_CODES. scripts/seed_ci.py writes the same list into the
+database (looping over this constant directly, so it can't drift from it);
+tests/test_admin_seed.py keeps the two in step. A database seeded before a
+code was added to this tuple needs scripts/seed_ci.py re-run to backfill the
+role_permissions rows -- it's idempotent, safe to run against an existing
+database. Nothing in the API checks the role code: admins pass routes
+through these grants like every other user (plan 2.5).
 """
 
 from __future__ import annotations

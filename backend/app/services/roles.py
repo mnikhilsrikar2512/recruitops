@@ -121,7 +121,7 @@ def assign_role_permissions_service(
         )
 
     # The Admin template is fixed by decision D-03 (app/core/rbac.py,
-    # scripts/011_admin_seed.sql); changing it is a migration, not an API call.
+    # scripts/seed_ci.py); changing it is a migration, not an API call.
     if existing.code == "admin" and set(payload.permission_codes) != set(ADMIN_PERMISSION_CODES):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
