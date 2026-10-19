@@ -28,8 +28,19 @@ def test_production_accepts_exact_https_origins():
     config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
                        JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0",
                        RATE_LIMIT_ENABLED=True,  # explicit: the verify script exports it false
-                       STORAGE_BACKEND="s3", S3_BUCKET="recruitops-files", MALWARE_SCANNER="clamav")
+                       STORAGE_BACKEND="s3", S3_BUCKET="recruitops-files", MALWARE_SCANNER="clamav",
+                       TRUSTED_PROXY_COUNT=1)
     assert validate_settings(config) == []
+
+
+def test_production_refuses_untrusted_forwarded_headers():
+    """Without a declared trusted-proxy hop count, X-Forwarded-For/-Proto
+    must never be trusted (app/core/net.py) -- staging/production must say
+    explicitly how many of our own proxies sit in front of the app."""
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
+                       JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0", RATE_LIMIT_ENABLED=True,
+                       STORAGE_BACKEND="s3", S3_BUCKET="recruitops-files", MALWARE_SCANNER="clamav")
+    assert any("TRUSTED_PROXY_COUNT" in error for error in validate_settings(config))
 
 
 def test_production_requires_a_real_jwt_signing_key():

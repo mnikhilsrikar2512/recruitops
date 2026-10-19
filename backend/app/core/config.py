@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = Field(default=15, alias="LOGIN_LOCKOUT_MINUTES")
     rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
     security_headers_enabled: bool = Field(default=True, alias="SECURITY_HEADERS_ENABLED")
+    # How many reverse proxies (our own load balancer, etc.) sit in front of
+    # this app and are trusted to set X-Forwarded-For / X-Forwarded-Proto.
+    # 0 (default/development) = never trust those headers, use the direct
+    # TCP peer instead -- a client can otherwise set X-Forwarded-For itself
+    # and forge the IP used for rate limiting, audit logs, and the HTTPS
+    # redirect. Set to the real hop count (usually 1) in staging/production.
+    # See app/core/net.py.
+    trusted_proxy_count: int = Field(default=0, alias="TRUSTED_PROXY_COUNT")
     # D-09: admins must enrol MFA. None = on in staging/production, off in dev.
     mfa_enforce_admin_enrollment_setting: bool | None = Field(default=None, alias="MFA_ENFORCE_ADMIN_ENROLLMENT")
 
@@ -147,6 +155,12 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("S3_BUCKET must be set when STORAGE_BACKEND=s3")
     if config.malware_scanner.strip().lower() != "clamav":
         errors.append("MALWARE_SCANNER must be clamav in staging/production (builtin only detects the EICAR test file)")
+    if config.trusted_proxy_count < 1:
+        errors.append(
+            "TRUSTED_PROXY_COUNT must be >= 1 in staging/production (TLS terminates at the load "
+            "balancer, so X-Forwarded-For/X-Forwarded-Proto must be explicitly trusted for exactly "
+            "that many hops, never trusted blindly)"
+        )
     return errors
 
 

@@ -15,6 +15,7 @@ import time
 
 from fastapi import HTTPException, Request, status
 
+from app.core import net
 from app.core.config import settings
 
 RULES: dict[str, int] = {
@@ -88,10 +89,10 @@ def reset_rate_limits() -> None:
 
 
 def client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip() or "unknown"
-    return request.client.host if request.client else "unknown"
+    """The caller's real IP (see app.core.net) -- never trusted blindly
+    from a client-supplied header. Falls back to "unknown" only when
+    there's truly no peer to report (e.g. a fully mocked request)."""
+    return net.client_ip(request) or "unknown"
 
 
 def enforce(rule: str, subject: str | None) -> None:
