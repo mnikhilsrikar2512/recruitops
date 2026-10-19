@@ -23,9 +23,13 @@
    than a hardcoded hex. */
 .hero-flow {
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  opacity: .62;
-  mask-image: radial-gradient(ellipse 58% 44% at 50% 42%, transparent 0%, transparent 28%, black 76%);
-  -webkit-mask-image: radial-gradient(ellipse 58% 44% at 50% 42%, transparent 0%, transparent 28%, black 76%);
+  opacity: .4;
+  /* Dead zone widened (was 28%→76%) so the pipeline motion stays in the
+     hero's true margins and never competes with the headline/paragraph
+     for attention — it reads as ambient texture, not a second thing to
+     read. */
+  mask-image: radial-gradient(ellipse 58% 44% at 50% 42%, transparent 0%, transparent 58%, black 94%);
+  -webkit-mask-image: radial-gradient(ellipse 58% 44% at 50% 42%, transparent 0%, transparent 58%, black 94%);
 }
 .hero-flow svg { width: 100%; height: 100%; display: block; }
 .hero-flow-line {
@@ -39,8 +43,11 @@
   animation: heroFlowPulse 3.2s ease-out infinite;
 }
 .hero-flow-label {
-  font-size: 15px; fill: var(--mk-primary); text-anchor: middle;
-  opacity: .55; font-weight: 600;
+  /* The stage names (Sourced/Screening/...) read as clutter floating
+     behind the headline at most viewport widths — the pipeline board
+     mock further down the page already spells them out. Keep the nodes,
+     pulses and traveling particles as pure ambient motion; drop the text. */
+  display: none;
 }
 .hero-flow-particle {
   fill: #fff; stroke: var(--mk-primary); stroke-width: 1.5;

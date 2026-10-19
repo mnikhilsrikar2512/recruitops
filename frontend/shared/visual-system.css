@@ -295,7 +295,7 @@ body[data-route-kind="marketing"]::before {
     radial-gradient(ellipse 85% 75% at 50% 40%, transparent 46%, rgba(63, 93, 67, 0.08) 100%),
     radial-gradient(circle at 86% 6%, transparent 108px, rgba(63, 93, 67, 0.08) 110px, rgba(63, 93, 67, 0.08) 176px, transparent 178px),
     radial-gradient(circle at 8% 96%, transparent 86px, rgba(63, 93, 67, 0.055) 88px, rgba(63, 93, 67, 0.055) 142px, transparent 144px),
-    radial-gradient(circle, rgba(63, 93, 67, 0.16) 1.15px, transparent 1.5px),
+    radial-gradient(circle, rgba(63, 93, 67, var(--ro-mesh-dot-alpha, 0.16)) 1.15px, transparent 1.5px),
     var(--ro-atmosphere-noise),
     linear-gradient(165deg, #f8f8f6 0%, #EFE6DA 38%, #e8ebe6 72%, #f4f4f1 100%);
   background-repeat:
@@ -326,6 +326,10 @@ body[data-route-kind="marketing"]::before {
 }
 
 body[data-route-kind="marketing"] {
+  /* Softens the mesh's fine dot layer for the full-width marketing
+     hero/pages — at that scale it read as a literal dot grid rather than
+     the subtle material texture it is on the smaller login panel. */
+  --ro-mesh-dot-alpha: 0.04;
   background-color: #F0ECE4 !important;
   background-image: none !important;
   background-attachment: scroll !important;

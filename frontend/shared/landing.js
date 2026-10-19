@@ -213,23 +213,16 @@
     updateHeadingParallax();
   }
 
-  /* ═══ MOUSE PARALLAX ON HERO ORBS ═══ */
+  /* ═══ HERO ORBS: calm ambient float only ═══
+     Used to also drag each orb toward the cursor on mousemove (up to
+     ±42px in any direction) — that's what made the hero background feel
+     like it was being dragged around. Removed entirely; the orbs now
+     only do the gentle CSS keyframe bob (float-slow/float-medium,
+     vertical only, already applied via class in markup) plus a slow
+     opacity breathe, both declared in landing.css. */
   const hero = document.querySelector(".landing-hero");
   if (hero && !reduceMotion) {
-    const orbs = hero.querySelectorAll(".orb");
-    orbs.forEach((orb) => orb.classList.add("parallax-orb"));
-    hero.addEventListener("mousemove", (e) => {
-      const rect = hero.getBoundingClientRect();
-      const nx = (e.clientX - rect.left) / rect.width - 0.5;
-      const ny = (e.clientY - rect.top) / rect.height - 0.5;
-      orbs.forEach((orb, i) => {
-        const depth = (i + 1) * 14;
-        orb.style.transform = `translate(${(-nx * depth).toFixed(1)}px, ${(-ny * depth).toFixed(1)}px)`;
-      });
-    });
-    hero.addEventListener("mouseleave", () => {
-      orbs.forEach((orb) => (orb.style.transform = ""));
-    });
+    hero.querySelectorAll(".orb").forEach((orb) => orb.classList.add("orb-breathe"));
   }
 
   /* ═══ 3D TILT ON PRODUCT PREVIEW ═══ */

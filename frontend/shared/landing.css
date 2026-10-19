@@ -153,24 +153,19 @@ html, body {
 .landing-hero { position: relative; overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100dvh - 64px); }
 .landing-hero-bg { position: absolute; inset: 0; }
 
-/* ── Hero layered background: dot grid + mesh glow + conic sweep ── */
+/* ── Hero layered background: a slow, calm glow instead of a dot grid.
+   The mesh already painted on body[data-route-kind="marketing"]::before
+   (visual-system.css) supplies the texture and brand-color blobs; this
+   layer used to add a second, competing dot pattern plus a diagonal
+   shimmer sweep. Replaced with one soft radial glow that breathes very
+   slowly in place — ambient, not distracting, nothing moves sideways. ── */
 .hero-grid {
   position: absolute; inset: 0; pointer-events: none; z-index: 1;
-  background-image: radial-gradient(circle, rgba(63, 93, 67,0.2) 1.2px, transparent 1.35px);
-  background-size: 24px 24px;
-  mask-image: radial-gradient(ellipse 82% 72% at 50% 36%, black 18%, transparent 82%);
-  -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 36%, black 18%, transparent 82%);
+  background-image: radial-gradient(ellipse 60% 50% at 50% 38%, rgba(63, 93, 67, 0.1), transparent 70%);
+  animation: heroGlowBreathe 9s ease-in-out infinite;
 }
-.hero-grid::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(115deg, transparent 28%, rgba(63, 93, 67,0.1) 46%, rgba(255,255,255,0.28) 54%, transparent 72%);
-  background-size: 220% 220%;
-  animation: heroSweep 11s ease-in-out infinite;
-}
-@keyframes heroSweep { 0%, 100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
-
-/* ── Parallax layer (driven by landing.js) ── */
-.parallax-orb { will-change: transform; transition: transform 0.25s cubic-bezier(0.22,1,0.36,1); }
+.hero-grid::after { content: none; }
+@keyframes heroGlowBreathe { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 
 /* ── 3D tilt product preview ── */
 .tilt-wrap { perspective: 1400px; }
@@ -285,8 +280,8 @@ html, body {
 
 /* ── Reduced motion: disable everything decorative ── */
 @media (prefers-reduced-motion: reduce) {
-  .hero-grid::after, .float-chip, .parallax-orb, .marquee-track { animation: none !important; }
-  .float-slow, .float-medium { animation: none !important; }
+  .hero-grid, .float-chip, .marquee-track { animation: none !important; }
+  .float-slow, .float-medium, .orb-breathe { animation: none !important; }
   .tilt-card, .tilt-card:hover { transform: none !important; }
   .parallax-heading { transform: none !important; will-change: auto; }
   .img-reveal { clip-path: none; transition: none; }
@@ -347,6 +342,10 @@ html, body {
 
 /* ── Floating Orbs ── */
 .orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.42; pointer-events: none; z-index: 1; }
+.orb-breathe { animation: orbBreathe 10s ease-in-out infinite; }
+.orb-breathe:nth-child(2) { animation-duration: 13s; animation-delay: -3s; }
+.orb-breathe:nth-child(3) { animation-duration: 16s; animation-delay: -6s; }
+@keyframes orbBreathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.52; } }
 
 .product-preview-body {
   height: auto;
