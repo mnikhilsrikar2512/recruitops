@@ -5332,12 +5332,7 @@ body[data-route-kind="auth"] .login-right h2 {
 }
 
 /* Inputs: unify sizing + radius across every auth page, add real focus states */
-body[data-route-kind="auth"] input[type="email"],
-body[data-route-kind="auth"] input[type="password"],
-body[data-route-kind="auth"] input[type="text"],
-body[data-route-kind="auth"] input#mfa-code,
-body[data-route-kind="auth"] input#mfa-recovery,
-body[data-route-kind="auth"] input[name="code"] {
+body[data-route-kind="auth"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
   border-radius: 9px !important;
   min-height: 44px !important;
   font-size: 14px !important;
@@ -5400,12 +5395,7 @@ body[data-route-kind="auth"] details summary:hover {
    decides the winner at equal specificity; only takes effect at 768px+,
    so phones keep the full 44px touch target untouched. */
 @media (min-width: 768px) {
-  body[data-route-kind="auth"] input[type="email"],
-  body[data-route-kind="auth"] input[type="password"],
-  body[data-route-kind="auth"] input[type="text"],
-  body[data-route-kind="auth"] input#mfa-code,
-  body[data-route-kind="auth"] input#mfa-recovery,
-  body[data-route-kind="auth"] input[name="code"] {
+  body[data-route-kind="auth"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
     min-height: 34px !important;
     font-size: 13px !important;
     padding-top: 6px !important;

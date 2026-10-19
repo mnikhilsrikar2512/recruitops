@@ -9,13 +9,13 @@
   <meta property="og:description" content="Follow a requisition through RecruitOps in five steps: plan, assign, move, resolve and report." />
   <meta property="og:type" content="website" />
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=2f7e76bef4" />
-  <link rel="stylesheet" href="../shared/global.css?v=2f7e76bef4" />
-  <link rel="stylesheet" href="../shared/design-tokens.css?v=2f7e76bef4" />
-  <link rel="stylesheet" href="../shared/visual-system.css?v=2f7e76bef4" />
-  <link rel="stylesheet" href="../shared/landing.css?v=2f7e76bef4" />
-  <link rel="stylesheet" href="../shared/marketing.css?v=2f7e76bef4" />
-  <link rel="stylesheet" href="../shared/landing-v2.css?v=2f7e76bef4" />
+  <link rel="stylesheet" href="../shared/fonts/fonts.css?v=deb0fa6317" />
+  <link rel="stylesheet" href="../shared/global.css?v=deb0fa6317" />
+  <link rel="stylesheet" href="../shared/design-tokens.css?v=deb0fa6317" />
+  <link rel="stylesheet" href="../shared/visual-system.css?v=deb0fa6317" />
+  <link rel="stylesheet" href="../shared/landing.css?v=deb0fa6317" />
+  <link rel="stylesheet" href="../shared/marketing.css?v=deb0fa6317" />
+  <link rel="stylesheet" href="../shared/landing-v2.css?v=deb0fa6317" />
   <noscript><style>.reveal,.reveal-scale,.reveal-left,.reveal-right,.reveal-pop{opacity:1!important;transform:none!important;}</style></noscript>
 </head>
 <body class="mk" data-route-id="product-tour" data-route-kind="marketing">
@@ -39,7 +39,19 @@
 <div class="mk-halo" aria-hidden="true"></div>
 <div class="tilt-stack-back two" aria-hidden="true"></div>
 <div class="tilt-stack-back" aria-hidden="true"></div>
-<div class="tilt-card"><div class="tilt-glare"></div><div class="mk-window" role="img" aria-label="Illustration of a pipeline board with candidates in stage columns"><div class="mk-window-bar"><i></i><i></i><i></i><b>Requisition &middot; candidates by stage</b></div><div class="mk-window-body"><div class="mk-board"><div class="mk-col"><h5>Sourced</h5><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Screening</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip focus"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Interview</h5><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Offer</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div></div></div></div></div></div>
+<div class="tilt-card"><div class="tilt-glare"></div><div class="mk-tour-slides" id="mkTourSlides" role="img" aria-label="Animated preview cycling through each of the five steps: plan, assign, move, resolve, report">
+
+<div class="mk-tour-slide is-active" data-step="0"><div class="mk-window"><div class="mk-window-bar"><i></i><i></i><i></i><b>Requisition</b></div><div class="mk-window-body"><div class="mk-rows"><div class="mk-row"><div><strong>Role and client</strong><span class="sub">Title, openings, target date</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">check</span>Captured</span></div><div class="mk-row"><div><strong>Pay range</strong><span class="sub">Guides which offers need approval</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">check</span>Set</span></div><div class="mk-row"><div><strong>Hiring stages</strong><span class="sub">The client&rsquo;s own list</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">check</span>Applied</span></div><div class="mk-row"><div><strong>Owner</strong><span class="sub">Primary and delivery owner</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">person</span>Assigned</span></div></div></div></div></div>
+
+<div class="mk-tour-slide" data-step="1"><div class="mk-window"><div class="mk-window-bar"><i></i><i></i><i></i><b>Ownership</b></div><div class="mk-window-body"><div class="mk-rows"><div class="mk-row"><div><strong>Primary owner</strong><span class="sub">Accountable for the role</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">person</span>Owner</span></div><div class="mk-row"><div><strong>Delivery owner</strong><span class="sub">Runs the day-to-day search</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">work</span>Delivery</span></div><div class="mk-row"><div><strong>Team members</strong><span class="sub">Sourcing and screening support</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">group</span>Assigned</span></div><div class="mk-row"><div><strong>Handover</strong><span class="sub">When someone moves on</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">history</span>Recorded</span></div></div></div></div></div>
+
+<div class="mk-tour-slide" data-step="2"><div class="mk-window"><div class="mk-window-bar"><i></i><i></i><i></i><b>Pipeline &middot; moving a candidate</b></div><div class="mk-window-body"><div class="mk-board"><div class="mk-col"><h5>Sourced</h5><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Screening</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip focus"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Interview</h5><div class="mk-chip"><span class="mk-avatar c"></span><span class="mk-lines"><i></i><i></i></span></div><div class="mk-chip"><span class="mk-avatar a"></span><span class="mk-lines"><i></i><i></i></span></div></div><div class="mk-col"><h5>Offer</h5><div class="mk-chip"><span class="mk-avatar b"></span><span class="mk-lines"><i></i><i></i></span></div></div></div></div></div></div>
+
+<div class="mk-tour-slide" data-step="3"><div class="mk-window"><div class="mk-window-bar"><i></i><i></i><i></i><b>Needs a decision</b></div><div class="mk-window-body"><div class="mk-rows"><div class="mk-row"><div><strong>Offer above the limit</strong><span class="sub">Routed to an approver</span></div><span class="mk-pill warn"><span class="material-symbols-outlined" aria-hidden="true">schedule</span>Waiting</span></div><div class="mk-row"><div><strong>Role on hold</strong><span class="sub">Client paused the search</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">pause_circle</span>Frozen</span></div><div class="mk-row"><div><strong>Candidate withdrew</strong><span class="sub">Reason recorded</span></div><span class="mk-pill "><span class="material-symbols-outlined" aria-hidden="true">logout</span>Closed</span></div><div class="mk-row"><div><strong>Role resumed</strong><span class="sub">The clock starts again</span></div><span class="mk-pill ok"><span class="material-symbols-outlined" aria-hidden="true">play_circle</span>Resumed</span></div></div></div></div></div>
+
+<div class="mk-tour-slide" data-step="4"><div class="mk-window"><div class="mk-window-bar"><i></i><i></i><i></i><b>Funnel &middot; this month</b></div><div class="mk-window-body"><div class="mk-bars"><div class="mk-bar"><span>Sourced</span><div><i style="width:92%"></i></div></div><div class="mk-bar"><span>Screening</span><div><i style="width:68%"></i></div></div><div class="mk-bar"><span>Interview</span><div><i style="width:44%"></i></div></div><div class="mk-bar"><span>Offer</span><div><i style="width:22%"></i></div></div><div class="mk-bar"><span>Joined</span><div><i style="width:14%"></i></div></div></div></div></div></div>
+
+</div></div>
 </div></section>
 
 <section class="mk-section tight"><div class="mk-wrap">
@@ -83,6 +95,47 @@
 </div></section>
 
   </main>
-  <script src="../shared/landing.js?v=2f7e76bef4"></script>
+  <script src="../shared/landing.js?v=deb0fa6317"></script>
+  <script>
+  (function () {
+    "use strict";
+    var slides = document.querySelectorAll("#mkTourSlides .mk-tour-slide");
+    var flowSteps = document.querySelectorAll(".mk-flow-step");
+    if (!slides.length) return;
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var DUR = 4200;
+    var idx = 0;
+    var timer = null;
+    var hovered = false;
+
+    function show(i) {
+      idx = i;
+      slides.forEach(function (s, n) { s.classList.toggle("is-active", n === i); });
+      flowSteps.forEach(function (s, n) { s.classList.toggle("is-current", n === i); });
+    }
+    function next() { show((idx + 1) % slides.length); }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    function start() {
+      stop();
+      if (reduceMotion || hovered) return;
+      timer = setInterval(next, DUR);
+    }
+
+    show(0);
+    start();
+
+    var wrap = document.querySelector(".mk-preview .tilt-wrap");
+    if (wrap) {
+      wrap.addEventListener("mouseenter", function () { hovered = true; stop(); });
+      wrap.addEventListener("mouseleave", function () { hovered = false; start(); });
+    }
+    flowSteps.forEach(function (card, n) {
+      card.addEventListener("mouseenter", function () { hovered = true; stop(); show(n); });
+      card.addEventListener("focus", function () { hovered = true; stop(); show(n); });
+      card.addEventListener("mouseleave", function () { hovered = false; start(); });
+      card.addEventListener("blur", function () { hovered = false; start(); });
+    });
+  })();
+  </script>
 </body>
 </html>
