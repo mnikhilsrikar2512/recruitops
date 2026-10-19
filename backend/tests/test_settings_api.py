@@ -18,7 +18,7 @@ from sqlalchemy import text
 
 from app.main import create_application
 
-ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
+ADMIN_EMAIL_CANDIDATES = ["ci.admin@recruitops-test.com", "admin@executiveconnection.com"]
 ADMIN_PASSWORD = "admin123"
 TINY_PNG = (
     "data:image/png;base64,"

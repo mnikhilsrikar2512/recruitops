@@ -142,6 +142,12 @@ safe to re-run. Most are SQL, applied with `sqlcmd -i` in order:
   fulfillment, Phase 5.3). Idempotent — drops and re-adds each constraint
   unconditionally, then verifies the new value is present in the stored
   definition.
+- `011_widen_remaining_lifecycle_check_constraints.sql` — widens two more
+  CHECK constraints that 010 missed: `CK_candidate_stage_history_source_type`
+  now also allows `reopen` (reopening a withdrawn application,
+  `app/repositories/pipeline.py`), and `CK_candidates_resume_parsing_status`
+  now also allows `erased` (privacy erase fulfillment, Phase 5.3,
+  `app/services/candidate_erasure.py`). Idempotent, same pattern as 010.
 
 Note: `005_create_approvals_table.sql`, `006_create_agent_runs_table.sql`,
 and `007_grant_ai_permissions.sql` are referenced above but are not

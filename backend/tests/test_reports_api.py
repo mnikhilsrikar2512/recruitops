@@ -26,7 +26,7 @@ from app.main import create_application
 
 
 # Seed admin candidates: repo dev DB uses the seed user, CI uses the seeded CI admin
-ADMIN_EMAIL_CANDIDATES = ["admin@executiveconnection.com", "ci.admin@recruitops-test.com"]
+ADMIN_EMAIL_CANDIDATES = ["ci.admin@recruitops-test.com", "admin@executiveconnection.com"]
 ADMIN_PASSWORD = "admin123"
 
 
