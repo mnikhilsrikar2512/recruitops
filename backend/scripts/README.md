@@ -124,6 +124,20 @@ safe to re-run. Most are SQL, applied with `sqlcmd -i` in order:
   gated on the new code 403 for an account that's supposed to have full
   access — `scripts/seed_ci.py` only seeds a brand-new database with the
   *current* list; it does not backfill an existing one.
+- `009_scope_office_codes_per_tenant.sql` — converts `UQ_branches_code` and
+  `UQ_locations_code` from a global unique index on `code` alone to a
+  composite unique index on `(tenant_id, code)`. Without this, two
+  different companies could never both use a code like `HO` for their head
+  office — exactly what `tests/test_company_isolation_db.py` expects to be
+  allowed. Safe to run against an existing database: a composite index is
+  always satisfied by data that already passed the single-column one, so
+  no cleanup is needed first.
+
+Note: `005_create_approvals_table.sql`, `006_create_agent_runs_table.sql`,
+and `007_grant_ai_permissions.sql` are referenced above but are not
+actually present in this repo (apply only from `scripts/README.md` history
+if you still have a copy, or treat their tables/grants as already applied
+if your database has them). Don't re-guess and recreate them blind.
 
 `backend/db/schema.sql` stays tables-only by design — permission rows are data
 and belong to `seed_ci.py` / migrations.

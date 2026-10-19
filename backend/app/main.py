@@ -37,7 +37,7 @@ def _stale_write_response(_request: Request, exc: StaleWriteConflict) -> JSONRes
     )
 
 
-def _integrity_error_response(_request: Request, exc: IntegrityError) -> JSONResponse:
+def _integrity_error_response(request: Request, exc: IntegrityError) -> JSONResponse:
     original = str(getattr(exc, "orig", exc)).lower()
     if "unique" in original or "duplicate" in original:
         detail = "A record with the same unique value already exists"
@@ -45,6 +45,13 @@ def _integrity_error_response(_request: Request, exc: IntegrityError) -> JSONRes
         detail = "The request references a missing or protected related record"
     else:
         detail = "The request conflicts with existing data"
+    # The client only ever gets the generic detail above; without this, the
+    # actual constraint that was violated (which table, which column) is
+    # lost entirely -- there was previously no server-side trace of an
+    # IntegrityError at all, unlike its sibling handler below.
+    logging.getLogger("recruitops.db").error(
+        "integrity error on %s %s: %s", request.method, request.url.path, exc, exc_info=exc
+    )
     return error_response(status.HTTP_409_CONFLICT, detail, code="DATA_CONFLICT")
 
 
