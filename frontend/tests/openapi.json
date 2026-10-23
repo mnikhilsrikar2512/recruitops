@@ -12765,6 +12765,41 @@
     "title": "UserDeactivationResponse",
     "type": "object"
    },
+   "UserExtraPermissionsResponse": {
+    "properties": {
+     "permission_codes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Permission Codes",
+      "type": "array"
+     },
+     "user_id": {
+      "title": "User Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "user_id",
+     "permission_codes"
+    ],
+    "title": "UserExtraPermissionsResponse",
+    "type": "object"
+   },
+   "UserExtraPermissionsUpdate": {
+    "description": "Replace-all set of extra permission codes granted directly to a user,\non top of their role. Empty list clears all extra grants.",
+    "properties": {
+     "permission_codes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Permission Codes",
+      "type": "array"
+     }
+    },
+    "title": "UserExtraPermissionsUpdate",
+    "type": "object"
+   },
    "UserListResponse": {
     "properties": {
      "items": {
@@ -23277,6 +23312,112 @@
      }
     ],
     "summary": "Deactivate User Endpoint",
+    "tags": [
+     "users"
+    ]
+   }
+  },
+  "/api/v1/users/{user_id}/extra-permissions": {
+   "get": {
+    "description": "Permission codes granted directly to this user, on top of their role\n(e.g. the read-only Company Overview bundle). See\napp/repositories/auth.py's list_resolved_permissions for how these are\nunioned into what the user can actually do.",
+    "operationId": "get_user_extra_permissions_endpoint_api_v1_users__user_id__extra_permissions_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "user_id",
+      "required": true,
+      "schema": {
+       "minimum": 1,
+       "title": "User Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserExtraPermissionsResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get User Extra Permissions Endpoint",
+    "tags": [
+     "users"
+    ]
+   },
+   "put": {
+    "description": "Replaces this user's extra permission grants with exactly the given\nset (same replace-all semantics as PUT /roles/{role_id}/permissions).\nThe data model holds one role per user per branch -- this is the\nsupported way to give someone reach beyond their role (e.g. an Admin who\nalso wants full read-only day-to-day visibility) without stacking a\nsecond concurrent role.",
+    "operationId": "update_user_extra_permissions_endpoint_api_v1_users__user_id__extra_permissions_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "user_id",
+      "required": true,
+      "schema": {
+       "minimum": 1,
+       "title": "User Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserExtraPermissionsUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserExtraPermissionsResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update User Extra Permissions Endpoint",
     "tags": [
      "users"
     ]
