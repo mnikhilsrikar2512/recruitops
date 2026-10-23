@@ -266,7 +266,23 @@ def list_resolved_permissions(engine: Engine, user_id: int) -> list[str]:
         INNER JOIN dbo.permissions AS p
           ON p.id = rp.permission_id
         WHERE ubr.user_id = :user_id
-        AND ubr.status = N'active';
+        AND ubr.status = N'active'
+
+        UNION
+
+        -- Extra permissions granted directly to the user, on top of their
+        -- role(s) -- e.g. the read-only Company Overview bundle granted to
+        -- an Admin who also wants full day-to-day visibility, without
+        -- needing a second role (the data model only supports one role per
+        -- user per branch today; this is the supported way to add reach
+        -- beyond that role). Purely additive/union, same as every other
+        -- grant here -- see app/api/v1/users.py's extra-permissions routes.
+        SELECT DISTINCT p.code AS permission_code
+        FROM dbo.user_extra_permissions AS uep
+        INNER JOIN dbo.permissions AS p
+          ON p.id = uep.permission_id
+        WHERE uep.user_id = :user_id
+        AND uep.status = N'active';
         """
     )
     with engine.connect() as connection:

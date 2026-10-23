@@ -2136,6 +2136,15 @@ async function loadUsers() {
   });
 }
 
+// Mirrors backend/app/core/rbac.py's COMPANY_OVERVIEW_PERMISSION_CODES exactly --
+// keep both lists in sync if that bundle ever changes.
+const COMPANY_OVERVIEW_PERMISSION_CODES = [
+  "candidate.read", "client.read", "client.contact.read", "requisition.read",
+  "offer.read", "interview.read", "meeting.read", "pipeline.read.summary",
+  "pipeline.read.detail", "pipeline.stage.history.read", "daily_update.read",
+  "workflow_action.read", "assignment.read", "portal.read",
+];
+
 async function loadUserDetail() {
   let user;
   try {
@@ -2175,6 +2184,56 @@ async function loadUserDetail() {
       deactivate.classList.remove("hidden");
     }
   }
+  if (hasPermission("role.permissions.assign")) {
+    await loadUserExtraPermissionsCard(user.id);
+  }
+}
+
+async function loadUserExtraPermissionsCard(userId) {
+  const card = document.querySelector("[data-extra-permissions-card]");
+  const toggle = document.querySelector("[data-extra-permissions-toggle]");
+  if (!card || !toggle) return;
+  card.classList.remove("hidden");
+
+  let current;
+  try {
+    current = await apiRequest(`/users/${userId}/extra-permissions`);
+  } catch (err) {
+    card.classList.add("hidden");
+    return;
+  }
+  const currentCodes = new Set(current.permission_codes || []);
+  toggle.checked = COMPANY_OVERVIEW_PERMISSION_CODES.every((code) => currentCodes.has(code));
+
+  if (toggle.dataset.wired === "true") return;
+  toggle.dataset.wired = "true";
+  toggle.addEventListener("change", async () => {
+    toggle.disabled = true;
+    try {
+      const latest = await apiRequest(`/users/${userId}/extra-permissions`);
+      const nextCodes = new Set(latest.permission_codes || []);
+      if (toggle.checked) {
+        COMPANY_OVERVIEW_PERMISSION_CODES.forEach((code) => nextCodes.add(code));
+      } else {
+        COMPANY_OVERVIEW_PERMISSION_CODES.forEach((code) => nextCodes.delete(code));
+      }
+      await apiRequest(`/users/${userId}/extra-permissions`, {
+        method: "PUT",
+        body: JSON.stringify({ permission_codes: Array.from(nextCodes) }),
+      });
+      showToast(
+        "Permissions updated",
+        toggle.checked
+          ? "Company Overview granted -- full read-only visibility into day-to-day work."
+          : "Company Overview removed.",
+      );
+    } catch (err) {
+      toggle.checked = !toggle.checked;
+      showToast("Could not update permissions", err.message || "Try again.");
+    } finally {
+      toggle.disabled = false;
+    }
+  });
 }
 
 function paintProfile(user, role, location) {

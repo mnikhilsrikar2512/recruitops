@@ -57,12 +57,20 @@ ADMIN_PERMISSION_CODES: tuple[str, ...] = (
 # scripts/seed_staging.py for a worked example), typically for someone who
 # needs full drill-down visibility without execution rights: an owner,
 # investor, or auditor, or an admin who wants their own role to include it.
-# Because RecruitOps currently gives a user exactly one active role at a
-# time (dbo.user_branch_roles' is_primary slot is replaced, not stacked, by
-# every role-change in the API), an admin who wants both the Admin
-# control-plane and this overview in one login should grant a custom role
-# that combines ADMIN_PERMISSION_CODES with these codes, rather than
-# expecting to hold two roles at once.
+#
+# RecruitOps still gives a user exactly one active role at a time
+# (dbo.user_branch_roles' is_primary slot is replaced, not stacked, by every
+# role-change in the API) -- but an admin who wants both the Admin
+# control-plane and this overview in one login no longer needs a combined
+# custom role for it. PUT /users/{user_id}/extra-permissions
+# (app/api/v1/users.py, backed by the pre-existing but previously-unused
+# dbo.user_extra_permissions table) grants a permission bundle like this one
+# directly to a user, on top of whatever their one role already gives them.
+# app/repositories/auth.py's list_resolved_permissions unions both sources.
+# The user's role, title, and hierarchy level are untouched -- only their
+# permission reach grows. See frontend/pages/user-detail.html's "Additional
+# permissions" card for the UI, and scripts/seed_staging.py for a worked
+# example granting this exact bundle to a tenant's admin.
 COMPANY_OVERVIEW_PERMISSION_CODES: tuple[str, ...] = (
     "candidate.read",
     "client.read", "client.contact.read",

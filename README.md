@@ -45,15 +45,13 @@ production-readiness criteria, see:
 | `scripts/` | Idempotent SQL migrations (`00X_*.sql`) and utility scripts |
 | `tools/ci/` | CI gates (contract check, undefined-identifier check, asset check, runner) |
 
-## Company Overview role (read-only oversight)
+## Company Overview permissions (read-only oversight) + extra permission grants
 
 The built-in **Admin** role is deliberately control-plane only (users,
 offices, roles, settings, approvals, reports) — it does not include
 day-to-day read access to individual requisitions, candidates, clients,
-offers, interviews, etc. An admin who wants full drill-down visibility
-into day-to-day work without execution rights can grant (or hold
-themselves, combined with Admin in one custom role) the **Company
-Overview** permission bundle:
+offers, interviews, etc. **Company Overview** is a read-only bundle that
+fills that gap:
 
 `candidate.read`, `client.read`, `client.contact.read`,
 `requisition.read`, `offer.read`, `interview.read`, `meeting.read`,
@@ -63,16 +61,31 @@ Overview** permission bundle:
 
 No create/update/decide/assign code is included — this bundle can see
 everything, change nothing. It's defined once as
-`COMPANY_OVERVIEW_PERMISSION_CODES` in `backend/app/core/rbac.py`, and
-`backend/scripts/seed_staging.py` demonstrates it as a standalone
-"Company Overview" role with its own demo login (`overview@<domain>`) for
-each seeded tenant. To grant it to someone in your own company: create a
-role in **Roles**, tick these codes in the **Permissions Editor**, and
-assign it to the user — same flow as any other role. Because a user holds
-exactly one role at a time today, an admin who wants both control-plane
-access and full visibility in a single login should create one custom
-role combining the Admin permission set with this bundle, rather than two
-separate roles.
+`COMPANY_OVERVIEW_PERMISSION_CODES` in `backend/app/core/rbac.py`.
+
+**A user still holds exactly one role** — the data model doesn't support
+stacking two concurrent roles, and that's intentional. What changed is
+that **extra permissions can now be granted directly to a user, on top of
+their one role**, via `PUT /users/{user_id}/extra-permissions` (and read
+back with the matching `GET`), backed by `dbo.user_extra_permissions` (a
+table that already existed in the schema but was unused until now — see
+`backend/app/repositories/auth.py`'s `list_resolved_permissions`, which
+unions it in alongside the user's role permissions). This is a strict
+replace-all set, same semantics as `PUT /roles/{role_id}/permissions`: it
+only adds permission reach, and never changes the user's displayed role,
+title, or hierarchy level.
+
+So an admin who wants both control-plane access and full read-only
+day-to-day visibility doesn't need a second role or a second login — grant
+them the Company Overview codes as extra permissions on their one Admin
+account. In the UI, this is on the **User Detail** page (reachable from
+**Users**): a signed-in Admin sees an "Additional permissions" card there
+with a toggle for Company Overview. Via the API it's the same
+`PUT /users/{user_id}/extra-permissions` call the toggle makes.
+`backend/scripts/seed_staging.py` demonstrates both paths for each seeded
+tenant: a standalone "Company Overview" role with its own demo login
+(`overview@<domain>`), and the bundle granted directly to the tenant's
+admin as extra permissions.
 
 ## Guided product tour (onboarding)
 
