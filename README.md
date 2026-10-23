@@ -45,6 +45,35 @@ production-readiness criteria, see:
 | `scripts/` | Idempotent SQL migrations (`00X_*.sql`) and utility scripts |
 | `tools/ci/` | CI gates (contract check, undefined-identifier check, asset check, runner) |
 
+## Company Overview role (read-only oversight)
+
+The built-in **Admin** role is deliberately control-plane only (users,
+offices, roles, settings, approvals, reports) — it does not include
+day-to-day read access to individual requisitions, candidates, clients,
+offers, interviews, etc. An admin who wants full drill-down visibility
+into day-to-day work without execution rights can grant (or hold
+themselves, combined with Admin in one custom role) the **Company
+Overview** permission bundle:
+
+`candidate.read`, `client.read`, `client.contact.read`,
+`requisition.read`, `offer.read`, `interview.read`, `meeting.read`,
+`pipeline.read.summary`, `pipeline.read.detail`,
+`pipeline.stage.history.read`, `daily_update.read`,
+`workflow_action.read`, `assignment.read`, `portal.read`.
+
+No create/update/decide/assign code is included — this bundle can see
+everything, change nothing. It's defined once as
+`COMPANY_OVERVIEW_PERMISSION_CODES` in `backend/app/core/rbac.py`, and
+`backend/scripts/seed_staging.py` demonstrates it as a standalone
+"Company Overview" role with its own demo login (`overview@<domain>`) for
+each seeded tenant. To grant it to someone in your own company: create a
+role in **Roles**, tick these codes in the **Permissions Editor**, and
+assign it to the user — same flow as any other role. Because a user holds
+exactly one role at a time today, an admin who wants both control-plane
+access and full visibility in a single login should create one custom
+role combining the Admin permission set with this bundle, rather than two
+separate roles.
+
 ## Guided product tour (onboarding)
 
 `frontend/shared/tour.js` is a self-contained, client-side spotlight-ring +

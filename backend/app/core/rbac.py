@@ -45,6 +45,39 @@ ADMIN_PERMISSION_CODES: tuple[str, ...] = (
     COMPANY_SCOPE_CODE,
 )
 
+# Read-only, cross-module visibility into day-to-day recruiting work --
+# candidates, clients, requisitions, offers, interviews, meetings, the
+# pipeline (summary, detail and stage history), daily updates, workflow
+# actions, assignments and portal accounts. No create/update/decide/assign
+# code appears here; this grants *seeing* everything, never *changing*
+# anything.
+#
+# This is NOT a fixed system role like Admin -- it is an ordinary custom
+# role any company admin can create via Roles -> Permissions Editor (or see
+# scripts/seed_staging.py for a worked example), typically for someone who
+# needs full drill-down visibility without execution rights: an owner,
+# investor, or auditor, or an admin who wants their own role to include it.
+# Because RecruitOps currently gives a user exactly one active role at a
+# time (dbo.user_branch_roles' is_primary slot is replaced, not stacked, by
+# every role-change in the API), an admin who wants both the Admin
+# control-plane and this overview in one login should grant a custom role
+# that combines ADMIN_PERMISSION_CODES with these codes, rather than
+# expecting to hold two roles at once.
+COMPANY_OVERVIEW_PERMISSION_CODES: tuple[str, ...] = (
+    "candidate.read",
+    "client.read", "client.contact.read",
+    "requisition.read",
+    "offer.read",
+    "interview.read",
+    "meeting.read",
+    "pipeline.read.summary", "pipeline.read.detail", "pipeline.stage.history.read",
+    "daily_update.read",
+    "workflow_action.read",
+    "assignment.read",
+    "portal.read",
+)
+
+
 def split_code(code: str) -> tuple[str, str]:
     """(module_name, action_name) for a catalog row, e.g. 'role.permissions.assign'
     → ('role', 'permissions.assign')."""
