@@ -6,6 +6,7 @@ from app.api.deps import (
     caller_tenant_id,
     get_current_auth_context,
     get_engine,
+    invalidate_permission_cache,
     pinned_location_id,
     require_permissions,
     require_record_in_location,
@@ -14,6 +15,8 @@ from app.schemas.user import (
     UserCreate,
     UserDeactivateRequest,
     UserDeactivationResponse,
+    UserExtraPermissionsResponse,
+    UserExtraPermissionsUpdate,
     UserListFilters,
     UserListResponse,
     UserMoveRequest,
@@ -27,9 +30,11 @@ from app.services.users import (
     create_user_service,
     deactivate_user_service,
     get_user_detail_service,
+    get_user_extra_permissions_service,
     list_users_service,
     move_user_service,
     reset_user_credentials_service,
+    update_user_extra_permissions_service,
     update_user_service,
 )
 from app.services import scope
@@ -138,6 +143,40 @@ def deactivate_user_endpoint(
     engine: Engine = Depends(get_engine),
 ) -> UserDeactivationResponse:
     return deactivate_user_service(engine, user_id, payload, auth_context)
+
+
+@router.get("/{user_id}/extra-permissions", response_model=UserExtraPermissionsResponse)
+def get_user_extra_permissions_endpoint(
+    _auth: object = Depends(require_permissions("user.read")),
+    _in_scope: object = Depends(_scope_user),
+    user_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> UserExtraPermissionsResponse:
+    """Permission codes granted directly to this user, on top of their role
+    (e.g. the read-only Company Overview bundle). See
+    app/repositories/auth.py's list_resolved_permissions for how these are
+    unioned into what the user can actually do."""
+    return get_user_extra_permissions_service(engine, user_id)
+
+
+@router.put("/{user_id}/extra-permissions", response_model=UserExtraPermissionsResponse)
+def update_user_extra_permissions_endpoint(
+    payload: UserExtraPermissionsUpdate,
+    _auth: object = Depends(require_permissions("role.permissions.assign")),
+    _in_scope: object = Depends(_scope_user),
+    auth_context: AuthContext = Depends(get_current_auth_context),
+    user_id: int = Path(..., ge=1),
+    engine: Engine = Depends(get_engine),
+) -> UserExtraPermissionsResponse:
+    """Replaces this user's extra permission grants with exactly the given
+    set (same replace-all semantics as PUT /roles/{role_id}/permissions).
+    The data model holds one role per user per branch -- this is the
+    supported way to give someone reach beyond their role (e.g. an Admin who
+    also wants full read-only day-to-day visibility) without stacking a
+    second concurrent role."""
+    response = update_user_extra_permissions_service(engine, user_id, payload, auth_context.user.id)
+    invalidate_permission_cache(user_id)  # this user's cached permission set is now stale
+    return response
 
 
 @router.post("/{user_id}/move", response_model=UserMoveResponse)

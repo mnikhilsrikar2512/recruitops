@@ -9,6 +9,7 @@ from app.core.security import hash_password, hash_session_token, random_secret
 
 from app.repositories.audit import insert_audit_log
 from app.repositories.auth import revoke_user_sessions
+from app.repositories.roles import count_permissions_by_codes
 from app.repositories.users import (
     count_active_admins,
     count_user_active_assignments,
@@ -20,8 +21,10 @@ from app.repositories.users import (
     find_user_by_email,
     find_user_by_employee_code,
     find_user_by_id,
+    list_extra_permission_codes_for_user,
     list_users,
     location_exists,
+    replace_user_extra_permissions,
     role_exists,
     transfer_active_user_work_and_deactivate,
     transfer_active_user_work_and_move,
@@ -35,6 +38,8 @@ from app.schemas.user import (
     UserCreate,
     UserDeactivateRequest,
     UserDeactivationResponse,
+    UserExtraPermissionsResponse,
+    UserExtraPermissionsUpdate,
     UserListFilters,
     UserListResponse,
     UserMoveRequest,
@@ -499,3 +504,53 @@ def move_user_service(
         active_pipeline_owner_count=active_pipeline_owner_count,
         reason=payload.reason,
     )
+
+
+# ---- Extra permissions (direct grants beyond a user's single role) ---------
+
+
+def get_user_extra_permissions_service(engine: Engine, user_id: int) -> UserExtraPermissionsResponse:
+    existing = find_user_by_id(engine, user_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User was not found")
+
+    return UserExtraPermissionsResponse(
+        user_id=user_id,
+        permission_codes=list_extra_permission_codes_for_user(engine, user_id),
+    )
+
+
+def update_user_extra_permissions_service(
+    engine: Engine,
+    user_id: int,
+    payload: UserExtraPermissionsUpdate,
+    granted_by_user_id: int,
+) -> UserExtraPermissionsResponse:
+    existing = find_user_by_id(engine, user_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User was not found")
+
+    permission_count = count_permissions_by_codes(engine, payload.permission_codes)
+    if permission_count != len(payload.permission_codes):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more permission codes are invalid",
+        )
+
+    before_codes = list_extra_permission_codes_for_user(engine, user_id)
+    replace_user_extra_permissions(engine, user_id, payload.permission_codes, granted_by_user_id)
+    after_codes = list_extra_permission_codes_for_user(engine, user_id)
+
+    if before_codes != after_codes:
+        insert_audit_log(
+            engine,
+            actor_user_id=granted_by_user_id,
+            location_id=existing.primary_location_id,
+            entity_type="user",
+            entity_id=user_id,
+            action_type="extra_permissions_updated",
+            old_values={"permission_codes": before_codes},
+            new_values={"permission_codes": after_codes},
+        )
+
+    return UserExtraPermissionsResponse(user_id=user_id, permission_codes=after_codes)

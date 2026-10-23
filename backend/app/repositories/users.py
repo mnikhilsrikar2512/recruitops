@@ -828,3 +828,71 @@ def mark_password_reset_token_used(engine: Engine, token_id: int) -> None:
     )
     with engine.begin() as connection:
         connection.execute(query, {"token_id": token_id})
+
+
+# ---- Extra permissions (direct grants beyond a user's role(s)) -------------
+#
+# dbo.user_extra_permissions already existed in the schema (tenant-scoped,
+# unique on (user_id, permission_id), with an audit trail via
+# granted_by_user_id) but was unused by the application until now. It's the
+# supported way to give a user permission reach beyond their single primary
+# role -- e.g. an Admin who also wants the read-only Company Overview bundle
+# -- without stacking a second concurrent role, which the rest of this
+# codebase (update_user, transfer_active_user_work_and_move, and every other
+# role-change path) assumes doesn't happen. See app/repositories/auth.py's
+# list_resolved_permissions, which unions this table in.
+
+
+def list_extra_permission_codes_for_user(engine: Engine, user_id: int) -> list[str]:
+    query = text(
+        """
+        SELECT p.code
+        FROM dbo.user_extra_permissions AS uep
+        INNER JOIN dbo.permissions AS p
+          ON p.id = uep.permission_id
+        WHERE uep.user_id = :user_id
+        AND uep.status = N'active'
+        ORDER BY p.code;
+        """
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(query, {"user_id": user_id}).mappings().all()
+    return [row["code"] for row in rows]
+
+
+def replace_user_extra_permissions(
+    engine: Engine,
+    user_id: int,
+    permission_codes: list[str],
+    granted_by_user_id: int,
+) -> None:
+    """Sets the user's extra-permission grants to exactly this set (replace
+    semantics, same as replace_role_permissions). An empty list clears them."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM dbo.user_extra_permissions WHERE user_id = :user_id;"),
+            {"user_id": user_id},
+        )
+
+        if permission_codes:
+            bind_names = [f"code_{index}" for index in range(len(permission_codes))]
+            placeholders = ", ".join(f":{name}" for name in bind_names)
+            params = {
+                "user_id": user_id,
+                "granted_by_user_id": granted_by_user_id,
+            } | {name: permission_codes[index] for index, name in enumerate(bind_names)}
+            connection.execute(
+                text(
+                    f"""
+                    INSERT INTO dbo.user_extra_permissions (user_id, permission_id, granted_by_user_id, status)
+                    SELECT
+                      :user_id,
+                      p.id,
+                      :granted_by_user_id,
+                      N'active'
+                    FROM dbo.permissions AS p
+                    WHERE p.code IN ({placeholders});
+                    """
+                ),
+                params,
+            )

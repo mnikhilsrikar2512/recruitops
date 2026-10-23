@@ -179,3 +179,20 @@ class UserResetCredentialsResponse(BaseModel):
     expires_in_hours: int | None = None
     message: str | None = None
     errors: list[str] | None = None
+
+
+class UserExtraPermissionsUpdate(BaseModel):
+    """Replace-all set of extra permission codes granted directly to a user,
+    on top of their role. Empty list clears all extra grants."""
+
+    permission_codes: list[str] = Field(default_factory=list)
+
+    @field_validator("permission_codes")
+    @classmethod
+    def normalize_permission_codes(cls, values: list[str]) -> list[str]:
+        return sorted({value.strip() for value in values if value.strip()})
+
+
+class UserExtraPermissionsResponse(BaseModel):
+    user_id: int
+    permission_codes: list[str]

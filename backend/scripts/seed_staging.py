@@ -31,6 +31,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 import seed_ci  # noqa: E402
+from app.core.rbac import COMPANY_OVERVIEW_PERMISSION_CODES  # noqa: E402
 from app.db.session import create_db_engine  # noqa: E402
 from app.main import create_application  # noqa: E402
 
@@ -54,6 +55,12 @@ MANAGER_CODES = RECRUITER_CODES + [
     "pipeline.stage.reopen", "candidate.delete.soft", "client.delete.soft",
     "report.read", "dashboard.read_pipeline_summary", "user.read",
 ]
+# Read-only, cross-module visibility into day-to-day work (candidates,
+# clients, requisitions, offers, interviews, pipeline, etc.) with zero
+# write permissions -- see app/core/rbac.py's COMPANY_OVERVIEW_PERMISSION_CODES
+# docstring for why this ships as its own demo user rather than a second
+# role stacked onto the company admin.
+OVERVIEW_CODES = list(COMPANY_OVERVIEW_PERMISSION_CODES)
 
 TENANTS = [
     {
@@ -212,18 +219,42 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
     clients, requisitions and approvals; the recruiter adds candidates."""
     manager_email = f"manager@{tenant['domain']}"
     recruiter_email = f"recruiter@{tenant['domain']}"
+    overview_email = f"overview@{tenant['domain']}"
     branch_id, admin_email, admin_id = ensure_company(engine, tenant)
     if user_exists(engine, manager_email):
-        print(f"• company {tenant['key']} already seeded — skipping")
-        return {"admin": admin_email, "manager": manager_email, "recruiter": recruiter_email}
+        admin = login(client, admin_email, PASSWORD)
+        if not user_exists(engine, overview_email):
+            # Backfill for a DB seeded before the Company Overview role existed.
+            overview_role = create_role(admin, tenant, "Company Overview", OVERVIEW_CODES)
+            create_user(client, admin, f"{tenant['company']} Observer", overview_email,
+                       branch_id, overview_role, "Company Overview (Read-Only)", issued_by=admin_id)
+            print(f"• company {tenant['key']} already seeded — added the Company Overview role/user")
+        # Backfill: grant the admin the SAME bundle directly (real multi-role
+        # support via PUT /users/{id}/extra-permissions) so they get full
+        # read-only day-to-day visibility on top of their own control-plane
+        # Admin role, no second login needed. Idempotent -- replace-all.
+        admin.call("PUT", f"/users/{admin_id}/extra-permissions", {"permission_codes": OVERVIEW_CODES})
+        print(f"• company {tenant['key']} already seeded — admin granted Company Overview as an extra permission set")
+        return {"admin": admin_email, "manager": manager_email, "recruiter": recruiter_email,
+                "overview": overview_email}
 
     admin = login(client, admin_email, PASSWORD)
     manager_role = create_role(admin, tenant, "Manager", MANAGER_CODES)
     recruiter_role = create_role(admin, tenant, "Recruiter", RECRUITER_CODES)
+    overview_role = create_role(admin, tenant, "Company Overview", OVERVIEW_CODES)
     manager_id = create_user(client, admin, f"{tenant['city']} Delivery Manager", manager_email,
                              branch_id, manager_role, "Delivery Manager", issued_by=admin_id)
     recruiter_id = create_user(client, admin, f"{tenant['city']} Recruiter", recruiter_email,
                                branch_id, recruiter_role, "Recruiter", manager_id, issued_by=admin_id)
+    create_user(client, admin, f"{tenant['company']} Observer", overview_email,
+               branch_id, overview_role, "Company Overview (Read-Only)", issued_by=admin_id)
+    # Demonstrates the real fix: the company admin ALSO gets Company Overview
+    # granted directly (PUT /users/{id}/extra-permissions), on top of their
+    # one primary Admin role -- full day-to-day read visibility without a
+    # second login, and without the data model needing to support two
+    # concurrent roles for the same user. See app/core/rbac.py and
+    # app/repositories/auth.py's list_resolved_permissions.
+    admin.call("PUT", f"/users/{admin_id}/extra-permissions", {"permission_codes": OVERVIEW_CODES})
     manager = login(client, manager_email, PASSWORD)
     recruiter = login(client, recruiter_email, PASSWORD)
 
@@ -281,9 +312,10 @@ def seed_tenant(client: TestClient, engine, tenant: dict) -> dict:
             location_id=branch_id, user_id=user_id, title="Welcome to staging",
             message=f"{tenant['company']} staging data is ready.", module_name="system",
         ))
-    print(f"✓ company {tenant['key']} ({tenant['company']}): admin + 2 users, {len(clients)} clients, "
+    print(f"✓ company {tenant['key']} ({tenant['company']}): admin + 3 users, {len(clients)} clients, "
           f"{len(requisitions)} requisitions, {len(applications)} applications, 2 approvals")
-    return {"admin": admin_email, "manager": manager_email, "recruiter": recruiter_email}
+    return {"admin": admin_email, "manager": manager_email, "recruiter": recruiter_email,
+            "overview": overview_email}
 
 
 def main() -> None:
@@ -307,6 +339,7 @@ def main() -> None:
         print(f"  Company {tenant['key']} admin      {account['admin']}")
         print(f"  Tenant {tenant['key']} manager     {account['manager']}")
         print(f"  Tenant {tenant['key']} recruiter   {account['recruiter']}")
+        print(f"  Tenant {tenant['key']} overview    {account['overview']}  (read-only, no admin control-plane)")
 
 
 if __name__ == "__main__":

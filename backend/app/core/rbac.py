@@ -45,6 +45,47 @@ ADMIN_PERMISSION_CODES: tuple[str, ...] = (
     COMPANY_SCOPE_CODE,
 )
 
+# Read-only, cross-module visibility into day-to-day recruiting work --
+# candidates, clients, requisitions, offers, interviews, meetings, the
+# pipeline (summary, detail and stage history), daily updates, workflow
+# actions, assignments and portal accounts. No create/update/decide/assign
+# code appears here; this grants *seeing* everything, never *changing*
+# anything.
+#
+# This is NOT a fixed system role like Admin -- it is an ordinary custom
+# role any company admin can create via Roles -> Permissions Editor (or see
+# scripts/seed_staging.py for a worked example), typically for someone who
+# needs full drill-down visibility without execution rights: an owner,
+# investor, or auditor, or an admin who wants their own role to include it.
+#
+# RecruitOps still gives a user exactly one active role at a time
+# (dbo.user_branch_roles' is_primary slot is replaced, not stacked, by every
+# role-change in the API) -- but an admin who wants both the Admin
+# control-plane and this overview in one login no longer needs a combined
+# custom role for it. PUT /users/{user_id}/extra-permissions
+# (app/api/v1/users.py, backed by the pre-existing but previously-unused
+# dbo.user_extra_permissions table) grants a permission bundle like this one
+# directly to a user, on top of whatever their one role already gives them.
+# app/repositories/auth.py's list_resolved_permissions unions both sources.
+# The user's role, title, and hierarchy level are untouched -- only their
+# permission reach grows. See frontend/pages/user-detail.html's "Additional
+# permissions" card for the UI, and scripts/seed_staging.py for a worked
+# example granting this exact bundle to a tenant's admin.
+COMPANY_OVERVIEW_PERMISSION_CODES: tuple[str, ...] = (
+    "candidate.read",
+    "client.read", "client.contact.read",
+    "requisition.read",
+    "offer.read",
+    "interview.read",
+    "meeting.read",
+    "pipeline.read.summary", "pipeline.read.detail", "pipeline.stage.history.read",
+    "daily_update.read",
+    "workflow_action.read",
+    "assignment.read",
+    "portal.read",
+)
+
+
 def split_code(code: str) -> tuple[str, str]:
     """(module_name, action_name) for a catalog row, e.g. 'role.permissions.assign'
     → ('role', 'permissions.assign')."""
