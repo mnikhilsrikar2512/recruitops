@@ -1,10 +1,39 @@
 # RecruitOps
 
-Multi-tenant recruitment operations system (frontend + FastAPI + MSSQL).
+**Multi-tenant recruitment operations platform** — requisitions, candidate
+pipelines, interviews, offers, and reporting for recruiting teams, with
+role-based access control fine-grained enough that one company's admin can
+configure exactly who on their team sees and does what.
 
-Product behavior, roles, modules, APIs, security, and production-ready criteria:
+Built as a FastAPI backend over Microsoft SQL Server, with a static,
+dependency-light HTML/JS frontend. No framework lock-in, no build step
+required to run it locally.
+
+For full product behavior, roles, modules, APIs, security posture, and
+production-readiness criteria, see:
 
 → [`docs/PRODUCT_REQUIREMENTS_DOCUMENT.md`](docs/PRODUCT_REQUIREMENTS_DOCUMENT.md)
+
+## What's in here
+
+- **Multi-tenant by design** — every company's data is isolated at the data
+  layer, not just the UI.
+- **Granular, role-based permissions** — access is controlled per action
+  (e.g. creating a requisition vs. reading one are separate grants), assigned
+  per role, and fully admin-configurable. See
+  [`docs/pipeline-rbac-architecture-spec.md`](docs/pipeline-rbac-architecture-spec.md).
+  Visibility Rules layer on top to mask specific sensitive fields (like
+  margin or bill rate) from roles that shouldn't see them, independent of
+  page-level access.
+- **Full recruiting lifecycle** — clients, requisitions, candidates, pipeline
+  stages, interviews, offers, approvals, daily activity tracking, and
+  reporting.
+- **Guided onboarding** — a built-in product tour walks new users through
+  each module the first time they open it. See
+  [Guided product tour](#guided-product-tour-onboarding) below.
+- **CI-gated** — every pull request runs backend tests against a real,
+  throwaway SQL Server instance and a full frontend contract/browser suite
+  before it can merge. See [Checks](#checks-ci) below.
 
 ## Project layout
 
@@ -19,18 +48,25 @@ Product behavior, roles, modules, APIs, security, and production-ready criteria:
 ## Guided product tour (onboarding)
 
 `frontend/shared/tour.js` is a self-contained, client-side spotlight-ring +
-tooltip-card tour engine — no backend or DB involved. It auto-starts the
-first time a user who already has access opens one of the 22 registered
-modules (Role Dashboard, Requisitions, Candidates, Pipeline Board, Approvals
-Inbox, Users, Roles, Permissions Editor, Visibility Rules, Reports, Company
+tooltip-card tour engine — no backend or database involved. It auto-starts
+the first time a user who already has access opens one of the 22 registered
+modules:
+
+Role Dashboard, Requisitions, Candidates, Pipeline Board, Approvals Inbox,
+Users, Roles, Permissions Editor, Visibility Rules, Reports, Company
 Settings, Clients, Offers, Interviews, Daily Review, Daily Update
 Submission, Follow-Ups, Audit Log, Data Export & Delete Requests, Portal
-Accounts, Hiring Stages, Work Assignment, My Profile), tracked per user per
-module in `localStorage`, with a "Replay tour" button always available.
-Because it only ever runs on a page the user already reached, it needs no
-RBAC logic of its own — the page's existing permission gate controls who
-ever sees a given tour. To add a module, add one entry to `TOUR_REGISTRY` in
-`tour.js` and one `<script src="../shared/tour.js">` tag to that page.
+Accounts, Hiring Stages, Work Assignment, My Profile.
+
+Each module's tour is tracked per user in `localStorage`, and a "Replay
+tour" control is always available in the top bar. Because the tour only
+ever runs on a page the user already reached, it carries no RBAC logic of
+its own — the page's existing permission gate already decides who ever
+sees it.
+
+To add a module: add one entry to `TOUR_REGISTRY` in `tour.js` (a short list
+of `{selector, title, body}` steps) and one `<script src="../shared/tour.js">`
+tag to that page. Nothing else needs to change.
 
 ## Run locally
 
@@ -57,23 +93,38 @@ Open: [http://127.0.0.1:4174/pages/login.html](http://127.0.0.1:4174/pages/login
 
 Use the Node server (not `python -m http.server`) so `/api/` proxies to FastAPI.
 
-Or start both with `./start.sh` (API on :8000, UI on :4174).
+Or start both at once with `./start.sh` (API on :8000, UI on :4174).
 
-## Checks (run in CI on every PR — `.github/workflows/ci.yml` (shipped as `tools/ci/github-workflow-ci.yml` — move it there to enable))
+### Demo login (seeded DB)
+
+See [`backend/README.md`](backend/README.md) for credentials after seeding.
+
+## Checks (CI)
+
+Every pull request runs the same checks defined in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml), which you can also
+run locally:
 
 ```bash
 # Backend: throwaway SQL Server container → schema → seed → pytest
 cd backend && DB_PORT=1434 ./scripts/run_tests_ci.sh
 
-# Frontend: syntax, undefined globals, API contract, assets,
-# browser sweep of every page (admin + recruiter), end-to-end UI flows
+# Frontend: syntax, undefined globals, API contract, static assets,
+# browser sweep of every page across personas, end-to-end UI flows
 tools/ci/run_frontend_checks.sh
 ```
 
 The frontend checks run against `frontend/tests/mock-api-server.js`, a mock
 generated from the backend's OpenAPI schema: any page that calls a path,
-method or request body the backend would reject fails the build.
+method, or request body the backend would reject fails the build.
 
-### Demo login (seeded DB)
+## Documentation
 
-See `backend/README.md` for credentials after seeding.
+| Doc | Covers |
+|-----|--------|
+| [`docs/PRODUCT_REQUIREMENTS_DOCUMENT.md`](docs/PRODUCT_REQUIREMENTS_DOCUMENT.md) | Product behavior, roles, modules, APIs, security, production-readiness criteria |
+| [`docs/pipeline-rbac-architecture-spec.md`](docs/pipeline-rbac-architecture-spec.md) | RBAC and pipeline architecture |
+| [`docs/production-readiness-assessment.md`](docs/production-readiness-assessment.md) | Production-readiness assessment |
+| [`docs/recruitops-production-readiness-execution-plan.md`](docs/recruitops-production-readiness-execution-plan.md) | Execution plan and phase tracking |
+| [`docs/runbooks/`](docs/runbooks) | Operational runbooks |
+| [`backend/README.md`](backend/README.md) | Backend setup, configuration, and demo credentials |
