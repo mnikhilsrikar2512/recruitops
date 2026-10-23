@@ -48,8 +48,26 @@ class Flow:
         self.base = base
         self.context = browser.new_context()
         if signed_in:
+            # Also mark every guided-tour module as already seen for this
+            # session's email, so the tour overlay (shared/tour.js) never
+            # auto-starts and blocks a flow's clicks on first visit to a
+            # page — mirrors a returning user, not a first-time one. Keep
+            # this list in sync with shared/tour.js's TOUR_REGISTRY keys.
+            tour_modules = [
+                "role-dashboard", "requisition-list", "candidate-profiles", "pipeline-board",
+                "approvals-inbox", "user-management", "role-management", "role-permissions-editor",
+                "visibility-rules", "reports", "tenant-setup", "client-directory", "offer-management",
+                "interview-scheduler", "daily-review", "daily-updates-submission", "follow-ups",
+                "audit-log-viewer", "data-export-delete-request", "portal-accounts", "stage-bucket-map",
+                "work-assignment", "my-profile",
+            ]
+            seed_email = session().get("email", "anon")
+            tour_seed_js = "; ".join(
+                f"localStorage.setItem({json.dumps('ro-tour-seen:' + seed_email + ':' + m)}, '1')"
+                for m in tour_modules
+            )
             self.context.add_init_script(
-                f"try {{ if (!sessionStorage.getItem('flow-seeded')) {{ sessionStorage.setItem('flow-seeded', '1'); localStorage.setItem('recruitops-session', {json.dumps(json.dumps(session()))}); }}"
+                f"try {{ if (!sessionStorage.getItem('flow-seeded')) {{ sessionStorage.setItem('flow-seeded', '1'); localStorage.setItem('recruitops-session', {json.dumps(json.dumps(session()))}); {tour_seed_js}; }}"
                 " } catch (e) {}")
         self.context.route("**/*", lambda r: r.continue_() if r.request.url.startswith(base) else r.fulfill(
             status=200, content_type="application/javascript", body=TAILWIND_STUB if "tailwind" in r.request.url else ""))

@@ -7746,6 +7746,13 @@ function startLiveApiClient() {
 
   Promise.resolve(bootPage()).catch(() => {}).finally(() => {
     hidePageLoader();
+    /* Guided module tour: only runs on pages with a registered tour
+       (frontend/shared/tour.js), and only ever reaches pages the user's
+       own permissions already let them open — so it is naturally scoped
+       "per module, by the permissions given" with no extra RBAC logic here. */
+    if (window.RoTour) {
+      try { window.RoTour.maybeAutoStart(); } catch (e) { /* never block the page on a tour error */ }
+    }
   });
 
   if (!isLandingPage && (RecruitOpsLive.session || readSession())) {
