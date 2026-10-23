@@ -16,6 +16,22 @@ Product behavior, roles, modules, APIs, security, and production-ready criteria:
 | `scripts/` | Idempotent SQL migrations (`00X_*.sql`) and utility scripts |
 | `tools/ci/` | CI gates (contract check, undefined-identifier check, asset check, runner) |
 
+## Guided product tour (onboarding)
+
+`frontend/shared/tour.js` is a self-contained, client-side spotlight-ring +
+tooltip-card tour engine — no backend or DB involved. It auto-starts the
+first time a user who already has access opens one of the 22 registered
+modules (Role Dashboard, Requisitions, Candidates, Pipeline Board, Approvals
+Inbox, Users, Roles, Permissions Editor, Visibility Rules, Reports, Company
+Settings, Clients, Offers, Interviews, Daily Review, Daily Update
+Submission, Follow-Ups, Audit Log, Data Export & Delete Requests, Portal
+Accounts, Hiring Stages, Work Assignment, My Profile), tracked per user per
+module in `localStorage`, with a "Replay tour" button always available.
+Because it only ever runs on a page the user already reached, it needs no
+RBAC logic of its own — the page's existing permission gate controls who
+ever sees a given tour. To add a module, add one entry to `TOUR_REGISTRY` in
+`tour.js` and one `<script src="../shared/tour.js">` tag to that page.
+
 ## Run locally
 
 ### Backend (port 8000)
