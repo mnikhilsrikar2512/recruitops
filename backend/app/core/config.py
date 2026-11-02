@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     email_from_address: str = Field(default="", alias="EMAIL_FROM_ADDRESS")
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
     email_reply_to: str = Field(default="", alias="EMAIL_REPLY_TO")
+    # Phase 6.4 observability
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    log_format: str = Field(default="", alias="LOG_FORMAT")  # json | text; empty = json in staging/production
+    metrics_token: str = Field(default="", alias="METRICS_TOKEN")
+    sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
+    sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
+    api_docs_enabled_setting: bool | None = Field(default=None, alias="API_DOCS_ENABLED")
     smtp_timeout_seconds: float = Field(default=15.0, alias="SMTP_TIMEOUT_SECONDS")
     ai_provider: str = Field(default="mock", alias="AI_PROVIDER")
     ai_max_items_per_run: int = Field(default=20, alias="AI_MAX_ITEMS_PER_RUN")
@@ -106,6 +113,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.strip().lower() in PRODUCTION_ENVS
+
+    @property
+    def api_docs_enabled(self) -> bool:
+        """/docs and /redoc: on in development and staging, off in production
+        unless API_DOCS_ENABLED says otherwise."""
+        if self.api_docs_enabled_setting is not None:
+            return self.api_docs_enabled_setting
+        return self.app_env.strip().lower() not in {"production", "prod"}
 
     @property
     def ai_agents_available(self) -> bool:
@@ -165,6 +180,8 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("SMTP_USE_TLS must stay true in staging/production")
     if not config.frontend_base_url.startswith("https://"):
         errors.append("FRONTEND_BASE_URL must be an https:// URL in staging/production (it is the link in every email)")
+    if len(config.metrics_token) < 24:
+        errors.append("METRICS_TOKEN must be a secret of at least 24 characters in staging/production (protects /metrics)")
     if config.trusted_proxy_count < 1:
         errors.append(
             "TRUSTED_PROXY_COUNT must be >= 1 in staging/production (TLS terminates at the load "

@@ -83,10 +83,18 @@ async def send_email(
 
         await aiosmtplib.send(build_mime(to_email, subject, html_body, text_body), **smtp_transport_kwargs())
         logger.info("email sent to=%s subject=%s", _mask(to_email), subject)
+        _count(True)
         return True
     except Exception:
         logger.exception("email failed to=%s subject=%s", _mask(to_email), subject)
+        _count(False)
         return False
+
+
+def _count(sent: bool) -> None:
+    from app.core.observability import count_email
+
+    count_email(sent)
 
 
 def send_email_sync(to_email: str, message: EmailMessage) -> bool:

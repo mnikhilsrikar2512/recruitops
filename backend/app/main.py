@@ -6,11 +6,19 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
+from app.api.probes import router as probes_router
 from app.api.router import api_router
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings, validate_settings
 from app.core.errors import error_response, http_exception_handler, validation_exception_handler
+from app.core.observability import (
+    REQUEST_ID_HEADER,
+    RequestContextMiddleware,
+    configure_logging,
+    current_request_id,
+    init_error_tracking,
+)
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.repositories.versioning import StaleWriteConflict
 
@@ -82,16 +90,38 @@ async def _live_lifespan(_app: FastAPI):
     yield
 
 
+def _unhandled_error_response(request: Request, exc: Exception) -> JSONResponse:
+    """Last resort: log with the request id, answer the standard envelope,
+    never the exception text."""
+    # Runs in Starlette's outermost error middleware, after the request
+    # context has been reset, so read the id the middleware left on the scope.
+    request_id = getattr(request.state, "request_id", None) or current_request_id()
+    logging.getLogger("recruitops.unhandled").exception(
+        "unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+    headers = {REQUEST_ID_HEADER: request_id} if request_id else None
+    return error_response(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        "Something went wrong on our side. Quote the request id if you contact support.",
+        code="INTERNAL_ERROR",
+        headers=headers,
+        request_id=request_id,
+    )
+
+
 def create_application() -> FastAPI:
+    configure_logging()
     config_errors = validate_settings(settings)
     if config_errors:
         raise RuntimeError("Refusing to start with unsafe configuration: " + "; ".join(config_errors))
+    init_error_tracking()
+    docs = settings.api_docs_enabled
     application = FastAPI(
         lifespan=_live_lifespan if settings.app_env.strip().lower() in LIVE_ENVS else None,
         title=settings.app_name,
         version=settings.app_version,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
     )
     # Exact-match allowlist (no wildcard). The UI is served same-origin via
     # frontend/server.js's /api proxy, so browsers only need CORS in dev.
@@ -100,7 +130,8 @@ def create_application() -> FastAPI:
         allow_origins=settings.cors_origin_list(),
         allow_credentials=True,  # refresh cookie; origins are exact (no "*") — validate_settings
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "Idempotency-Key"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Idempotency-Key", REQUEST_ID_HEADER],
+        expose_headers=[REQUEST_ID_HEADER],
     )
     if settings.security_headers_enabled:
         application.add_middleware(SecurityHeadersMiddleware)
@@ -110,6 +141,11 @@ def create_application() -> FastAPI:
     application.add_exception_handler(IntegrityError, _integrity_error_response)
     application.add_exception_handler(OperationalError, _database_unavailable_response)
     application.add_exception_handler(SQLAlchemyError, _sqlalchemy_error_response)
+    application.add_exception_handler(Exception, _unhandled_error_response)
+    # Outermost: the request id exists before anything else runs and is on
+    # every response, including CORS preflights and HTTPS redirects.
+    application.add_middleware(RequestContextMiddleware)
+    application.include_router(probes_router)
     application.include_router(api_router, prefix=settings.api_prefix)
     return application
 
@@ -117,6 +153,8 @@ def create_application() -> FastAPI:
 app = create_application()
 
 
-@app.get("/", include_in_schema=False)
-def api_root() -> RedirectResponse:
-    return RedirectResponse(url="/docs", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+@app.get("/", include_in_schema=False, response_model=None)
+def api_root() -> RedirectResponse | dict:
+    if settings.api_docs_enabled:
+        return RedirectResponse(url="/docs", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    return {"name": settings.app_name, "version": settings.app_version}

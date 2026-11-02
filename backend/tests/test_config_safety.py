@@ -25,7 +25,8 @@ def test_production_rejects_plain_http_origins():
 
 
 PROD_EMAIL = dict(EMAIL_ENABLED=True, SMTP_HOST="smtp.example.com", EMAIL_FROM_ADDRESS="no-reply@example.com",
-                  SMTP_USE_TLS=True, FRONTEND_BASE_URL="https://app.example.com")
+                  SMTP_USE_TLS=True, FRONTEND_BASE_URL="https://app.example.com",
+                  METRICS_TOKEN="m" * 32)
 
 
 def test_production_accepts_exact_https_origins():
@@ -88,3 +89,15 @@ def test_production_requires_working_email():
     assert any("SMTP_USE_TLS" in e for e in validate_settings(plain))
     http_links = _settings(**base, **{**PROD_EMAIL, "FRONTEND_BASE_URL": "http://app.example.com"})
     assert any("FRONTEND_BASE_URL" in e for e in validate_settings(http_links))
+
+
+def test_production_requires_a_metrics_token():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    assert any("METRICS_TOKEN" in e for e in validate_settings(config))
+
+
+def test_api_docs_are_off_in_production_only():
+    assert _settings(APP_ENV="development").api_docs_enabled is True
+    assert _settings(APP_ENV="staging").api_docs_enabled is True
+    assert _settings(APP_ENV="production").api_docs_enabled is False
+    assert _settings(APP_ENV="production", API_DOCS_ENABLED=True).api_docs_enabled is True
