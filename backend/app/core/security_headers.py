@@ -11,6 +11,9 @@ from app.core import net
 from app.core.config import settings
 
 _DOC_PATHS = ("/docs", "/redoc", "/openapi.json")
+# Container health probes and the metrics scraper talk to the app directly
+# inside the private network, without the load balancer's X-Forwarded-Proto.
+_PLAIN_HTTP_PATHS = ("/livez", "/readyz", "/metrics")
 _BASE_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -23,7 +26,8 @@ _API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        if settings.is_production and not net.is_forwarded_https(request):
+        if (settings.is_production and not net.is_forwarded_https(request)
+                and request.url.path not in _PLAIN_HTTP_PATHS):
             return RedirectResponse(request.url.replace(scheme="https"), status_code=308)
         response = await call_next(request)
         for name, value in _BASE_HEADERS.items():

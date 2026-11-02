@@ -1,0 +1,86 @@
+# RecruitOps on a Docker host (any cloud VM or on-prem server).
+# Managed services stay outside: SQL Server/Azure SQL, Redis, S3-compatible
+# bucket and SMTP are reached through production.env. This file only runs
+# what we build: the TLS edge, web tier, API, scheduler, ClamAV, and the
+# one-shot migrate job. deploy.sh drives it; nobody edits containers by hand.
+
+name: recruitops
+
+x-app: &app
+  image: ${IMAGE_REPO:?set IMAGE_REPO}/recruitops-api:${IMAGE_TAG:?set IMAGE_TAG}
+  env_file: [production.env]
+  read_only: true
+  tmpfs: ["/tmp"]
+  logging: &logging
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    profiles: ["migrate"]   # only ever started by deploy.sh
+    restart: "no"
+
+  api:
+    <<: *app
+    command: ["api"]
+    depends_on:
+      clamav: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    restart: unless-stopped
+
+  scheduler:
+    <<: *app
+    # The ops image: the API image plus sqlpackage, for backups and restore drills.
+    image: ${IMAGE_REPO}/recruitops-ops:${IMAGE_TAG}
+    command: ["scheduler"]
+    healthcheck:
+      test: ["CMD-SHELL", "find /tmp/recruitops/scheduler-heartbeat -mmin -3 | grep -q ."]
+      interval: 60s
+      start_period: 60s
+    restart: unless-stopped
+
+  web:
+    image: ${IMAGE_REPO}/recruitops-web:${IMAGE_TAG}
+    environment:
+      API_UPSTREAM: api:8000
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
+    tmpfs: ["/tmp:uid=101,gid=101", "/var/cache/nginx:uid=101,gid=101", "/etc/nginx/conf.d:uid=101,gid=101"]
+    logging: *logging
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:1.4
+    volumes: [clamav-db:/var/lib/clamav]
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    logging: *logging
+    restart: unless-stopped
+
+  edge:
+    # Automatic HTTPS: Let's Encrypt certificate for $DOMAIN, renewed by Caddy.
+    # Point the domain's A/AAAA record at this host and open ports 80 and 443.
+    image: caddy:2.9-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL (Let's Encrypt account email)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    ports: ["80:80", "443:443", "443:443/udp"]
+    depends_on: [web]
+    logging: *logging
+    restart: unless-stopped
+
+volumes:
+  clamav-db:
+  caddy-data:

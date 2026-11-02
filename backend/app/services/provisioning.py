@@ -3,8 +3,8 @@ by ops (scripts/provision_company.py), so both paths build the same thing:
 
 - dbo.tenants (status 'pending' until activation), onboarding source
 - company profile (company_entities, primary)
-- head office: dbo.branches + mirrored dbo.locations row with the SAME id
-  (the codebase treats branch id == location id)
+- head office: one dbo.branches row (dbo.locations is a read-only view of
+  dbo.branches since migration 033)
 - first Admin: the shared system Admin role (D-03), primary office role
 - legal acceptance records (see callers)
 - an audit row 'company.provisioned'
@@ -58,16 +58,6 @@ def provision_company(
             "INSERT INTO dbo.branches (name, code, location, status, offers_enabled, tenant_id) OUTPUT INSERTED.id "
             "VALUES (N'Head Office', :code, :city, N'active', 1, :t);"),
             {"code": office_code, "city": city or "Head Office", "t": tenant_id}).scalar_one())
-        connection.execute(text(
-            """
-            IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
-            BEGIN
-                SET IDENTITY_INSERT dbo.locations ON;
-                INSERT INTO dbo.locations (id, name, code, location, city, status, tenant_id)
-                VALUES (:id, N'Head Office', :code, :city, :city, N'active', :t);
-                SET IDENTITY_INSERT dbo.locations OFF;
-            END
-            """), {"id": branch_id, "code": office_code, "city": city or "Head Office", "t": tenant_id})
         connection.execute(text(
             "INSERT INTO dbo.company_entities (display_name, legal_name, company_code, hq_city, support_email, is_primary, status, tenant_id) "
             "VALUES (:name, :name, :code, :city, :email, 1, N'active', :t);"),

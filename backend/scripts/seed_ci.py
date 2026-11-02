@@ -21,82 +21,9 @@ from app.db.session import create_db_engine  # noqa: E402
 
 ADMIN_PASSWORD = "admin123"
 
-# (code, module, action) — codes mirror the live permission catalog
-PERMISSIONS = [
-    # AI agents (PRD §4.16): base ai.use + one ai.agent.<id> code per registry
-    # agent (app/agents/registry.py). Without these rows only the admin role
-    # (check bypass in app/api/deps.py) can reach the agents API.
-    ("ai.use", "ai", "use"),
-    ("ai.agent.resume_screener", "ai", "agent.resume_screener"),
-    ("ai.agent.daily_brief", "ai", "agent.daily_brief"),
-    ("ai.agent.inbox_triage", "ai", "agent.inbox_triage"),
-    ("approval.decide", "approval", "decide"),
-    ("approval.read", "approval", "read"),
-    ("assignment.read", "assignment", "read"),
-    ("candidate.create", "candidate", "create"),
-    ("candidate.link_requisition", "candidate", "link_requisition"),
-    ("candidate.read", "candidate", "read"),
-    ("client.contact.create", "client", "contact_create"),
-    ("client.create", "client", "create"),
-    ("client.read", "client", "read"),
-    ("dashboard.read_my_work", "dashboard", "read_my_work"),
-    ("daily_update.create_main", "daily_update", "create_main"),
-    ("daily_update.read", "daily_update", "read"),
-    ("interview.create", "interview", "create"),
-    ("location.create", "location", "create"),
-    ("location.read", "location", "read"),
-    ("meeting.create", "meeting", "create"),
-    ("notification.read", "notification", "read"),
-    ("offer.create", "offer", "create"),
-    ("offer.read", "offer", "read"),
-    ("pipeline.read.summary", "pipeline", "read_summary"),
-    ("pipeline.stage.move", "pipeline", "stage_move"),
-    ("requisition.assign", "requisition", "assign"),
-    ("requisition.create", "requisition", "create"),
-    ("requisition.read", "requisition", "read"),
-    ("report.read", "report", "read"),
-    ("role.create", "role", "create"),
-    ("role.permissions.assign", "role", "permissions_assign"),
-    ("role.read", "role", "read"),
-    ("role.update", "role", "update"),
-    ("settings.create", "settings", "create"),
-    ("settings.read", "settings", "read"),
-    ("settings.update", "settings", "update"),
-    ("user.create", "user", "create"),
-    ("user.read", "user", "read"),
-    ("user.update", "user", "update"),
-    ("approval.create", "approval", "create"),
-    ("assignment.create", "assignment", "create"),
-    ("assignment.update", "assignment", "update"),
-    ("candidate.duplicate.check", "candidate", "duplicate.check"),
-    ("candidate.resume.upload", "candidate", "resume.upload"),
-    ("candidate.update", "candidate", "update"),
-    ("client.contact.read", "client", "contact.read"),
-    ("client.contact.update", "client", "contact.update"),
-    ("client.update", "client", "update"),
-    ("dashboard.read_pipeline_summary", "dashboard", "read_pipeline_summary"),
-    ("interview.feedback.submit", "interview", "feedback.submit"),
-    ("interview.read", "interview", "read"),
-    ("location.update", "location", "update"),
-    ("meeting.read", "meeting", "read"),
-    ("meeting.update", "meeting", "update"),
-    ("notification.mark_read", "notification", "mark_read"),
-    ("offer.decide", "offer", "decide"),
-    ("pipeline.read.detail", "pipeline", "read.detail"),
-    ("pipeline.stage.history.read", "pipeline", "stage.history.read"),
-    ("portal.assign_slot", "portal", "assign_slot"),
-    ("portal.create", "portal", "create"),
-    ("portal.read", "portal", "read"),
-    ("portal.update", "portal", "update"),
-    ("requisition.status.update", "requisition", "status.update"),
-    ("requisition.update", "requisition", "update"),
-    ("user.credentials.manage", "user", "credentials.manage"),
-    ("workflow_action.nudge", "workflow_action", "nudge"),
-    ("workflow_action.read", "workflow_action", "read"),
-    ("workflow_action.resolve", "workflow_action", "resolve"),
-    ("workflow_action.run", "workflow_action", "run"),
-    ("workflow_overlay.submit", "workflow_overlay", "submit"),
-]
+# The catalog lives in the app now (shared with the production seed).
+from app.core.permission_catalog import PERMISSIONS  # noqa: E402
+
 
 
 # (name, query, description) — post-seed invariants; each must return >= 1 row
@@ -241,31 +168,6 @@ def main() -> None:
             ),
             {"tenant_id": tenant_id},
         ).scalar_one()
-
-        # Mirror into dbo.locations for consumers that read the locations
-        # table -- forcing the SAME id as the branches row (the same
-        # IDENTITY_INSERT pattern app/services/provisioning.py uses), not a
-        # plain INSERT that gets its own auto-generated id. A plain INSERT
-        # only happens to line up with location_id on an empty database
-        # where both tables' IDENTITY counters start at 1 in lockstep; on
-        # any database that already has other tenants' rows in either
-        # table, the ids diverge and every dbo.users.location_id insert
-        # using this branch id fails FK_users_location, exactly as it did
-        # against this local database.
-        connection.execute(
-            text(
-                """
-                IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
-                BEGIN
-                    SET IDENTITY_INSERT dbo.locations ON;
-                    INSERT INTO dbo.locations (id, name, code, location, status, tenant_id)
-                    VALUES (:id, N'Head Office', N'HO', N'Head Office', N'active', :tenant_id);
-                    SET IDENTITY_INSERT dbo.locations OFF;
-                END
-                """
-            ),
-            {"id": location_id, "tenant_id": tenant_id},
-        )
 
         # Permission catalog (id is IDENTITY — no explicit ids)
         for code, module_name, action_name in PERMISSIONS:

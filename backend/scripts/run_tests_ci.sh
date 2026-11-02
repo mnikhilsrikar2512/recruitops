@@ -83,34 +83,23 @@ if [ "$SKIP_DOCKER" != "1" ]; then
     run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C \
       -Q "IF DB_ID('$DB_NAME') IS NOT NULL DROP DATABASE [$DB_NAME]; CREATE DATABASE [$DB_NAME];" >/dev/null
 
-    echo "→ applying schema (backend/db/schema.sql)…"
-    if ! run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DB_NAME" -b \
-      -i /dev/stdin < "$BACKEND_DIR/db/schema.sql" >/tmp/schema_apply.log 2>&1; then
-      echo "✗ schema apply failed — first errors:" >&2
-      grep -iE "error|already|invalid|cannot" /tmp/schema_apply.log | head -8 >&2
-      exit 1
-    fi
-
-    echo "→ verifying table count…"
-    table_count=$(run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DB_NAME" -h -1 -W \
-      -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='dbo';" 2>/dev/null | tr -d '[:space:]')
-    if [ -z "$table_count" ] || [ "$table_count" -lt 50 ]; then
-      echo "✗ schema incomplete: expected ≥50 tables, got '${table_count:-none}'" >&2
-      exit 1
-    fi
-    echo "✓ $table_count tables present"
-
-    # Migrations newer than the schema dump (005/006 are in schema.sql;
-    # 007 is covered by seed_ci.py). Same list as scripts/create_staging_db.py.
-    for migration in 008_display_ids.sql 009_branch_offer_toggle.sql 010_tenants.sql 011_admin_seed.sql 012_tenant_settings.sql 013_jwt_sessions.sql 014_login_lockout.sql 015_mfa.sql 016_metric_buckets.sql 017_pipeline_reopen.sql 018_row_versions.sql 019_soft_delete.sql 020_offer_threshold.sql 021_file_pipeline.sql 022_signing_bonus_policy.sql 023_withdraw_reasons.sql 024_requisition_holds.sql 025_client_stage_lists.sql 026_legal.sql 027_privacy.sql 028_signup.sql 029_setup_checklist.sql 030_cross_tenant_duplicate_flags.sql 031_visibility_rules.sql; do
-      echo "→ applying migration $migration…"
-      if ! run_sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DB_NAME" -b \
-        -i /dev/stdin < "$BACKEND_DIR/../scripts/$migration" >/tmp/migration_apply.log 2>&1; then
-        echo "✗ migration $migration failed:" >&2
-        head -8 /tmp/migration_apply.log >&2
+    # Schema baseline + every numbered migration + reference data, through the
+    # same runner every deploy uses (scripts/migrate.py). Run twice: the second
+    # run must find nothing to do, which proves the runner and the migrations
+    # are idempotent before they ever touch a real database.
+    for pass_name in "apply" "re-run (must be a no-op)"; do
+      echo "→ migrate.py: $pass_name…"
+      if ! DB_HOST=localhost DB_PORT="$DB_PORT" DB_NAME="$DB_NAME" DB_USER=sa DB_PASSWORD="$SA_PASSWORD" \
+           DB_ENCRYPT=false DB_TRUST_SERVER_CERTIFICATE=true DEPLOY_ACTOR=ci \
+           .venv/bin/python scripts/migrate.py | tee /tmp/migrate.log; then
+        echo "✗ migrate.py failed" >&2
         exit 1
       fi
     done
+    if ! grep -q " 0 pending" /tmp/migrate.log; then
+      echo "✗ second migrate.py run still found pending migrations" >&2
+      exit 1
+    fi
   fi
 else
   echo "→ SKIP_DOCKER=1 — using already-running database at localhost:${DB_PORT}"

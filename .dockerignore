@@ -1,0 +1,19 @@
+# Keep images small and secret-free: only what the Dockerfiles COPY matters.
+**/.git
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/uploads
+.claude-tmp
+.phase1-logs
+docs/*.pdf
+frontend/tests
+frontend/*.json
+!frontend/package.json
+backend/tests

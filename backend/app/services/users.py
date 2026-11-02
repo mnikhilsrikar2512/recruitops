@@ -7,6 +7,7 @@ from sqlalchemy import Engine
 from app.core.config import settings
 from app.core.security import hash_password, hash_session_token, random_secret
 
+from app.core.email import build_password_setup_email, queue_email
 from app.repositories.audit import insert_audit_log
 from app.repositories.auth import revoke_user_sessions
 from app.repositories.roles import count_permissions_by_codes
@@ -17,6 +18,7 @@ from app.repositories.users import (
     count_user_active_pipeline_ownership,
     count_user_active_requisitions,
     create_password_reset_token,
+    mark_unused_password_reset_tokens_used,
     create_user,
     find_user_by_email,
     find_user_by_employee_code,
@@ -114,7 +116,14 @@ def get_user_detail_service(engine: Engine, user_id: int) -> UserResponse:
     return UserResponse.model_validate(existing)
 
 
-def create_user_service(engine: Engine, payload: UserCreate) -> UserResponse:
+def create_user_service(
+    engine: Engine,
+    payload: UserCreate,
+    background=None,
+    *,
+    invited_by: str | None = None,
+    issued_by_user_id: int | None = None,
+) -> UserResponse:
     if find_user_by_email(engine, str(payload.email)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
@@ -129,7 +138,38 @@ def create_user_service(engine: Engine, payload: UserCreate) -> UserResponse:
     )
 
     created = create_user(engine, payload, hash_password(random_secret(24)))
-    return UserResponse.model_validate(created)
+    user = UserResponse.model_validate(created)
+    send_invitation(engine, user.id, str(payload.email), background, invited_by=invited_by,
+                    issued_by_user_id=issued_by_user_id, purpose="first-password-setup")
+    return user
+
+
+def send_invitation(
+    engine: Engine,
+    user_id: int,
+    email: str,
+    background=None,
+    *,
+    invited_by: str | None = None,
+    issued_by_user_id: int | None = None,
+    purpose: str = "admin-reset",
+) -> str:
+    """Issue a single-use password-setup link and email it to the user.
+    Older open setup links for the user stop working. Returns the raw token
+    (callers decide whether it may be shown; API responses don't return it
+    for new users)."""
+    mark_unused_password_reset_tokens_used(engine, user_id, ("first-password-setup", "admin-reset"))
+    setup_token = random_secret(24)
+    create_password_reset_token(
+        engine,
+        user_id=user_id,
+        token_hash=hash_session_token(setup_token),
+        purpose=purpose,
+        issued_by_user_id=issued_by_user_id,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
+    )
+    queue_email(background, email, build_password_setup_email(setup_token, invited_by=invited_by))
+    return setup_token
 
 
 def update_user_service(engine: Engine, user_id: int, payload: UserUpdate) -> UserResponse:
@@ -181,6 +221,7 @@ def reset_user_credentials_service(
     engine: Engine,
     user_id: int,
     payload: UserResetCredentials,
+    background=None,
 ) -> UserResetCredentialsResponse:
     existing = find_user_by_id(engine, user_id)
     if not existing:
@@ -202,30 +243,8 @@ def reset_user_credentials_service(
             password_setup_status="reset-required",
         )
 
-    # Clean up any stale unused tokens for this user before creating a new one
-    _mark_stale_tokens_used(engine, user_id, "admin-reset")
-
-    setup_token = random_secret(24)
-    try:
-        create_password_reset_token(
-            engine,
-            user_id=user_id,
-            token_hash=hash_session_token(setup_token),
-            purpose="admin-reset",
-            issued_by_user_id=payload.issued_by_user_id,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
-        )
-    except Exception:
-        # Unique constraint violation — mark existing tokens used and retry once
-        _mark_stale_tokens_used(engine, user_id, "admin-reset")
-        create_password_reset_token(
-            engine,
-            user_id=user_id,
-            token_hash=hash_session_token(setup_token),
-            purpose="admin-reset",
-            issued_by_user_id=payload.issued_by_user_id,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
-        )
+    setup_token = send_invitation(engine, user_id, existing.email, background,
+                                  issued_by_user_id=payload.issued_by_user_id, purpose="admin-reset")
 
     update_user_password_state(
         engine,
@@ -241,21 +260,6 @@ def reset_user_credentials_service(
         expires_in_hours=24,
         password_setup_status="reset-required",
     )
-
-
-def _mark_stale_tokens_used(engine: Engine, user_id: int, purpose: str) -> None:
-    """Mark all unused tokens for the given user and purpose as used."""
-    query = text(
-        """
-        UPDATE dbo.password_reset_tokens
-        SET used_at = SYSUTCDATETIME()
-        WHERE user_id = :user_id
-        AND purpose = :purpose
-        AND used_at IS NULL
-        """
-    )
-    with engine.begin() as connection:
-        connection.execute(query, {"user_id": user_id, "purpose": purpose})
 
 
 def deactivate_user_service(

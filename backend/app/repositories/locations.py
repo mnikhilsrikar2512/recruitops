@@ -188,22 +188,6 @@ def create_location(engine: Engine, payload: LocationCreate, tenant_id: int | No
         );
         """
     )
-    # dbo.branches and dbo.locations are parallel tables and the code assumes
-    # branch id == location id (several FKs point at dbo.locations), so every
-    # new office is mirrored with the same id.
-    mirror_query = text(
-        """
-        IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
-        BEGIN
-          SET IDENTITY_INSERT dbo.locations ON;
-          INSERT INTO dbo.locations (id, name, code, location, address, status, location_head_user_id, tenant_id)
-          SELECT b.id, b.name, b.code, b.location, b.address, b.status, b.manager_user_id, b.tenant_id
-          FROM dbo.branches AS b WHERE b.id = :id;
-          SET IDENTITY_INSERT dbo.locations OFF;
-        END
-        """
-    )
-
     with engine.begin() as connection:
         result = connection.execute(
             query,
@@ -219,7 +203,6 @@ def create_location(engine: Engine, payload: LocationCreate, tenant_id: int | No
             },
         )
         location_id = result.scalar_one()
-        connection.execute(mirror_query, {"id": int(location_id)})
 
     created = find_location_by_id(engine, int(location_id))
     if created is None:
@@ -266,19 +249,6 @@ def update_location(engine: Engine, location_id: int, payload: LocationUpdate) -
                 "has_offers_enabled": 1 if "offers_enabled" in payload.model_fields_set else 0,
                 "offers_enabled": payload.offers_enabled,
             },
-        )
-        # keep the dbo.locations mirror in step (same id)
-        connection.execute(
-            text(
-                """
-                UPDATE l SET l.name = b.name, l.location = b.location, l.address = b.address,
-                       l.status = b.status, l.location_head_user_id = b.manager_user_id,
-                       l.updated_at = SYSUTCDATETIME()
-                FROM dbo.locations AS l INNER JOIN dbo.branches AS b ON b.id = l.id
-                WHERE l.id = :location_id;
-                """
-            ),
-            {"location_id": location_id},
         )
 
     updated = find_location_by_id(engine, location_id)

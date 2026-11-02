@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import Engine
 
+from app.core.observability import bind_identity
 from app.core.rbac import COMPANY_SCOPE_CODE
 from app.db.session import create_db_engine
 from app.repositories.auth import list_resolved_permissions
@@ -123,6 +124,7 @@ def get_current_auth_context(
     if credentials is None or credentials.scheme.lower() != "bearer" or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required")
     auth_context = get_auth_context_from_token(engine, credentials.credentials)
+    bind_identity(auth_context.user.id, getattr(auth_context.user, "tenant_id", None))
     # Company-wide reach is a GRANT (scope.company), not a role code (plan 2.5).
     auth_context.company_wide = COMPANY_SCOPE_CODE in resolved_permissions_for(engine, auth_context)
     return auth_context

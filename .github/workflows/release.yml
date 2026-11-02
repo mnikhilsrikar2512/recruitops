@@ -1,0 +1,155 @@
+name: Release
+
+# main is green in CI -> build and scan images -> deploy to staging -> wait
+# for a human approval -> deploy the same images to production.
+# Nobody deploys by hand: every deploy is this workflow, logged here and in
+# the host's .deploy/history.log, and every one runs the migration gate.
+#
+# Setup (once): docs/runbooks/deploy.md. In short, create two GitHub
+# environments, "staging" and "production" (add yourself as a required
+# reviewer on production), each with:
+#   secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+#   vars:    DEPLOY_PATH (default /opt/recruitops), PUBLIC_URL (https://...)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to release (default: main)"
+        required: false
+        default: main
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false   # never interrupt a deploy half-way
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: Build, scan and push images
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      repo: ${{ steps.meta.outputs.repo }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+      - id: meta
+        name: Image names
+        run: |
+          echo "repo=${REGISTRY}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "tag=$(date -u +%Y%m%d)-$(git rev-parse --short=10 HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          tags: ${{ steps.meta.outputs.repo }}/recruitops-api:${{ steps.meta.outputs.tag }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.tag }}
+            GIT_SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Build ops image (API + sqlpackage, runs the scheduler and backups)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: ops
+          load: true
+          tags: ${{ steps.meta.outputs.repo }}/recruitops-ops:${{ steps.meta.outputs.tag }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.tag }}
+            GIT_SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+          cache-from: type=gha,scope=api
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          load: true
+          tags: ${{ steps.meta.outputs.repo }}/recruitops-web:${{ steps.meta.outputs.tag }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.tag }}
+            GIT_SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+      - name: Scan images (fail on fixable critical vulnerabilities)
+        run: |
+          for image in recruitops-api recruitops-ops recruitops-web; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image \
+              --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress \
+              "${{ steps.meta.outputs.repo }}/$image:${{ steps.meta.outputs.tag }}"
+          done
+      - name: Push
+        run: |
+          for image in recruitops-api recruitops-ops recruitops-web; do
+            docker push "${{ steps.meta.outputs.repo }}/$image:${{ steps.meta.outputs.tag }}"
+          done
+      - name: Summary
+        run: echo "Images tagged \`${{ steps.meta.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: staging
+      url: ${{ vars.PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+      - name: Deploy
+        uses: ./.github/actions/deploy
+        with:
+          tag: ${{ needs.build.outputs.tag }}
+          image-repo: ${{ needs.build.outputs.repo }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          user: ${{ secrets.DEPLOY_USER }}
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          path: ${{ vars.DEPLOY_PATH || '/opt/recruitops' }}
+          public-url: ${{ vars.PUBLIC_URL }}
+
+  deploy-production:
+    name: Deploy to production
+    needs: [build, deploy-staging]
+    runs-on: ubuntu-24.04
+    environment:
+      name: production   # required reviewers: the approval gate
+      url: ${{ vars.PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+      - name: Deploy
+        uses: ./.github/actions/deploy
+        with:
+          tag: ${{ needs.build.outputs.tag }}
+          image-repo: ${{ needs.build.outputs.repo }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          user: ${{ secrets.DEPLOY_USER }}
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          path: ${{ vars.DEPLOY_PATH || '/opt/recruitops' }}
+          public-url: ${{ vars.PUBLIC_URL }}

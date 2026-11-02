@@ -22,6 +22,7 @@ from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy import Engine, text
 
 from app.core.config import settings
+from app.core.email import build_signup_verification_email, queue_email
 from app.core.security import generate_session_token, hash_password, hash_session_token
 from app.core.tokens import InvalidToken, decode_signup_token, issue_signup_token
 from app.core.totp import hash_recovery_code, matching_step, new_recovery_codes, new_secret, otpauth_uri
@@ -38,12 +39,7 @@ GENERIC = "Check your email: we've sent a link to confirm your address and finis
 
 
 def _verification_email(token: str) -> tuple[str, str, str]:
-    url = f"{settings.frontend_base_url}/pages/signup-verify.html?token={token}"
-    subject = "Confirm your email to finish setting up RecruitOps"
-    html = (f"<p>Welcome to RecruitOps.</p><p><a href=\"{url}\">Confirm your email address</a> to finish setting up "
-            "your company. The link works for 24 hours.</p><p>If you didn't sign up, ignore this email.</p>")
-    text_body = f"Welcome to RecruitOps.\n\nConfirm your email address: {url}\n\nThe link works for 24 hours."
-    return subject, html, text_body
+    return build_signup_verification_email(token)
 
 
 def _issue_verification(engine: Engine, user_id: int) -> str:
@@ -58,11 +54,7 @@ def _issue_verification(engine: Engine, user_id: int) -> str:
 
 
 def _send(background: BackgroundTasks | None, email: str, token: str) -> None:
-    from app.core.email import send_email
-
-    subject, html, text_body = _verification_email(token)
-    if background is not None:
-        background.add_task(send_email, email, subject, html, text_body)
+    queue_email(background, email, _verification_email(token))
 
 
 def _dev(token: str | None) -> str | None:

@@ -6,6 +6,8 @@ from datetime import datetime
 
 from sqlalchemy import Engine, text
 
+from app.core.secret_box import decrypt, encrypt, mfa_context
+
 
 @dataclass
 class MfaRecord:
@@ -21,7 +23,12 @@ def find_mfa(engine: Engine, user_id: int) -> MfaRecord | None:
             text("SELECT user_id, totp_secret, enabled_at, last_used_step FROM dbo.user_mfa WHERE user_id = :u"),
             {"u": user_id},
         ).mappings().first()
-    return MfaRecord(**row) if row else None
+    if not row:
+        return None
+    record = dict(row)
+    # Stored encrypted (Phase 6.3); callers only ever see the plain seed.
+    record["totp_secret"] = decrypt(record["totp_secret"], mfa_context(record["user_id"]))
+    return MfaRecord(**record)
 
 
 def start_enrollment(engine: Engine, user_id: int, secret: str) -> None:
@@ -34,7 +41,7 @@ def start_enrollment(engine: Engine, user_id: int, secret: str) -> None:
                 INSERT INTO dbo.user_mfa (user_id, totp_secret) VALUES (:u, :s);
                 """
             ),
-            {"u": user_id, "s": secret},
+            {"u": user_id, "s": encrypt(secret, mfa_context(user_id))},
         )
 
 

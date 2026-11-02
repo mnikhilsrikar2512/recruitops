@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 
@@ -241,11 +241,12 @@ def setup_password_endpoint(
 def forgot_password_endpoint(
     payload: PasswordForgotRequest,
     request: Request,
+    background: BackgroundTasks,
     engine: Engine = Depends(get_engine),
 ) -> PasswordForgotResponse:
     rate_limit.enforce("forgot:ip", rate_limit.client_ip(request))
     rate_limit.enforce("forgot:account", str(payload.email))
-    return forgot_password_service(engine, payload)
+    return forgot_password_service(engine, payload, background)
 
 
 @router.post("/password/reset", response_model=PasswordResetResponse)

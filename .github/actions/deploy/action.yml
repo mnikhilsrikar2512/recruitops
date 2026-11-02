@@ -1,0 +1,41 @@
+name: Deploy over SSH
+description: Copy the server kit to the host and run deploy.sh with one image tag.
+inputs:
+  tag: { required: true, description: Image tag to deploy }
+  image-repo: { required: true, description: "Registry + owner, e.g. ghcr.io/acme" }
+  host: { required: true, description: SSH host }
+  user: { required: true, description: SSH user (in the docker group) }
+  ssh-key: { required: true, description: Private key for that user }
+  known-hosts: { required: true, description: "Host key line(s): ssh-keyscan -H <host>" }
+  path: { required: true, description: Directory on the host }
+  public-url: { required: true, description: "https://... checked after the rollout" }
+runs:
+  using: composite
+  steps:
+    - name: SSH setup
+      shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh-key }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        install -m 700 -d ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+        printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+    - name: Copy the server kit
+      shell: bash
+      run: |
+        scp -i ~/.ssh/deploy_key -o BatchMode=yes \
+          deploy/server/docker-compose.yml deploy/server/Caddyfile deploy/server/deploy.sh \
+          "${{ inputs.user }}@${{ inputs.host }}:${{ inputs.path }}/"
+    - name: Run deploy.sh (migrate gate, rollout, verify, auto-rollback)
+      shell: bash
+      run: |
+        ssh -i ~/.ssh/deploy_key -o BatchMode=yes "${{ inputs.user }}@${{ inputs.host }}" \
+          "cd '${{ inputs.path }}' && chmod +x deploy.sh && IMAGE_REPO='${{ inputs.image-repo }}' PUBLIC_URL='${{ inputs.public-url }}' DEPLOY_ACTOR='github:${{ github.actor }}:${{ github.run_id }}' ./deploy.sh '${{ inputs.tag }}'"
+    - name: Public check
+      shell: bash
+      run: curl -fsS --retry 5 --retry-delay 5 "${{ inputs.public-url }}/api/v1/health" | grep -q '"database_status":"ok"'
+    - name: Clean up the key
+      if: always()
+      shell: bash
+      run: rm -f ~/.ssh/deploy_key

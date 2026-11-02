@@ -16,7 +16,7 @@ Use this when a customer **isn't** signing up themselves at `/pages/signup.html`
        --dpa-signed-by "Priya Rao (Director), DPA ref ACME-2026-01"
    ```
    It prints the company id, its **slug**, and a one-time **password setup link** that is valid for 24 hours.
-2. **Send the link** to the admin through a channel you trust, such as their verified work email.
+2. **Send the link** to the admin. Add `--email` to step 1 and the script emails it for you (needs `EMAIL_ENABLED=true` and the SMTP settings); it says whether the email went out. Without `--email`, or if sending fails, send the printed link yourself through a channel you trust.
 3. The admin opens the link and sets a password. This also confirms their email address.
 4. **Activation happens automatically.** Right after setting the password, the admin is taken to set up two-step verification (required for admins in staging and production). When that's done, the company becomes **active**. In development, with two-step verification not enforced, the company is active as soon as the password is set.
    - If the admin lost the page part-way, reissue a setup link with `.venv/bin/python scripts/provision_company.py --reissue-link <their email>` (the old link stops working). Then check with `.venv/bin/python scripts/activate_company.py --slug <slug>`, which lists anyone still missing two-step verification.

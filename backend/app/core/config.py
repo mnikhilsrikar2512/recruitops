@@ -1,3 +1,5 @@
+import os
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,6 +9,13 @@ DEV_CORS_ORIGINS = (
     "http://localhost:4174,http://127.0.0.1:4174,"
     "http://localhost:3000,http://127.0.0.1:3000"
 )
+
+
+def _secrets_dir() -> str | None:
+    path = os.environ.get("SECRETS_DIR", "").strip()
+    return path if path and os.path.isdir(path) else None
+
+
 PRODUCTION_ENVS = {"production", "prod", "staging"}
 
 
@@ -56,6 +65,20 @@ class Settings(BaseSettings):
     email_from_name: str = Field(default="Recruitment System", alias="EMAIL_FROM_NAME")
     email_from_address: str = Field(default="", alias="EMAIL_FROM_ADDRESS")
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
+    email_reply_to: str = Field(default="", alias="EMAIL_REPLY_TO")
+    # Phase 6.3: AES-256-GCM key ring for TOTP seeds at rest (app/core/secret_box.py)
+    mfa_encryption_keys: str = Field(default="", alias="MFA_ENCRYPTION_KEYS")
+    # Phase 6.4 observability
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    log_format: str = Field(default="", alias="LOG_FORMAT")  # json | text; empty = json in staging/production
+    metrics_token: str = Field(default="", alias="METRICS_TOKEN")
+    sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
+    sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
+    api_docs_enabled_setting: bool | None = Field(default=None, alias="API_DOCS_ENABLED")
+    smtp_timeout_seconds: float = Field(default=15.0, alias="SMTP_TIMEOUT_SECONDS")
+    # Verify the SMTP server's certificate. Only a staging stack with a
+    # self-signed test mail server may turn this off; production refuses.
+    smtp_validate_certs: bool = Field(default=True, alias="SMTP_VALIDATE_CERTS")
     ai_provider: str = Field(default="mock", alias="AI_PROVIDER")
     ai_max_items_per_run: int = Field(default=20, alias="AI_MAX_ITEMS_PER_RUN")
     # AI is OFF at launch (decision D-10): in staging/production the agents
@@ -63,13 +86,7 @@ class Settings(BaseSettings):
     # true there until the §4.16 gates ship. Development keeps agents on.
     ai_enabled: bool = Field(default=False, alias="AI_ENABLED")
 
-    # ── Scaffolding for production-readiness Phases 3–4 (not yet consumed) ──
-    # Object storage (Phase 4.1): "local" keeps core/storage.py's disk path.
-    storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")
-    s3_bucket: str = Field(default="", alias="S3_BUCKET")
-    s3_region: str = Field(default="", alias="S3_REGION")
-    s3_endpoint_url: str = Field(default="", alias="S3_ENDPOINT_URL")
-    signed_url_ttl_seconds: int = Field(default=300, alias="SIGNED_URL_TTL_SECONDS")
+    # (Storage settings are declared once, above, with the upload pipeline.)
     # Rate limiting / session denylist / permission cache (Phase 3.7).
     redis_url: str = Field(default="", alias="REDIS_URL")
     # JWT access + rotating refresh tokens (Phase 3.1–3.2).
@@ -106,17 +123,31 @@ class Settings(BaseSettings):
         return self.app_env.strip().lower() in PRODUCTION_ENVS
 
     @property
+    def api_docs_enabled(self) -> bool:
+        """/docs and /redoc: on in development and staging, off in production
+        unless API_DOCS_ENABLED says otherwise."""
+        if self.api_docs_enabled_setting is not None:
+            return self.api_docs_enabled_setting
+        return self.app_env.strip().lower() not in {"production", "prod"}
+
+    @property
     def ai_agents_available(self) -> bool:
         return self.ai_enabled or not self.is_production
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip().rstrip("/") for origin in self.cors_origins.split(",") if origin.strip()]
 
+    # Phase 6.3: secrets can come from files instead of the environment —
+    # one file per setting, named like the variable (JWT_SIGNING_KEY,
+    # DB_PASSWORD, ...), in SECRETS_DIR. That is how Docker/Kubernetes
+    # secrets and cloud secret stores mounted as volumes arrive. A real
+    # environment variable still wins over a file; .env is for development.
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        secrets_dir=_secrets_dir(),
     )
 
 
@@ -155,6 +186,29 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("S3_BUCKET must be set when STORAGE_BACKEND=s3")
     if config.malware_scanner.strip().lower() != "clamav":
         errors.append("MALWARE_SCANNER must be clamav in staging/production (builtin only detects the EICAR test file)")
+    if not config.email_enabled:
+        errors.append("EMAIL_ENABLED must be true in staging/production (sign-up verification, invites and password resets are emailed)")
+    elif not config.smtp_host or not config.email_from_address:
+        errors.append("SMTP_HOST and EMAIL_FROM_ADDRESS must be set when EMAIL_ENABLED=true")
+    elif not config.smtp_use_tls:
+        errors.append("SMTP_USE_TLS must stay true in staging/production")
+    if not config.frontend_base_url.startswith("https://"):
+        errors.append("FRONTEND_BASE_URL must be an https:// URL in staging/production (it is the link in every email)")
+    from app.core.secret_box import SecretBoxError, parse_key_ring  # noqa: PLC0415 (secret_box imports config)
+
+    try:
+        if not parse_key_ring(config.mfa_encryption_keys):
+            errors.append("MFA_ENCRYPTION_KEYS must be set in staging/production (encrypts two-step verification secrets)")
+    except SecretBoxError as exc:
+        errors.append(f"MFA_ENCRYPTION_KEYS is invalid: {exc}")
+    if config.app_env.strip().lower() in ("production", "prod"):
+        # Live data: the database and mail links must verify the far end.
+        if not config.db_encrypt or config.db_trust_server_certificate:
+            errors.append("production needs DB_ENCRYPT=true and DB_TRUST_SERVER_CERTIFICATE=false")
+        if not config.smtp_validate_certs:
+            errors.append("SMTP_VALIDATE_CERTS must stay true in production")
+    if len(config.metrics_token) < 24:
+        errors.append("METRICS_TOKEN must be a secret of at least 24 characters in staging/production (protects /metrics)")
     if config.trusted_proxy_count < 1:
         errors.append(
             "TRUSTED_PROXY_COUNT must be >= 1 in staging/production (TLS terminates at the load "

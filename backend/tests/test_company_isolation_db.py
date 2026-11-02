@@ -86,17 +86,6 @@ def world():
             ),
             {"name": f"Company B HQ {sfx}", "code": code_a, "t": tenant_b},
         ).scalar_one()
-        connection.execute(
-            text(
-                """
-                SET IDENTITY_INSERT dbo.locations ON;
-                INSERT INTO dbo.locations (id, name, code, location, status, tenant_id)
-                VALUES (:id, :name, :code, :name, N'active', :t);
-                SET IDENTITY_INSERT dbo.locations OFF;
-                """
-            ),
-            {"id": office_b, "name": f"Company B HQ {sfx}", "code": code_a, "t": tenant_b},
-        )
         email_b = f"admin-b-{sfx}@example.com"
         admin_b_id = connection.execute(
             text(
@@ -205,7 +194,6 @@ def _cleanup(engine, w) -> None:
         ("DELETE FROM dbo.users WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.role_permissions WHERE role_id IN (SELECT id FROM dbo.roles WHERE tenant_id = :t)", {}),
         ("DELETE FROM dbo.roles WHERE tenant_id = :t", {}),
-        ("DELETE FROM dbo.locations WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.branches WHERE tenant_id = :t", {}),
         ("DELETE FROM dbo.tenants WHERE id = :t", {}),
     ]

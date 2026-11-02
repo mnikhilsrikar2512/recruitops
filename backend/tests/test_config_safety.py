@@ -24,12 +24,19 @@ def test_production_rejects_plain_http_origins():
     assert any("https" in error for error in validate_settings(config))
 
 
+PROD_EMAIL = dict(EMAIL_ENABLED=True, SMTP_HOST="smtp.example.com", EMAIL_FROM_ADDRESS="no-reply@example.com",
+                  SMTP_USE_TLS=True, FRONTEND_BASE_URL="https://app.example.com",
+                  METRICS_TOKEN="m" * 32,
+                  MFA_ENCRYPTION_KEYS="k1:" + "A" * 43,
+                  DB_ENCRYPT=True, DB_TRUST_SERVER_CERTIFICATE=False)
+
+
 def test_production_accepts_exact_https_origins():
     config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x",
                        JWT_SIGNING_KEY="k" * 48, REDIS_URL="redis://cache:6379/0",
                        RATE_LIMIT_ENABLED=True,  # explicit: the verify script exports it false
                        STORAGE_BACKEND="s3", S3_BUCKET="recruitops-files", MALWARE_SCANNER="clamav",
-                       TRUSTED_PROXY_COUNT=1)
+                       TRUSTED_PROXY_COUNT=1, **PROD_EMAIL)
     assert validate_settings(config) == []
 
 
@@ -73,3 +80,37 @@ def test_production_refuses_local_storage_and_builtin_scanner():
     assert any("MALWARE_SCANNER" in e for e in errors)
     bucketless = _settings(APP_ENV="production", STORAGE_BACKEND="s3", MALWARE_SCANNER="clamav")
     assert any("S3_BUCKET" in e for e in validate_settings(bucketless))
+
+
+def test_production_requires_working_email():
+    base = dict(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    assert any("EMAIL_ENABLED" in e for e in validate_settings(_settings(**base, EMAIL_ENABLED=False)))
+    no_host = _settings(**base, EMAIL_ENABLED=True, SMTP_HOST="", EMAIL_FROM_ADDRESS="a@b.com")
+    assert any("SMTP_HOST" in e for e in validate_settings(no_host))
+    plain = _settings(**base, **{**PROD_EMAIL, "SMTP_USE_TLS": False})
+    assert any("SMTP_USE_TLS" in e for e in validate_settings(plain))
+    http_links = _settings(**base, **{**PROD_EMAIL, "FRONTEND_BASE_URL": "http://app.example.com"})
+    assert any("FRONTEND_BASE_URL" in e for e in validate_settings(http_links))
+
+
+def test_production_requires_a_metrics_token():
+    config = _settings(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    assert any("METRICS_TOKEN" in e for e in validate_settings(config))
+
+
+def test_api_docs_are_off_in_production_only():
+    assert _settings(APP_ENV="development").api_docs_enabled is True
+    assert _settings(APP_ENV="staging").api_docs_enabled is True
+    assert _settings(APP_ENV="production").api_docs_enabled is False
+    assert _settings(APP_ENV="production", API_DOCS_ENABLED=True).api_docs_enabled is True
+
+
+def test_production_verifies_database_and_mail_certificates():
+    base = dict(APP_ENV="production", CORS_ORIGINS="https://app.example.com", DB_PASSWORD="x")
+    loose_db = _settings(**base, DB_ENCRYPT=True, DB_TRUST_SERVER_CERTIFICATE=True)
+    assert any("DB_TRUST_SERVER_CERTIFICATE" in e for e in validate_settings(loose_db))
+    loose_mail = _settings(**base, SMTP_VALIDATE_CERTS=False)
+    assert any("SMTP_VALIDATE_CERTS" in e for e in validate_settings(loose_mail))
+    staging = _settings(APP_ENV="staging", CORS_ORIGINS="https://s.example.com", DB_PASSWORD="x",
+                        SMTP_VALIDATE_CERTS=False, DB_TRUST_SERVER_CERTIFICATE=True)
+    assert not any("SMTP_VALIDATE_CERTS" in e or "DB_TRUST" in e for e in validate_settings(staging))
