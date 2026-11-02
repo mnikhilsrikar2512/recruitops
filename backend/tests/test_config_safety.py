@@ -26,7 +26,8 @@ def test_production_rejects_plain_http_origins():
 
 PROD_EMAIL = dict(EMAIL_ENABLED=True, SMTP_HOST="smtp.example.com", EMAIL_FROM_ADDRESS="no-reply@example.com",
                   SMTP_USE_TLS=True, FRONTEND_BASE_URL="https://app.example.com",
-                  METRICS_TOKEN="m" * 32)
+                  METRICS_TOKEN="m" * 32,
+                  MFA_ENCRYPTION_KEYS="k1:" + "A" * 43)
 
 
 def test_production_accepts_exact_https_origins():

@@ -1,3 +1,5 @@
+import os
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,6 +9,13 @@ DEV_CORS_ORIGINS = (
     "http://localhost:4174,http://127.0.0.1:4174,"
     "http://localhost:3000,http://127.0.0.1:3000"
 )
+
+
+def _secrets_dir() -> str | None:
+    path = os.environ.get("SECRETS_DIR", "").strip()
+    return path if path and os.path.isdir(path) else None
+
+
 PRODUCTION_ENVS = {"production", "prod", "staging"}
 
 
@@ -57,6 +66,8 @@ class Settings(BaseSettings):
     email_from_address: str = Field(default="", alias="EMAIL_FROM_ADDRESS")
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
     email_reply_to: str = Field(default="", alias="EMAIL_REPLY_TO")
+    # Phase 6.3: AES-256-GCM key ring for TOTP seeds at rest (app/core/secret_box.py)
+    mfa_encryption_keys: str = Field(default="", alias="MFA_ENCRYPTION_KEYS")
     # Phase 6.4 observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_format: str = Field(default="", alias="LOG_FORMAT")  # json | text; empty = json in staging/production
@@ -129,11 +140,17 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [origin.strip().rstrip("/") for origin in self.cors_origins.split(",") if origin.strip()]
 
+    # Phase 6.3: secrets can come from files instead of the environment —
+    # one file per setting, named like the variable (JWT_SIGNING_KEY,
+    # DB_PASSWORD, ...), in SECRETS_DIR. That is how Docker/Kubernetes
+    # secrets and cloud secret stores mounted as volumes arrive. A real
+    # environment variable still wins over a file; .env is for development.
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        secrets_dir=_secrets_dir(),
     )
 
 
@@ -180,6 +197,13 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("SMTP_USE_TLS must stay true in staging/production")
     if not config.frontend_base_url.startswith("https://"):
         errors.append("FRONTEND_BASE_URL must be an https:// URL in staging/production (it is the link in every email)")
+    from app.core.secret_box import SecretBoxError, parse_key_ring  # noqa: PLC0415 (secret_box imports config)
+
+    try:
+        if not parse_key_ring(config.mfa_encryption_keys):
+            errors.append("MFA_ENCRYPTION_KEYS must be set in staging/production (encrypts two-step verification secrets)")
+    except SecretBoxError as exc:
+        errors.append(f"MFA_ENCRYPTION_KEYS is invalid: {exc}")
     if len(config.metrics_token) < 24:
         errors.append("METRICS_TOKEN must be a secret of at least 24 characters in staging/production (protects /metrics)")
     if config.trusted_proxy_count < 1:
