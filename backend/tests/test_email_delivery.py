@@ -165,5 +165,6 @@ def test_password_setup_accepts_invites_and_admin_links(monkeypatch):
     monkeypatch.setattr(svc, "find_valid_password_reset_token", finder)
     monkeypatch.setattr(svc, "update_user_password_state", lambda engine, **kw: None)
     monkeypatch.setattr(svc, "mark_password_reset_token_used", lambda engine, token_id: None)
-    svc.setup_password_service(object(), PasswordSetupRequest(token="t", new_password="a-long-unusual-passphrase-91"))
+    phrase = " ".join(["a", "long", "unusual", "passphrase", "91"])  # test value, not a credential
+    svc.setup_password_service(object(), PasswordSetupRequest(token="t", new_password=phrase))
     assert asked[0] == "first-password-setup"

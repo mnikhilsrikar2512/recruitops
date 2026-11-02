@@ -112,14 +112,16 @@ def _exec_batches(cursor, sql_text: str) -> None:
             pass
 
 
-def _connect(database: str, attempts: int = 30):
-    """The database container may still be starting: retry for ~60 s."""
+def _connect(database: str, attempts: int | None = None):
+    """The database may still be starting: retry for about a minute
+    (MIGRATE_CONNECT_ATTEMPTS x ~7 s), then give up."""
     import pyodbc
 
+    attempts = attempts or int(os.environ.get("MIGRATE_CONNECT_ATTEMPTS", "8"))
     last: Exception | None = None
     for _ in range(attempts):
         try:
-            return pyodbc.connect(_connection_string(database), autocommit=True, timeout=10)
+            return pyodbc.connect(_connection_string(database), autocommit=True, timeout=5)
         except pyodbc.Error as exc:  # noqa: PERF203
             last = exc
             time.sleep(2)

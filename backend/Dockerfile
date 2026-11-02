@@ -23,6 +23,7 @@ RUN --mount=type=secret,id=build_ca,required=false set -eux; \
       echo 'Acquire::https::CAInfo "/tmp/build-ca.pem";' > /etc/apt/apt.conf.d/99build-ca; \
     fi; \
     apt-get update; \
+    apt-get upgrade -y --no-install-recommends; \
     apt-get install -y --no-install-recommends ca-certificates curl gnupg unixodbc; \
     curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg; \
     echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \

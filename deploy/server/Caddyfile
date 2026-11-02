@@ -1,0 +1,13 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$DOMAIN} {
+	encode gzip
+	# Probes and metrics belong to the private network only (nginx doesn't
+	# proxy them either; this is a second lock on the door).
+	@internal path /livez /readyz /metrics
+	respond @internal 404
+	reverse_proxy web:8080
+}
