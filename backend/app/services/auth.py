@@ -10,6 +10,7 @@ from app.core.rbac import COMPANY_SCOPE_CODE
 from app.repositories.display_ids import find_branch_by_id
 
 from app.core.config import settings
+from app.core.email import build_password_reset_email, queue_email
 from app.core.security import (
     generate_session_token,
     hash_password,
@@ -54,6 +55,7 @@ from app.repositories.users import (
     find_user_by_email,
     find_valid_password_reset_token,
     mark_password_reset_token_used,
+    mark_unused_password_reset_tokens_used,
     update_own_profile_fields,
     update_user_password_hash,
     update_user_password_state,
@@ -76,6 +78,10 @@ from app.schemas.auth import (
     ProfileUpdateRequest,
 )
 from app.schemas.permission import PermissionScopePayload, ResolvedPermissionsResponse
+
+FORGOT_PURPOSE = "forgot-password"  # one of CK_password_reset_tokens_purpose's values
+SETUP_PURPOSES = ("first-password-setup", "admin-reset")  # links that /auth/password/setup accepts
+FORGOT_MESSAGE = "If an account with that email exists, a reset link has been sent"
 
 SESSION_TTL_HOURS = settings.session_ttl_hours
 
@@ -463,7 +469,11 @@ def setup_password_service(
     from app.core.security import sha256_hex
 
     token_hash = sha256_hex(payload.token)
-    token_record = find_valid_password_reset_token(engine, token_hash, "admin-reset")
+    token_record = None
+    for purpose in SETUP_PURPOSES:
+        token_record = find_valid_password_reset_token(engine, token_hash, purpose)
+        if token_record:
+            break
     if not token_record:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -518,28 +528,25 @@ def _after_first_password(engine: Engine, user_id: int) -> PasswordSetupResponse
 def forgot_password_service(
     engine: Engine,
     payload: PasswordForgotRequest,
+    background=None,
 ) -> PasswordForgotResponse:
+    """Same answer whether or not the address exists; only an active user
+    gets a link, emailed after the response (never returned in it)."""
     user = find_user_by_email(engine, payload.email)
-    if not user:
-        return PasswordForgotResponse(
-            message="If an account with that email exists, a reset link has been sent"
-        )
-    if user.status != "active":
-        return PasswordForgotResponse(
-            message="If an account with that email exists, a reset link has been sent"
-        )
-    setup_token = generate_session_token()
+    if not user or user.status != "active":
+        return PasswordForgotResponse(message=FORGOT_MESSAGE)
+    mark_unused_password_reset_tokens_used(engine, user.id, (FORGOT_PURPOSE,))
+    reset_token = generate_session_token()
     create_password_reset_token(
         engine,
         user_id=user.id,
-        token_hash=hash_session_token(setup_token),
-        purpose="self-reset",
+        token_hash=hash_session_token(reset_token),
+        purpose=FORGOT_PURPOSE,
         issued_by_user_id=user.id,
         expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.token_expiry_hours),
     )
-    return PasswordForgotResponse(
-        message="If an account with that email exists, a reset link has been sent"
-    )
+    queue_email(background, user.email, build_password_reset_email(reset_token))
+    return PasswordForgotResponse(message=FORGOT_MESSAGE)
 
 
 def reset_password_service(
@@ -549,7 +556,7 @@ def reset_password_service(
     from app.core.security import sha256_hex
 
     token_hash = sha256_hex(payload.token)
-    token_record = find_valid_password_reset_token(engine, token_hash, "self-reset")
+    token_record = find_valid_password_reset_token(engine, token_hash, FORGOT_PURPOSE)
     if not token_record:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

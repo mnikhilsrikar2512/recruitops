@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query
 from sqlalchemy import Engine
 
 from app.api.deps import (
@@ -91,12 +91,16 @@ def list_users_endpoint(
 @router.post("/", response_model=UserResponse, status_code=201)
 def create_user_endpoint(
     payload: UserCreate,
+    background: BackgroundTasks,
     _auth: object = Depends(require_permissions("user.create")),
     auth_context: AuthContext = Depends(get_current_auth_context),
     engine: Engine = Depends(get_engine),
 ) -> UserResponse:
+    """Creates the user and emails them a single-use password-setup link."""
     _assert_assignments_in_company(engine, auth_context, payload.primary_location_id, payload.primary_role_id, payload.reporting_manager_user_id)
-    return create_user_service(engine, payload)
+    return create_user_service(engine, payload, background,
+                               invited_by=getattr(auth_context.user, "full_name", None),
+                               issued_by_user_id=auth_context.user.id)
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -125,12 +129,17 @@ def update_user_endpoint(
 @router.post("/{user_id}/credentials/reset", response_model=UserResetCredentialsResponse)
 def reset_user_credentials_endpoint(
     payload: UserResetCredentials,
+    background: BackgroundTasks,
     _auth: object = Depends(require_permissions("user.credentials.manage")),
     _in_scope: object = Depends(_scope_user),
+    auth_context: AuthContext = Depends(get_current_auth_context),
     user_id: int = Path(..., ge=1),
     engine: Engine = Depends(get_engine),
 ) -> UserResetCredentialsResponse:
-    return reset_user_credentials_service(engine, user_id, payload)
+    """setup-link mode emails the user a fresh link; the issuer is always the
+    signed-in admin, never an id sent by the browser."""
+    payload = payload.model_copy(update={"issued_by_user_id": auth_context.user.id})
+    return reset_user_credentials_service(engine, user_id, payload, background)
 
 
 @router.post("/{user_id}/deactivate", response_model=UserDeactivationResponse)

@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     email_from_name: str = Field(default="Recruitment System", alias="EMAIL_FROM_NAME")
     email_from_address: str = Field(default="", alias="EMAIL_FROM_ADDRESS")
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
+    email_reply_to: str = Field(default="", alias="EMAIL_REPLY_TO")
+    smtp_timeout_seconds: float = Field(default=15.0, alias="SMTP_TIMEOUT_SECONDS")
     ai_provider: str = Field(default="mock", alias="AI_PROVIDER")
     ai_max_items_per_run: int = Field(default=20, alias="AI_MAX_ITEMS_PER_RUN")
     # AI is OFF at launch (decision D-10): in staging/production the agents
@@ -155,6 +157,14 @@ def validate_settings(config: "Settings") -> list[str]:
         errors.append("S3_BUCKET must be set when STORAGE_BACKEND=s3")
     if config.malware_scanner.strip().lower() != "clamav":
         errors.append("MALWARE_SCANNER must be clamav in staging/production (builtin only detects the EICAR test file)")
+    if not config.email_enabled:
+        errors.append("EMAIL_ENABLED must be true in staging/production (sign-up verification, invites and password resets are emailed)")
+    elif not config.smtp_host or not config.email_from_address:
+        errors.append("SMTP_HOST and EMAIL_FROM_ADDRESS must be set when EMAIL_ENABLED=true")
+    elif not config.smtp_use_tls:
+        errors.append("SMTP_USE_TLS must stay true in staging/production")
+    if not config.frontend_base_url.startswith("https://"):
+        errors.append("FRONTEND_BASE_URL must be an https:// URL in staging/production (it is the link in every email)")
     if config.trusted_proxy_count < 1:
         errors.append(
             "TRUSTED_PROXY_COUNT must be >= 1 in staging/production (TLS terminates at the load "

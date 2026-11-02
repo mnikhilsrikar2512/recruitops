@@ -128,19 +128,38 @@ def test_forgot_password_creates_token_for_existing_user(monkeypatch) -> None:
         lambda engine, email: make_login_user_record(),
     )
     captured = {}
+    retired = []
     monkeypatch.setattr(
         "app.services.auth.create_password_reset_token",
         lambda engine, **kwargs: captured.update(kwargs),
     )
+    monkeypatch.setattr(
+        "app.services.auth.mark_unused_password_reset_tokens_used",
+        lambda engine, user_id, purposes: retired.append((user_id, purposes)),
+    )
 
+    class Queue:
+        def __init__(self):
+            self.tasks = []
+
+        def add_task(self, fn, *args):
+            self.tasks.append(args)
+
+    queue = Queue()
     response = forgot_password_service(
         object(),
         PasswordForgotRequest(email="test@example.com"),
+        queue,
     )
 
     assert "reset link" in response.message.lower()
     assert captured["user_id"] == 22
-    assert captured["purpose"] == "self-reset"
+    # Must be a value CK_password_reset_tokens_purpose allows (it was 'self-reset', which the DB rejects).
+    assert captured["purpose"] == "forgot-password"
+    assert retired == [(22, ("forgot-password",))]
+    (to, subject, html_body, _text), = queue.tasks
+    assert to == make_login_user_record().email
+    assert "Reset" in subject and "/pages/reset-password.html?token=" in html_body
 
 
 def test_reset_password_rejects_invalid_token(monkeypatch) -> None:

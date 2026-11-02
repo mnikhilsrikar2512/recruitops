@@ -830,6 +830,20 @@ def mark_password_reset_token_used(engine: Engine, token_id: int) -> None:
         connection.execute(query, {"token_id": token_id})
 
 
+def mark_unused_password_reset_tokens_used(engine: Engine, user_id: int, purposes: tuple[str, ...]) -> None:
+    """Retire every still-open link of these purposes for a user, so only the
+    newest link works (and the one-open-token unique index is never hit)."""
+    if not purposes:
+        return
+    names = ", ".join(f":p{i}" for i in range(len(purposes)))
+    query = text(
+        f"UPDATE dbo.password_reset_tokens SET used_at = SYSUTCDATETIME() "
+        f"WHERE user_id = :user_id AND used_at IS NULL AND purpose IN ({names});"
+    )
+    with engine.begin() as connection:
+        connection.execute(query, {"user_id": user_id, **{f"p{i}": p for i, p in enumerate(purposes)}})
+
+
 # ---- Extra permissions (direct grants beyond a user's role(s)) -------------
 #
 # dbo.user_extra_permissions already existed in the schema (tenant-scoped,

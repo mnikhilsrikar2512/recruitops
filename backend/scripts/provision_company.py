@@ -8,7 +8,7 @@
 
 Creates the company (pending), head office and first Admin, records the DPA
 the customer signed offline on the company's behalf, and prints a one-time
-password setup link (24 h). The admin sets a password, signs in, accepts the
+password setup link (24 h); with --email it is also emailed. The admin sets a password, signs in, accepts the
 Terms and Privacy Policy, and sets up two-step verification; then:
 
     .venv/bin/python scripts/activate_company.py --slug <slug printed below>
@@ -31,9 +31,11 @@ def main() -> None:
     ap.add_argument("--city", default=None)
     ap.add_argument("--dpa-signed-by", help="who signed the DPA offline, and the document reference")
     ap.add_argument("--reissue-link", metavar="EMAIL", help="new setup link for the first admin of a still-pending company")
+    ap.add_argument("--email", action="store_true",
+                    help="also email the setup link to the admin (needs EMAIL_ENABLED and SMTP settings)")
     opts = ap.parse_args()
     if opts.reissue_link:
-        return reissue(opts.reissue_link.strip().lower())
+        return reissue(opts.reissue_link.strip().lower(), send=opts.email)
     if not (opts.company and opts.admin_name and opts.admin_email and opts.dpa_signed_by):
         ap.error("--company, --admin-name, --admin-email and --dpa-signed-by are required")
 
@@ -70,9 +72,18 @@ def main() -> None:
     print(f"  admin: {opts.admin_email} — send them this one-time link (24 h):")
     print(f"  {settings.frontend_base_url}/pages/password-setup.html?token={token}")
     print(f"  after they set up two-step verification: scripts/activate_company.py --slug {slug}")
+    if opts.email:
+        _email_link(opts.admin_email.strip().lower(), token, company=opts.company.strip())
 
 
-def reissue(email: str) -> None:
+def _email_link(to: str, token: str, company: str | None = None) -> None:
+    from app.core.email import build_password_setup_email, send_email_sync
+
+    sent = send_email_sync(to, build_password_setup_email(token, company_name=company, expires_in_hours=24))
+    print(f"  {'✓ emailed to ' + to if sent else '✗ email NOT sent (see log) — share the link above yourself'}")
+
+
+def reissue(email: str, send: bool = False) -> None:
     from sqlalchemy import text
 
     from app.core.config import settings
@@ -93,6 +104,8 @@ def reissue(email: str) -> None:
     create_password_reset_token(engine, user_id=int(row[0]), token_hash=hash_session_token(token), purpose="admin-reset",
                                 issued_by_user_id=None, expires_at=datetime.now(timezone.utc) + timedelta(hours=24))
     print(f"✓ new one-time link (24 h): {settings.frontend_base_url}/pages/password-setup.html?token={token}")
+    if send:
+        _email_link(email, token)
 
 
 if __name__ == "__main__":

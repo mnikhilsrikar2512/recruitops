@@ -80,7 +80,7 @@ def test_login_is_limited_to_10_per_minute_per_account(limits_on, monkeypatch) -
 
 def test_forgot_password_is_limited_per_account(limits_on, monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.auth.forgot_password_service",
-                        lambda engine, payload: {"message": "If an account with that email exists, a reset link has been sent"})
+                        lambda engine, payload, background=None: {"message": "If an account with that email exists, a reset link has been sent"})
     client = TestClient(create_application(), raise_server_exceptions=False)
     codes = [
         client.post(f"{API}/auth/password/forgot", json={"email": "victim@example.com"},

@@ -1170,8 +1170,8 @@ async function submitRequisition() {
   const userId = intOrNull(button?.dataset.userId);
   if (!userId) { showLiveError(new Error("No user selected.")); return; }
   try {
-    await apiRequest(`/users/${userId}/credentials/reset`, { method: "POST" });
-    showLiveSuccess("Credentials reset", "A new invitation email has been sent.");
+    await apiRequest(`/users/${userId}/credentials/reset`, { method: "POST", body: { mode: "setup-link" } });
+    showLiveSuccess("Setup link sent", "The user has been emailed a new single-use link to set their password.");
   } catch (error) { showLiveError(error); }
 }
 
