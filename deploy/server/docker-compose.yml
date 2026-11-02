@@ -34,6 +34,8 @@ services:
 
   scheduler:
     <<: *app
+    # The ops image: the API image plus sqlpackage, for backups and restore drills.
+    image: ${IMAGE_REPO}/recruitops-ops:${IMAGE_TAG}
     command: ["scheduler"]
     healthcheck:
       test: ["CMD-SHELL", "find /tmp/recruitops/scheduler-heartbeat -mmin -3 | grep -q ."]

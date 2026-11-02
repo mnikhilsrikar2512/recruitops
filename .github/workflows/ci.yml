@@ -97,15 +97,21 @@ jobs:
       - name: Build images
         run: |
           docker build -q -f backend/Dockerfile -t recruitops-api:ci .
+          docker build -q -f backend/Dockerfile --target ops -t recruitops-ops:ci .
           docker build -q -f frontend/Dockerfile -t recruitops-web:ci .
       - name: Image scan (fixable critical vulnerabilities fail the build)
         run: |
-          for image in recruitops-api:ci recruitops-web:ci; do
+          for image in recruitops-api:ci recruitops-ops:ci recruitops-web:ci; do
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image \
               --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress "$image"
           done
+      - name: Alert rules are valid and behave as tested
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring:/m" -w /m --entrypoint promtool prom/prometheus:v2.55.1 check rules alerts.yml
+          docker run --rm -v "$PWD/deploy/monitoring:/m" -w /m --entrypoint promtool prom/prometheus:v2.55.1 test rules alerts.test.yml
       - name: Images start as a non-root user
         run: |
           test "$(docker run --rm --entrypoint id recruitops-api:ci -u)" = "10001"
+          test "$(docker run --rm --entrypoint id recruitops-ops:ci -u)" = "10001"
           test "$(docker run --rm --entrypoint id recruitops-web:ci -u)" = "101"
 

@@ -129,7 +129,9 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: recruitops-api:local
+    # The ops image (API image + sqlpackage) also runs backups and restore drills.
+    build: { context: ../.., dockerfile: backend/Dockerfile, target: ops }
+    image: recruitops-ops:local
     <<: *api-env
     command: ["scheduler"]
     depends_on:

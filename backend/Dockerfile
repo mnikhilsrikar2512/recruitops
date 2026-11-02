@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1.7
 # RecruitOps API. Build from the repo root:
 #   docker build -f backend/Dockerfile -t recruitops-api .
-# The same image runs the API (default), migrations (scripts/migrate.py) and
-# the scheduled jobs (scripts/scheduler.py).
+#   docker build -f backend/Dockerfile --target ops -t recruitops-ops .
+# The runtime image runs the API (default) and migrations (scripts/migrate.py).
+# The ops image adds sqlpackage and runs the scheduler, backups and restore
+# drills (scripts/scheduler.py, backup_db.py, restore_drill.py).
 
 FROM python:3.12-slim-bookworm AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -77,3 +79,27 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
   CMD python -c "import os,urllib.request,sys; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"8000\")}/livez', timeout=2); sys.exit(0)" || exit 1
 ENTRYPOINT ["/app/backend/docker/entrypoint.sh"]
 CMD ["api"]
+
+# ---- ops: runtime + sqlpackage (portable .bacpac export/import) --------------
+FROM runtime AS ops
+ARG SQLPACKAGE_URL=https://aka.ms/sqlpackage-linux
+USER root
+RUN --mount=type=secret,id=build_ca,required=false set -eux; \
+    if [ -s /run/secrets/build_ca ]; then \
+      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/build_ca > /tmp/build-ca.pem; \
+      export CURL_CA_BUNDLE=/tmp/build-ca.pem; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl unzip libicu72; \
+    curl -fsSL -o /tmp/sqlpackage.zip "$SQLPACKAGE_URL"; \
+    mkdir -p /opt/sqlpackage; unzip -q /tmp/sqlpackage.zip -d /opt/sqlpackage; chmod +x /opt/sqlpackage/sqlpackage; \
+    ln -s /opt/sqlpackage/sqlpackage /usr/local/bin/sqlpackage; \
+    apt-get purge -y --auto-remove curl unzip; \
+    rm -rf /var/lib/apt/lists/* /tmp/sqlpackage.zip /tmp/build-ca.pem; \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 sqlpackage /version
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 \
+    HOME=/tmp
+USER app
+CMD ["scheduler"]
+

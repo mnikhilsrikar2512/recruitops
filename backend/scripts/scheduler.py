@@ -23,6 +23,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
 import time
@@ -73,6 +74,45 @@ def job_housekeeping(engine) -> dict:
     return removed
 
 
+def job_db_backup(engine) -> dict:
+    """Nightly portable .bacpac to the object store (needs the ops image)."""
+    from backup_db import run_backup
+
+    return run_backup()
+
+
+def job_restore_drill(engine) -> dict:
+    """Monthly: restore the newest backup into a scratch DB and verify it."""
+    from restore_drill import run_drill
+
+    report = run_drill()
+    if report["result"] != "PASS":
+        raise RuntimeError(f"restore drill failed: {report.get('report_key') or report}")
+    return {k: report.get(k) for k in ("result", "backup", "restore_time_minutes", "tables", "rows", "report_key")}
+
+
+def job_audit_retention(engine) -> dict:
+    """Off unless AUDIT_RETENTION_DAYS is set (an owner decision: how long the
+    audit trail is kept). Deletes in batches; rows on the privacy hold are
+    already outside dbo.audit_logs."""
+    from sqlalchemy import text
+
+    days = int(os.environ.get("AUDIT_RETENTION_DAYS", "0"))
+    if days <= 0:
+        return {"skipped": "AUDIT_RETENTION_DAYS not set: audit logs are kept indefinitely"}
+    if days < 365:
+        raise RuntimeError("AUDIT_RETENTION_DAYS below 365 is refused; keep at least a year of audit history")
+    removed = 0
+    while True:
+        with engine.begin() as connection:
+            batch = connection.execute(text(
+                "DELETE TOP (5000) FROM dbo.audit_logs WHERE created_at < DATEADD(day, -:d, SYSUTCDATETIME())"),
+                {"d": days}).rowcount or 0
+        removed += batch
+        if batch < 5000:
+            return {"audit_rows_removed": removed, "older_than_days": days}
+
+
 def job_mfa_rewrap(engine) -> dict:
     """After a key rotation, re-encrypts seeds still under an older key."""
     from encrypt_mfa_secrets import rewrap_all
@@ -86,14 +126,21 @@ class Job:
     run: Callable[[object], dict]
     every: timedelta | None = None   # fixed interval ...
     daily_at: tuple[int, int] | None = None  # ... or once a day at (hour, minute) UTC
+    monthly_on: int | None = None    # with daily_at: only on this day of the month
     description: str = ""
+    needs_ops_image: bool = False    # sqlpackage
 
     def next_after(self, moment: datetime) -> datetime:
         if self.every is not None:
             return moment + self.every
         hour, minute = self.daily_at or (0, 0)
         candidate = moment.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        return candidate if candidate > moment else candidate + timedelta(days=1)
+        if candidate <= moment:
+            candidate += timedelta(days=1)
+        if self.monthly_on is not None:
+            while candidate.day != self.monthly_on:
+                candidate += timedelta(days=1)
+        return candidate
 
 
 JOBS: dict[str, Job] = {job.name: job for job in (
@@ -105,6 +152,12 @@ JOBS: dict[str, Job] = {job.name: job for job in (
         description="old upload idempotency keys and long-expired reset links (daily)"),
     Job("mfa_rewrap", job_mfa_rewrap, daily_at=(21, 30),
         description="re-wrap two-step seeds after a key rotation (daily; no-op otherwise)"),
+    Job("audit_retention", job_audit_retention, daily_at=(21, 45),
+        description="delete audit rows older than AUDIT_RETENTION_DAYS (off unless set)"),
+    Job("db_backup", job_db_backup, daily_at=(20, 30), needs_ops_image=True,
+        description="portable .bacpac backup to the object store (daily 02:00 IST)"),
+    Job("restore_drill", job_restore_drill, daily_at=(22, 30), monthly_on=1, needs_ops_image=True,
+        description="restore the newest backup into a scratch DB and verify it (monthly, 1st, 04:00 IST)"),
 )}
 
 
@@ -213,7 +266,12 @@ def main() -> None:
         return
     if opts.run_once:
         raise SystemExit(0 if run_job(JOBS[opts.run_once]) else 1)
-    loop([JOBS[name] for name in (opts.only or JOBS)])
+    names = opts.only or [name for name, job in JOBS.items()
+                          if not job.needs_ops_image or shutil.which("sqlpackage")]
+    skipped = sorted(set(JOBS) - set(names))
+    if skipped and not opts.only:
+        logger.warning("sqlpackage not found (not the ops image): not scheduling %s", ", ".join(skipped))
+    loop([JOBS[name] for name in names])
 
 
 if __name__ == "__main__":

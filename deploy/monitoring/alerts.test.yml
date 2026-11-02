@@ -1,0 +1,40 @@
+# promtool test rules deploy/monitoring/alerts.test.yml
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'recruitops_http_requests_total{status_class="2xx",method="GET",route="/api/v1/candidates/"}'
+        values: '0+90x70'
+      - series: 'recruitops_http_requests_total{status_class="5xx",method="GET",route="/api/v1/candidates/"}'
+        values: '0+10x70'
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: RecruitOpsErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "API 5xx rate 10%: the monthly error budget burns in ~2 days"
+              runbook: docs/runbooks/monitoring.md#errors
+  - interval: 1m
+    input_series:
+      - series: 'recruitops_emails_total{result="failed"}'
+        values: '0+1x40'
+      - series: 'recruitops_emails_total{result="sent"}'
+        values: '5x40'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: RecruitOpsEmailFailing
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "Every email in the last 30 minutes failed: sign-up, invites and password resets are stuck"
+              runbook: docs/runbooks/monitoring.md#email
+  - interval: 1m
+    input_series:
+      - series: 'recruitops_http_requests_total{status_class="2xx",method="GET",route="/x"}'
+        values: '0+100x70'
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: RecruitOpsErrorBudgetFastBurn
+        exp_alerts: []
