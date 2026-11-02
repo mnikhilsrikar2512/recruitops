@@ -48,6 +48,7 @@ def smtp_transport_kwargs() -> dict[str, Any]:
         "use_tls": implicit_tls,
         "start_tls": False if implicit_tls else bool(settings.smtp_use_tls),
         "timeout": settings.smtp_timeout_seconds,
+        "validate_certs": bool(settings.smtp_validate_certs),
     }
 
 

@@ -130,3 +130,67 @@ def test_sentry_scrubber_drops_bodies_cookies_and_secrets():
     assert "data" not in out["request"] and "cookies" not in out["request"] and "query_string" not in out["request"]
     assert out["request"]["headers"]["Authorization"] == "[scrubbed]" and out["request"]["headers"]["Accept"] == "json"
     assert "user" not in out
+
+
+def test_route_labels_are_full_templates_even_in_nested_routers(monkeypatch):
+    monkeypatch.setattr(settings, "metrics_token", "")
+    application = create_application()
+    inner = APIRouter()
+
+    @inner.get("/{widget_id}/parts/{part_id}")
+    def read_part(widget_id: int, part_id: int):
+        return {}
+
+    outer = APIRouter()
+    outer.include_router(inner, prefix="/widgets")
+    application.include_router(outer, prefix="/__nest")
+    client = TestClient(application)
+    client.get("/__nest/widgets/7/parts/7")
+    client.get("/__nothing/here")
+    body = client.get("/metrics").text
+    assert 'route="/__nest/widgets/{widget_id}/parts/{part_id}"' in body
+    assert 'route="<unmatched>"' in body and "/__nothing" not in body
+
+
+def test_identity_bound_in_a_worker_thread_reaches_the_access_log(monkeypatch, caplog):
+    application = create_application()
+    from fastapi import Depends
+
+    def fake_auth():
+        obs.bind_identity(41, 9)  # runs in a threadpool, like get_current_auth_context
+        return True
+
+    who = APIRouter()
+
+    @who.get("/__who")
+    def endpoint(_=Depends(fake_auth)):
+        return {}
+
+    application.include_router(who)
+    with caplog.at_level(logging.INFO, logger="recruitops.access"):
+        TestClient(application).get("/__who")
+    record = [r for r in caplog.records if r.name == "recruitops.access"][-1]
+    obs.ContextFilter()  # the filter runs on the handler; emulate what it sees at log time
+    assert getattr(record, "user_id", None) == 41 and getattr(record, "tenant_id", None) == 9
+
+
+def test_metrics_add_up_across_worker_processes(tmp_path, monkeypatch):
+    """With PROMETHEUS_MULTIPROC_DIR set, a scrape sums every worker's files."""
+    import subprocess
+    import sys
+    import textwrap
+
+    code = textwrap.dedent("""
+        from app.core import observability as obs
+        m = obs._get_metrics()
+        m["requests"].labels("GET", "/x", "2xx").inc()
+    """)
+    env = {**__import__("os").environ, "PROMETHEUS_MULTIPROC_DIR": str(tmp_path)}
+    for _ in range(2):  # two separate "workers"
+        subprocess.run([sys.executable, "-c", code], check=True, env=env,
+                       cwd=str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+    monkeypatch.setenv("PROMETHEUS_MULTIPROC_DIR", str(tmp_path))
+    monkeypatch.setattr(obs, "_metrics", None)
+    body, _ = obs.metrics_payload()
+    monkeypatch.setattr(obs, "_metrics", None)
+    assert b'recruitops_http_requests_total{method="GET",route="/x",status_class="2xx"} 2.0' in body

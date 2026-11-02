@@ -40,3 +40,6 @@ frontend/node_modules/
 _claude_scratch.tar.gz
 fe_sync.tar.gz
 _claude_review_scratch.tgz
+
+# Local compose stack secrets (deploy/compose/gen_secrets.py)
+deploy/compose/staging.env

@@ -1,0 +1,87 @@
+# RecruitOps web tier: serves the static frontend and proxies /api to the API
+# containers. TLS terminates at the load balancer in front of this; the
+# original scheme arrives in X-Forwarded-Proto and is passed on to the API.
+# ${API_UPSTREAM} is filled in at container start (host:port).
+
+map $http_x_forwarded_proto $ro_forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+map $ro_forwarded_proto $ro_hsts {
+    https   "max-age=31536000; includeSubDomains";
+    default "";
+}
+# Keep the load balancer's request id when it sends one, otherwise make one.
+map $http_x_request_id $ro_request_id {
+    default $http_x_request_id;
+    ""      $request_id;
+}
+
+log_format ro_json escape=json
+  '{"ts":"$time_iso8601","level":"INFO","logger":"nginx.access","request_id":"$ro_request_id",'
+  '"http_method":"$request_method","path":"$uri","status":$status,"bytes":$body_bytes_sent,'
+  '"duration_ms":$request_time,"upstream_ms":"$upstream_response_time","ua":"$http_user_agent"}';
+
+upstream recruitops_api {
+    server ${API_UPSTREAM};
+    keepalive 32;
+}
+
+server {
+    listen 8080;
+    server_name _;
+    server_tokens off;
+    root /usr/share/nginx/html;
+    access_log /dev/stdout ro_json;
+    # Uploads are capped at 10 MB by the API; leave room for multipart overhead.
+    client_max_body_size 12m;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /api/ {
+        proxy_pass http://recruitops_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $ro_forwarded_proto;
+        proxy_set_header X-Request-ID $ro_request_id;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_request_buffering on;
+        # The API sets its own security headers on every response.
+    }
+
+    # Versioned assets (?v=<hash> on every link, scripts/stamp_assets.py): cache for a year.
+    location ^~ /shared/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # Pages: /, /pages/x.html, and the short forms /x and /x.html (same rules as frontend/server.js).
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        add_header X-Request-ID $ro_request_id always;
+        try_files $uri $uri/index.html /pages$uri /pages$uri.html =404;
+    }
+
+    location ~ /\. { deny all; return 404; }
+
+    error_page 404 /pages/not-found.html;
+    location = /pages/not-found.html {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        internal;
+    }
+}

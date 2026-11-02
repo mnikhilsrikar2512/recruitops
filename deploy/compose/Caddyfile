@@ -1,0 +1,14 @@
+# Local stand-in for the cloud load balancer: terminates TLS with a
+# self-signed certificate and forwards to the web tier, exactly like the
+# production LB does (X-Forwarded-For / X-Forwarded-Proto set by Caddy).
+{
+	local_certs
+	skip_install_trust
+	admin off
+}
+
+https://localhost:8443 {
+	tls internal
+	encode gzip
+	reverse_proxy web:8080
+}

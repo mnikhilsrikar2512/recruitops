@@ -36,6 +36,10 @@ from app.core.config import settings
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 user_id_var: ContextVar[int | None] = ContextVar("user_id", default=None)
 tenant_id_var: ContextVar[int | None] = ContextVar("tenant_id", default=None)
+# One mutable dict per request. FastAPI runs sync dependencies and endpoints
+# in worker threads with a *copy* of the context, so a ContextVar.set() made
+# there never reaches the middleware; mutating this shared dict does.
+_identity_var: ContextVar[dict | None] = ContextVar("identity", default=None)
 
 REQUEST_ID_HEADER = "X-Request-ID"
 _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
@@ -53,6 +57,14 @@ def bind_identity(user_id: int | None, tenant_id: int | None) -> None:
     """Called once authentication resolves the caller."""
     user_id_var.set(user_id)
     tenant_id_var.set(tenant_id)
+    identity = _identity_var.get()
+    if identity is not None:
+        identity["user_id"], identity["tenant_id"] = user_id, tenant_id
+
+
+def _current_identity() -> tuple[int | None, int | None]:
+    identity = _identity_var.get() or {}
+    return (identity.get("user_id", user_id_var.get()), identity.get("tenant_id", tenant_id_var.get()))
 
 
 # ---- logging -------------------------------------------------------------------
@@ -60,8 +72,7 @@ def bind_identity(user_id: int | None, tenant_id: int | None) -> None:
 class ContextFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_var.get()
-        record.user_id = user_id_var.get()
-        record.tenant_id = tenant_id_var.get()
+        record.user_id, record.tenant_id = _current_identity()
         return True
 
 
@@ -128,6 +139,15 @@ def configure_logging() -> None:
 _metrics: dict[str, Any] | None = None
 
 
+def _multiprocess_dir() -> str | None:
+    """Set (PROMETHEUS_MULTIPROC_DIR) when several worker processes serve the
+    API: each writes its numbers to files there and a scrape adds them up."""
+    import os
+
+    path = os.environ.get("PROMETHEUS_MULTIPROC_DIR", "")
+    return path if path and os.path.isdir(path) else None
+
+
 def _get_metrics() -> dict[str, Any] | None:
     global _metrics
     if _metrics is not None:
@@ -136,7 +156,9 @@ def _get_metrics() -> dict[str, Any] | None:
         from prometheus_client import CollectorRegistry, Counter, Histogram
     except ImportError:  # optional in dev
         return None
-    registry = CollectorRegistry(auto_describe=True)
+    # In multiprocess mode values live in shared files; registering in a
+    # per-process registry would only ever show this worker's share.
+    registry = None if _multiprocess_dir() else CollectorRegistry(auto_describe=True)
     _metrics = {
         "registry": registry,
         "requests": Counter("recruitops_http_requests_total", "HTTP requests",
@@ -159,16 +181,36 @@ def metrics_payload() -> tuple[bytes, str]:
     m = _get_metrics()
     if not m:
         return b"# prometheus_client not installed\n", "text/plain; charset=utf-8"
-    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 
+    if m["registry"] is None:
+        from prometheus_client import multiprocess
+
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry), CONTENT_TYPE_LATEST
     return generate_latest(m["registry"]), CONTENT_TYPE_LATEST
 
 
 # ---- middleware ----------------------------------------------------------------
 
 def _route_template(scope: dict) -> str:
-    route = scope.get("route")
-    return getattr(route, "path", None) or UNMATCHED_ROUTE
+    """The full path with matched parameters named, e.g.
+    /api/v1/candidates/{candidate_id}/upload. Built from the request because
+    nested routers only know their own part of the path. Unmatched requests
+    (404s, scanners) collapse into one label so metrics stay small."""
+    if scope.get("route") is None:
+        return UNMATCHED_ROUTE
+    params = scope.get("path_params") or {}
+    segments = scope.get("path", "").split("/")
+    remaining = {name: str(value) for name, value in params.items()}
+    for index, segment in enumerate(segments):
+        for name, value in list(remaining.items()):
+            if segment == value:
+                segments[index] = "{" + name + "}"
+                del remaining[name]
+                break
+    return "/".join(segments) or "/"
 
 
 class RequestContextMiddleware:
@@ -188,7 +230,8 @@ class RequestContextMiddleware:
                 incoming = value.decode("latin-1")
                 break
         request_id = incoming if incoming and _VALID_REQUEST_ID.match(incoming) else uuid.uuid4().hex
-        tokens = (request_id_var.set(request_id), user_id_var.set(None), tenant_id_var.set(None))
+        tokens = (request_id_var.set(request_id), user_id_var.set(None), tenant_id_var.set(None),
+                  _identity_var.set({}))
         scope.setdefault("state", {})["request_id"] = request_id
         started = time.perf_counter()
         status_holder = {"status": 500}
@@ -217,7 +260,7 @@ class RequestContextMiddleware:
                 access_logger.log(level, "%s %s %s %.1fms", scope.get("method"), route, status_code, elapsed * 1000,
                                   extra={"http_method": scope.get("method"), "route": route, "status": status_code,
                                          "duration_ms": round(elapsed * 1000, 1)})
-            for var, token in zip((request_id_var, user_id_var, tenant_id_var), tokens):
+            for var, token in zip((request_id_var, user_id_var, tenant_id_var, _identity_var), tokens):
                 var.reset(token)
 
 
@@ -238,8 +281,9 @@ def _scrub(event: dict, _hint: dict) -> dict:
     tags = event.setdefault("tags", {})
     if request_id_var.get():
         tags["request_id"] = request_id_var.get()
-    if tenant_id_var.get() is not None:
-        tags["tenant_id"] = str(tenant_id_var.get())
+    tenant_id = _current_identity()[1]
+    if tenant_id is not None:
+        tags["tenant_id"] = str(tenant_id)
     event.pop("user", None)
     return event
 
