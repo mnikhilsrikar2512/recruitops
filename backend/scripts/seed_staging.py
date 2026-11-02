@@ -106,9 +106,8 @@ def ensure_company(engine, tenant: dict) -> tuple[int, str, int]:
     """Create the company (dbo.tenants), its head office, and its company
     admin (shared system Admin role, decision D-03 control plane).
 
-    The office is mirrored into dbo.locations with the SAME id: the codebase
-    treats branch id == location id and several FKs (approvals, clients,
-    users, …) reference dbo.locations. Returns (office id, admin email,
+    The office is one dbo.branches row (dbo.locations is a read-only view of
+    it since migration 033). Returns (office id, admin email,
     admin user id)."""
     from app.core.security import hash_password  # noqa: PLC0415
 
@@ -137,20 +136,6 @@ def ensure_company(engine, tenant: dict) -> tuple[int, str, int]:
             ),
             {"code": tenant["code"], "name": tenant["branch"], "city": tenant["city"], "tenant_id": tenant_id},
         ).scalar_one()
-        connection.execute(
-            text(
-                """
-                IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
-                BEGIN
-                    SET IDENTITY_INSERT dbo.locations ON;
-                    INSERT INTO dbo.locations (id, name, code, location, city, status, tenant_id)
-                    VALUES (:id, :name, :code, :city, :city, N'active', :tenant_id);
-                    SET IDENTITY_INSERT dbo.locations OFF;
-                END
-                """
-            ),
-            {"id": branch_id, "code": tenant["code"], "name": tenant["branch"], "city": tenant["city"], "tenant_id": tenant_id},
-        )
         admin_role = connection.execute(
             text("SELECT id FROM dbo.roles WHERE code = N'admin' AND tenant_id IS NULL")
         ).scalar_one()

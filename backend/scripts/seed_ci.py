@@ -169,31 +169,6 @@ def main() -> None:
             {"tenant_id": tenant_id},
         ).scalar_one()
 
-        # Mirror into dbo.locations for consumers that read the locations
-        # table -- forcing the SAME id as the branches row (the same
-        # IDENTITY_INSERT pattern app/services/provisioning.py uses), not a
-        # plain INSERT that gets its own auto-generated id. A plain INSERT
-        # only happens to line up with location_id on an empty database
-        # where both tables' IDENTITY counters start at 1 in lockstep; on
-        # any database that already has other tenants' rows in either
-        # table, the ids diverge and every dbo.users.location_id insert
-        # using this branch id fails FK_users_location, exactly as it did
-        # against this local database.
-        connection.execute(
-            text(
-                """
-                IF NOT EXISTS (SELECT 1 FROM dbo.locations WHERE id = :id)
-                BEGIN
-                    SET IDENTITY_INSERT dbo.locations ON;
-                    INSERT INTO dbo.locations (id, name, code, location, status, tenant_id)
-                    VALUES (:id, N'Head Office', N'HO', N'Head Office', N'active', :tenant_id);
-                    SET IDENTITY_INSERT dbo.locations OFF;
-                END
-                """
-            ),
-            {"id": location_id, "tenant_id": tenant_id},
-        )
-
         # Permission catalog (id is IDENTITY — no explicit ids)
         for code, module_name, action_name in PERMISSIONS:
             connection.execute(
